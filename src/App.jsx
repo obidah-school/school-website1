@@ -48,6 +48,8 @@ const DEFAULT_WEEK = {
   ]
 };
 
+const ATTENDANCE_STATUS = ["حاضر", "متأخر", "غائب"];
+const PERIODS = ["الأولى","الثانية","الثالثة","الرابعة","الخامسة","السادسة","السابعة"];
 const ABSENCE_TYPES = ["حاضر", "اضطراري", "مرضي", "اعتيادي"];
 const FARES_OPTIONS = ["—", "نعم ✓", "لا ✗"];
 
@@ -272,7 +274,7 @@ function RichEditor({ value, onChange }) {
   );
 }
 
-function LoginPage({ users, onLogin, siteFont, onParentPortal }) {
+function LoginPage({ users, onLogin, siteFont, onParentPortal, onTeacherPortal }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -312,6 +314,11 @@ function LoginPage({ users, onLogin, siteFont, onParentPortal }) {
             <button onClick={handleLogin} className="w-full py-3 rounded-xl bg-gradient-to-l from-teal-500 to-emerald-600 text-white font-bold hover:shadow-lg transition-all">دخول — الإدارة</button>
           </div>
           <div className="mt-4 pt-4 border-t border-gray-100">
+            <button onClick={onTeacherPortal}
+              className="w-full py-3 rounded-xl font-bold hover:shadow-lg transition-all text-sm text-white mb-2"
+              style={{ background: "linear-gradient(135deg, #1e3a5f, #2563eb)" }}>
+              👨‍🏫 بوابة المعلم — إدخال مستويات الطلاب
+            </button>
             <button onClick={onParentPortal}
               className="w-full py-3 rounded-xl bg-gradient-to-l from-blue-500 to-indigo-600 text-white font-bold hover:shadow-lg transition-all text-sm">
               👨‍👦 بوابة أولياء الأمور — متابعة مستوى الطالب
@@ -421,136 +428,430 @@ function HomePage({ teachers, announcements, activities, navigate }) {
   );
 }
 
-function AttendancePage({ teachers, week, attendance, setAttendance, saveAttendance }) {
+function AttendancePage({ teachers, setTeachers, saveTeachers, week, attendance, setAttendance, saveAttendance }) {
   const [selectedDay, setSelectedDay] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
   const [showSummary, setShowSummary] = useState(false);
+  const [showExcelImport, setShowExcelImport] = useState(false);
 
+  // تحديث حقل في سجل الحضور
   const updateField = (ti, di, field, value) => {
     setAttendance(prev => {
       const next = { ...prev, [ti]: { ...prev[ti], [di]: { ...(prev[ti]?.[di] || {}), [field]: value } } };
-      if (field === "type" && value === "حاضر") next[ti][di].fares = "—";
+      // إذا تغير الحالة لـ"حاضر" امسح البيانات الأخرى
+      if (field === "status" && value === "حاضر") {
+        next[ti][di] = { status: "حاضر" };
+      }
+      // إذا تغير لـ"غائب" امسح بيانات التأخر
+      if (field === "status" && value === "غائب") {
+        next[ti][di] = { status: "غائب", absType: next[ti][di]?.absType || "اضطراري", notes: next[ti][di]?.notes || "" };
+      }
       return next;
     });
   };
 
-  useEffect(() => { const t = setTimeout(() => saveAttendance(attendance), 600); return () => clearTimeout(t); }, [attendance]);
+  useEffect(() => { const t = setTimeout(() => saveAttendance(attendance), 700); return () => clearTimeout(t); }, [attendance]);
 
-  const cnt = (di, type) => teachers.filter((_, ti) => attendance[ti]?.[di]?.type === type).length;
-  const totalAbs = (di) => teachers.filter((_, ti) => attendance[ti]?.[di]?.type && attendance[ti][di].type !== "حاضر").length;
+  // إحصائيات
+  const countStatus = (di, st) => teachers.filter((_, ti) => (attendance[ti]?.[di]?.status || "حاضر") === st).length;
+  const countLate = (di) => countStatus(di, "متأخر");
+  const countAbsent = (di) => countStatus(di, "غائب");
+  const countPresent = (di) => teachers.length - countLate(di) - countAbsent(di);
   const filtered = teachers.map((t, i) => ({ name: t, idx: i })).filter(t => t.name.includes(searchQuery));
 
+  // استيراد المعلمين من إكسل
+  const handleTeacherImport = async (file) => {
+    if (!window.XLSX) {
+      await new Promise((res, rej) => {
+        const s = document.createElement("script");
+        s.src = "https://unpkg.com/xlsx/dist/xlsx.full.min.js";
+        s.onload = res; s.onerror = rej;
+        document.head.appendChild(s);
+      });
+    }
+    const buf = await file.arrayBuffer();
+    const wb = window.XLSX.read(buf);
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const data = window.XLSX.utils.sheet_to_json(ws, { header: 1 });
+    const names = data.flat().map(c => String(c||"").trim()).filter(c => c.length > 3 && isNaN(c));
+    if (names.length > 0) {
+      const merged = [...new Set([...teachers, ...names])];
+      setTeachers(merged);
+      saveTeachers(merged);
+      alert(`✅ تم إضافة ${names.length} اسم. الإجمالي الآن: ${merged.length}`);
+    }
+    setShowExcelImport(false);
+  };
+
+  // طباعة اليومي
   const handlePrint = () => {
+    const day = week.days[selectedDay];
     const w = window.open("", "_blank");
-    w.document.write(`<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8"><title>سجل غياب المعلمين</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Noto Sans Arabic',sans-serif;padding:20px;direction:rtl;font-size:12px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:6px;text-align:center;font-size:11px}th{background:#0d9488;color:white}.absent{background:#fef2f2!important}</style></head><body>`);
-    w.document.write(`<div style="text-align:center;margin-bottom:20px"><h1>مدرسة عبيدة بن الحارث المتوسطة</h1><p>${week.days[selectedDay].name} — ${week.days[selectedDay].dateH} هـ</p></div>`);
-    w.document.write(`<table><thead><tr><th>م</th><th>اسم المعلم</th><th>نوع الغياب</th><th>فارس</th><th>ملاحظات</th></tr></thead><tbody>`);
-    teachers.forEach((t, ti) => {
+    const rows = teachers.map((t, ti) => {
       const r = attendance[ti]?.[selectedDay] || {};
-      const isAbs = r.type && r.type !== "حاضر";
-      w.document.write(`<tr class="${isAbs?'absent':''}"><td>${ti+1}</td><td>${t}</td><td>${r.type||'حاضر'}</td><td>${isAbs?(r.fares||'—'):'—'}</td><td>${r.notes||'—'}</td></tr>`);
-    });
-    w.document.write(`</tbody></table></body></html>`);
+      const st = r.status || "حاضر";
+      let details = "—";
+      if (st === "متأخر") {
+        const periods = (r.latePeriods || []).join("، ");
+        details = `تأخر ${r.lateMinutes || "—"} دقيقة — من الحصة: ${periods || "—"}`;
+      } else if (st === "غائب") {
+        details = `${r.absType || "اضطراري"} — ${r.notes || ""}`;
+      }
+      const color = st === "حاضر" ? "#f0fdf4" : st === "متأخر" ? "#fffbeb" : "#fef2f2";
+      return `<tr style="background:${color}"><td>${ti+1}</td><td style="text-align:right;padding:6px 10px">${t}</td><td>${st === "حاضر" ? "✅ حاضر" : st === "متأخر" ? "🕐 متأخر" : "❌ غائب"}</td><td>${details}</td></tr>`;
+    }).join("");
+
+    w.document.write(`<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8">
+    <title>سجل الحضور — ${day.name}</title>
+    <style>
+      *{margin:0;padding:0;box-sizing:border-box}
+      body{font-family:'Noto Sans Arabic',Arial,sans-serif;padding:24px;direction:rtl;background:#fff;color:#111}
+      .header{text-align:center;margin-bottom:20px;padding-bottom:12px;border-bottom:3px solid #0d9488}
+      .header h1{font-size:20px;color:#0d9488;font-weight:900}
+      .header p{font-size:13px;color:#555;margin-top:4px}
+      .stats{display:flex;gap:12px;margin-bottom:16px;justify-content:center}
+      .stat{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:8px 20px;text-align:center}
+      .stat.late{background:#fffbeb;border-color:#fde68a}
+      .stat.abs{background:#fef2f2;border-color:#fecaca}
+      .stat span{display:block;font-size:22px;font-weight:900}
+      .stat small{font-size:11px;color:#555}
+      table{width:100%;border-collapse:collapse;font-size:12px}
+      th{background:#0d9488;color:#fff;padding:8px;text-align:center}
+      td{border:1px solid #e5e7eb;padding:6px;text-align:center}
+      .footer{text-align:center;margin-top:20px;font-size:11px;color:#999}
+      @media print{@page{size:A4;margin:1.5cm}}
+    </style></head><body>
+    <div class="header">
+      <h1>مدرسة عبيدة بن الحارث المتوسطة</h1>
+      <p>سجل الحضور والغياب — ${day.name} | ${day.dateH} هـ | ${day.dateM} م</p>
+    </div>
+    <div class="stats">
+      <div class="stat"><span>${countPresent(selectedDay)}</span><small>✅ حاضر</small></div>
+      <div class="stat late"><span>${countLate(selectedDay)}</span><small>🕐 متأخر</small></div>
+      <div class="stat abs"><span>${countAbsent(selectedDay)}</span><small>❌ غائب</small></div>
+    </div>
+    <table>
+      <thead><tr><th>م</th><th>اسم المعلم / الإداري</th><th>الحالة</th><th>التفاصيل</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div class="footer">تم الإصدار بتاريخ ${new Date().toLocaleDateString('ar-SA')} — بوابة مدرسة عبيدة بن الحارث الإلكترونية</div>
+    </body></html>`);
     w.document.close();
-    setTimeout(() => w.print(), 300);
+    setTimeout(() => w.print(), 400);
+  };
+
+  // طباعة ملخص الأسبوع
+  const handlePrintSummary = () => {
+    const w = window.open("", "_blank");
+    const rows = teachers.map((t, ti) => {
+      const lateCount = week.days.filter((_, di) => (attendance[ti]?.[di]?.status || "حاضر") === "متأخر").length;
+      const absCount = week.days.filter((_, di) => (attendance[ti]?.[di]?.status || "حاضر") === "غائب").length;
+      const totalLateMin = week.days.reduce((sum, _, di) => {
+        if ((attendance[ti]?.[di]?.status || "") === "متأخر") return sum + (parseInt(attendance[ti]?.[di]?.lateMinutes) || 0);
+        return sum;
+      }, 0);
+      const color = absCount > 0 ? "#fef2f2" : lateCount > 0 ? "#fffbeb" : "#fff";
+      return `<tr style="background:${color}"><td>${ti+1}</td><td style="text-align:right;padding:6px 10px">${t}</td>
+        ${week.days.map((_, di) => {
+          const st = attendance[ti]?.[di]?.status || "حاضر";
+          return `<td>${st === "حاضر" ? "✅" : st === "متأخر" ? `🕐${attendance[ti]?.[di]?.lateMinutes||""}د` : "❌"}</td>`;
+        }).join("")}
+        <td style="color:#d97706;font-weight:bold">${lateCount||"—"}</td>
+        <td style="color:#dc2626;font-weight:bold">${totalLateMin > 0 ? totalLateMin + " د" : "—"}</td>
+        <td style="color:#dc2626;font-weight:bold">${absCount||"—"}</td></tr>`;
+    }).join("");
+
+    w.document.write(`<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8"><title>ملخص الأسبوع</title>
+    <style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Noto Sans Arabic',Arial,sans-serif;padding:24px;direction:rtl}
+    .header{text-align:center;margin-bottom:16px;padding-bottom:10px;border-bottom:3px solid #7c3aed}
+    .header h1{font-size:18px;color:#7c3aed;font-weight:900}.header p{font-size:12px;color:#555;margin-top:3px}
+    table{width:100%;border-collapse:collapse;font-size:11px}
+    th{background:#7c3aed;color:#fff;padding:7px;text-align:center}
+    td{border:1px solid #e5e7eb;padding:5px;text-align:center}
+    @media print{@page{size:A4 landscape;margin:1cm}}</style></head><body>
+    <div class="header"><h1>مدرسة عبيدة بن الحارث المتوسطة</h1>
+    <p>ملخص الحضور والغياب الأسبوعي — ${week.days[0]?.dateH} إلى ${week.days[week.days.length-1]?.dateH} هـ</p></div>
+    <table><thead><tr><th>م</th><th>اسم المعلم</th>
+    ${week.days.map(d => `<th>${d.name}</th>`).join("")}
+    <th>عدد التأخر</th><th>مجموع دقائق التأخر</th><th>عدد الغياب</th></tr></thead>
+    <tbody>${rows}</tbody></table>
+    <div style="text-align:center;margin-top:16px;font-size:10px;color:#999">تم الإصدار بتاريخ ${new Date().toLocaleDateString('ar-SA')}</div>
+    </body></html>`);
+    w.document.close();
+    setTimeout(() => w.print(), 400);
   };
 
   return (
-    <div>
-      <div className="text-center mb-5">
-        <h2 className="text-2xl font-black text-teal-900 mb-1">سجل متابعة غياب المعلمين</h2>
-        <div className="flex justify-center gap-2 mt-3">
-          <button onClick={handlePrint} className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-xl text-xs font-bold">🖨️ طباعة</button>
-          <div className="bg-green-50 text-green-700 px-3 py-2 rounded-xl text-xs font-bold">💾 الحفظ تلقائي</div>
+    <div dir="rtl">
+      {/* العنوان */}
+      <div className="rounded-3xl p-6 mb-5 text-white shadow-xl"
+        style={{ background: "linear-gradient(135deg, #0d9488 0%, #065f46 100%)" }}>
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="text-center sm:text-right">
+            <div className="text-4xl mb-1">📋</div>
+            <h2 className="text-2xl font-black">سجل الحضور والغياب</h2>
+            <p className="opacity-80 text-sm mt-1">مدرسة عبيدة بن الحارث المتوسطة — ١٤٤٧هـ</p>
+          </div>
+          <div className="flex gap-2 flex-wrap justify-center">
+            <button onClick={handlePrint}
+              className="bg-white text-teal-700 px-4 py-2 rounded-xl text-sm font-bold hover:bg-teal-50 flex items-center gap-1 shadow">
+              🖨️ طباعة اليوم
+            </button>
+            <button onClick={() => { setShowSummary(true); }}
+              className="bg-white text-purple-700 px-4 py-2 rounded-xl text-sm font-bold hover:bg-purple-50 flex items-center gap-1 shadow">
+              📊 ملخص الأسبوع
+            </button>
+            <button onClick={() => setShowExcelImport(true)}
+              className="bg-white text-green-700 px-4 py-2 rounded-xl text-sm font-bold hover:bg-green-50 flex items-center gap-1 shadow">
+              📥 إضافة من إكسل
+            </button>
+            <div className="bg-white bg-opacity-20 px-3 py-2 rounded-xl text-xs font-bold">💾 حفظ تلقائي</div>
+          </div>
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-3 mb-5 sm:grid-cols-4">
-        <StatCard icon="👨‍🏫" label="إجمالي المعلمين" value={teachers.length} color="bg-white" />
-        <StatCard icon="✅" label="حاضرون اليوم" value={teachers.length - totalAbs(selectedDay)} color="bg-emerald-50" />
-        <StatCard icon="🏥" label="غياب مرضي" value={cnt(selectedDay, "مرضي")} color="bg-rose-50" />
-        <StatCard icon="📋" label="غياب اضطراري" value={cnt(selectedDay, "اضطراري")} color="bg-amber-50" />
-      </div>
-      <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
+
+      {/* إحصائيات اليوم */}
+      {!showSummary && (
+        <div className="grid grid-cols-3 gap-3 mb-5">
+          <div className="bg-emerald-50 border-2 border-emerald-200 rounded-2xl p-4 text-center">
+            <div className="text-3xl font-black text-emerald-700">{countPresent(selectedDay)}</div>
+            <div className="text-sm font-bold text-emerald-600 mt-1">✅ حاضر</div>
+          </div>
+          <div className="bg-amber-50 border-2 border-amber-200 rounded-2xl p-4 text-center">
+            <div className="text-3xl font-black text-amber-700">{countLate(selectedDay)}</div>
+            <div className="text-sm font-bold text-amber-600 mt-1">🕐 متأخر</div>
+          </div>
+          <div className="bg-red-50 border-2 border-red-200 rounded-2xl p-4 text-center">
+            <div className="text-3xl font-black text-red-700">{countAbsent(selectedDay)}</div>
+            <div className="text-sm font-bold text-red-600 mt-1">❌ غائب</div>
+          </div>
+        </div>
+      )}
+
+      {/* أيام الأسبوع */}
+      <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
         {week.days.map((day, i) => (
           <button key={i} onClick={() => { setSelectedDay(i); setShowSummary(false); }}
-            className={`flex-shrink-0 px-4 py-2.5 rounded-xl text-sm font-bold transition-all ${!showSummary && selectedDay === i ? "bg-teal-600 text-white" : "bg-white text-gray-600 border border-gray-200"}`}>
-            <div>{day.name}</div><div className="text-xs opacity-80">{day.dateH}</div>
+            className={`flex-shrink-0 px-4 py-2.5 rounded-xl text-sm font-bold transition-all ${!showSummary && selectedDay === i ? "bg-teal-600 text-white shadow-md" : "bg-white text-gray-600 border-2 border-gray-100 hover:border-teal-200"}`}>
+            <div className="font-black">{day.name}</div>
+            <div className="text-xs opacity-70">{day.dateH}</div>
+            {!showSummary && selectedDay !== i && (countAbsent(i) > 0 || countLate(i) > 0) && (
+              <div className="text-xs mt-0.5">
+                {countAbsent(i) > 0 && <span className="text-red-500 font-bold">{countAbsent(i)}غ </span>}
+                {countLate(i) > 0 && <span className="text-amber-500 font-bold">{countLate(i)}ت</span>}
+              </div>
+            )}
           </button>
         ))}
-        <button onClick={() => setShowSummary(!showSummary)}
-          className={`flex-shrink-0 px-4 py-2.5 rounded-xl text-sm font-bold ${showSummary ? "bg-purple-600 text-white" : "bg-purple-50 text-purple-700 border border-purple-200"}`}>
-          📊 ملخص
-        </button>
       </div>
-      <input type="text" placeholder="🔍 بحث عن معلم..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+
+      {/* بحث */}
+      <input type="text" placeholder="🔍 بحث عن معلم أو إداري..." value={searchQuery}
+        onChange={e => setSearchQuery(e.target.value)}
         className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-teal-400 focus:outline-none text-sm bg-white mb-4" />
+
+      {/* ملخص الأسبوع */}
       {showSummary ? (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="bg-purple-600 text-white px-4 py-3 font-bold text-center">ملخص غياب الأسبوع</div>
+        <div className="bg-white rounded-2xl shadow-sm border border-purple-100 overflow-hidden">
+          <div className="flex items-center justify-between bg-purple-600 text-white px-4 py-3">
+            <div className="font-black text-lg">📊 ملخص غياب وتأخر الأسبوع</div>
+            <div className="flex gap-2">
+              <button onClick={handlePrintSummary} className="bg-white text-purple-700 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-purple-50">🖨️ طباعة</button>
+              <button onClick={() => setShowSummary(false)} className="bg-white bg-opacity-20 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-opacity-30">✕ إغلاق</button>
+            </div>
+          </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead><tr className="bg-purple-50">
-                <th className="p-3 text-right">م</th><th className="p-3 text-right">اسم المعلم</th>
-                <th className="p-3 text-center">اضطراري</th><th className="p-3 text-center">مرضي</th>
-                <th className="p-3 text-center">اعتيادي</th><th className="p-3 text-center">إجمالي</th>
-              </tr></thead>
-              <tbody>{teachers.map((teacher, ti) => {
-                const em = week.days.filter((_,di) => attendance[ti]?.[di]?.type === "اضطراري").length;
-                const sk = week.days.filter((_,di) => attendance[ti]?.[di]?.type === "مرضي").length;
-                const rg = week.days.filter((_,di) => attendance[ti]?.[di]?.type === "اعتيادي").length;
-                const tot = em+sk+rg;
-                return (
-                  <tr key={ti} className={`border-t border-gray-100 ${tot > 0 ? "bg-red-50" : ""}`}>
-                    <td className="p-3 text-center text-gray-500">{ti+1}</td><td className="p-3">{teacher}</td>
-                    <td className="p-3 text-center">{em||"—"}</td><td className="p-3 text-center">{sk||"—"}</td>
-                    <td className="p-3 text-center">{rg||"—"}</td>
-                    <td className="p-3 text-center font-bold text-red-600">{tot||"—"}</td>
-                  </tr>);
-              })}</tbody>
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-purple-50">
+                  <th className="p-2 text-right font-bold text-gray-600 w-8">م</th>
+                  <th className="p-2 text-right font-bold text-gray-600">اسم المعلم / الإداري</th>
+                  {week.days.map((d, i) => <th key={i} className="p-2 text-center font-bold text-gray-600">{d.name}</th>)}
+                  <th className="p-2 text-center font-bold text-amber-700">تأخرات</th>
+                  <th className="p-2 text-center font-bold text-amber-700">دقائق</th>
+                  <th className="p-2 text-center font-bold text-red-700">غياب</th>
+                </tr>
+              </thead>
+              <tbody>
+                {teachers.filter(t => t.includes(searchQuery)).map((teacher, ti) => {
+                  const lateCount = week.days.filter((_, di) => (attendance[ti]?.[di]?.status || "حاضر") === "متأخر").length;
+                  const absCount = week.days.filter((_, di) => (attendance[ti]?.[di]?.status || "حاضر") === "غائب").length;
+                  const totalMin = week.days.reduce((s, _, di) => {
+                    return (attendance[ti]?.[di]?.status === "متأخر") ? s + (parseInt(attendance[ti]?.[di]?.lateMinutes) || 0) : s;
+                  }, 0);
+                  return (
+                    <tr key={ti} className={`border-t border-gray-100 ${absCount > 0 ? "bg-red-50" : lateCount > 0 ? "bg-amber-50" : "hover:bg-gray-50"}`}>
+                      <td className="p-2 text-center text-gray-400 font-bold">{ti + 1}</td>
+                      <td className="p-2 font-medium text-gray-800">{teacher}</td>
+                      {week.days.map((_, di) => {
+                        const st = attendance[ti]?.[di]?.status || "حاضر";
+                        const min = attendance[ti]?.[di]?.lateMinutes || "";
+                        return (
+                          <td key={di} className="p-2 text-center">
+                            {st === "حاضر" ? <span className="text-green-500 font-bold">✅</span>
+                              : st === "متأخر" ? <span className="text-amber-600 font-bold">🕐{min && <span className="text-xs"> {min}د</span>}</span>
+                              : <span className="text-red-500 font-bold">❌</span>}
+                          </td>
+                        );
+                      })}
+                      <td className="p-2 text-center font-black text-amber-700">{lateCount || "—"}</td>
+                      <td className="p-2 text-center font-black text-amber-700">{totalMin > 0 ? `${totalMin}د` : "—"}</td>
+                      <td className="p-2 text-center font-black text-red-700">{absCount || "—"}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
             </table>
           </div>
         </div>
       ) : (
+        /* جدول الحضور اليومي */
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="bg-teal-600 text-white px-4 py-3 font-bold text-center">
-            {week.days[selectedDay].name} | {week.days[selectedDay].dateH} هـ | {week.days[selectedDay].dateM} م
+          <div className="bg-teal-600 text-white px-4 py-3 text-center">
+            <span className="font-black">{week.days[selectedDay].name}</span>
+            <span className="mx-2 opacity-60">|</span>
+            <span className="text-sm opacity-90">{week.days[selectedDay].dateH} هـ</span>
+            <span className="mx-2 opacity-60">|</span>
+            <span className="text-sm opacity-90">{week.days[selectedDay].dateM} م</span>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead><tr className="bg-teal-50">
-                <th className="p-3 text-right w-10">م</th><th className="p-3 text-right">اسم المعلم</th>
-                <th className="p-3 text-center">نوع الغياب</th><th className="p-3 text-center">فارس</th>
-                <th className="p-3 text-center">ملاحظات</th>
-              </tr></thead>
-              <tbody>{filtered.map(({ name, idx: ti }) => {
-                const r = attendance[ti]?.[selectedDay] || {};
-                const isAbs = r.type && r.type !== "حاضر";
-                return (
-                  <tr key={ti} className={`border-t border-gray-100 ${isAbs ? "bg-red-50" : "hover:bg-gray-50"}`}>
-                    <td className="p-3 text-center text-gray-400">{ti+1}</td>
-                    <td className="p-3 font-medium">
-                      <span className={`inline-block w-2 h-2 rounded-full ml-2 ${isAbs ? "bg-red-400" : "bg-green-400"}`}></span>{name}
-                    </td>
-                    <td className="p-3 text-center">
-                      <select value={r.type || "حاضر"} onChange={e => updateField(ti, selectedDay, "type", e.target.value)}
-                        className={`px-3 py-2 rounded-lg border-2 text-sm font-bold focus:outline-none ${!r.type || r.type === "حاضر" ? "border-green-300 bg-green-50 text-green-700" : r.type === "مرضي" ? "border-red-300 bg-red-50 text-red-700" : r.type === "اضطراري" ? "border-amber-300 bg-amber-50 text-amber-700" : "border-blue-300 bg-blue-50 text-blue-700"}`}>
-                        {ABSENCE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                      </select>
-                    </td>
-                    <td className="p-3 text-center">
-                      <select value={r.fares || "—"} onChange={e => updateField(ti, selectedDay, "fares", e.target.value)}
-                        disabled={!r.type || r.type === "حاضر"}
-                        className={`px-3 py-2 rounded-lg border-2 text-sm font-bold focus:outline-none ${!r.type || r.type === "حاضر" ? "border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed" : r.fares === "نعم ✓" ? "border-green-300 bg-green-50 text-green-700" : r.fares === "لا ✗" ? "border-red-300 bg-red-50 text-red-700" : "border-gray-300 bg-white"}`}>
-                        {FARES_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
-                      </select>
-                    </td>
-                    <td className="p-3 text-center">
-                      <input type="text" placeholder="—" value={r.notes || ""} onChange={e => updateField(ti, selectedDay, "notes", e.target.value)}
-                        className="w-full px-3 py-2 rounded-lg border-2 border-gray-200 text-sm focus:outline-none focus:border-teal-400 text-center" />
-                    </td>
-                  </tr>);
-              })}</tbody>
+              <thead>
+                <tr style={{ background: "#f0fdfa" }}>
+                  <th className="p-3 text-right text-xs font-bold text-gray-500 w-8">م</th>
+                  <th className="p-3 text-right text-xs font-bold text-gray-500">اسم المعلم / الإداري</th>
+                  <th className="p-3 text-center text-xs font-bold text-gray-500 w-28">الحالة</th>
+                  <th className="p-3 text-center text-xs font-bold text-amber-700">الحصة</th>
+                  <th className="p-3 text-center text-xs font-bold text-amber-700">مدة التأخر</th>
+                  <th className="p-3 text-center text-xs font-bold text-red-600">نوع الغياب</th>
+                  <th className="p-3 text-center text-xs font-bold text-gray-500">ملاحظات</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map(({ name, idx: ti }) => {
+                  const r = attendance[ti]?.[selectedDay] || {};
+                  const status = r.status || "حاضر";
+                  const isLate = status === "متأخر";
+                  const isAbsent = status === "غائب";
+                  const rowBg = isAbsent ? "#fef2f2" : isLate ? "#fffbeb" : "#fff";
+
+                  return (
+                    <tr key={ti} style={{ background: rowBg }} className="border-t border-gray-100">
+                      <td className="p-2 text-center text-xs text-gray-400 font-bold">{ti + 1}</td>
+                      <td className="p-2.5">
+                        <div className="flex items-center gap-2">
+                          <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${isAbsent ? "bg-red-400" : isLate ? "bg-amber-400" : "bg-green-400"}`}></div>
+                          <span className="font-medium text-gray-800 text-sm">{name}</span>
+                        </div>
+                      </td>
+
+                      {/* الحالة */}
+                      <td className="p-1.5 text-center">
+                        <div className="flex gap-1 justify-center">
+                          {ATTENDANCE_STATUS.map(st => (
+                            <button key={st} onClick={() => updateField(ti, selectedDay, "status", st)}
+                              className="px-2 py-1.5 rounded-lg text-xs font-bold transition-all border-2"
+                              style={{
+                                background: status === st ? (st === "حاضر" ? "#dcfce7" : st === "متأخر" ? "#fef3c7" : "#fee2e2") : "#f9fafb",
+                                borderColor: status === st ? (st === "حاضر" ? "#16a34a" : st === "متأخر" ? "#d97706" : "#dc2626") : "#e5e7eb",
+                                color: status === st ? (st === "حاضر" ? "#15803d" : st === "متأخر" ? "#92400e" : "#991b1b") : "#9ca3af",
+                              }}>
+                              {st === "حاضر" ? "✅" : st === "متأخر" ? "🕐" : "❌"} {st}
+                            </button>
+                          ))}
+                        </div>
+                      </td>
+
+                      {/* الحصة المتأخر عنها */}
+                      <td className="p-1.5 text-center">
+                        {isLate ? (
+                          <div className="flex flex-wrap gap-1 justify-center">
+                            {PERIODS.map((p, pi) => {
+                              const sel = (r.latePeriods || []).includes(p);
+                              return (
+                                <button key={pi} onClick={() => {
+                                  const cur = r.latePeriods || [];
+                                  const updated = sel ? cur.filter(x => x !== p) : [...cur, p];
+                                  updateField(ti, selectedDay, "latePeriods", updated);
+                                }}
+                                  className="px-1.5 py-1 rounded-lg text-xs font-bold border-2 transition-all"
+                                  style={{
+                                    background: sel ? "#fef3c7" : "#f9fafb",
+                                    borderColor: sel ? "#f59e0b" : "#e5e7eb",
+                                    color: sel ? "#92400e" : "#9ca3af"
+                                  }}>
+                                  {pi + 1}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        ) : <span className="text-gray-200 text-lg">—</span>}
+                      </td>
+
+                      {/* مدة التأخر */}
+                      <td className="p-1.5 text-center">
+                        {isLate ? (
+                          <div className="flex items-center gap-1 justify-center">
+                            <input type="number" min="1" max="120" placeholder="دقيقة"
+                              value={r.lateMinutes || ""}
+                              onChange={e => updateField(ti, selectedDay, "lateMinutes", e.target.value)}
+                              className="w-16 px-2 py-1.5 rounded-lg border-2 border-amber-200 text-center text-xs font-bold focus:outline-none focus:border-amber-400 bg-amber-50"
+                              style={{ fontFamily: "inherit" }} />
+                            <span className="text-xs text-amber-600 font-bold">د</span>
+                          </div>
+                        ) : <span className="text-gray-200 text-lg">—</span>}
+                      </td>
+
+                      {/* نوع الغياب */}
+                      <td className="p-1.5 text-center">
+                        {isAbsent ? (
+                          <select value={r.absType || "اضطراري"}
+                            onChange={e => updateField(ti, selectedDay, "absType", e.target.value)}
+                            className="px-2 py-1.5 rounded-lg border-2 border-red-200 text-xs font-bold focus:outline-none bg-red-50 text-red-700">
+                            <option>اضطراري</option>
+                            <option>مرضي</option>
+                            <option>اعتيادي</option>
+                            <option>إذن خروج</option>
+                          </select>
+                        ) : <span className="text-gray-200 text-lg">—</span>}
+                      </td>
+
+                      {/* ملاحظات */}
+                      <td className="p-1.5">
+                        <input type="text" placeholder="ملاحظة..."
+                          value={r.notes || ""}
+                          onChange={e => updateField(ti, selectedDay, "notes", e.target.value)}
+                          className="w-full px-2 py-1.5 rounded-lg border-2 border-gray-200 text-xs focus:outline-none focus:border-teal-400 text-center"
+                          style={{ fontFamily: "inherit", minWidth: "90px" }} />
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* نافذة استيراد إكسل للمعلمين */}
+      {showExcelImport && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-black text-gray-800 text-lg">📥 إضافة معلمين من إكسل</h3>
+              <button onClick={() => setShowExcelImport(false)} className="text-gray-400 hover:text-gray-600 text-xl font-bold">✕</button>
+            </div>
+            <div className="bg-blue-50 rounded-xl p-4 text-sm text-blue-700 mb-4 font-medium">
+              الملف يجب أن يحتوي على عمود بأسماء المعلمين والإداريين. سيتم إضافة الأسماء الجديدة تلقائياً.
+            </div>
+            <label className="flex flex-col items-center justify-center border-2 border-dashed border-blue-300 rounded-xl p-8 cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-all">
+              <div className="text-4xl mb-2">📂</div>
+              <div className="font-bold text-gray-700">اضغط لاختيار ملف إكسل</div>
+              <div className="text-xs text-gray-400 mt-1">يدعم .xlsx و .xls</div>
+              <input type="file" accept=".xlsx,.xls" className="hidden"
+                onChange={e => { const f = e.target.files?.[0]; if (f) handleTeacherImport(f); }} />
+            </label>
+            <button onClick={() => setShowExcelImport(false)} className="w-full mt-4 py-2.5 rounded-xl bg-gray-100 text-gray-600 font-bold hover:bg-gray-200">إلغاء</button>
           </div>
         </div>
       )}
@@ -846,6 +1147,139 @@ function ParentPortal({ classList, siteFont, onBack }) {
   );
 }
 
+// ===== بوابة المعلم =====
+function TeacherPortal({ classList, setClassList, saveClass, siteFont, onBack }) {
+  const [step, setStep] = useState("login"); // login | dashboard
+  const [teacherId, setTeacherId] = useState("");
+  const [teacherAccounts, setTeacherAccounts] = useState([]);
+  const [currentTeacher, setCurrentTeacher] = useState(null);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    DB.get("school-teacher-accounts", []).then(data => {
+      setTeacherAccounts(Array.isArray(data) ? data : []);
+      setLoading(false);
+    });
+  }, []);
+
+  const handleLogin = () => {
+    if (!teacherId.trim()) { setError("أدخل رقم الهوية"); return; }
+    const found = teacherAccounts.find(t => t.id === teacherId.trim());
+    if (found) {
+      setCurrentTeacher(found);
+      setStep("dashboard");
+      setError("");
+    } else {
+      setError("رقم الهوية غير مسجل. تواصل مع الإدارة.");
+    }
+  };
+
+  // فصول المعلم فقط (إذا مرتبطة باسمه)
+  const myClasses = classList.filter(c =>
+    !currentTeacher || !c.teacher || c.teacher === "" ||
+    c.teacher === currentTeacher.name
+  );
+
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center" style={{ fontFamily: siteFont, background: "linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%)" }}>
+      <div className="text-white text-center"><div className="text-5xl mb-4 animate-bounce">👨‍🏫</div><p>جاري التحميل…</p></div>
+    </div>
+  );
+
+  if (step === "login") return (
+    <div dir="rtl" className="min-h-screen flex items-center justify-center p-4"
+      style={{ fontFamily: siteFont, background: "linear-gradient(135deg, #1e3a5f 0%, #1d4ed8 60%, #1e40af 100%)" }}>
+      <div className="w-full max-w-sm">
+        <div className="text-center text-white mb-8">
+          <div className="text-6xl mb-4">👨‍🏫</div>
+          <h1 className="text-2xl font-black mb-1">مدرسة عبيدة بن الحارث المتوسطة</h1>
+          <p className="opacity-70 text-sm">بوابة المعلم — إدخال مستويات الطلاب</p>
+        </div>
+        <div className="bg-white rounded-3xl p-6 shadow-2xl">
+          <h2 className="text-center font-black text-gray-800 mb-5 text-lg">دخول المعلم</h2>
+          <div className="space-y-4">
+            <div>
+              <label className="text-xs font-bold text-gray-500 mb-1.5 block">رقم الهوية الوطنية</label>
+              <input type="text" value={teacherId}
+                onChange={e => { setTeacherId(e.target.value); setError(""); }}
+                onKeyDown={e => e.key === "Enter" && handleLogin()}
+                placeholder="أدخل رقم هويتك"
+                className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-blue-400 focus:outline-none text-sm text-center tracking-widest font-bold" />
+            </div>
+            {error && <div className="bg-red-50 text-red-600 text-xs font-bold p-3 rounded-xl text-center">{error}</div>}
+            <button onClick={handleLogin}
+              className="w-full py-3 rounded-xl font-black text-white hover:shadow-lg transition-all"
+              style={{ background: "linear-gradient(135deg, #1e3a5f, #2563eb)" }}>
+              دخول 👨‍🏫
+            </button>
+          </div>
+          <div className="mt-4 pt-4 border-t border-gray-100 text-center">
+            <p className="text-xs text-gray-400 mb-2">كلمة المرور هي رقم هويتك الوطنية</p>
+            <button onClick={onBack} className="text-xs text-blue-500 font-bold hover:underline">← العودة للصفحة الرئيسية</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  // واجهة المعلم بعد الدخول
+  return (
+    <div dir="rtl" className="min-h-screen" style={{ fontFamily: siteFont, background: "linear-gradient(135deg, #eff6ff 0%, #f0fdf4 100%)" }}>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;800&display=swap');`}</style>
+      {/* شريط التنقل */}
+      <nav className="bg-white shadow-md sticky top-0 z-50 border-b border-blue-100">
+        <div className="max-w-5xl mx-auto px-4">
+          <div className="flex items-center justify-between h-14">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center text-white text-base" style={{ background: "linear-gradient(135deg, #1e3a5f, #2563eb)" }}>🏫</div>
+              <div>
+                <div className="font-black text-blue-900 text-sm">مدرسة عبيدة بن الحارث</div>
+                <div className="text-xs text-gray-400">بوابة المعلم</div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="hidden sm:flex items-center gap-2 bg-blue-50 rounded-xl px-3 py-1.5">
+                <div className="w-7 h-7 rounded-full bg-blue-200 flex items-center justify-center text-blue-700 text-xs font-black">
+                  {currentTeacher.name.charAt(0)}
+                </div>
+                <div className="text-xs">
+                  <div className="font-black text-blue-900">{currentTeacher.name}</div>
+                  <div className="text-gray-400">معلم</div>
+                </div>
+              </div>
+              <button onClick={() => { setStep("login"); setCurrentTeacher(null); setTeacherId(""); }}
+                className="text-xs text-red-500 font-bold px-3 py-1.5 rounded-lg hover:bg-red-50">خروج</button>
+            </div>
+          </div>
+        </div>
+      </nav>
+
+      <main className="max-w-5xl mx-auto px-4 py-6">
+        {/* ترحيب */}
+        <div className="rounded-3xl p-6 mb-6 text-white shadow-xl" style={{ background: "linear-gradient(135deg, #1e3a5f 0%, #2563eb 60%, #3b82f6 100%)" }}>
+          <div className="text-4xl mb-2">👨‍🏫</div>
+          <h2 className="text-2xl font-black">أهلاً، {currentTeacher.name}</h2>
+          <p className="opacity-80 text-sm mt-1">يمكنك إدخال وتعديل مستويات طلابك في الفصول أدناه</p>
+        </div>
+
+        {/* فصول المعلم */}
+        <StudentsPage
+          classList={myClasses}
+          setClassList={setClassList}
+          saveClass={saveClass}
+          deleteClass={() => {}}
+          teacherMode={true}
+          teacherName={currentTeacher.name}
+        />
+      </main>
+
+      <footer className="text-center py-4 text-xs text-gray-400 border-t border-gray-200 bg-white mt-8">
+        مدرسة عبيدة بن الحارث المتوسطة — بوابة المعلم © ١٤٤٧ هـ
+      </footer>
+    </div>
+  );
+}
 function ClassTable({ cls, onUpdateClass, onSave }) {
   const [search, setSearch] = useState("");
   const [editInfo, setEditInfo] = useState(false);
@@ -1074,7 +1508,7 @@ function ClassTable({ cls, onUpdateClass, onSave }) {
                   <th className="p-3 text-right text-white font-bold" style={{ background: "#1B3A6B", minWidth: "160px" }}>اسم الطالب</th>
                   <th className="p-2 text-center text-white font-bold text-xs" style={{ background: "#374151", minWidth: "110px" }}>رقم الهوية</th>
                   {SUBJECTS.map(s => (
-                    <th key={s.key} className="p-2 text-center text-white font-bold text-xs" style={{ background: s.color, minWidth: "160px" }}>{s.label}</th>
+                    <th key={s.key} className="p-2 text-center text-white font-bold text-xs" style={{ background: s.color, minWidth: "110px" }}>{s.label}</th>
                   ))}
                   <th className="p-2 text-center text-white font-bold text-xs w-10" style={{ background: "#374151" }}>حذف</th>
                 </tr>
@@ -1105,26 +1539,35 @@ function ClassTable({ cls, onUpdateClass, onSave }) {
                       const face = noteData.face || "";
                       const note = noteData.note || "";
                       const FACES = ["","😊","😐","😟","⭐","👍","👎","💪","📚","⚠️"];
+                      const hasNote = face || note;
                       return (
                         <td key={subj.key} className="p-1 text-center">
-                          <div className="flex flex-col gap-1">
-                            {/* التقدير */}
+                          <div className="flex items-center gap-1">
                             <select value={val} onChange={e => updateGrade(student.id, subj.key, e.target.value)}
-                              className="w-full rounded-lg border-2 px-1 py-1 text-xs font-bold focus:outline-none cursor-pointer"
+                              className="flex-1 rounded-lg border-2 px-1 py-1.5 text-xs font-bold focus:outline-none cursor-pointer"
                               style={{ ...st, appearance: "none", textAlign: "center" }}>
                               {GRADE_OPTIONS.map(g => <option key={g.value} value={g.value}>{g.label}</option>)}
                             </select>
-                            {/* الوجه التعبيري */}
-                            <select value={face} onChange={e => updateFace(student.id, subj.key, e.target.value)}
-                              className="w-full rounded-lg border border-gray-200 bg-white px-1 py-0.5 text-sm text-center focus:outline-none cursor-pointer">
-                              {FACES.map(f => <option key={f} value={f}>{f || "— وجه —"}</option>)}
-                            </select>
-                            {/* الملاحظة */}
-                            <input type="text" value={note} placeholder="ملاحظة..."
-                              onChange={e => updateNote(student.id, subj.key, e.target.value)}
-                              className="w-full rounded-lg border border-gray-200 px-1.5 py-0.5 text-xs focus:outline-none focus:border-blue-400"
-                              style={{ fontFamily: "inherit", background: note ? "#fffbeb" : "#fff" }} />
+                            <button
+                              title="إضافة ملاحظة"
+                              onClick={() => {
+                                const f = prompt("الوجه التعبيري (اختر: 😊 😐 😟 ⭐ 👍 👎 💪 📚 ⚠️):", face);
+                                if (f === null) return;
+                                updateFace(student.id, subj.key, f.trim());
+                                const n = prompt("ملاحظة المعلم:", note);
+                                if (n === null) return;
+                                updateNote(student.id, subj.key, n.trim());
+                              }}
+                              className="w-6 h-6 rounded-lg flex items-center justify-center text-xs flex-shrink-0 transition-all"
+                              style={{ background: hasNote ? "#fef3c7" : "#f3f4f6", border: hasNote ? "1.5px solid #f59e0b" : "1.5px solid #e5e7eb" }}>
+                              {face || "💬"}
+                            </button>
                           </div>
+                          {note && (
+                            <div className="mt-0.5 text-xs text-amber-700 bg-amber-50 rounded px-1 py-0.5 text-right truncate" style={{ maxWidth: "150px" }} title={note}>
+                              {note}
+                            </div>
+                          )}
                         </td>
                       );
                     })}
@@ -1591,6 +2034,126 @@ function SettingsPage({ teachers, setTeachers, saveTeachers, week, setWeek, save
           </div>
         ))}</div>
       </div>
+      <TeacherAccountsSection />
+    </div>
+  );
+}
+
+// ===== إدارة حسابات المعلمين =====
+function TeacherAccountsSection() {
+  const [accounts, setAccounts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [newName, setNewName] = useState("");
+  const [newId, setNewId] = useState("");
+  const [saved, setSaved] = useState(false);
+  const fileRef = useRef(null);
+
+  useEffect(() => {
+    DB.get("school-teacher-accounts", []).then(data => {
+      setAccounts(Array.isArray(data) ? data : []);
+      setLoading(false);
+    });
+  }, []);
+
+  const save = async (list) => {
+    setAccounts(list);
+    await DB.set("school-teacher-accounts", list);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
+  const addOne = () => {
+    if (!newName.trim() || !newId.trim()) return;
+    if (accounts.find(a => a.id === newId.trim())) { alert("هذه الهوية موجودة بالفعل"); return; }
+    save([...accounts, { name: newName.trim(), id: newId.trim() }]);
+    setNewName(""); setNewId("");
+  };
+
+  const removeOne = (id) => {
+    if (!confirm("حذف هذا المعلم من بوابة المعلمين؟")) return;
+    save(accounts.filter(a => a.id !== id));
+  };
+
+  const handleExcel = async (file) => {
+    if (!window.XLSX) {
+      await new Promise((res, rej) => {
+        const s = document.createElement("script");
+        s.src = "https://unpkg.com/xlsx/dist/xlsx.full.min.js";
+        s.onload = res; s.onerror = rej;
+        document.head.appendChild(s);
+      });
+    }
+    const buf = await file.arrayBuffer();
+    const wb = window.XLSX.read(buf);
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const data = window.XLSX.utils.sheet_to_json(ws, { header: 1 });
+    const hdrs = data[0]?.map(h => String(h || "").trim()) || [];
+    const nameIdx = hdrs.findIndex(h => h.includes("اسم") || h.toLowerCase().includes("name"));
+    const idIdx = hdrs.findIndex(h => h.includes("هوية") || h.includes("هوي") || h.includes("رقم") || h.toLowerCase().includes("id"));
+    if (nameIdx < 0 || idIdx < 0) { alert("لم يتم العثور على أعمدة الاسم والهوية. تأكد أن الملف يحتوي على عمودي: الاسم ورقم الهوية"); return; }
+    const imported = data.slice(1)
+      .filter(r => r[nameIdx] && r[idIdx])
+      .map(r => ({ name: String(r[nameIdx]).trim(), id: String(r[idIdx]).trim() }));
+    const merged = [...accounts];
+    let added = 0;
+    imported.forEach(t => {
+      if (!merged.find(a => a.id === t.id)) { merged.push(t); added++; }
+    });
+    save(merged);
+    alert(`✅ تم إضافة ${added} معلم جديد. الإجمالي: ${merged.length}`);
+  };
+
+  return (
+    <div className="bg-white rounded-2xl p-5 shadow-sm border border-blue-100">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="font-bold text-gray-800">👨‍🏫 حسابات المعلمين — بوابة المعلم</h3>
+        {saved && <span className="text-xs text-green-600 font-bold bg-green-50 px-3 py-1 rounded-full">✅ تم الحفظ</span>}
+      </div>
+      <div className="bg-blue-50 rounded-xl p-3 text-xs text-blue-700 font-medium mb-4">
+        💡 كل معلم يدخل بوابة المعلم برقم هويته كـ"كلمة مرور" — يمكنه فقط إدخال مستويات الطلاب
+      </div>
+
+      {/* إضافة يدوية */}
+      <div className="flex gap-2 mb-3">
+        <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="اسم المعلم"
+          className="flex-1 px-3 py-2 rounded-xl border-2 border-gray-200 text-sm focus:border-blue-400 focus:outline-none" />
+        <input value={newId} onChange={e => setNewId(e.target.value)} placeholder="رقم الهوية"
+          className="w-32 px-3 py-2 rounded-xl border-2 border-gray-200 text-sm text-center focus:border-blue-400 focus:outline-none" />
+        <button onClick={addOne} className="bg-blue-600 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-blue-700">إضافة</button>
+      </div>
+
+      {/* استيراد إكسل */}
+      <div className="mb-4">
+        <button onClick={() => fileRef.current?.click()}
+          className="w-full py-2.5 rounded-xl border-2 border-dashed border-green-300 text-green-700 text-sm font-bold hover:border-green-500 hover:bg-green-50 transition-all">
+          📊 استيراد من إكسل (اسم + هوية)
+        </button>
+        <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden"
+          onChange={e => { const f = e.target.files?.[0]; if (f) handleExcel(f); e.target.value = ""; }} />
+      </div>
+
+      {/* قائمة المعلمين */}
+      {loading ? <div className="text-center text-gray-400 py-4">جاري التحميل…</div> : (
+        accounts.length === 0 ? (
+          <div className="text-center text-gray-400 py-6 text-sm">لا يوجد معلمون مسجلون بعد</div>
+        ) : (
+          <div className="space-y-1 max-h-64 overflow-y-auto">
+            {accounts.map((a, i) => (
+              <div key={i} className="flex items-center justify-between bg-gray-50 hover:bg-blue-50 rounded-xl px-3 py-2.5 transition-all">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-full bg-blue-100 text-blue-700 text-xs font-black flex items-center justify-center">{i + 1}</div>
+                  <span className="font-medium text-sm text-gray-800">{a.name}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded-lg font-mono">{a.id}</span>
+                  <button onClick={() => removeOne(a.id)} className="text-red-400 hover:text-red-600 text-sm px-1">🗑️</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )
+      )}
+      <div className="mt-3 text-xs text-gray-400 text-center">{accounts.length} معلم مسجل</div>
     </div>
   );
 }
@@ -1599,6 +2162,7 @@ export default function SchoolWebsite() {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
   const [parentPortal, setParentPortal] = useState(false);
+  const [teacherPortal, setTeacherPortal] = useState(false);
   const [page, setPage] = useState("home");
   const [menuOpen, setMenuOpen] = useState(false);
   const [teachers, setTeachers] = useState(DEFAULT_TEACHERS);
@@ -1670,8 +2234,9 @@ export default function SchoolWebsite() {
     </div>
   );
 
+  if (!user && teacherPortal) return <TeacherPortal classList={classList} setClassList={setClassList} saveClass={saveClass} siteFont={siteFont} onBack={() => setTeacherPortal(false)} />;
   if (!user && parentPortal) return <ParentPortal classList={classList} siteFont={siteFont} onBack={() => setParentPortal(false)} />;
-  if (!user) return <LoginPage users={users} onLogin={setUser} siteFont={siteFont} onParentPortal={() => setParentPortal(true)} />;
+  if (!user) return <LoginPage users={users} onLogin={setUser} siteFont={siteFont} onParentPortal={() => setParentPortal(true)} onTeacherPortal={() => setTeacherPortal(true)} />;
 
   const pages = [
     { id: "home",          label: "الرئيسية",       icon: "🏠" },
@@ -1727,7 +2292,7 @@ export default function SchoolWebsite() {
       </nav>
       <main className="max-w-6xl mx-auto px-4 py-6">
         {page === "home"          && <HomePage teachers={teachers} announcements={announcements} activities={activities} navigate={navigate} />}
-        {page === "attendance"    && <AttendancePage teachers={teachers} week={week} attendance={attendance} setAttendance={setAttendance} saveAttendance={saveAttendance} />}
+        {page === "attendance"    && <AttendancePage teachers={teachers} setTeachers={setTeachers} saveTeachers={saveTeachers} week={week} attendance={attendance} setAttendance={setAttendance} saveAttendance={saveAttendance} />}
         {page === "students"      && <StudentsPage classList={classList} setClassList={setClassList} saveClass={saveClass} deleteClass={deleteClass} />}
         {page === "announcements" && <AnnouncementsPage announcements={announcements} setAnnouncements={setAnnouncements} saveAnnouncements={saveAnnouncements} />}
         {page === "activities"    && <ActivitiesPage activities={activities} />}
