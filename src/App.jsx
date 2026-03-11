@@ -1136,8 +1136,6 @@ function StudentsPage({ classList, setClassList, saveClass, deleteClass }) {
     setActiveId(PRELOADED_CLASS.id);
   };
 
-  const activeClass = classList.find(c => c.id === activeId) || null;
-
   const addNewClass = () => {
     const exists = classList.find(c => c.level === newLevel && c.section === newSection);
     if (exists) { alert("هذا الفصل موجود بالفعل!"); return; }
