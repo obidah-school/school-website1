@@ -799,16 +799,25 @@ function ParentPortal({ classList, siteFont, onBack }) {
                 {SUBJECTS.map(subj => {
                   const gradeVal = result.student.grades?.[subj.key] || "";
                   const gd = GRADE_MAP[gradeVal];
+                  const noteData = result.student.notes?.[subj.key] || {};
                   return (
-                    <div key={subj.key} className="flex items-center justify-between px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: subj.color }}></div>
-                        <span className="font-bold text-gray-800 text-sm">{subj.label}</span>
+                    <div key={subj.key} className="px-4 py-3 border-b border-gray-100 last:border-0">
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: subj.color }}></div>
+                          <span className="font-bold text-gray-800 text-sm">{subj.label}</span>
+                          {noteData.face && <span className="text-base">{noteData.face}</span>}
+                        </div>
+                        {gd ? (
+                          <span className="px-3 py-1 rounded-full text-xs font-black" style={{ backgroundColor: gd.bg, color: gd.c }}>{gd.label}</span>
+                        ) : (
+                          <span className="px-3 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-400">لم يُقيَّم</span>
+                        )}
                       </div>
-                      {gd ? (
-                        <span className="px-4 py-1.5 rounded-full text-xs font-black" style={{ backgroundColor: gd.bg, color: gd.c }}>{gd.label}</span>
-                      ) : (
-                        <span className="px-4 py-1.5 rounded-full text-xs font-bold bg-gray-100 text-gray-400">لم يُقيَّم</span>
+                      {noteData.note && (
+                        <div className="mr-5 text-xs text-gray-600 bg-amber-50 rounded-lg px-3 py-1.5 border border-amber-100 mt-1">
+                          💬 <span className="font-medium">{noteData.note}</span>
+                        </div>
                       )}
                     </div>
                   );
@@ -851,6 +860,12 @@ function ClassTable({ cls, onUpdateClass, onSave }) {
 
   const updateGrade = (sid, subj, val) => {
     onUpdateClass({ ...cls, students: cls.students.map(s => s.id === sid ? { ...s, grades: { ...s.grades, [subj]: val } } : s) });
+  };
+  const updateNote = (sid, subj, note) => {
+    onUpdateClass({ ...cls, students: cls.students.map(s => s.id === sid ? { ...s, notes: { ...(s.notes||{}), [subj]: { ...(s.notes?.[subj]||{}), note } } } : s) });
+  };
+  const updateFace = (sid, subj, face) => {
+    onUpdateClass({ ...cls, students: cls.students.map(s => s.id === sid ? { ...s, notes: { ...(s.notes||{}), [subj]: { ...(s.notes?.[subj]||{}), face } } } : s) });
   };
   const updateName = (sid, name) => {
     onUpdateClass({ ...cls, students: cls.students.map(s => s.id === sid ? { ...s, name } : s) });
@@ -1059,7 +1074,7 @@ function ClassTable({ cls, onUpdateClass, onSave }) {
                   <th className="p-3 text-right text-white font-bold" style={{ background: "#1B3A6B", minWidth: "160px" }}>اسم الطالب</th>
                   <th className="p-2 text-center text-white font-bold text-xs" style={{ background: "#374151", minWidth: "110px" }}>رقم الهوية</th>
                   {SUBJECTS.map(s => (
-                    <th key={s.key} className="p-2 text-center text-white font-bold text-xs" style={{ background: s.color, minWidth: "95px" }}>{s.label}</th>
+                    <th key={s.key} className="p-2 text-center text-white font-bold text-xs" style={{ background: s.color, minWidth: "160px" }}>{s.label}</th>
                   ))}
                   <th className="p-2 text-center text-white font-bold text-xs w-10" style={{ background: "#374151" }}>حذف</th>
                 </tr>
@@ -1086,13 +1101,30 @@ function ClassTable({ cls, onUpdateClass, onSave }) {
                     {SUBJECTS.map(subj => {
                       const val = student.grades?.[subj.key] || "";
                       const st = getGradeStyle(val);
+                      const noteData = student.notes?.[subj.key] || {};
+                      const face = noteData.face || "";
+                      const note = noteData.note || "";
+                      const FACES = ["","😊","😐","😟","⭐","👍","👎","💪","📚","⚠️"];
                       return (
                         <td key={subj.key} className="p-1 text-center">
-                          <select value={val} onChange={e => updateGrade(student.id, subj.key, e.target.value)}
-                            className="w-full rounded-lg border-2 px-1 py-1.5 text-xs font-bold focus:outline-none cursor-pointer"
-                            style={{ ...st, appearance: "none", textAlign: "center" }}>
-                            {GRADE_OPTIONS.map(g => <option key={g.value} value={g.value}>{g.label}</option>)}
-                          </select>
+                          <div className="flex flex-col gap-1">
+                            {/* التقدير */}
+                            <select value={val} onChange={e => updateGrade(student.id, subj.key, e.target.value)}
+                              className="w-full rounded-lg border-2 px-1 py-1 text-xs font-bold focus:outline-none cursor-pointer"
+                              style={{ ...st, appearance: "none", textAlign: "center" }}>
+                              {GRADE_OPTIONS.map(g => <option key={g.value} value={g.value}>{g.label}</option>)}
+                            </select>
+                            {/* الوجه التعبيري */}
+                            <select value={face} onChange={e => updateFace(student.id, subj.key, e.target.value)}
+                              className="w-full rounded-lg border border-gray-200 bg-white px-1 py-0.5 text-sm text-center focus:outline-none cursor-pointer">
+                              {FACES.map(f => <option key={f} value={f}>{f || "— وجه —"}</option>)}
+                            </select>
+                            {/* الملاحظة */}
+                            <input type="text" value={note} placeholder="ملاحظة..."
+                              onChange={e => updateNote(student.id, subj.key, e.target.value)}
+                              className="w-full rounded-lg border border-gray-200 px-1.5 py-0.5 text-xs focus:outline-none focus:border-blue-400"
+                              style={{ fontFamily: "inherit", background: note ? "#fffbeb" : "#fff" }} />
+                          </div>
                         </td>
                       );
                     })}
