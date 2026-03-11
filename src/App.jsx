@@ -136,6 +136,8 @@ const PRELOADED_CLASS = {
     {id:1700000024,num:25,name:"فواز زكريا محمد الشريف",nationalId:"1166796266",grades:{}},
   ]
 };
+
+function Badge({ children, color = "teal" }) {
   const c = { teal: "bg-teal-100 text-teal-800", red: "bg-red-100 text-red-700", amber: "bg-amber-100 text-amber-800", blue: "bg-blue-100 text-blue-800", green: "bg-green-100 text-green-800", purple: "bg-purple-100 text-purple-800", gray: "bg-gray-100 text-gray-600" };
   return <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${c[color] || c.teal}`}>{children}</span>;
 }
