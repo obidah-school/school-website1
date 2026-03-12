@@ -1049,11 +1049,12 @@ function ExcelImportModal({ onImport, onClose }) {
 }
 
 // ===== بوابة ولي الأمر =====
-function ParentPortal({ classList, siteFont, onBack }) {
+function ParentPortal({ classList, messages, setMessages, saveMessages, surveys, setSurveys, saveSurveys, siteFont, onBack }) {
   const [nationalId, setNationalId] = useState("");
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
   const [searched, setSearched] = useState(false);
+  const [tab, setTab] = useState("grades"); // grades | messages | surveys
 
   const handleSearch = () => {
     if (!nationalId.trim()) { setError("أدخل رقم الهوية"); return; }
@@ -1126,8 +1127,22 @@ function ParentPortal({ classList, siteFont, onBack }) {
               </div>
             </div>
 
+            {/* تبويبات ولي الأمر */}
+            <div className="flex gap-1 bg-white rounded-2xl p-1.5 shadow-sm">
+              {[
+                { id: "grades",   label: "التقييمات",  icon: "📊" },
+                { id: "messages", label: "رسالة",      icon: "✉️" },
+                { id: "surveys",  label: "استبيانات",  icon: "📋" },
+              ].map(t => (
+                <button key={t.id} onClick={() => setTab(t.id)}
+                  className={`flex-1 py-2.5 rounded-xl text-xs font-black transition-all ${tab === t.id ? "bg-blue-600 text-white shadow" : "text-gray-500 hover:bg-gray-50"}`}>
+                  {t.icon} {t.label}
+                </button>
+              ))}
+            </div>
+
             {/* التقييمات الأسبوعية */}
-            {(() => {
+            {tab === "grades" && (() => {
               const evals = result.student.evals || [];
               const LMAP = { weak: { label: "ضعيف", bg: "#FF6B6B", c: "#fff" }, accept: { label: "مقبول", bg: "#FFD93D", c: "#5a4200" }, good: { label: "جيد", bg: "#A8E6CF", c: "#1a4a30" }, vgood: { label: "جيد جداً", bg: "#4ECDC4", c: "#fff" }, excel: { label: "ممتاز", bg: "#2ECC71", c: "#fff" } };
               const CATS = [{ key:"behavior", label:"السلوك", icon:"🌿" }, { key:"homework", label:"الواجبات", icon:"📝" }, { key:"participation", label:"المشاركة", icon:"🙋" }, { key:"discipline", label:"الانضباط", icon:"⚖️" }];
@@ -1144,7 +1159,6 @@ function ParentPortal({ classList, siteFont, onBack }) {
 
               return (
                 <>
-                  {/* آخر مستوى */}
                   {lastLv && (
                     <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
                       <div className="px-4 py-3 font-black text-white text-sm" style={{ background: "#1B3A6B" }}>⭐ آخر تقييم أسبوعي</div>
@@ -1171,13 +1185,11 @@ function ParentPortal({ classList, siteFont, onBack }) {
                       </div>
                     </div>
                   )}
-
-                  {/* سجل التقييمات */}
                   {evals.length > 1 && (
                     <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
-                      <div className="px-4 py-3 font-black text-white text-sm" style={{ background: "#1B3A6B" }}>📅 سجل التقييمات الأسبوعية ({evals.length})</div>
+                      <div className="px-4 py-3 font-black text-white text-sm" style={{ background: "#1B3A6B" }}>📅 سجل التقييمات ({evals.length})</div>
                       <div className="divide-y divide-gray-100">
-                        {[...evals].reverse().map((ev, i) => {
+                        {[...evals].reverse().map(ev => {
                           const lv = LMAP[ev.level];
                           return (
                             <div key={ev.id} className="flex items-center justify-between px-4 py-3">
@@ -1198,6 +1210,31 @@ function ParentPortal({ classList, siteFont, onBack }) {
                 </>
               );
             })()}
+
+            {/* تبويب الرسائل */}
+            {tab === "messages" && (
+              <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
+                <MessagesPage
+                  messages={messages}
+                  setMessages={setMessages}
+                  saveMessages={saveMessages}
+                  isParent={true}
+                  parentName={result.student.name}
+                />
+              </div>
+            )}
+
+            {/* تبويب الاستبيانات */}
+            {tab === "surveys" && (
+              <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
+                <SurveysPage
+                  surveys={surveys}
+                  setSurveys={setSurveys}
+                  saveSurveys={saveSurveys}
+                  isParent={true}
+                />
+              </div>
+            )}
           </div>
         )}
 
@@ -1968,6 +2005,752 @@ function StudentsPage({ classList, setClassList, saveClass, deleteClass, teacher
   );
 }
 
+// ===== صفحة رسائل وآراء أولياء الأمور =====
+const MSG_RECIPIENTS = ["مدير المدرسة", "المعلم المسؤول", "الموجه الطلابي", "الجميع"];
+const MSG_TYPES = [
+  { value: "suggestion", label: "اقتراح", icon: "💡", color: "#dbeafe" },
+  { value: "complaint",  label: "شكوى",  icon: "📣", color: "#fee2e2" },
+  { value: "inquiry",    label: "استفسار",icon: "❓", color: "#fef9c3" },
+  { value: "praise",     label: "إشادة", icon: "🌟", color: "#d1fae5" },
+  { value: "message",    label: "رسالة",  icon: "✉️", color: "#ede9fe" },
+];
+
+function MessagesPage({ messages, setMessages, saveMessages, isParent, parentName }) {
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({ recipient: "مدير المدرسة", type: "suggestion", name: parentName || "", phone: "", text: "" });
+  const [saved, setSaved] = useState(false);
+  const [filterType, setFilterType] = useState("all");
+  const [filterRecipient, setFilterRecipient] = useState("all");
+  const [searchQ, setSearchQ] = useState("");
+  const [replyId, setReplyId] = useState(null);
+  const [replyText, setReplyText] = useState("");
+
+  const sendMsg = () => {
+    if (!form.text.trim()) { alert("الرجاء كتابة نص الرسالة"); return; }
+    const msg = { id: Date.now(), ...form, date: new Date().toLocaleDateString("ar-SA"), time: new Date().toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit" }), read: false, reply: "" };
+    const updated = [msg, ...messages];
+    setMessages(updated);
+    saveMessages(updated);
+    setForm({ recipient: "مدير المدرسة", type: "suggestion", name: parentName || "", phone: "", text: "" });
+    setShowForm(false);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 3000);
+  };
+
+  const markRead = (id) => {
+    const updated = messages.map(m => m.id === id ? { ...m, read: true } : m);
+    setMessages(updated); saveMessages(updated);
+  };
+
+  const sendReply = (id) => {
+    if (!replyText.trim()) return;
+    const updated = messages.map(m => m.id === id ? { ...m, reply: replyText, repliedAt: new Date().toLocaleDateString("ar-SA"), read: true } : m);
+    setMessages(updated); saveMessages(updated);
+    setReplyId(null); setReplyText("");
+  };
+
+  const deleteMsg = (id) => {
+    if (!confirm("حذف هذه الرسالة؟")) return;
+    const updated = messages.filter(m => m.id !== id);
+    setMessages(updated); saveMessages(updated);
+  };
+
+  const filtered = messages.filter(m => {
+    if (filterType !== "all" && m.type !== filterType) return false;
+    if (filterRecipient !== "all" && m.recipient !== filterRecipient) return false;
+    if (searchQ && !m.text.includes(searchQ) && !m.name.includes(searchQ)) return false;
+    return true;
+  });
+
+  const unread = messages.filter(m => !m.read).length;
+
+  return (
+    <div dir="rtl">
+      {/* بانر الشراكة */}
+      <div className="rounded-3xl overflow-hidden mb-6 shadow-xl" style={{ background: "linear-gradient(135deg, #1e3a5f 0%, #2563eb 60%, #0ea5e9 100%)" }}>
+        <div className="p-8 text-white">
+          <div className="flex flex-col md:flex-row items-center gap-6">
+            <div className="text-7xl flex-shrink-0">🤝</div>
+            <div className="text-center md:text-right flex-1">
+              <h2 className="text-2xl font-black mb-2">شراكة الأسرة والمدرسة</h2>
+              <p className="text-blue-100 leading-relaxed text-sm">
+                تؤمن مدرسة عبيدة بن الحارث المتوسطة بأن نجاح الطالب يبدأ من شراكة حقيقية بين الأسرة والمدرسة.
+                هذه المنصة جسر تواصل مفتوح بين أولياء الأمور والمدرسة — شاركونا آراءكم ومقترحاتكم واستفساراتكم،
+                فأنتم شركاؤنا في بناء جيل واعٍ ومتميز.
+              </p>
+              <div className="flex flex-wrap gap-3 mt-4 justify-center md:justify-start">
+                {["🎯 نستمع لكم", "💬 نردّ على رسائلكم", "🌱 نبني معاً", "🏆 أبناؤكم أولويتنا"].map(t => (
+                  <span key={t} className="bg-white bg-opacity-20 px-3 py-1.5 rounded-full text-xs font-bold">{t}</span>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white bg-opacity-10 px-6 py-3 flex flex-wrap gap-4 justify-between items-center">
+          <div className="flex gap-4 text-white text-sm">
+            <span className="font-bold">📨 إجمالي الرسائل: <b>{messages.length}</b></span>
+            {unread > 0 && <span className="bg-red-500 text-white px-2 py-0.5 rounded-full text-xs font-black">{unread} غير مقروءة</span>}
+          </div>
+          {saved && <span className="bg-green-400 text-white px-4 py-1.5 rounded-full text-sm font-black">✅ تم إرسال رسالتك بنجاح!</span>}
+        </div>
+      </div>
+
+      {/* زر إرسال رسالة */}
+      {!showForm && (
+        <button onClick={() => setShowForm(true)}
+          className="w-full mb-5 py-4 rounded-2xl text-white font-black text-base shadow-lg hover:shadow-xl transition-all"
+          style={{ background: "linear-gradient(135deg, #2563eb, #0ea5e9)" }}>
+          ✉️ إرسال رسالة / رأي / مقترح جديد
+        </button>
+      )}
+
+      {/* نموذج الإرسال */}
+      {showForm && (
+        <div className="bg-white rounded-3xl shadow-xl border border-blue-100 p-6 mb-6">
+          <div className="flex items-center justify-between mb-5">
+            <h3 className="font-black text-gray-800 text-lg">✉️ رسالة جديدة</h3>
+            <button onClick={() => setShowForm(false)} className="text-gray-400 hover:text-gray-600 text-xl font-bold">✕</button>
+          </div>
+          <div className="space-y-4">
+            {/* نوع الرسالة */}
+            <div>
+              <label className="text-xs font-black text-gray-600 mb-2 block">نوع الرسالة</label>
+              <div className="flex gap-2 flex-wrap">
+                {MSG_TYPES.map(t => (
+                  <button key={t.value} onClick={() => setForm(p => ({ ...p, type: t.value }))}
+                    className="px-3 py-2 rounded-xl text-sm font-bold border-2 transition-all"
+                    style={{ background: form.type === t.value ? t.color : "#f9fafb", borderColor: form.type === t.value ? "#2563eb" : "#e5e7eb", color: form.type === t.value ? "#1e3a5f" : "#9ca3af" }}>
+                    {t.icon} {t.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {/* الجهة المرسل إليها */}
+            <div>
+              <label className="text-xs font-black text-gray-600 mb-2 block">الرسالة موجهة إلى</label>
+              <select value={form.recipient} onChange={e => setForm(p => ({ ...p, recipient: e.target.value }))}
+                className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 text-sm focus:border-blue-400 focus:outline-none font-bold"
+                style={{ fontFamily: "inherit" }}>
+                {MSG_RECIPIENTS.map(r => <option key={r} value={r}>{r}</option>)}
+              </select>
+            </div>
+            {/* الاسم والجوال */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-black text-gray-600 mb-1 block">الاسم (اختياري)</label>
+                <input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
+                  placeholder="اسم ولي الأمر"
+                  className="w-full px-3 py-2.5 rounded-xl border-2 border-gray-200 text-sm focus:border-blue-400 focus:outline-none"
+                  style={{ fontFamily: "inherit" }} />
+              </div>
+              <div>
+                <label className="text-xs font-black text-gray-600 mb-1 block">رقم التواصل (اختياري)</label>
+                <input value={form.phone} onChange={e => setForm(p => ({ ...p, phone: e.target.value }))}
+                  placeholder="05xxxxxxxx" dir="ltr"
+                  className="w-full px-3 py-2.5 rounded-xl border-2 border-gray-200 text-sm focus:border-blue-400 focus:outline-none text-right"
+                  style={{ fontFamily: "inherit" }} />
+              </div>
+            </div>
+            {/* نص الرسالة */}
+            <div>
+              <label className="text-xs font-black text-gray-600 mb-1 block">نص الرسالة / الرأي / الاقتراح *</label>
+              <textarea value={form.text} onChange={e => setForm(p => ({ ...p, text: e.target.value }))}
+                rows={5} placeholder="اكتب رسالتك هنا..."
+                className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 text-sm focus:border-blue-400 focus:outline-none resize-none"
+                style={{ fontFamily: "inherit" }} />
+            </div>
+            <div className="flex gap-3">
+              <button onClick={sendMsg}
+                className="flex-1 py-3 rounded-xl text-white font-black hover:shadow-lg transition-all"
+                style={{ background: "linear-gradient(135deg, #2563eb, #0ea5e9)" }}>
+                📤 إرسال الرسالة
+              </button>
+              <button onClick={() => setShowForm(false)} className="px-6 py-3 rounded-xl bg-gray-100 text-gray-600 font-bold hover:bg-gray-200">إلغاء</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* فلاتر وبحث — للإدارة فقط */}
+      {!isParent && messages.length > 0 && (
+        <div className="bg-white rounded-2xl border border-gray-100 p-4 mb-4 shadow-sm">
+          <div className="flex flex-wrap gap-3 items-center">
+            <input value={searchQ} onChange={e => setSearchQ(e.target.value)} placeholder="🔍 بحث..."
+              className="flex-1 min-w-32 px-3 py-2 rounded-xl border-2 border-gray-200 text-sm focus:outline-none focus:border-blue-400" />
+            <select value={filterType} onChange={e => setFilterType(e.target.value)}
+              className="px-3 py-2 rounded-xl border-2 border-gray-200 text-sm focus:outline-none" style={{ fontFamily: "inherit" }}>
+              <option value="all">جميع الأنواع</option>
+              {MSG_TYPES.map(t => <option key={t.value} value={t.value}>{t.icon} {t.label}</option>)}
+            </select>
+            <select value={filterRecipient} onChange={e => setFilterRecipient(e.target.value)}
+              className="px-3 py-2 rounded-xl border-2 border-gray-200 text-sm focus:outline-none" style={{ fontFamily: "inherit" }}>
+              <option value="all">جميع الجهات</option>
+              {MSG_RECIPIENTS.map(r => <option key={r} value={r}>{r}</option>)}
+            </select>
+          </div>
+        </div>
+      )}
+
+      {/* قائمة الرسائل */}
+      {filtered.length === 0 ? (
+        <div className="bg-white rounded-2xl p-10 text-center border-2 border-dashed border-blue-100">
+          <div className="text-5xl mb-3">📬</div>
+          <div className="font-bold text-gray-400">لا توجد رسائل بعد — كن أول من يشارك!</div>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {filtered.map(msg => {
+            const t = MSG_TYPES.find(x => x.value === msg.type) || MSG_TYPES[4];
+            return (
+              <div key={msg.id} className="bg-white rounded-2xl border shadow-sm overflow-hidden transition-all"
+                style={{ borderColor: msg.read ? "#e5e7eb" : "#bfdbfe", borderWidth: msg.read ? 1 : 2 }}>
+                {/* رأس الرسالة */}
+                <div className="flex items-center justify-between px-4 py-3" style={{ background: t.color }}>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl">{t.icon}</span>
+                    <span className="font-black text-gray-800 text-sm">{t.label}</span>
+                    <span className="text-xs text-gray-500 bg-white bg-opacity-60 px-2 py-0.5 rounded-full">→ {msg.recipient}</span>
+                    {!msg.read && <span className="bg-blue-600 text-white text-xs px-2 py-0.5 rounded-full font-bold">جديد</span>}
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-gray-500">
+                    <span>{msg.time} | {msg.date}</span>
+                    {!isParent && (
+                      <>
+                        {!msg.read && <button onClick={() => markRead(msg.id)} className="text-blue-600 hover:text-blue-800 font-bold px-2 py-0.5 rounded-lg hover:bg-blue-50">✓ قراءة</button>}
+                        <button onClick={() => deleteMsg(msg.id)} className="text-red-400 hover:text-red-600 px-1">🗑️</button>
+                      </>
+                    )}
+                  </div>
+                </div>
+                {/* محتوى الرسالة */}
+                <div className="px-4 py-3">
+                  {msg.name && <div className="text-xs font-bold text-gray-500 mb-1">👤 {msg.name}{msg.phone && ` | 📞 ${msg.phone}`}</div>}
+                  <p className="text-sm text-gray-800 leading-relaxed">{msg.text}</p>
+                  {/* الرد */}
+                  {msg.reply && (
+                    <div className="mt-3 bg-teal-50 border border-teal-200 rounded-xl p-3">
+                      <div className="text-xs font-black text-teal-700 mb-1">↩️ رد الإدارة — {msg.repliedAt}</div>
+                      <p className="text-sm text-teal-800">{msg.reply}</p>
+                    </div>
+                  )}
+                  {/* نموذج الرد للإدارة */}
+                  {!isParent && !msg.reply && replyId === msg.id && (
+                    <div className="mt-3 flex gap-2">
+                      <input value={replyText} onChange={e => setReplyText(e.target.value)}
+                        placeholder="اكتب الرد هنا..."
+                        className="flex-1 px-3 py-2 rounded-xl border-2 border-teal-300 text-sm focus:outline-none focus:border-teal-500"
+                        style={{ fontFamily: "inherit" }} />
+                      <button onClick={() => sendReply(msg.id)} className="bg-teal-600 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-teal-700">إرسال</button>
+                      <button onClick={() => setReplyId(null)} className="bg-gray-100 text-gray-500 px-3 py-2 rounded-xl text-sm font-bold">✕</button>
+                    </div>
+                  )}
+                  {!isParent && !msg.reply && replyId !== msg.id && (
+                    <button onClick={() => { setReplyId(msg.id); setReplyText(""); }}
+                      className="mt-2 text-xs text-teal-600 font-bold hover:underline">↩️ ردّ على هذه الرسالة</button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ===== صفحة الاستبيانات =====
+const SURVEY_FIELD_TYPES = [
+  { value: "text",     label: "نص حر",       icon: "✍️" },
+  { value: "radio",    label: "اختيار واحد", icon: "🔘" },
+  { value: "checkbox", label: "اختيار متعدد",icon: "☑️" },
+  { value: "scale",    label: "تقييم 1-5",   icon: "⭐" },
+  { value: "yesno",    label: "نعم / لا",    icon: "✅" },
+];
+const SURVEY_THEMES = [
+  { name: "أزرق",     header: "#1e3a5f", accent: "#2563eb", bg: "#eff6ff" },
+  { name: "أخضر",    header: "#064e3b", accent: "#059669", bg: "#ecfdf5" },
+  { name: "بنفسجي",  header: "#4c1d95", accent: "#7c3aed", bg: "#f5f3ff" },
+  { name: "برتقالي", header: "#7c2d12", accent: "#ea580c", bg: "#fff7ed" },
+  { name: "وردي",    header: "#831843", accent: "#db2777", bg: "#fdf2f8" },
+  { name: "رمادي",   header: "#1f2937", accent: "#374151", bg: "#f9fafb" },
+];
+const SURVEY_FONTS = ["Tajawal","Cairo","Noto Naskh Arabic","Noto Kufi Arabic","Amiri","Reem Kufi"];
+const SURVEY_TARGETS = ["أولياء الأمور","المعلمون","الطلاب","الجميع"];
+const SURVEY_FACES = ["","😊","😁","🙂","😐","😕","😞","⭐","👍","👎","💪","🔥","💯","🌟"];
+
+function newField() {
+  return { id: Date.now() + Math.random() * 1000 | 0, type: "radio", label: "", options: ["خيار 1","خيار 2"], required: true, emoji: "", fontSize: "text-sm" };
+}
+function newSurvey() {
+  return { id: Date.now(), title: "", description: "", target: "أولياء الأمور", theme: 0, font: "Tajawal", fields: [], active: true, responses: [], createdAt: new Date().toLocaleDateString("ar-SA") };
+}
+
+function SurveyBuilder({ survey, onSave, onCancel }) {
+  const [s, setS] = useState({ ...survey });
+  const [editingField, setEditingField] = useState(null);
+
+  const theme = SURVEY_THEMES[s.theme];
+
+  const addField = () => {
+    const f = newField();
+    setS(p => ({ ...p, fields: [...p.fields, f] }));
+    setEditingField(f.id);
+  };
+
+  const updateField = (id, changes) => setS(p => ({ ...p, fields: p.fields.map(f => f.id === id ? { ...f, ...changes } : f) }));
+  const removeField = (id) => setS(p => ({ ...p, fields: p.fields.filter(f => f.id !== id) }));
+  const moveField = (id, dir) => {
+    const idx = s.fields.findIndex(f => f.id === id);
+    if (idx + dir < 0 || idx + dir >= s.fields.length) return;
+    const arr = [...s.fields];
+    [arr[idx], arr[idx + dir]] = [arr[idx + dir], arr[idx]];
+    setS(p => ({ ...p, fields: arr }));
+  };
+
+  return (
+    <div className="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden">
+      {/* رأس البناء */}
+      <div className="px-6 py-4 flex items-center justify-between" style={{ background: theme.header }}>
+        <span className="font-black text-white text-lg">🛠️ {survey.id ? "تعديل الاستبيان" : "استبيان جديد"}</span>
+        <div className="flex gap-2">
+          <button onClick={() => onSave(s)} className="bg-green-400 text-white px-4 py-2 rounded-xl text-sm font-black hover:bg-green-500">💾 حفظ</button>
+          <button onClick={onCancel} className="bg-white bg-opacity-20 text-white px-3 py-2 rounded-xl text-sm font-bold hover:bg-opacity-30">✕ إلغاء</button>
+        </div>
+      </div>
+
+      <div className="p-5 space-y-5" style={{ background: theme.bg, fontFamily: s.font }}>
+        {/* معلومات الاستبيان */}
+        <div className="bg-white rounded-2xl p-4 space-y-3 shadow-sm">
+          <h4 className="font-black text-gray-700 text-sm mb-3">📋 معلومات الاستبيان</h4>
+          <input value={s.title} onChange={e => setS(p => ({ ...p, title: e.target.value }))}
+            placeholder="عنوان الاستبيان *" style={{ fontFamily: s.font }}
+            className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 text-base font-black focus:outline-none focus:border-blue-400" />
+          <textarea value={s.description} onChange={e => setS(p => ({ ...p, description: e.target.value }))}
+            rows={2} placeholder="وصف أو مقدمة الاستبيان (اختياري)" style={{ fontFamily: s.font }}
+            className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 text-sm focus:outline-none focus:border-blue-400 resize-none" />
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div>
+              <label className="text-xs font-bold text-gray-500 mb-1 block">الفئة المستهدفة</label>
+              <select value={s.target} onChange={e => setS(p => ({ ...p, target: e.target.value }))} style={{ fontFamily: s.font }}
+                className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 text-sm focus:outline-none focus:border-blue-400">
+                {SURVEY_TARGETS.map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-bold text-gray-500 mb-1 block">الخط</label>
+              <select value={s.font} onChange={e => setS(p => ({ ...p, font: e.target.value }))}
+                className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 text-sm focus:outline-none">
+                {SURVEY_FONTS.map(f => <option key={f} value={f} style={{ fontFamily: f }}>{f}</option>)}
+              </select>
+            </div>
+            <div className="col-span-2">
+              <label className="text-xs font-bold text-gray-500 mb-1 block">لون الاستبيان</label>
+              <div className="flex gap-1.5">
+                {SURVEY_THEMES.map((t, i) => (
+                  <button key={i} onClick={() => setS(p => ({ ...p, theme: i }))}
+                    className="w-8 h-8 rounded-full border-4 transition-all"
+                    title={t.name}
+                    style={{ background: t.accent, borderColor: s.theme === i ? "#fff" : "transparent", outline: s.theme === i ? `2px solid ${t.accent}` : "none" }} />
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* الحقول */}
+        <div className="space-y-3">
+          {s.fields.map((field, fi) => (
+            <div key={field.id} className="bg-white rounded-2xl border-2 shadow-sm overflow-hidden"
+              style={{ borderColor: editingField === field.id ? theme.accent : "#e5e7eb" }}>
+              {/* رأس الحقل */}
+              <div className="flex items-center justify-between px-4 py-2.5" style={{ background: editingField === field.id ? theme.accent : "#f9fafb" }}>
+                <div className="flex items-center gap-2">
+                  <span className="text-base">{SURVEY_FIELD_TYPES.find(t => t.value === field.type)?.icon}</span>
+                  <span className={`font-bold text-sm ${editingField === field.id ? "text-white" : "text-gray-700"}`}>
+                    {field.label || `سؤال ${fi + 1}`}
+                  </span>
+                  {field.emoji && <span className="text-base">{field.emoji}</span>}
+                </div>
+                <div className="flex gap-1">
+                  <button onClick={() => moveField(field.id, -1)} className="text-gray-400 hover:text-gray-600 px-1 text-sm">↑</button>
+                  <button onClick={() => moveField(field.id,  1)} className="text-gray-400 hover:text-gray-600 px-1 text-sm">↓</button>
+                  <button onClick={() => setEditingField(editingField === field.id ? null : field.id)}
+                    className={`px-2 py-0.5 rounded-lg text-xs font-bold transition-all ${editingField === field.id ? "bg-white text-gray-700" : "bg-gray-200 text-gray-600 hover:bg-gray-300"}`}>
+                    {editingField === field.id ? "✕ إغلاق" : "✏️ تعديل"}
+                  </button>
+                  <button onClick={() => removeField(field.id)} className="text-red-400 hover:text-red-600 px-1 text-sm">🗑️</button>
+                </div>
+              </div>
+
+              {/* تعديل الحقل */}
+              {editingField === field.id && (
+                <div className="p-4 space-y-3 border-t border-gray-100">
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 mb-1 block">نص السؤال</label>
+                      <input value={field.label} onChange={e => updateField(field.id, { label: e.target.value })}
+                        placeholder="اكتب السؤال..." style={{ fontFamily: s.font }}
+                        className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 text-sm focus:outline-none focus:border-blue-400" />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 mb-1 block">نوع الإجابة</label>
+                      <select value={field.type} onChange={e => updateField(field.id, { type: e.target.value })}
+                        className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 text-sm focus:outline-none">
+                        {SURVEY_FIELD_TYPES.map(t => <option key={t.value} value={t.value}>{t.icon} {t.label}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 mb-1 block">حجم الخط</label>
+                      <select value={field.fontSize || "text-sm"} onChange={e => updateField(field.id, { fontSize: e.target.value })}
+                        className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 text-sm focus:outline-none">
+                        <option value="text-xs">صغير</option>
+                        <option value="text-sm">متوسط</option>
+                        <option value="text-base">كبير</option>
+                        <option value="text-lg">كبير جداً</option>
+                      </select>
+                    </div>
+                  </div>
+                  {/* إيموجي */}
+                  <div>
+                    <label className="text-xs font-bold text-gray-500 mb-1.5 block">رمز تعبيري</label>
+                    <div className="flex gap-1.5 flex-wrap">
+                      {SURVEY_FACES.map(f => (
+                        <button key={f} onClick={() => updateField(field.id, { emoji: f === field.emoji ? "" : f })}
+                          className="w-8 h-8 rounded-lg text-base flex items-center justify-center border-2 transition-all"
+                          style={{ background: field.emoji === f ? "#dbeafe" : "#f3f4f6", borderColor: field.emoji === f ? "#3b82f6" : "transparent" }}>
+                          {f || "✕"}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  {/* خيارات radio/checkbox */}
+                  {(field.type === "radio" || field.type === "checkbox") && (
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 mb-2 block">الخيارات</label>
+                      <div className="space-y-2">
+                        {(field.options || []).map((opt, oi) => (
+                          <div key={oi} className="flex gap-2 items-center">
+                            <span className="text-gray-400 text-xs w-4">{oi + 1}</span>
+                            <input value={opt} onChange={e => { const opts = [...field.options]; opts[oi] = e.target.value; updateField(field.id, { options: opts }); }}
+                              style={{ fontFamily: s.font }}
+                              className="flex-1 px-3 py-1.5 rounded-lg border-2 border-gray-200 text-sm focus:outline-none focus:border-blue-400" />
+                            <button onClick={() => updateField(field.id, { options: field.options.filter((_, i) => i !== oi) })}
+                              className="text-red-400 hover:text-red-600 text-sm px-1">✕</button>
+                          </div>
+                        ))}
+                        <button onClick={() => updateField(field.id, { options: [...(field.options || []), `خيار ${(field.options?.length || 0) + 1}`] })}
+                          className="text-blue-600 text-xs font-bold hover:underline">+ إضافة خيار</button>
+                      </div>
+                    </div>
+                  )}
+                  <label className="flex items-center gap-2 text-sm cursor-pointer">
+                    <input type="checkbox" checked={field.required} onChange={e => updateField(field.id, { required: e.target.checked })} />
+                    <span className="font-bold text-gray-600">إجباري</span>
+                  </label>
+                </div>
+              )}
+
+              {/* معاينة الحقل */}
+              {editingField !== field.id && field.label && (
+                <div className="px-4 py-3">
+                  <div className={`font-bold text-gray-700 mb-2 flex items-center gap-2 ${field.fontSize || "text-sm"}`} style={{ fontFamily: s.font }}>
+                    {field.emoji && <span>{field.emoji}</span>}
+                    {field.label}
+                    {field.required && <span className="text-red-500 text-xs">*</span>}
+                  </div>
+                  {field.type === "text" && <div className="h-9 rounded-xl border-2 border-dashed border-gray-200 bg-gray-50" />}
+                  {(field.type === "radio" || field.type === "checkbox") && (
+                    <div className="flex flex-wrap gap-2">
+                      {(field.options || []).map((o, i) => (
+                        <span key={i} className="px-3 py-1.5 rounded-full text-xs border-2 border-gray-200 text-gray-500" style={{ fontFamily: s.font }}>{o}</span>
+                      ))}
+                    </div>
+                  )}
+                  {field.type === "scale" && (
+                    <div className="flex gap-1">
+                      {[1,2,3,4,5].map(n => <span key={n} className="w-9 h-9 rounded-xl border-2 border-gray-200 text-gray-400 text-sm flex items-center justify-center font-bold">{"⭐".repeat(n).slice(-1)}{n}</span>)}
+                    </div>
+                  )}
+                  {field.type === "yesno" && (
+                    <div className="flex gap-2">
+                      <span className="px-5 py-2 rounded-xl border-2 border-green-200 text-green-600 text-sm font-bold">✅ نعم</span>
+                      <span className="px-5 py-2 rounded-xl border-2 border-red-200 text-red-500 text-sm font-bold">❌ لا</span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* زر إضافة سؤال */}
+        <button onClick={addField}
+          className="w-full py-3 rounded-2xl border-2 border-dashed font-black text-sm hover:opacity-90 transition-all"
+          style={{ borderColor: theme.accent, color: theme.accent, background: theme.bg }}>
+          ➕ إضافة سؤال جديد
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function SurveyRespond({ survey, onClose }) {
+  const [answers, setAnswers] = useState({});
+  const [submitted, setSubmitted] = useState(false);
+  const theme = SURVEY_THEMES[survey.theme ?? 0];
+
+  const setAns = (fid, val) => setAnswers(p => ({ ...p, [fid]: val }));
+  const toggleCheck = (fid, opt) => {
+    const cur = answers[fid] || [];
+    setAns(fid, cur.includes(opt) ? cur.filter(x => x !== opt) : [...cur, opt]);
+  };
+
+  const submit = () => {
+    const missing = survey.fields.filter(f => f.required && !answers[f.id]);
+    if (missing.length > 0) { alert(`يرجى الإجابة على: ${missing.map(f => f.label).join("، ")}`); return; }
+    setSubmitted(true);
+  };
+
+  if (submitted) return (
+    <div className="bg-white rounded-3xl p-10 text-center shadow-xl border border-gray-100">
+      <div className="text-6xl mb-4">🎉</div>
+      <h3 className="font-black text-gray-800 text-xl mb-2">شكراً لمشاركتك!</h3>
+      <p className="text-gray-500 text-sm mb-5">تم استلام إجابتك بنجاح وسيتم مراجعتها من قِبل الإدارة</p>
+      <button onClick={onClose} className="px-6 py-2.5 rounded-xl text-white font-bold" style={{ background: theme.accent }}>العودة</button>
+    </div>
+  );
+
+  return (
+    <div className="rounded-3xl overflow-hidden shadow-xl border border-gray-100" style={{ background: theme.bg, fontFamily: survey.font || "Tajawal" }}>
+      <div className="px-6 py-5 text-white" style={{ background: `linear-gradient(135deg, ${theme.header}, ${theme.accent})` }}>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h3 className="font-black text-xl mb-1">{survey.title}</h3>
+            {survey.description && <p className="opacity-80 text-sm">{survey.description}</p>}
+          </div>
+          <button onClick={onClose} className="text-white opacity-60 hover:opacity-100 text-xl font-bold flex-shrink-0">✕</button>
+        </div>
+        <div className="mt-3 flex gap-3 text-xs opacity-80">
+          <span>👥 {survey.target}</span>
+          <span>📅 {survey.createdAt}</span>
+          <span>❓ {survey.fields.length} سؤال</span>
+        </div>
+      </div>
+      <div className="p-5 space-y-4">
+        {survey.fields.map((field, fi) => (
+          <div key={field.id} className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+            <div className={`font-bold text-gray-800 mb-3 flex items-center gap-2 ${field.fontSize || "text-sm"}`}>
+              {field.emoji && <span className="text-lg">{field.emoji}</span>}
+              <span>{fi + 1}. {field.label}</span>
+              {field.required && <span className="text-red-500 text-xs mr-1">*</span>}
+            </div>
+            {field.type === "text" && (
+              <textarea rows={3} value={answers[field.id] || ""} onChange={e => setAns(field.id, e.target.value)}
+                placeholder="اكتب إجابتك هنا..."
+                className="w-full px-3 py-2.5 rounded-xl border-2 border-gray-200 text-sm focus:outline-none resize-none"
+                style={{ borderColor: answers[field.id] ? theme.accent : undefined, fontFamily: survey.font }} />
+            )}
+            {(field.type === "radio") && (
+              <div className="space-y-2">
+                {(field.options || []).map(opt => (
+                  <label key={opt} className="flex items-center gap-3 cursor-pointer p-2.5 rounded-xl border-2 transition-all hover:border-blue-200"
+                    style={{ borderColor: answers[field.id] === opt ? theme.accent : "#e5e7eb", background: answers[field.id] === opt ? theme.bg : "white" }}>
+                    <input type="radio" name={`f${field.id}`} value={opt} checked={answers[field.id] === opt} onChange={() => setAns(field.id, opt)} className="sr-only" />
+                    <div className="w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0"
+                      style={{ borderColor: answers[field.id] === opt ? theme.accent : "#d1d5db", background: answers[field.id] === opt ? theme.accent : "white" }}>
+                      {answers[field.id] === opt && <div className="w-2 h-2 rounded-full bg-white" />}
+                    </div>
+                    <span className="text-sm font-medium text-gray-700" style={{ fontFamily: survey.font }}>{opt}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+            {(field.type === "checkbox") && (
+              <div className="space-y-2">
+                {(field.options || []).map(opt => {
+                  const checked = (answers[field.id] || []).includes(opt);
+                  return (
+                    <label key={opt} className="flex items-center gap-3 cursor-pointer p-2.5 rounded-xl border-2 transition-all hover:border-blue-200"
+                      style={{ borderColor: checked ? theme.accent : "#e5e7eb", background: checked ? theme.bg : "white" }}>
+                      <input type="checkbox" checked={checked} onChange={() => toggleCheck(field.id, opt)} className="sr-only" />
+                      <div className="w-5 h-5 rounded-lg border-2 flex items-center justify-center flex-shrink-0"
+                        style={{ borderColor: checked ? theme.accent : "#d1d5db", background: checked ? theme.accent : "white" }}>
+                        {checked && <span className="text-white text-xs font-black">✓</span>}
+                      </div>
+                      <span className="text-sm font-medium text-gray-700" style={{ fontFamily: survey.font }}>{opt}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+            {field.type === "scale" && (
+              <div className="flex gap-2">
+                {[1,2,3,4,5].map(n => (
+                  <button key={n} onClick={() => setAns(field.id, n)}
+                    className="flex-1 py-3 rounded-xl border-2 font-black text-sm transition-all"
+                    style={{ borderColor: answers[field.id] === n ? theme.accent : "#e5e7eb", background: answers[field.id] === n ? theme.accent : "white", color: answers[field.id] === n ? "white" : "#374151" }}>
+                    {"⭐".repeat(n)}
+                  </button>
+                ))}
+              </div>
+            )}
+            {field.type === "yesno" && (
+              <div className="flex gap-3">
+                {[["نعم","✅","#dcfce7","#16a34a"], ["لا","❌","#fee2e2","#dc2626"]].map(([opt, icon, bg, col]) => (
+                  <button key={opt} onClick={() => setAns(field.id, opt)}
+                    className="flex-1 py-3 rounded-xl border-2 font-black text-sm transition-all"
+                    style={{ borderColor: answers[field.id] === opt ? col : "#e5e7eb", background: answers[field.id] === opt ? bg : "white", color: answers[field.id] === opt ? col : "#9ca3af" }}>
+                    {icon} {opt}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+        <button onClick={submit}
+          className="w-full py-4 rounded-2xl text-white font-black text-base shadow-lg hover:shadow-xl transition-all"
+          style={{ background: `linear-gradient(135deg, ${theme.header}, ${theme.accent})` }}>
+          📤 إرسال الإجابات
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function SurveysPage({ surveys, setSurveys, saveSurveys, isParent }) {
+  const [mode, setMode] = useState("list"); // list | build | respond
+  const [editing, setEditing] = useState(null);
+  const [responding, setResponding] = useState(null);
+  const [filterTarget, setFilterTarget] = useState("all");
+
+  const saveSurvey = (s) => {
+    const exists = surveys.find(x => x.id === s.id);
+    const updated = exists ? surveys.map(x => x.id === s.id ? s : x) : [s, ...surveys];
+    setSurveys(updated); saveSurveys(updated); setMode("list"); setEditing(null);
+  };
+  const deleteSurvey = (id) => {
+    if (!confirm("حذف هذا الاستبيان نهائياً؟")) return;
+    const updated = surveys.filter(s => s.id !== id);
+    setSurveys(updated); saveSurveys(updated);
+  };
+  const toggleActive = (id) => {
+    const updated = surveys.map(s => s.id === id ? { ...s, active: !s.active } : s);
+    setSurveys(updated); saveSurveys(updated);
+  };
+
+  const filtered = surveys.filter(s => {
+    if (isParent && !s.active) return false;
+    if (filterTarget !== "all" && s.target !== filterTarget && s.target !== "الجميع") return false;
+    return true;
+  });
+
+  if (mode === "build") return (
+    <SurveyBuilder survey={editing || newSurvey()} onSave={saveSurvey} onCancel={() => { setMode("list"); setEditing(null); }} />
+  );
+  if (mode === "respond" && responding) return (
+    <SurveyRespond survey={responding} onClose={() => { setMode("list"); setResponding(null); }} />
+  );
+
+  return (
+    <div dir="rtl">
+      {/* رأس الصفحة */}
+      <div className="rounded-3xl overflow-hidden mb-6 shadow-xl" style={{ background: "linear-gradient(135deg, #4c1d95 0%, #7c3aed 60%, #a78bfa 100%)" }}>
+        <div className="p-8 text-white">
+          <div className="flex flex-col md:flex-row items-center gap-6">
+            <div className="text-7xl flex-shrink-0">📊</div>
+            <div className="text-center md:text-right flex-1">
+              <h2 className="text-2xl font-black mb-2">الاستبيانات والاستطلاعات</h2>
+              <p className="text-purple-100 text-sm leading-relaxed">
+                منصة متكاملة لإنشاء استبيانات احترافية وجمع آراء أولياء الأمور والمعلمين والطلاب
+                — شاركونا في تطوير بيئتنا التعليمية
+              </p>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white bg-opacity-10 px-6 py-3 flex flex-wrap gap-4 justify-between items-center">
+          <div className="flex gap-4 text-white text-sm">
+            <span>📋 إجمالي الاستبيانات: <b>{surveys.length}</b></span>
+            <span>✅ نشط: <b>{surveys.filter(s => s.active).length}</b></span>
+          </div>
+          {!isParent && (
+            <button onClick={() => { setEditing(null); setMode("build"); }}
+              className="bg-white text-purple-700 px-5 py-2 rounded-xl font-black text-sm hover:bg-purple-50 shadow">
+              ➕ استبيان جديد
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* فلتر */}
+      {!isParent && (
+        <div className="flex gap-2 mb-4 flex-wrap">
+          {["all", ...SURVEY_TARGETS].map(t => (
+            <button key={t} onClick={() => setFilterTarget(t)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold border-2 transition-all ${filterTarget === t ? "bg-purple-600 text-white border-purple-600" : "bg-white text-gray-500 border-gray-200"}`}>
+              {t === "all" ? "الكل" : t}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* قائمة الاستبيانات */}
+      {filtered.length === 0 ? (
+        <div className="bg-white rounded-2xl p-12 text-center border-2 border-dashed border-purple-100">
+          <div className="text-5xl mb-3">📋</div>
+          <div className="font-bold text-gray-400 mb-3">لا توجد استبيانات {isParent ? "متاحة" : "بعد"}</div>
+          {!isParent && (
+            <button onClick={() => setMode("build")} className="bg-purple-600 text-white px-6 py-2.5 rounded-xl font-bold hover:bg-purple-700">
+              ➕ إنشاء أول استبيان
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2">
+          {filtered.map(s => {
+            const theme = SURVEY_THEMES[s.theme ?? 0];
+            return (
+              <div key={s.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-all">
+                <div className="px-5 py-4 text-white" style={{ background: `linear-gradient(135deg, ${theme.header}, ${theme.accent})` }}>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1">
+                      <h3 className="font-black text-base leading-tight">{s.title || "استبيان بدون عنوان"}</h3>
+                      {s.description && <p className="opacity-80 text-xs mt-1 line-clamp-2">{s.description}</p>}
+                    </div>
+                    {!s.active && <span className="bg-white bg-opacity-20 text-white text-xs px-2 py-0.5 rounded-full font-bold flex-shrink-0">متوقف</span>}
+                  </div>
+                  <div className="flex gap-3 mt-3 text-xs opacity-80">
+                    <span>👥 {s.target}</span>
+                    <span>❓ {s.fields.length} سؤال</span>
+                    <span>📅 {s.createdAt}</span>
+                  </div>
+                </div>
+                <div className="px-4 py-3 flex gap-2 flex-wrap">
+                  <button onClick={() => { setResponding(s); setMode("respond"); }}
+                    className="flex-1 py-2 rounded-xl text-white text-xs font-black hover:opacity-90 transition-all"
+                    style={{ background: theme.accent }}>
+                    📝 {isParent ? "ملء الاستبيان" : "معاينة"}
+                  </button>
+                  {!isParent && (
+                    <>
+                      <button onClick={() => { setEditing(s); setMode("build"); }}
+                        className="px-3 py-2 rounded-xl bg-gray-100 text-gray-600 text-xs font-bold hover:bg-gray-200">✏️ تعديل</button>
+                      <button onClick={() => toggleActive(s.id)}
+                        className={`px-3 py-2 rounded-xl text-xs font-bold ${s.active ? "bg-amber-50 text-amber-700 hover:bg-amber-100" : "bg-green-50 text-green-700 hover:bg-green-100"}`}>
+                        {s.active ? "⏸ إيقاف" : "▶ تفعيل"}
+                      </button>
+                      <button onClick={() => deleteSurvey(s.id)} className="px-3 py-2 rounded-xl bg-red-50 text-red-500 text-xs font-bold hover:bg-red-100">🗑️</button>
+                    </>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AnnouncementsPage({ announcements, setAnnouncements, saveAnnouncements }) {
   const [showForm, setShowForm] = useState(false);
   const [newAnn, setNewAnn] = useState({ title: "", content: "", category: "إعلانات", priority: "عادي", bgColor: "" });
@@ -2331,11 +3114,13 @@ export default function SchoolWebsite() {
   const [classList, setClassList] = useState([]);
   const [users] = useState(DEFAULT_USERS);
   const [siteFont, setSiteFont] = useState("'Noto Naskh Arabic', serif");
+  const [messages, setMessages] = useState([]);
+  const [surveys, setSurveys] = useState([]);
 
   useEffect(() => {
     const h = () => {
       const hash = window.location.hash.replace("#","") || "home";
-      if (["home","attendance","announcements","activities","settings","students"].includes(hash)) setPage(hash);
+      if (["home","attendance","announcements","activities","settings","students","messages","surveys"].includes(hash)) setPage(hash);
     };
     window.addEventListener("hashchange", h); h();
     return () => window.removeEventListener("hashchange", h);
@@ -2346,7 +3131,7 @@ export default function SchoolWebsite() {
   useEffect(() => {
     (async () => {
       try {
-        const [t, w, att, ann, act, font, clsListMeta] = await Promise.all([
+        const [t, w, att, ann, act, font, clsListMeta, msgs, survs] = await Promise.all([
           DB.get("school-teachers", DEFAULT_TEACHERS),
           DB.get("school-week", DEFAULT_WEEK),
           DB.get("school-attendance", {}),
@@ -2354,9 +3139,13 @@ export default function SchoolWebsite() {
           DB.get("school-activities", DEFAULT_ACTIVITIES),
           DB.get("school-font", "'Noto Naskh Arabic', serif"),
           DB.get("school-class-list", []),
+          DB.get("school-messages", []),
+          DB.get("school-surveys", []),
         ]);
         setTeachers(t); setWeek(w); setAttendance(att); setAnnouncements(ann);
         setActivities(act); setSiteFont(font);
+        setMessages(Array.isArray(msgs) ? msgs : []);
+        setSurveys(Array.isArray(survs) ? survs : []);
         // تحميل بيانات كل فصل
         if (clsListMeta && clsListMeta.length > 0) {
           const classDataArr = await Promise.all(clsListMeta.map(m => DB.get(`school-cls-${m.id}`, { ...m, students: [] })));
@@ -2381,6 +3170,8 @@ export default function SchoolWebsite() {
   const saveSiteFont = (v) => DB.set("school-font", v);
   const saveClass = (cls) => DB.set(`school-cls-${cls.id}`, cls);
   const deleteClass = (id) => DB.set(`school-cls-${id}`, null);
+  const saveMessages = (v) => DB.set("school-messages", v);
+  const saveSurveys = (v) => DB.set("school-surveys", v);
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center" style={{ background: "linear-gradient(135deg, #f0fdfa 0%, #ecfdf5 50%, #f5f5f4 100%)" }}>
@@ -2393,16 +3184,18 @@ export default function SchoolWebsite() {
   );
 
   if (!user && teacherPortal) return <TeacherPortal classList={classList} setClassList={setClassList} saveClass={saveClass} siteFont={siteFont} onBack={() => setTeacherPortal(false)} />;
-  if (!user && parentPortal) return <ParentPortal classList={classList} siteFont={siteFont} onBack={() => setParentPortal(false)} />;
+  if (!user && parentPortal) return <ParentPortal classList={classList} messages={messages} setMessages={setMessages} saveMessages={saveMessages} surveys={surveys} setSurveys={setSurveys} saveSurveys={saveSurveys} siteFont={siteFont} onBack={() => setParentPortal(false)} />;
   if (!user) return <LoginPage users={users} onLogin={setUser} siteFont={siteFont} onParentPortal={() => setParentPortal(true)} onTeacherPortal={() => setTeacherPortal(true)} />;
 
   const pages = [
-    { id: "home",          label: "الرئيسية",       icon: "🏠" },
-    { id: "attendance",    label: "غياب المعلمين",  icon: "📋" },
-    { id: "students",      label: "تقييم الطلاب",  icon: "👨‍🎓" },
-    { id: "announcements", label: "الإعلانات",      icon: "📢" },
-    { id: "activities",    label: "الأنشطة",        icon: "⚡" },
-    { id: "settings",      label: "الإعدادات",      icon: "⚙️" },
+    { id: "home",          label: "الرئيسية",        icon: "🏠" },
+    { id: "attendance",    label: "غياب المعلمين",   icon: "📋" },
+    { id: "students",      label: "تقييم الطلاب",   icon: "👨‍🎓" },
+    { id: "announcements", label: "الإعلانات",       icon: "📢" },
+    { id: "activities",    label: "الأنشطة",         icon: "⚡" },
+    { id: "messages",      label: "رسائل الأهالي",  icon: "✉️" },
+    { id: "surveys",       label: "الاستبيانات",     icon: "📊" },
+    { id: "settings",      label: "الإعدادات",       icon: "⚙️" },
   ];
 
   return (
@@ -2454,6 +3247,8 @@ export default function SchoolWebsite() {
         {page === "students"      && <StudentsPage classList={classList} setClassList={setClassList} saveClass={saveClass} deleteClass={deleteClass} />}
         {page === "announcements" && <AnnouncementsPage announcements={announcements} setAnnouncements={setAnnouncements} saveAnnouncements={saveAnnouncements} />}
         {page === "activities"    && <ActivitiesPage activities={activities} />}
+        {page === "messages"      && <MessagesPage messages={messages} setMessages={setMessages} saveMessages={saveMessages} isParent={false} />}
+        {page === "surveys"       && <SurveysPage surveys={surveys} setSurveys={setSurveys} saveSurveys={saveSurveys} isParent={false} />}
         {page === "settings"      && <SettingsPage teachers={teachers} setTeachers={setTeachers} saveTeachers={saveTeachers} week={week} setWeek={setWeek} saveWeek={saveWeek} users={users} siteFont={siteFont} setSiteFont={setSiteFont} saveSiteFont={saveSiteFont} />}
       </main>
       <footer className="text-center py-6 text-xs text-gray-400 border-t border-gray-200 bg-white mt-8">
