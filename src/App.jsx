@@ -2087,11 +2087,27 @@ function MessagesPage({ messages, setMessages, saveMessages, isParent, parentNam
           </div>
         </div>
         <div className="bg-white bg-opacity-10 px-6 py-3 flex flex-wrap gap-4 justify-between items-center">
-          <div className="flex gap-4 text-white text-sm">
-            <span className="font-bold">📨 إجمالي الرسائل: <b>{messages.length}</b></span>
-            {unread > 0 && <span className="bg-red-500 text-white px-2 py-0.5 rounded-full text-xs font-black">{unread} غير مقروءة</span>}
+          <div className="flex gap-2 flex-wrap">
+            {/* زر دعوة أولياء الأمور */}
+            {!isParent && (
+              <button onClick={() => {
+                const link = "https://school-website1.vercel.app";
+                const msg = encodeURIComponent(
+                  `🏫 *مدرسة عبيدة بن الحارث المتوسطة*\n\n` +
+                  `✉️ *بوابة التواصل مع الأسرة*\n\n` +
+                  `أعزاءنا أولياء الأمور،\n` +
+                  `يسعدنا إطلاق بوابة التواصل المدرسي حيث يمكنكم إرسال آرائكم ومقترحاتكم واستفساراتكم مباشرةً لإدارة المدرسة.\n\n` +
+                  `👈 اضغط الرابط وأدخل رقم هوية الطالب:\n${link}\n\n` +
+                  `_ثم اختر تبويب "رسالة" ✉️_`
+                );
+                window.open(`https://wa.me/?text=${msg}`, "_blank");
+              }}
+                className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-xl font-black text-xs flex items-center gap-1.5 shadow">
+                <span className="text-base">📲</span> دعوة أولياء الأمور عبر واتساب
+              </button>
+            )}
+            {saved && <span className="bg-green-400 text-white px-4 py-1.5 rounded-full text-sm font-black">✅ تم إرسال رسالتك بنجاح!</span>}
           </div>
-          {saved && <span className="bg-green-400 text-white px-4 py-1.5 rounded-full text-sm font-black">✅ تم إرسال رسالتك بنجاح!</span>}
         </div>
       </div>
 
@@ -2618,10 +2634,49 @@ function SurveyRespond({ survey, onClose }) {
 }
 
 function SurveysPage({ surveys, setSurveys, saveSurveys, isParent }) {
-  const [mode, setMode] = useState("list"); // list | build | respond
+  const [mode, setMode] = useState("list");
   const [editing, setEditing] = useState(null);
   const [responding, setResponding] = useState(null);
   const [filterTarget, setFilterTarget] = useState("all");
+  const [copiedId, setCopiedId] = useState(null);
+  const [shareMsg, setShareMsg] = useState("");
+
+  const BASE_URL = "https://school-website1.vercel.app";
+
+  const getSurveyLink = (s) => `${BASE_URL}/?survey=${s.id}`;
+
+  const copyLink = (s) => {
+    const link = getSurveyLink(s);
+    navigator.clipboard.writeText(link).then(() => {
+      setCopiedId(s.id);
+      setTimeout(() => setCopiedId(null), 2000);
+    });
+  };
+
+  const shareWhatsApp = (s) => {
+    const link = getSurveyLink(s);
+    const msg = encodeURIComponent(
+      `🏫 *مدرسة عبيدة بن الحارث المتوسطة*\n\n` +
+      `📊 *${s.title}*\n` +
+      (s.description ? `${s.description}\n\n` : `\n`) +
+      `👥 موجّه إلى: ${s.target}\n\n` +
+      `📝 للمشاركة في الاستبيان اضغط الرابط:\n${link}\n\n` +
+      `_أدخل رقم هوية الطالب للوصول_`
+    );
+    window.open(`https://wa.me/?text=${msg}`, "_blank");
+  };
+
+  const shareMsgPage = () => {
+    const link = BASE_URL;
+    const msg = encodeURIComponent(
+      `🏫 *مدرسة عبيدة بن الحارث المتوسطة*\n\n` +
+      `✉️ *بوابة التواصل مع المدرسة*\n\n` +
+      `يمكنكم الآن إرسال آرائكم ومقترحاتكم واستفساراتكم مباشرةً إلى إدارة المدرسة\n\n` +
+      `👈 اضغط الرابط وأدخل رقم هوية الطالب:\n${link}\n\n` +
+      `_ثم اختر تبويب "رسالة" 📩_`
+    );
+    window.open(`https://wa.me/?text=${msg}`, "_blank");
+  };
 
   const saveSurvey = (s) => {
     const exists = surveys.find(x => x.id === s.id);
@@ -2643,6 +2698,8 @@ function SurveysPage({ surveys, setSurveys, saveSurveys, isParent }) {
     if (filterTarget !== "all" && s.target !== filterTarget && s.target !== "الجميع") return false;
     return true;
   });
+
+  const newSurveyCount = surveys.filter(s => s.active).length;
 
   if (mode === "build") return (
     <SurveyBuilder survey={editing || newSurvey()} onSave={saveSurvey} onCancel={() => { setMode("list"); setEditing(null); }} />
@@ -2667,19 +2724,39 @@ function SurveysPage({ surveys, setSurveys, saveSurveys, isParent }) {
             </div>
           </div>
         </div>
-        <div className="bg-white bg-opacity-10 px-6 py-3 flex flex-wrap gap-4 justify-between items-center">
+        <div className="bg-white bg-opacity-10 px-6 py-3 flex flex-wrap gap-3 justify-between items-center">
           <div className="flex gap-4 text-white text-sm">
             <span>📋 إجمالي الاستبيانات: <b>{surveys.length}</b></span>
             <span>✅ نشط: <b>{surveys.filter(s => s.active).length}</b></span>
           </div>
-          {!isParent && (
-            <button onClick={() => { setEditing(null); setMode("build"); }}
-              className="bg-white text-purple-700 px-5 py-2 rounded-xl font-black text-sm hover:bg-purple-50 shadow">
-              ➕ استبيان جديد
-            </button>
-          )}
+          <div className="flex gap-2 flex-wrap">
+            {/* زر مشاركة بوابة الرسائل عبر واتساب */}
+            {!isParent && (
+              <button onClick={shareMsgPage}
+                className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-xl font-black text-xs flex items-center gap-1.5 shadow">
+                <span className="text-base">📲</span> دعوة أولياء الأمور للتواصل
+              </button>
+            )}
+            {!isParent && (
+              <button onClick={() => { setEditing(null); setMode("build"); }}
+                className="bg-white text-purple-700 px-5 py-2 rounded-xl font-black text-sm hover:bg-purple-50 shadow">
+                ➕ استبيان جديد
+              </button>
+            )}
+          </div>
         </div>
       </div>
+
+      {/* إشعار لولي الأمر عند وجود استبيانات نشطة */}
+      {isParent && newSurveyCount > 0 && (
+        <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-4 mb-4 flex items-start gap-3 shadow-sm">
+          <span className="text-2xl flex-shrink-0">🔔</span>
+          <div>
+            <div className="font-black text-amber-800 text-sm">يوجد {newSurveyCount} استبيان بانتظار مشاركتك!</div>
+            <div className="text-amber-600 text-xs mt-0.5">رأيك يهمنا — شاركنا في تطوير بيئة أبنائنا التعليمية</div>
+          </div>
+        </div>
+      )}
 
       {/* فلتر */}
       {!isParent && (
@@ -2708,6 +2785,7 @@ function SurveysPage({ surveys, setSurveys, saveSurveys, isParent }) {
         <div className="grid gap-4 sm:grid-cols-2">
           {filtered.map(s => {
             const theme = SURVEY_THEMES[s.theme ?? 0];
+            const link = getSurveyLink(s);
             return (
               <div key={s.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-all">
                 <div className="px-5 py-4 text-white" style={{ background: `linear-gradient(135deg, ${theme.header}, ${theme.accent})` }}>
@@ -2724,6 +2802,20 @@ function SurveysPage({ surveys, setSurveys, saveSurveys, isParent }) {
                     <span>📅 {s.createdAt}</span>
                   </div>
                 </div>
+
+                {/* رابط الاستبيان — للإدارة فقط */}
+                {!isParent && (
+                  <div className="px-4 pt-3 pb-1">
+                    <div className="flex items-center gap-1.5 bg-gray-50 rounded-xl px-3 py-2 border border-gray-200">
+                      <span className="text-xs text-gray-400 flex-1 truncate" dir="ltr">{link}</span>
+                      <button onClick={() => copyLink(s)}
+                        className={`flex-shrink-0 px-2.5 py-1 rounded-lg text-xs font-black transition-all ${copiedId === s.id ? "bg-green-500 text-white" : "bg-gray-200 text-gray-600 hover:bg-gray-300"}`}>
+                        {copiedId === s.id ? "✓ تم" : "📋 نسخ"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 <div className="px-4 py-3 flex gap-2 flex-wrap">
                   <button onClick={() => { setResponding(s); setMode("respond"); }}
                     className="flex-1 py-2 rounded-xl text-white text-xs font-black hover:opacity-90 transition-all"
@@ -2732,6 +2824,11 @@ function SurveysPage({ surveys, setSurveys, saveSurveys, isParent }) {
                   </button>
                   {!isParent && (
                     <>
+                      {/* زر مشاركة واتساب */}
+                      <button onClick={() => shareWhatsApp(s)}
+                        className="px-3 py-2 rounded-xl bg-green-50 text-green-700 text-xs font-black hover:bg-green-100 flex items-center gap-1">
+                        <span>📲</span> واتساب
+                      </button>
                       <button onClick={() => { setEditing(s); setMode("build"); }}
                         className="px-3 py-2 rounded-xl bg-gray-100 text-gray-600 text-xs font-bold hover:bg-gray-200">✏️ تعديل</button>
                       <button onClick={() => toggleActive(s.id)}
