@@ -1073,68 +1073,78 @@ function ParentPortal({ classList, siteFont, onBack }) {
               </div>
             </div>
 
-            {/* ملخص المستوى */}
-            {totalGraded > 0 && (
-              <div className="bg-white rounded-2xl shadow-xl p-4">
-                <h4 className="font-black text-gray-800 mb-3 text-sm">📊 ملخص المستوى العام</h4>
-                <div className="flex gap-2 flex-wrap">
-                  {Object.entries(gradeCount).map(([g, cnt]) => {
-                    const gd = GRADE_MAP[g];
-                    if (!gd) return null;
-                    return <span key={g} className="px-3 py-1.5 rounded-full text-xs font-bold" style={{ backgroundColor: gd.bg, color: gd.c }}>{gd.label}: {cnt} مادة</span>;
-                  })}
+            {/* التقييمات الأسبوعية */}
+            {(() => {
+              const evals = result.student.evals || [];
+              const LMAP = { weak: { label: "ضعيف", bg: "#FF6B6B", c: "#fff" }, accept: { label: "مقبول", bg: "#FFD93D", c: "#5a4200" }, good: { label: "جيد", bg: "#A8E6CF", c: "#1a4a30" }, vgood: { label: "جيد جداً", bg: "#4ECDC4", c: "#fff" }, excel: { label: "ممتاز", bg: "#2ECC71", c: "#fff" } };
+              const CATS = [{ key:"behavior", label:"السلوك", icon:"🌿" }, { key:"homework", label:"الواجبات", icon:"📝" }, { key:"participation", label:"المشاركة", icon:"🙋" }, { key:"discipline", label:"الانضباط", icon:"⚖️" }];
+
+              if (evals.length === 0) return (
+                <div className="bg-white rounded-2xl shadow-xl p-5 text-center">
+                  <div className="text-3xl mb-2">📋</div>
+                  <div className="text-sm text-gray-400 font-bold">لا توجد تقييمات أسبوعية بعد</div>
                 </div>
-                {weakCount === 0 && excellentCount >= 3 && (
-                  <div className="mt-3 bg-green-50 text-green-700 text-xs font-bold p-3 rounded-xl text-center">🌟 أداء ممتاز — استمر في التفوق!</div>
-                )}
-                {weakCount >= 2 && (
-                  <div className="mt-3 bg-red-50 text-red-600 text-xs font-bold p-3 rounded-xl text-center">⚠️ يحتاج إلى اهتمام في بعض المواد</div>
-                )}
-              </div>
-            )}
+              );
 
-            {/* تقييم كل مادة */}
-            <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
-              <div className="px-4 py-3 font-black text-white text-sm" style={{ background: "#1B3A6B" }}>📚 مستوى الطالب في المواد</div>
-              <div className="divide-y divide-gray-100">
-                {SUBJECTS.map(subj => {
-                  const gradeVal = result.student.grades?.[subj.key] || "";
-                  const gd = GRADE_MAP[gradeVal];
-                  const noteData = result.student.notes?.[subj.key] || {};
-                  return (
-                    <div key={subj.key} className="px-4 py-3 border-b border-gray-100 last:border-0">
-                      <div className="flex items-center justify-between mb-1">
-                        <div className="flex items-center gap-2">
-                          <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: subj.color }}></div>
-                          <span className="font-bold text-gray-800 text-sm">{subj.label}</span>
-                          {noteData.face && <span className="text-base">{noteData.face}</span>}
+              const lastEval = evals[evals.length - 1];
+              const lastLv = LMAP[lastEval?.level];
+
+              return (
+                <>
+                  {/* آخر مستوى */}
+                  {lastLv && (
+                    <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
+                      <div className="px-4 py-3 font-black text-white text-sm" style={{ background: "#1B3A6B" }}>⭐ آخر تقييم أسبوعي</div>
+                      <div className="p-4">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="text-xs text-gray-400">{lastEval.day} {lastEval.dateH}</div>
+                          <span className="px-4 py-2 rounded-full font-black text-sm" style={{ background: lastLv.bg, color: lastLv.c }}>{lastLv.label}</span>
                         </div>
-                        {gd ? (
-                          <span className="px-3 py-1 rounded-full text-xs font-black" style={{ backgroundColor: gd.bg, color: gd.c }}>{gd.label}</span>
-                        ) : (
-                          <span className="px-3 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-400">لم يُقيَّم</span>
-                        )}
+                        {CATS.map(cat => {
+                          const d = lastEval.categories?.[cat.key];
+                          if (!d?.text && !d?.face) return null;
+                          return (
+                            <div key={cat.key} className="flex items-start gap-2 rounded-xl px-3 py-2 mb-2"
+                              style={{ background: d.color || "#f9fafb", border: "1px solid #e5e7eb" }}>
+                              <span className="text-lg flex-shrink-0">{cat.icon}</span>
+                              <div className="flex-1">
+                                <div className="text-xs font-black text-gray-600">{cat.label}</div>
+                                <div className="text-sm text-gray-700 mt-0.5">{d.text}</div>
+                              </div>
+                              {d.face && <span className="text-xl">{d.face}</span>}
+                            </div>
+                          );
+                        })}
                       </div>
-                      {noteData.note && (
-                        <div className="mr-5 text-xs text-gray-600 bg-amber-50 rounded-lg px-3 py-1.5 border border-amber-100 mt-1">
-                          💬 <span className="font-medium">{noteData.note}</span>
-                        </div>
-                      )}
                     </div>
-                  );
-                })}
-              </div>
-            </div>
+                  )}
 
-            {/* دليل التقييم */}
-            <div className="bg-white rounded-2xl shadow-xl p-4">
-              <div className="text-xs font-bold text-gray-600 mb-2">🎨 دليل التقييم:</div>
-              <div className="flex gap-2 flex-wrap">
-                {[{ bg: "#FF6B6B", c: "#fff", l: "ضعيف < 60%" }, { bg: "#FFD93D", c: "#5a4200", l: "مقبول 60-69%" }, { bg: "#A8E6CF", c: "#1a4a30", l: "جيد 70-79%" }, { bg: "#4ECDC4", c: "#fff", l: "جيد جداً 80-89%" }, { bg: "#2ECC71", c: "#fff", l: "ممتاز 90%+" }].map(x => (
-                  <span key={x.l} className="px-2 py-1 rounded-full text-xs font-bold" style={{ backgroundColor: x.bg, color: x.c }}>{x.l}</span>
-                ))}
-              </div>
-            </div>
+                  {/* سجل التقييمات */}
+                  {evals.length > 1 && (
+                    <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
+                      <div className="px-4 py-3 font-black text-white text-sm" style={{ background: "#1B3A6B" }}>📅 سجل التقييمات الأسبوعية ({evals.length})</div>
+                      <div className="divide-y divide-gray-100">
+                        {[...evals].reverse().map((ev, i) => {
+                          const lv = LMAP[ev.level];
+                          return (
+                            <div key={ev.id} className="flex items-center justify-between px-4 py-3">
+                              <div>
+                                <div className="text-xs font-black text-gray-600">{ev.day} {ev.dateH}</div>
+                                <div className="text-xs text-gray-400 mt-0.5">
+                                  {CATS.filter(c => ev.categories?.[c.key]?.text).map(c => c.icon + " " + c.label).join(" · ")}
+                                </div>
+                              </div>
+                              {lv ? <span className="px-3 py-1 rounded-full text-xs font-black" style={{ background: lv.bg, color: lv.c }}>{lv.label}</span>
+                                : <span className="text-xs text-gray-300">—</span>}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </>
+              );
+            })()}
           </div>
         )}
 
@@ -1280,129 +1290,325 @@ function TeacherPortal({ classList, setClassList, saveClass, siteFont, onBack })
     </div>
   );
 }
+// ===== ثوابت التقييم الأسبوعي =====
+const EVAL_LEVELS = [
+  { value: "", label: "— المستوى —", bg: "#f5f5f5", color: "#aaa" },
+  { value: "weak",  label: "ضعيف",    bg: "#FF6B6B", color: "#fff" },
+  { value: "accept",label: "مقبول",   bg: "#FFD93D", color: "#5a4200" },
+  { value: "good",  label: "جيد",     bg: "#A8E6CF", color: "#1a4a30" },
+  { value: "vgood", label: "جيد جداً",bg: "#4ECDC4", color: "#fff" },
+  { value: "excel", label: "ممتاز",   bg: "#2ECC71", color: "#fff" },
+];
+const EVAL_FACES = ["","😊","😁","😐","😟","😞","⭐","👍","👎","💪","📚","⚠️","🌟","🔥","💯"];
+const EVAL_COLORS = [
+  { label: "بدون", value: "" },
+  { label: "أخضر", value: "#d1fae5" },
+  { label: "أصفر", value: "#fef9c3" },
+  { label: "أحمر", value: "#fee2e2" },
+  { label: "أزرق", value: "#dbeafe" },
+  { label: "بنفسجي", value: "#ede9fe" },
+  { label: "برتقالي", value: "#ffedd5" },
+];
+const EVAL_CATEGORIES = [
+  { key: "behavior",      label: "السلوك",      icon: "🌿" },
+  { key: "homework",      label: "الواجبات",    icon: "📝" },
+  { key: "participation", label: "المشاركة",    icon: "🙋" },
+  { key: "discipline",    label: "الانضباط",    icon: "⚖️" },
+];
+const HIJRI_DAYS = ["الأحد","الاثنين","الثلاثاء","الأربعاء","الخميس"];
+
+// نموذج تقييم أسبوعي جديد
+function newEval() {
+  return {
+    id: Date.now() + Math.random() * 1000 | 0,
+    dateH: "",
+    day: "الأحد",
+    level: "",
+    categories: {},
+  };
+}
+
+// مكوّن التقييم الأسبوعي للطالب
+function StudentEvalCard({ student, onUpdate, onDelete }) {
+  const [expanded, setExpanded] = useState(false);
+  const [addingEval, setAddingEval] = useState(false);
+  const [draft, setDraft] = useState(newEval());
+  const [openCats, setOpenCats] = useState({});
+
+  const evals = student.evals || [];
+  const lastEval = evals[evals.length - 1];
+  const lastLevel = lastEval ? EVAL_LEVELS.find(l => l.value === lastEval.level) : null;
+
+  const toggleCat = (key) => setOpenCats(p => ({ ...p, [key]: !p[key] }));
+
+  const updateDraftCat = (key, field, val) => {
+    setDraft(p => ({ ...p, categories: { ...p.categories, [key]: { ...(p.categories[key] || {}), [field]: val } } }));
+  };
+
+  const saveEval = () => {
+    if (!draft.level) { alert("اختر المستوى أولاً"); return; }
+    const updated = { ...student, evals: [...evals, { ...draft, id: Date.now() }] };
+    onUpdate(updated);
+    setAddingEval(false);
+    setDraft(newEval());
+    setOpenCats({});
+  };
+
+  const deleteEval = (eid) => {
+    if (!confirm("حذف هذا التقييم؟")) return;
+    onUpdate({ ...student, evals: evals.filter(e => e.id !== eid) });
+  };
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden mb-3">
+      {/* رأس الطالب */}
+      <div className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-gray-50 transition-all"
+        style={{ borderRight: `4px solid ${lastLevel ? lastLevel.bg : "#e5e7eb"}` }}
+        onClick={() => setExpanded(p => !p)}>
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-full flex items-center justify-center font-black text-sm"
+            style={{ background: "#1B3A6B", color: "#fff" }}>{student.num}</div>
+          <div>
+            <div className="font-black text-gray-800">{student.name || <span className="text-gray-300 font-normal">اسم الطالب</span>}</div>
+            {student.nationalId && <div className="text-xs text-gray-400">{student.nationalId}</div>}
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          {lastLevel && lastLevel.value && (
+            <span className="px-3 py-1 rounded-full text-xs font-black" style={{ background: lastLevel.bg, color: lastLevel.color }}>
+              {lastLevel.label}
+            </span>
+          )}
+          <span className="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded-full font-bold">{evals.length} تقييم</span>
+          <button onClick={e => { e.stopPropagation(); onDelete(student.id); }}
+            className="text-red-300 hover:text-red-500 text-sm px-1 font-bold">✕</button>
+          <span className="text-gray-400 text-lg">{expanded ? "▲" : "▼"}</span>
+        </div>
+      </div>
+
+      {/* تفاصيل الطالب */}
+      {expanded && (
+        <div className="border-t border-gray-100">
+          {/* قائمة التقييمات السابقة */}
+          {evals.length > 0 && (
+            <div className="px-4 pt-3 space-y-3">
+              {evals.map(ev => {
+                const lv = EVAL_LEVELS.find(l => l.value === ev.level) || EVAL_LEVELS[0];
+                return (
+                  <div key={ev.id} className="rounded-xl border border-gray-100 overflow-hidden">
+                    {/* رأس التقييم */}
+                    <div className="flex items-center justify-between px-3 py-2" style={{ background: lv.bg || "#f5f5f5" }}>
+                      <div className="flex items-center gap-2">
+                        <span className="font-black text-sm" style={{ color: lv.color }}>{lv.label}</span>
+                        {ev.dateH && <span className="text-xs opacity-70" style={{ color: lv.color }}>📅 {ev.day} {ev.dateH}</span>}
+                      </div>
+                      <button onClick={() => deleteEval(ev.id)} className="text-xs opacity-50 hover:opacity-100 px-2 py-0.5 rounded-lg hover:bg-red-100 hover:text-red-600 transition-all">🗑️</button>
+                    </div>
+                    {/* ملاحظات الفئات */}
+                    {EVAL_CATEGORIES.map(cat => {
+                      const catData = ev.categories?.[cat.key];
+                      if (!catData?.text && !catData?.face) return null;
+                      return (
+                        <div key={cat.key} className="flex items-start gap-2 px-3 py-2 border-t border-gray-50"
+                          style={{ background: catData.color || "#fff" }}>
+                          <span className="text-base flex-shrink-0">{cat.icon}</span>
+                          <div className="flex-1">
+                            <span className="text-xs font-black text-gray-600">{cat.label}:</span>
+                            <span className="text-xs text-gray-700 mr-1">{catData.text}</span>
+                          </div>
+                          {catData.face && <span className="text-base">{catData.face}</span>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* نموذج تقييم جديد */}
+          {addingEval ? (
+            <div className="m-4 bg-blue-50 rounded-2xl p-4 border-2 border-blue-200">
+              <div className="font-black text-blue-800 mb-3 text-sm">➕ تقييم أسبوعي جديد</div>
+
+              {/* التاريخ واليوم والمستوى */}
+              <div className="grid grid-cols-3 gap-2 mb-3">
+                <div>
+                  <label className="text-xs font-bold text-gray-500 mb-1 block">اليوم</label>
+                  <select value={draft.day} onChange={e => setDraft(p => ({ ...p, day: e.target.value }))}
+                    className="w-full px-2 py-2 rounded-xl border-2 border-gray-200 text-sm focus:outline-none focus:border-blue-400">
+                    {HIJRI_DAYS.map(d => <option key={d} value={d}>{d}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-500 mb-1 block">التاريخ الهجري</label>
+                  <input type="text" placeholder="مثال: 15/09/1447" value={draft.dateH}
+                    onChange={e => setDraft(p => ({ ...p, dateH: e.target.value }))}
+                    className="w-full px-2 py-2 rounded-xl border-2 border-gray-200 text-sm text-center focus:outline-none focus:border-blue-400" />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-500 mb-1 block">المستوى *</label>
+                  <select value={draft.level} onChange={e => setDraft(p => ({ ...p, level: e.target.value }))}
+                    className="w-full px-2 py-2 rounded-xl border-2 border-gray-200 text-sm font-bold focus:outline-none focus:border-blue-400"
+                    style={draft.level ? { background: EVAL_LEVELS.find(l=>l.value===draft.level)?.bg, color: EVAL_LEVELS.find(l=>l.value===draft.level)?.color } : {}}>
+                    {EVAL_LEVELS.map(l => <option key={l.value} value={l.value}>{l.label}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              {/* فئات الملاحظات */}
+              <div className="space-y-2 mb-3">
+                {EVAL_CATEGORIES.map(cat => {
+                  const catData = draft.categories[cat.key] || {};
+                  const isOpen = openCats[cat.key];
+                  return (
+                    <div key={cat.key} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                      <button className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-gray-50 transition-all"
+                        onClick={() => toggleCat(cat.key)}>
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">{cat.icon}</span>
+                          <span className="font-black text-gray-700 text-sm">{cat.label}</span>
+                          {catData.face && <span className="text-base">{catData.face}</span>}
+                          {catData.text && <span className="text-xs text-gray-400 truncate max-w-32">{catData.text}</span>}
+                        </div>
+                        <span className="text-gray-400 text-xs">{isOpen ? "▲" : "▼"}</span>
+                      </button>
+                      {isOpen && (
+                        <div className="px-3 pb-3 space-y-2 border-t border-gray-100"
+                          style={{ background: catData.color || "#fff" }}>
+                          {/* الوجه التعبيري */}
+                          <div className="pt-2">
+                            <div className="text-xs font-bold text-gray-500 mb-1.5">الوجه التعبيري:</div>
+                            <div className="flex gap-1.5 flex-wrap">
+                              {EVAL_FACES.map(f => (
+                                <button key={f} onClick={() => updateDraftCat(cat.key, "face", f === catData.face ? "" : f)}
+                                  className="w-8 h-8 rounded-lg text-base flex items-center justify-center transition-all"
+                                  style={{ background: catData.face === f ? "#dbeafe" : "#f3f4f6", border: catData.face === f ? "2px solid #3b82f6" : "2px solid transparent" }}>
+                                  {f || "✕"}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          {/* لون الخلفية */}
+                          <div>
+                            <div className="text-xs font-bold text-gray-500 mb-1.5">لون الخلفية:</div>
+                            <div className="flex gap-1.5 flex-wrap">
+                              {EVAL_COLORS.map(c => (
+                                <button key={c.value} onClick={() => updateDraftCat(cat.key, "color", c.value)}
+                                  className="px-2.5 py-1 rounded-lg text-xs font-bold border-2 transition-all"
+                                  style={{ background: c.value || "#f3f4f6", borderColor: catData.color === c.value ? "#3b82f6" : "transparent" }}>
+                                  {c.label}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          {/* الملاحظة */}
+                          <div>
+                            <div className="text-xs font-bold text-gray-500 mb-1.5">الملاحظة:</div>
+                            <textarea value={catData.text || ""} rows={2}
+                              onChange={e => updateDraftCat(cat.key, "text", e.target.value)}
+                              placeholder={`اكتب ملاحظة عن ${cat.label}...`}
+                              className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 text-sm focus:outline-none focus:border-blue-400 resize-none"
+                              style={{ fontFamily: "inherit" }} />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="flex gap-2">
+                <button onClick={saveEval} className="flex-1 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-black hover:bg-blue-700">💾 حفظ التقييم</button>
+                <button onClick={() => { setAddingEval(false); setDraft(newEval()); setOpenCats({}); }}
+                  className="px-4 py-2.5 rounded-xl bg-gray-100 text-gray-600 text-sm font-bold hover:bg-gray-200">إلغاء</button>
+              </div>
+            </div>
+          ) : (
+            <div className="px-4 py-3">
+              <button onClick={() => setAddingEval(true)}
+                className="w-full py-2.5 rounded-xl border-2 border-dashed border-blue-300 text-blue-600 text-sm font-black hover:border-blue-500 hover:bg-blue-50 transition-all">
+                ➕ إضافة تقييم أسبوعي
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ClassTable({ cls, onUpdateClass, onSave }) {
   const [search, setSearch] = useState("");
   const [editInfo, setEditInfo] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [info, setInfo] = useState({ level: cls.level, section: cls.section, teacher: cls.teacher, semester: cls.semester });
 
-  // حفظ تلقائي عند تغيير البيانات
   useEffect(() => {
     const t = setTimeout(() => onSave(cls), 800);
     return () => clearTimeout(t);
   }, [cls.students]);
 
-  const updateGrade = (sid, subj, val) => {
-    onUpdateClass({ ...cls, students: cls.students.map(s => s.id === sid ? { ...s, grades: { ...s.grades, [subj]: val } } : s) });
-  };
-  const updateNote = (sid, subj, note) => {
-    onUpdateClass({ ...cls, students: cls.students.map(s => s.id === sid ? { ...s, notes: { ...(s.notes||{}), [subj]: { ...(s.notes?.[subj]||{}), note } } } : s) });
-  };
-  const updateFace = (sid, subj, face) => {
-    onUpdateClass({ ...cls, students: cls.students.map(s => s.id === sid ? { ...s, notes: { ...(s.notes||{}), [subj]: { ...(s.notes?.[subj]||{}), face } } } : s) });
-  };
-  const updateName = (sid, name) => {
-    onUpdateClass({ ...cls, students: cls.students.map(s => s.id === sid ? { ...s, name } : s) });
-  };
-  const updateNationalId = (sid, nationalId) => {
-    onUpdateClass({ ...cls, students: cls.students.map(s => s.id === sid ? { ...s, nationalId } : s) });
+  const updateName = (sid, name) => onUpdateClass({ ...cls, students: cls.students.map(s => s.id === sid ? { ...s, name } : s) });
+  const updateNationalId = (sid, nationalId) => onUpdateClass({ ...cls, students: cls.students.map(s => s.id === sid ? { ...s, nationalId } : s) });
+  const updateStudent = (updated) => onUpdateClass({ ...cls, students: cls.students.map(s => s.id === updated.id ? updated : s) });
+  const removeStudent = (sid) => {
+    if (!confirm("حذف الطالب وجميع تقييماته؟")) return;
+    onUpdateClass({ ...cls, students: cls.students.filter(s => s.id !== sid).map((s, i) => ({ ...s, num: i + 1 })) });
   };
   const handleExcelImport = (importedStudents) => {
     const start = cls.students.length;
-    const numbered = importedStudents.map((s, i) => ({ ...s, num: start + i + 1 }));
-    onUpdateClass({ ...cls, students: [...cls.students, ...numbered] });
+    onUpdateClass({ ...cls, students: [...cls.students, ...importedStudents.map((s, i) => ({ ...s, num: start + i + 1 }))] });
   };
-  const addStudent = () => {
-    const num = cls.students.length + 1;
-    onUpdateClass({ ...cls, students: [...cls.students, newStudent(num)] });
-  };
+  const addStudent = () => onUpdateClass({ ...cls, students: [...cls.students, newStudent(cls.students.length + 1)] });
   const addMany = (count) => {
     const start = cls.students.length;
-    const extra = Array.from({ length: count }, (_, i) => newStudent(start + i + 1));
-    onUpdateClass({ ...cls, students: [...cls.students, ...extra] });
-  };
-  const removeStudent = (sid) => {
-    const updated = cls.students.filter(s => s.id !== sid).map((s, i) => ({ ...s, num: i + 1 }));
-    onUpdateClass({ ...cls, students: updated });
+    onUpdateClass({ ...cls, students: [...cls.students, ...Array.from({ length: count }, (_, i) => newStudent(start + i + 1))] });
   };
   const saveInfo = () => {
     const updated = { ...cls, ...info, name: `${info.level} / ${info.section}` };
-    onUpdateClass(updated);
-    onSave(updated);
-    setEditInfo(false);
+    onUpdateClass(updated); onSave(updated); setEditInfo(false);
   };
-  const clearGrades = () => {
-    if (!confirm("هل تريد مسح جميع التقييمات لهذا الفصل؟")) return;
-    onUpdateClass({ ...cls, students: cls.students.map(s => ({ ...s, grades: {} })) });
-  };
-
-  const getGradeStyle = (value) => {
-    const g = GRADE_OPTIONS.find(o => o.value === value) || GRADE_OPTIONS[0];
-    return { backgroundColor: g.bg, color: g.color, borderColor: g.border };
-  };
-
-  const counts = { weak: 0, accept: 0, good: 0, vgood: 0, excel: 0 };
-  cls.students.forEach(s => Object.values(s.grades || {}).forEach(g => { if (g && counts[g] !== undefined) counts[g]++; }));
 
   const filtered = search ? cls.students.filter(s => s.name.includes(search)) : cls.students;
 
   const handlePrint = () => {
     const w = window.open("", "_blank");
+    const rows = cls.students.map(s => {
+      const evals = s.evals || [];
+      const last = evals[evals.length - 1];
+      const lv = EVAL_LEVELS.find(l => l.value === last?.level) || EVAL_LEVELS[0];
+      const cats = EVAL_CATEGORIES.map(cat => {
+        const d = last?.categories?.[cat.key];
+        return d?.text ? `${cat.icon} ${cat.label}: ${d.text}` : null;
+      }).filter(Boolean).join(" | ");
+      return `<tr>
+        <td>${s.num}</td>
+        <td style="text-align:right;padding-right:8px">${s.name||"—"}</td>
+        <td style="background:${lv.bg||'#fff'};color:${lv.color||'#333'};font-weight:700">${lv.label==="— المستوى —"?"—":lv.label}</td>
+        <td style="font-size:10px;text-align:right;padding:4px 8px">${last?.dateH||""} ${last?.day||""}</td>
+        <td style="font-size:9px;text-align:right;padding:4px 8px">${cats}</td>
+      </tr>`;
+    }).join("");
     w.document.write(`<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8">
-    <title>سجل تقييم — ${cls.name}</title>
-    <style>
-      *{margin:0;padding:0;box-sizing:border-box}
-      body{font-family:'Tajawal',Arial,sans-serif;padding:16px;direction:rtl;font-size:11px;background:#fff}
-      h1{text-align:center;font-size:15px;color:#1B3A6B;margin-bottom:3px}
-      .sub{text-align:center;color:#666;font-size:10px;margin-bottom:10px}
-      .info-row{display:flex;gap:16px;margin-bottom:8px;font-size:10px;background:#D6E4F0;padding:6px 10px;border-radius:6px}
-      table{width:100%;border-collapse:collapse}
-      th,td{border:1px solid #ccc;padding:4px 5px;text-align:center;font-size:10px}
-      th{color:#fff;font-weight:700}
-      .h-name{background:#1B3A6B}.h-math{background:#C00000}.h-sci{background:#375623}
-      .h-eng{background:#7030A0}.h-arab{background:#C55A11}.h-soc{background:#2E75B6}.h-isl{background:#833C00}
-      tr:nth-child(odd) td{background:#f4f7fb} tr:nth-child(even) td{background:#fff}
-      .g-weak{background:#FF6B6B;color:#fff}.g-accept{background:#FFD93D;color:#5a4200}
-      .g-good{background:#A8E6CF;color:#1a4a30}.g-vgood{background:#4ECDC4;color:#fff}.g-excel{background:#2ECC71;color:#fff}
-      .legend{margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;font-size:9px}
-      .lb{padding:2px 8px;border-radius:4px;font-weight:700}
-      @page{margin:1cm;size:A3 landscape}
-    </style></head><body>
-    <h1>🏫 سجل تقييم الطلاب — ${cls.name || cls.level + " / " + cls.section}</h1>
-    <div class="sub">مدرسة عبيدة بن الحارث المتوسطة — العام الدراسي ١٤٤٧هـ</div>
-    <div class="info-row">
-      <span>📅 الفصل الدراسي: <b>${cls.semester || "—"}</b></span>
-      <span>🎓 المستوى: <b>${cls.level} / ${cls.section}</b></span>
-      <span>👨‍🏫 المعلم: <b>${cls.teacher || "—"}</b></span>
-      <span>👨‍🎓 عدد الطلاب: <b>${cls.students.filter(s=>s.name).length}</b></span>
-    </div>
-    <table><thead><tr>
-      <th class="h-name" style="width:28px">م</th>
-      <th class="h-name" style="text-align:right;padding-right:8px;min-width:140px">اسم الطالب</th>
-      <th class="h-math">رياضيات</th><th class="h-sci">علوم</th><th class="h-eng">إنجليزي</th>
-      <th class="h-arab">لغتي</th><th class="h-soc">اجتماعيات</th><th class="h-isl">تربية إسلامية</th>
-    </tr></thead><tbody>`);
-    cls.students.forEach((s, i) => {
-      w.document.write(`<tr><td>${i+1}</td><td style="text-align:right;padding-right:8px">${s.name || "—"}</td>`);
-      SUBJECTS.forEach(subj => {
-        const g = GRADE_OPTIONS.find(o => o.value === (s.grades?.[subj.key] || "")) || GRADE_OPTIONS[0];
-        w.document.write(`<td class="${g.value ? `g-${g.value}` : ''}">${g.label === "— اختر —" ? "—" : g.label}</td>`);
-      });
-      w.document.write("</tr>");
-    });
-    w.document.write(`</tbody></table>
-    <div class="legend">🎨 دليل:
-      <span class="lb" style="background:#FF6B6B;color:#fff">ضعيف</span>
-      <span class="lb" style="background:#FFD93D;color:#5a4200">مقبول</span>
-      <span class="lb" style="background:#A8E6CF;color:#1a4a30">جيد</span>
-      <span class="lb" style="background:#4ECDC4;color:#fff">جيد جداً</span>
-      <span class="lb" style="background:#2ECC71;color:#fff">ممتاز</span>
-    </div>
-    <div style="display:flex;gap:40px;margin-top:24px;font-size:10px">
+    <title>سجل التقييم الأسبوعي — ${cls.name}</title>
+    <style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Tajawal',Arial,sans-serif;padding:20px;direction:rtl;font-size:12px}
+    h1{text-align:center;color:#1B3A6B;font-size:16px;margin-bottom:4px}.sub{text-align:center;color:#666;font-size:10px;margin-bottom:12px}
+    table{width:100%;border-collapse:collapse}th,td{border:1px solid #ddd;padding:6px;text-align:center}
+    th{background:#1B3A6B;color:#fff}tr:nth-child(odd){background:#f4f7fb}
+    .footer{text-align:center;margin-top:20px;font-size:9px;color:#999}
+    @page{size:A4;margin:1.5cm}</style></head><body>
+    <h1>🏫 سجل التقييم الأسبوعي — ${cls.name||cls.level+" / "+cls.section}</h1>
+    <div class="sub">مدرسة عبيدة بن الحارث المتوسطة — الفصل ${cls.semester||"—"} — ${cls.teacher||""}</div>
+    <table><thead><tr><th>م</th><th>اسم الطالب</th><th>آخر مستوى</th><th>التاريخ</th><th>الملاحظات</th></tr></thead>
+    <tbody>${rows}</tbody></table>
+    <div style="display:flex;gap:40px;margin-top:20px;font-size:10px">
       <div>توقيع المعلم: __________________</div>
       <div>توقيع مدير المدرسة: __________________</div>
       <div>التاريخ: __________________</div>
-    </div></body></html>`);
+    </div>
+    <div class="footer">بوابة مدرسة عبيدة بن الحارث الإلكترونية © ١٤٤٧هـ</div>
+    </body></html>`);
     w.document.close();
     setTimeout(() => w.print(), 300);
   };
@@ -1412,43 +1618,30 @@ function ClassTable({ cls, onUpdateClass, onSave }) {
       {/* بيانات الفصل */}
       <div className="bg-white rounded-2xl shadow-sm border border-blue-100 mb-4 overflow-hidden">
         <div className="flex items-center justify-between px-4 py-3" style={{ background: "#1B3A6B" }}>
-          <span className="font-bold text-white text-sm">📋 بيانات الفصل</span>
+          <span className="font-bold text-white text-sm">📋 بيانات الفصل والمعلم</span>
           <button onClick={() => setEditInfo(!editInfo)} className="text-xs bg-white bg-opacity-20 hover:bg-opacity-30 text-white px-3 py-1 rounded-lg font-bold">
             {editInfo ? "✕ إلغاء" : "✏️ تعديل"}
           </button>
         </div>
         {editInfo ? (
-          <div className="p-4 space-y-3">
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <div>
-                <label className="text-xs font-bold text-gray-500 mb-1 block">المستوى</label>
-                <select value={info.level} onChange={e => setInfo(p => ({ ...p, level: e.target.value }))}
-                  className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 focus:border-blue-400 focus:outline-none text-sm">
-                  {LEVELS.map(l => <option key={l} value={l}>{l}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="text-xs font-bold text-gray-500 mb-1 block">الشعبة</label>
-                <select value={info.section} onChange={e => setInfo(p => ({ ...p, section: e.target.value }))}
-                  className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 focus:border-blue-400 focus:outline-none text-sm">
-                  {SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="text-xs font-bold text-gray-500 mb-1 block">اسم المعلم</label>
-                <input type="text" value={info.teacher} placeholder="اكتب الاسم"
-                  onChange={e => setInfo(p => ({ ...p, teacher: e.target.value }))}
-                  className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 focus:border-blue-400 focus:outline-none text-sm" />
-              </div>
-              <div>
-                <label className="text-xs font-bold text-gray-500 mb-1 block">الفصل الدراسي</label>
-                <select value={info.semester} onChange={e => setInfo(p => ({ ...p, semester: e.target.value }))}
-                  className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 focus:border-blue-400 focus:outline-none text-sm">
-                  <option value="الأول">الأول</option><option value="الثاني">الثاني</option><option value="الثالث">الثالث</option>
-                </select>
-              </div>
+          <div className="p-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div><label className="text-xs font-bold text-gray-500 mb-1 block">المستوى</label>
+              <select value={info.level} onChange={e => setInfo(p => ({ ...p, level: e.target.value }))} className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 text-sm focus:outline-none focus:border-blue-400">
+                {LEVELS.map(l => <option key={l} value={l}>{l}</option>)}
+              </select></div>
+            <div><label className="text-xs font-bold text-gray-500 mb-1 block">الشعبة</label>
+              <select value={info.section} onChange={e => setInfo(p => ({ ...p, section: e.target.value }))} className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 text-sm focus:outline-none focus:border-blue-400">
+                {SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+              </select></div>
+            <div><label className="text-xs font-bold text-gray-500 mb-1 block">اسم المعلم</label>
+              <input type="text" value={info.teacher} placeholder="اكتب الاسم" onChange={e => setInfo(p => ({ ...p, teacher: e.target.value }))} className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 text-sm focus:outline-none focus:border-blue-400" /></div>
+            <div><label className="text-xs font-bold text-gray-500 mb-1 block">الفصل الدراسي</label>
+              <select value={info.semester} onChange={e => setInfo(p => ({ ...p, semester: e.target.value }))} className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 text-sm focus:outline-none focus:border-blue-400">
+                <option>الأول</option><option>الثاني</option><option>الثالث</option>
+              </select></div>
+            <div className="col-span-2 sm:col-span-4">
+              <button onClick={saveInfo} className="bg-blue-600 text-white px-6 py-2 rounded-xl text-sm font-bold hover:bg-blue-700">💾 حفظ</button>
             </div>
-            <button onClick={saveInfo} className="bg-blue-600 text-white px-6 py-2 rounded-xl text-sm font-bold hover:bg-blue-700">💾 حفظ البيانات</button>
           </div>
         ) : (
           <div className="flex flex-wrap gap-4 px-4 py-3 text-sm">
@@ -1460,149 +1653,81 @@ function ClassTable({ cls, onUpdateClass, onSave }) {
         )}
       </div>
 
-      {/* إحصائيات سريعة */}
-      <div className="flex gap-2 mb-4 flex-wrap">
-        {[
-          { key: "weak", label: "ضعيف", bg: "#FF6B6B", c: "#fff" },
-          { key: "accept", label: "مقبول", bg: "#FFD93D", c: "#5a4200" },
-          { key: "good", label: "جيد", bg: "#A8E6CF", c: "#1a4a30" },
-          { key: "vgood", label: "جيد جداً", bg: "#4ECDC4", c: "#fff" },
-          { key: "excel", label: "ممتاز", bg: "#2ECC71", c: "#fff" },
-        ].map(s => (
-          <span key={s.key} className="px-3 py-1.5 rounded-full text-xs font-bold"
-            style={{ backgroundColor: s.bg, color: s.c }}>{s.label}: {counts[s.key]}</span>
-        ))}
-        <span className="bg-green-50 text-green-700 px-3 py-1.5 rounded-full text-xs font-bold">💾 حفظ تلقائي</span>
-      </div>
-
-      {/* شريط الأدوات */}
+      {/* أدوات */}
       <div className="flex gap-2 mb-4 flex-wrap">
         <input type="text" placeholder="🔍 بحث عن طالب..." value={search} onChange={e => setSearch(e.target.value)}
           className="flex-1 min-w-40 px-4 py-2.5 rounded-xl border-2 border-gray-200 focus:border-blue-400 focus:outline-none text-sm bg-white" />
         <button onClick={addStudent} className="bg-blue-600 text-white px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-blue-700">+ طالب</button>
-        <button onClick={() => addMany(5)} className="bg-blue-100 text-blue-700 px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-blue-200">+ 5</button>
-        <button onClick={() => addMany(43)} className="bg-indigo-100 text-indigo-700 px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-indigo-200">+ فصل كامل</button>
-        <button onClick={() => setShowImport(true)} className="bg-green-600 text-white px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-green-700">📊 استيراد إكسل</button>
+        <button onClick={() => addMany(5)} className="bg-blue-100 text-blue-700 px-4 py-2.5 rounded-xl text-sm font-bold">+ 5</button>
+        <button onClick={() => addMany(43)} className="bg-indigo-100 text-indigo-700 px-4 py-2.5 rounded-xl text-sm font-bold">+ كامل</button>
+        <button onClick={() => setShowImport(true)} className="bg-green-600 text-white px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-green-700">📊 إكسل</button>
         <button onClick={handlePrint} className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2.5 rounded-xl text-sm font-bold">🖨️ طباعة</button>
-        <button onClick={clearGrades} className="bg-red-50 hover:bg-red-100 text-red-600 px-4 py-2.5 rounded-xl text-sm font-bold">🗑️ مسح التقييمات</button>
       </div>
       {showImport && <ExcelImportModal onImport={handleExcelImport} onClose={() => setShowImport(false)} />}
 
-      {/* جدول الطلاب */}
+      {/* قائمة الطلاب */}
       {cls.students.length === 0 ? (
         <div className="bg-white rounded-2xl p-12 text-center border-2 border-dashed border-blue-200">
           <div className="text-5xl mb-3">👨‍🎓</div>
           <div className="font-bold text-gray-500 mb-3">لا يوجد طلاب في هذا الفصل بعد</div>
           <div className="flex gap-2 justify-center flex-wrap">
             <button onClick={addStudent} className="bg-blue-600 text-white px-5 py-2.5 rounded-xl text-sm font-bold">+ إضافة طالب</button>
-            <button onClick={() => addMany(43)} className="bg-indigo-600 text-white px-5 py-2.5 rounded-xl text-sm font-bold">+ إضافة 43 طالباً</button>
+            <button onClick={() => addMany(43)} className="bg-indigo-600 text-white px-5 py-2.5 rounded-xl text-sm font-bold">+ إضافة فصل كامل</button>
           </div>
         </div>
       ) : (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm" style={{ minWidth: "800px" }}>
-              <thead>
-                <tr>
-                  <th className="p-3 text-center text-white font-bold w-10" style={{ background: "#1B3A6B" }}>م</th>
-                  <th className="p-3 text-right text-white font-bold" style={{ background: "#1B3A6B", minWidth: "160px" }}>اسم الطالب</th>
-                  <th className="p-2 text-center text-white font-bold text-xs" style={{ background: "#374151", minWidth: "110px" }}>رقم الهوية</th>
-                  {SUBJECTS.map(s => (
-                    <th key={s.key} className="p-2 text-center text-white font-bold text-xs" style={{ background: s.color, minWidth: "110px" }}>{s.label}</th>
+        <div>
+          {/* تعديل الأسماء والهويات */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 mb-4 overflow-hidden">
+            <div className="bg-gray-50 px-4 py-2 border-b border-gray-100 text-xs font-bold text-gray-500">📝 تعديل الأسماء وأرقام الهويات</div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead><tr style={{ background: "#1B3A6B" }}>
+                  <th className="p-2 text-center text-white w-10 text-xs">م</th>
+                  <th className="p-2 text-right text-white text-xs">اسم الطالب</th>
+                  <th className="p-2 text-center text-white text-xs w-36">رقم الهوية</th>
+                </tr></thead>
+                <tbody>
+                  {filtered.map((s, idx) => (
+                    <tr key={s.id} style={{ background: idx % 2 === 0 ? "#f4f7fb" : "#fff" }}>
+                      <td className="p-2 text-center font-black text-xs" style={{ color: "#1B3A6B" }}>{s.num}</td>
+                      <td className="p-2">
+                        <input type="text" value={s.name} placeholder="اكتب اسم الطالب"
+                          onChange={e => updateName(s.id, e.target.value)}
+                          className="w-full border-none bg-transparent text-sm font-medium focus:outline-none" style={{ color: "#1B3A6B" }} />
+                      </td>
+                      <td className="p-1.5">
+                        <input type="text" value={s.nationalId || ""} placeholder="رقم الهوية"
+                          onChange={e => updateNationalId(s.id, e.target.value)}
+                          className="w-full border border-gray-200 rounded-lg px-2 py-1 text-xs text-center focus:outline-none focus:border-blue-400" />
+                      </td>
+                    </tr>
                   ))}
-                  <th className="p-2 text-center text-white font-bold text-xs w-10" style={{ background: "#374151" }}>حذف</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((student, idx) => (
-                  <tr key={student.id}
-                    style={{ background: idx % 2 === 0 ? "#f4f7fb" : "#fff" }}
-                    onMouseEnter={e => e.currentTarget.style.background = "#eaf1fb"}
-                    onMouseLeave={e => e.currentTarget.style.background = idx % 2 === 0 ? "#f4f7fb" : "#fff"}>
-                    <td className="p-2 text-center font-bold text-sm" style={{ color: "#1B3A6B", background: "#e8f0fb" }}>{student.num}</td>
-                    <td className="p-2">
-                      <input type="text" value={student.name} placeholder="اكتب اسم الطالب"
-                        onChange={e => updateName(student.id, e.target.value)}
-                        className="w-full border-none bg-transparent text-sm font-medium focus:outline-none"
-                        style={{ color: "#1B3A6B", fontFamily: "inherit" }} />
-                    </td>
-                    <td className="p-1.5">
-                      <input type="text" value={student.nationalId || ""} placeholder="رقم الهوية"
-                        onChange={e => updateNationalId(student.id, e.target.value)}
-                        className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs text-center focus:outline-none focus:border-blue-400"
-                        style={{ fontFamily: "inherit" }} />
-                    </td>
-                    {SUBJECTS.map(subj => {
-                      const val = student.grades?.[subj.key] || "";
-                      const st = getGradeStyle(val);
-                      const noteData = student.notes?.[subj.key] || {};
-                      const face = noteData.face || "";
-                      const note = noteData.note || "";
-                      const FACES = ["","😊","😐","😟","⭐","👍","👎","💪","📚","⚠️"];
-                      const hasNote = face || note;
-                      return (
-                        <td key={subj.key} className="p-1 text-center">
-                          <div className="flex items-center gap-1">
-                            <select value={val} onChange={e => updateGrade(student.id, subj.key, e.target.value)}
-                              className="flex-1 rounded-lg border-2 px-1 py-1.5 text-xs font-bold focus:outline-none cursor-pointer"
-                              style={{ ...st, appearance: "none", textAlign: "center" }}>
-                              {GRADE_OPTIONS.map(g => <option key={g.value} value={g.value}>{g.label}</option>)}
-                            </select>
-                            <button
-                              title="إضافة ملاحظة"
-                              onClick={() => {
-                                const f = prompt("الوجه التعبيري (اختر: 😊 😐 😟 ⭐ 👍 👎 💪 📚 ⚠️):", face);
-                                if (f === null) return;
-                                updateFace(student.id, subj.key, f.trim());
-                                const n = prompt("ملاحظة المعلم:", note);
-                                if (n === null) return;
-                                updateNote(student.id, subj.key, n.trim());
-                              }}
-                              className="w-6 h-6 rounded-lg flex items-center justify-center text-xs flex-shrink-0 transition-all"
-                              style={{ background: hasNote ? "#fef3c7" : "#f3f4f6", border: hasNote ? "1.5px solid #f59e0b" : "1.5px solid #e5e7eb" }}>
-                              {face || "💬"}
-                            </button>
-                          </div>
-                          {note && (
-                            <div className="mt-0.5 text-xs text-amber-700 bg-amber-50 rounded px-1 py-0.5 text-right truncate" style={{ maxWidth: "150px" }} title={note}>
-                              {note}
-                            </div>
-                          )}
-                        </td>
-                      );
-                    })}
-                    <td className="p-1 text-center">
-                      <button onClick={() => removeStudent(student.id)}
-                        className="w-7 h-7 rounded-lg bg-red-50 hover:bg-red-100 text-red-500 text-xs font-bold flex items-center justify-center mx-auto">✕</button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                </tbody>
+              </table>
+            </div>
           </div>
-          <div className="p-3 border-t border-gray-100 bg-gray-50 flex gap-2">
-            <button onClick={addStudent} className="bg-blue-600 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-blue-700">+ إضافة طالب</button>
-            <button onClick={() => addMany(5)} className="bg-blue-100 text-blue-700 px-4 py-2 rounded-xl text-xs font-bold">+ 5 طلاب</button>
+
+          {/* بطاقات التقييم الأسبوعي */}
+          <div className="mb-2 flex items-center justify-between">
+            <div className="font-black text-gray-700 text-sm">📊 التقييمات الأسبوعية ({filtered.length} طالب)</div>
+            <div className="flex gap-1.5 flex-wrap">
+              {EVAL_LEVELS.slice(1).map(l => (
+                <span key={l.value} className="px-2.5 py-1 rounded-full text-xs font-bold" style={{ background: l.bg, color: l.color }}>{l.label}</span>
+              ))}
+            </div>
           </div>
+          {filtered.map(s => (
+            <StudentEvalCard key={s.id} student={s} onUpdate={updateStudent} onDelete={removeStudent} />
+          ))}
         </div>
       )}
-
-      {/* دليل التقييم */}
-      <div className="mt-4 bg-white rounded-xl p-3 shadow-sm border border-gray-100 flex gap-2 flex-wrap items-center">
-        <span className="text-xs font-bold text-gray-600">🎨 دليل:</span>
-        {[
-          { bg: "#FF6B6B", c: "#fff", label: "ضعيف < 60%" },
-          { bg: "#FFD93D", c: "#5a4200", label: "مقبول 60-69%" },
-          { bg: "#A8E6CF", c: "#1a4a30", label: "جيد 70-79%" },
-          { bg: "#4ECDC4", c: "#fff", label: "جيد جداً 80-89%" },
-          { bg: "#2ECC71", c: "#fff", label: "ممتاز 90%+" },
-        ].map(l => <span key={l.label} className="px-2 py-1 rounded-full text-xs font-bold" style={{ backgroundColor: l.bg, color: l.c }}>{l.label}</span>)}
-      </div>
     </div>
   );
 }
 
-function StudentsPage({ classList, setClassList, saveClass, deleteClass }) {
+
+function StudentsPage({ classList, setClassList, saveClass, deleteClass, teacherMode, teacherName }) {
   const [activeId, setActiveId] = useState(null);
   const [showAddClass, setShowAddClass] = useState(false);
   const [newLevel, setNewLevel] = useState("الصف الأول");
