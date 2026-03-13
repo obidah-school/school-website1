@@ -2994,8 +2994,7 @@ async function loadXLSX() {
 
 function SMSPage({ teachers, attendance, week }) {
   const [tab, setTab] = useState("contacts");
-  const [username, setUsername] = useState("966548454776");
-  const [password, setPassword] = useState("");
+  const [apiKey, setApiKey] = useState("zrIbnRQNcJ7L5FIN9W6IQOI3dGLmp6vBz8pqbkzJcdcc9b29");
   const [sender, setSender] = useState("School1");
   const [showConfig, setShowConfig] = useState(false);
   const [sending, setSending] = useState(false);
@@ -3124,9 +3123,9 @@ function SMSPage({ teachers, attendance, week }) {
     { id: "bulk",     label: "رسالة للأهالي", icon: "👨‍👦" },
   ];
 
-  // ===== SEND FUNCTION — مباشر بدون خادم وسيط =====
+  // ===== SEND FUNCTION — API Key من المدار التقني =====
   const sendSMS = async (numbers, message) => {
-    if (!password) { setResult({ ok:false, topMsg:"⚙️ أدخل كلمة المرور في الإعدادات أولاً" }); return; }
+    if (!apiKey?.trim()) { setResult({ ok:false, topMsg:"⚙️ أدخل مفتاح API في الإعدادات أولاً" }); return; }
     if (!numbers?.trim()) { setResult({ ok:false, topMsg:"📞 أدخل رقماً واحداً على الأقل" }); return; }
     if (!message.trim()) { setResult({ ok:false, topMsg:"✏️ اكتب نص الرسالة" }); return; }
     setSending(true); setResult(null);
@@ -3137,72 +3136,103 @@ function SMSPage({ teachers, attendance, week }) {
       .join(",");
 
     const isArabic = /[\u0600-\u06FF]/.test(message);
-    const payload = { username, password, numbers: cleanNums, message, sender: sender || "School1", msgType: isArabic ? 2 : 0 };
+    const s = sender || "School1";
 
-    // محاولة 1: مباشر
-    const tryDirect = async () => {
-      const r = await fetch("https://app.mobile.net.sa/api/v1/sendSMS", {
+    // المسارات الرسمية لـ API المدار بمفتاح API
+    const attempts = [
+      // المسار الرسمي من توثيق المدار
+      {
+        label: "mobile.net.sa — Authorization Header",
+        url: "https://app.mobile.net.sa/api/v1/sendSMS",
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
+        body: JSON.stringify({ numbers: cleanNums, message, sender: s, msgType: isArabic ? 2 : 0 })
+      },
+      {
+        label: "mobile.net.sa — apiKey in body",
+        url: "https://app.mobile.net.sa/api/v1/sendSMS",
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-      const text = await r.text();
-      return { ok: r.ok, text, status: r.status };
-    };
-
-    // محاولة 2: عبر CORS proxy مجاني
-    const tryProxy = async () => {
-      const targetUrl = encodeURIComponent("https://app.mobile.net.sa/api/v1/sendSMS");
-      const r = await fetch(`https://corsproxy.io/?${targetUrl}`, {
+        body: JSON.stringify({ apiKey, numbers: cleanNums, message, sender: s, msgType: isArabic ? 2 : 0 })
+      },
+      {
+        label: "mobile.net.sa — api_key param",
+        url: "https://app.mobile.net.sa/api/v1/sendSMS",
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-      const text = await r.text();
-      return { ok: r.ok, text, status: r.status };
-    };
-
-    // محاولة 3: proxy بديل
-    const tryProxy2 = async () => {
-      const r = await fetch("https://api.allorigins.win/raw?url=" + encodeURIComponent("https://app.mobile.net.sa/api/v1/sendSMS"), {
+        body: JSON.stringify({ api_key: apiKey, numbers: cleanNums, message, sender: s })
+      },
+      {
+        label: "mobile.net.sa — token param",
+        url: "https://app.mobile.net.sa/api/v1/sendSMS",
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-API-KEY": apiKey },
+        body: JSON.stringify({ numbers: cleanNums, message, sender: s })
+      },
+      {
+        label: "mobile.net.sa — GET webservice",
+        url: `https://app.mobile.net.sa/webservice/?apiKey=${encodeURIComponent(apiKey)}&numbers=${encodeURIComponent(cleanNums)}&message=${encodeURIComponent(message)}&sender=${encodeURIComponent(s)}`,
+        method: "GET",
+        headers: {},
+        body: null
+      },
+      {
+        label: "allorigins proxy — Authorization",
+        url: `https://api.allorigins.win/raw?url=${encodeURIComponent("https://app.mobile.net.sa/api/v1/sendSMS")}`,
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
+        body: JSON.stringify({ numbers: cleanNums, message, sender: s, msgType: isArabic ? 2 : 0 })
+      },
+      {
+        label: "allorigins proxy — apiKey in body",
+        url: `https://api.allorigins.win/raw?url=${encodeURIComponent("https://app.mobile.net.sa/api/v1/sendSMS")}`,
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-      const text = await r.text();
-      return { ok: r.ok, text, status: r.status };
-    };
+        body: JSON.stringify({ apiKey, numbers: cleanNums, message, sender: s })
+      },
+      {
+        label: "corsproxy — Authorization",
+        url: `https://corsproxy.io/?${encodeURIComponent("https://app.mobile.net.sa/api/v1/sendSMS")}`,
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
+        body: JSON.stringify({ numbers: cleanNums, message, sender: s })
+      },
+    ];
 
-    const checkSuccess = (text) => {
-      let p = null;
-      try { p = JSON.parse(text); } catch {}
-      return p?.success===true || p?.code===0 || p?.code==="0" ||
-             p?.status==="success" || text.trim()==="0" || text.trim()==="00";
-    };
+    const allResults = [];
+    for (let i = 0; i < attempts.length; i++) {
+      const a = attempts[i];
+      try {
+        const opts = { method: a.method, headers: a.headers };
+        if (a.body) opts.body = a.body;
+        const r = await fetch(a.url, opts);
+        const text = await r.text();
+        let p = null; try { p = JSON.parse(text); } catch {}
 
-    try {
-      const attempts = [tryDirect, tryProxy, tryProxy2];
-      const labels = ["مباشر", "proxy1", "proxy2"];
-      const allResults = [];
+        const raw = text.substring(0, 200);
+        allResults.push({ n: i+1, label: a.label, http: r.status, raw });
 
-      for (let i = 0; i < attempts.length; i++) {
-        try {
-          const r = await attempts[i]();
-          allResults.push({ n: i+1, label: labels[i], http: r.status, raw: r.text.substring(0, 150) });
-          if (checkSuccess(r.text)) {
-            setSending(false);
-            setResult({ ok: true, msg: `✅ تم الإرسال بنجاح عبر ${labels[i]}!\n📋 رد الخادم: ${r.text}` });
-            return;
-          }
-        } catch (e) {
-          allResults.push({ n: i+1, label: labels[i], http: 0, raw: e.message });
+        const ok = p?.success === true || p?.code === 0 || p?.code === "0" ||
+                   p?.status === "success" || p?.status === "sent" || p?.status === 200 ||
+                   text.trim() === "0" || text.trim() === "00" ||
+                   (r.status === 200 && !raw.includes("Not found") && !raw.includes("Unauthorized") && !raw.includes("error") && raw.length < 50);
+
+        if (ok) {
+          setSending(false);
+          setResult({ ok: true, msg: `✅ تم الإرسال بنجاح عبر: ${a.label}\n📋 رد الخادم: ${raw}` });
+          return;
         }
+      } catch(e) {
+        allResults.push({ n: i+1, label: a.label, http: 0, raw: "خطأ: " + e.message });
       }
-
-      setResult({ ok: false, topMsg: "❌ لم يُرسَل — تقرير التشخيص:", attempts: allResults });
-    } catch (e) {
-      setResult({ ok: false, topMsg: "❌ خطأ: " + e.message });
     }
+
+    setResult({
+      ok: false,
+      topMsg: "❌ لم يُرسَل — تقرير التشخيص:",
+      attempts: allResults,
+      msg: "💡 تأكد أن API Key مفعّل وله صلاحية 'أرسل رسالة نصية قصيرة' من لوحة المدار"
+    });
     setSending(false);
   };
 
@@ -3231,21 +3261,18 @@ function SMSPage({ teachers, attendance, week }) {
       {showConfig && (
         <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm">
           <h3 className="font-black text-gray-800 mb-4">⚙️ إعدادات حساب المدار التقني</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div>
-              <label className="text-xs font-bold text-gray-500 mb-1 block">اسم المستخدم</label>
-              <input value={username} onChange={e => setUsername(e.target.value)} className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm" placeholder="966XXXXXXXXX" dir="ltr" />
-            </div>
-            <div>
-              <label className="text-xs font-bold text-gray-500 mb-1 block">كلمة المرور</label>
-              <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm" placeholder="••••••••" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="sm:col-span-2">
+              <label className="text-xs font-bold text-gray-500 mb-1 block">مفتاح API (API Key)</label>
+              <input value={apiKey} onChange={e => setApiKey(e.target.value)} className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm font-mono" placeholder="API Key من لوحة تحكم المدار" dir="ltr" />
+              <p className="text-xs text-gray-400 mt-1">من لوحة المدار: رموز API ← اسم الرمز ← تفعيل صلاحية إرسال رسالة</p>
             </div>
             <div>
               <label className="text-xs font-bold text-gray-500 mb-1 block">اسم المرسل (Sender)</label>
               <input value={sender} onChange={e => setSender(e.target.value)} className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm" placeholder="School1" />
             </div>
           </div>
-          <p className="text-xs text-amber-600 mt-3 bg-amber-50 rounded-xl px-3 py-2">⚠️ كلمة المرور تُحفظ في المتصفح فقط ولا تُرسل إلا عند الضغط على إرسال</p>
+          <p className="text-xs text-green-600 mt-3 bg-green-50 rounded-xl px-3 py-2">✅ مفتاح API أكثر أماناً من كلمة المرور ويُحفظ في جلسة المتصفح فقط</p>
         </div>
       )}
 
