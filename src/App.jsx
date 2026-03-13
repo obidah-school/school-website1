@@ -3124,39 +3124,84 @@ function SMSPage({ teachers, attendance, week }) {
     { id: "bulk",     label: "رسالة للأهالي", icon: "👨‍👦" },
   ];
 
-  // ===== SEND FUNCTION =====
+  // ===== SEND FUNCTION — مباشر بدون خادم وسيط =====
   const sendSMS = async (numbers, message) => {
-    if (!password) { setResult({ ok:false, topMsg:"⚙️ أدخل كلمة المرور في الإعدادات أولاً", msg:"" }); return; }
-    if (!numbers?.trim()) { setResult({ ok:false, topMsg:"📞 أدخل رقماً واحداً على الأقل", msg:"" }); return; }
-    if (!message.trim()) { setResult({ ok:false, topMsg:"✏️ اكتب نص الرسالة", msg:"" }); return; }
+    if (!password) { setResult({ ok:false, topMsg:"⚙️ أدخل كلمة المرور في الإعدادات أولاً" }); return; }
+    if (!numbers?.trim()) { setResult({ ok:false, topMsg:"📞 أدخل رقماً واحداً على الأقل" }); return; }
+    if (!message.trim()) { setResult({ ok:false, topMsg:"✏️ اكتب نص الرسالة" }); return; }
     setSending(true); setResult(null);
-    try {
-      const resp = await fetch("/api/sms", {
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({ username, password, numbers, message, sender })
+
+    const cleanNums = numbers.split(/[\n,،\s]+/)
+      .map(n => n.trim()).filter(n => n.length >= 9)
+      .map(n => n.startsWith("05") ? "966" + n.slice(1) : n)
+      .join(",");
+
+    const isArabic = /[\u0600-\u06FF]/.test(message);
+    const payload = { username, password, numbers: cleanNums, message, sender: sender || "School1", msgType: isArabic ? 2 : 0 };
+
+    // محاولة 1: مباشر
+    const tryDirect = async () => {
+      const r = await fetch("https://app.mobile.net.sa/api/v1/sendSMS", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
       });
+      const text = await r.text();
+      return { ok: r.ok, text, status: r.status };
+    };
 
-      // إذا فشل الـ API نفسه (404 = الملف غير مرفوع)
-      if (resp.status === 404) {
-        setResult({ ok:false, topMsg:"❌ ملف api/sms.js غير موجود على Vercel", msg:"تأكد من رفع مجلد api/ على GitHub" });
-        setSending(false); return;
+    // محاولة 2: عبر CORS proxy مجاني
+    const tryProxy = async () => {
+      const targetUrl = encodeURIComponent("https://app.mobile.net.sa/api/v1/sendSMS");
+      const r = await fetch(`https://corsproxy.io/?${targetUrl}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const text = await r.text();
+      return { ok: r.ok, text, status: r.status };
+    };
+
+    // محاولة 3: proxy بديل
+    const tryProxy2 = async () => {
+      const r = await fetch("https://api.allorigins.win/raw?url=" + encodeURIComponent("https://app.mobile.net.sa/api/v1/sendSMS"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const text = await r.text();
+      return { ok: r.ok, text, status: r.status };
+    };
+
+    const checkSuccess = (text) => {
+      let p = null;
+      try { p = JSON.parse(text); } catch {}
+      return p?.success===true || p?.code===0 || p?.code==="0" ||
+             p?.status==="success" || text.trim()==="0" || text.trim()==="00";
+    };
+
+    try {
+      const attempts = [tryDirect, tryProxy, tryProxy2];
+      const labels = ["مباشر", "proxy1", "proxy2"];
+      const allResults = [];
+
+      for (let i = 0; i < attempts.length; i++) {
+        try {
+          const r = await attempts[i]();
+          allResults.push({ n: i+1, label: labels[i], http: r.status, raw: r.text.substring(0, 150) });
+          if (checkSuccess(r.text)) {
+            setSending(false);
+            setResult({ ok: true, msg: `✅ تم الإرسال بنجاح عبر ${labels[i]}!\n📋 رد الخادم: ${r.text}` });
+            return;
+          }
+        } catch (e) {
+          allResults.push({ n: i+1, label: labels[i], http: 0, raw: e.message });
+        }
       }
 
-      const data = await resp.json();
-
-      if (data.success === true) {
-        setResult({ ok:true, msg:`✅ تم الإرسال بنجاح!\n🔗 المسار: ${data.url||""}\n📋 رد الخادم: ${data.raw||""}` });
-      } else {
-        setResult({
-          ok:false,
-          topMsg:"❌ لم يُرسَل — تقرير التشخيص:",
-          attempts: data.allAttempts || [],
-          msg: data.error || "تحقق من اسم المستخدم وكلمة المرور"
-        });
-      }
-    } catch(e) {
-      setResult({ ok:false, topMsg:"❌ خطأ في الاتصال", msg:`${e.message}\n\nتأكد أن:\n• ملف api/sms.js مرفوع في GitHub\n• الموقع على Vercel` });
+      setResult({ ok: false, topMsg: "❌ لم يُرسَل — تقرير التشخيص:", attempts: allResults });
+    } catch (e) {
+      setResult({ ok: false, topMsg: "❌ خطأ: " + e.message });
     }
     setSending(false);
   };
