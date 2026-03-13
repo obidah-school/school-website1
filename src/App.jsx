@@ -2979,6 +2979,288 @@ function ActivitiesPage({ activities }) {
   );
 }
 
+// ==================== SMS PAGE ====================
+function SMSPage({ teachers, attendance, week }) {
+  const [tab, setTab] = useState("manual");
+  const [username, setUsername] = useState("966548454776");
+  const [password, setPassword] = useState("");
+  const [sender, setSender] = useState("School1");
+  const [showConfig, setShowConfig] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [result, setResult] = useState(null);
+
+  // Tab 1: Manual
+  const [manualNums, setManualNums] = useState("");
+  const [manualMsg, setManualMsg] = useState("");
+
+  // Tab 2: Attendance notify
+  const [selectedDay, setSelectedDay] = useState(0);
+  const [supervisorNum, setSupervisorNum] = useState("");
+  const [absentMsg, setAbsentMsg] = useState("");
+
+  // Tab 3: Bulk class
+  const [bulkNums, setBulkNums] = useState("");
+  const [bulkMsg, setBulkMsg] = useState("");
+
+  // Build attendance message for tab2
+  useEffect(() => {
+    const di = selectedDay;
+    const dayLabel = week?.[di]?.day || `اليوم ${di + 1}`;
+    const dateLabel = week?.[di]?.dateH || "";
+    const absents = teachers.filter((t, ti) => (attendance?.[ti]?.[di]?.status || "حاضر") === "غائب")
+      .map((t, i) => `${i + 1}. ${t}`);
+    const lates = teachers.filter((t, ti) => (attendance?.[ti]?.[di]?.status || "حاضر") === "متأخر")
+      .map((t, i) => {
+        const r = attendance?.[teachers.indexOf(t)]?.[di] || {};
+        return `${i + 1}. ${t} (${r.lateType || "صباحي"} - ${r.lateMinutes || 0} دقيقة)`;
+      });
+    let msg = `📋 تقرير حضور ${dayLabel} ${dateLabel}\n`;
+    msg += `مدرسة عبيدة بن الحارث المتوسطة\n\n`;
+    if (absents.length) msg += `❌ الغائبون (${absents.length}):\n${absents.join("\n")}\n\n`;
+    if (lates.length) msg += `🕐 المتأخرون (${lates.length}):\n${lates.join("\n")}\n`;
+    if (!absents.length && !lates.length) msg += `✅ جميع المعلمين حاضرون`;
+    setAbsentMsg(msg);
+  }, [selectedDay, teachers, attendance, week]);
+
+  const sendSMS = async (numbers, message) => {
+    if (!password) { setResult({ ok: false, msg: "أدخل كلمة المرور أولاً في الإعدادات ↑" }); return; }
+    if (!numbers.trim()) { setResult({ ok: false, msg: "أدخل رقماً واحداً على الأقل" }); return; }
+    if (!message.trim()) { setResult({ ok: false, msg: "اكتب نص الرسالة" }); return; }
+
+    setSending(true);
+    setResult(null);
+    try {
+      const resp = await fetch("/api/sms", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password, numbers: numbers.replace(/\s/g, ""), message, sender })
+      });
+      const data = await resp.json();
+      if (data.success || data.code === "0" || data.status === "success" || resp.ok) {
+        setResult({ ok: true, msg: `✅ تم الإرسال بنجاح! (${numbers.split(",").filter(Boolean).length} رسالة)` });
+      } else {
+        setResult({ ok: false, msg: `❌ فشل: ${data.message || data.error || JSON.stringify(data)}` });
+      }
+    } catch (e) {
+      setResult({ ok: false, msg: `❌ خطأ في الاتصال: ${e.message}` });
+    }
+    setSending(false);
+  };
+
+  const TABS = [
+    { id: "manual", label: "رسالة يدوية", icon: "✍️" },
+    { id: "attendance", label: "إشعار الغياب", icon: "📋" },
+    { id: "bulk", label: "رسالة للأهالي", icon: "👨‍👦" },
+  ];
+
+  return (
+    <div className="space-y-5">
+      {/* Header */}
+      <div className="bg-gradient-to-l from-green-600 to-teal-700 rounded-2xl p-5 text-white flex items-center justify-between flex-wrap gap-4">
+        <div>
+          <h2 className="text-xl font-black">📱 مركز الرسائل النصية SMS</h2>
+          <p className="text-sm opacity-75 mt-1">إرسال مباشر عبر المدار التقني — mobile.net.sa</p>
+        </div>
+        <button onClick={() => setShowConfig(!showConfig)}
+          className="bg-white bg-opacity-20 hover:bg-opacity-30 px-4 py-2 rounded-xl text-sm font-bold border border-white border-opacity-30">
+          ⚙️ إعدادات الحساب
+        </button>
+      </div>
+
+      {/* Config panel */}
+      {showConfig && (
+        <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm">
+          <h3 className="font-black text-gray-800 mb-4">⚙️ إعدادات حساب المدار التقني</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <label className="text-xs font-bold text-gray-500 mb-1 block">اسم المستخدم</label>
+              <input value={username} onChange={e => setUsername(e.target.value)}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm" placeholder="966XXXXXXXXX" />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-gray-500 mb-1 block">كلمة المرور</label>
+              <input type="password" value={password} onChange={e => setPassword(e.target.value)}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm" placeholder="••••••••" />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-gray-500 mb-1 block">اسم المرسل (Sender)</label>
+              <input value={sender} onChange={e => setSender(e.target.value)}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm" placeholder="School1" />
+            </div>
+          </div>
+          <p className="text-xs text-amber-600 mt-3 bg-amber-50 rounded-xl px-3 py-2">
+            ⚠️ كلمة المرور تُحفظ مؤقتاً في الجلسة فقط ولا تُرسَل إلا عند إرسال رسالة
+          </p>
+        </div>
+      )}
+
+      {/* Tabs */}
+      <div className="flex gap-2 bg-gray-100 p-1 rounded-2xl">
+        {TABS.map(t => (
+          <button key={t.id} onClick={() => { setTab(t.id); setResult(null); }}
+            className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all ${tab === t.id ? "bg-white shadow text-teal-700" : "text-gray-500 hover:text-gray-700"}`}>
+            {t.icon} {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Result banner */}
+      {result && (
+        <div className={`rounded-2xl px-5 py-3 text-sm font-bold ${result.ok ? "bg-green-50 text-green-700 border border-green-200" : "bg-red-50 text-red-700 border border-red-200"}`}>
+          {result.msg}
+        </div>
+      )}
+
+      {/* ===== TAB 1: MANUAL ===== */}
+      {tab === "manual" && (
+        <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm space-y-4">
+          <h3 className="font-black text-gray-800">✍️ رسالة يدوية</h3>
+          <div>
+            <label className="text-xs font-bold text-gray-500 mb-1 block">أرقام الهاتف (افصل بفاصلة — مثال: 0512345678,0598765432)</label>
+            <textarea value={manualNums} onChange={e => setManualNums(e.target.value)}
+              rows={2} className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm resize-none"
+              placeholder="0512345678,0598765432,0566778899" dir="ltr" />
+          </div>
+          <div>
+            <label className="text-xs font-bold text-gray-500 mb-1 block">
+              نص الرسالة
+              <span className="mr-2 text-gray-400">({manualMsg.length} حرف)</span>
+            </label>
+            <textarea value={manualMsg} onChange={e => setManualMsg(e.target.value)}
+              rows={4} className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm resize-none"
+              placeholder="اكتب نص رسالتك هنا..." />
+          </div>
+          <div className="flex gap-3">
+            <button onClick={() => sendSMS(manualNums, manualMsg)} disabled={sending}
+              className="bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white font-bold px-6 py-2.5 rounded-xl text-sm flex items-center gap-2">
+              {sending ? "⏳ جاري الإرسال..." : "📤 إرسال الآن"}
+            </button>
+            <button onClick={() => { setManualNums(""); setManualMsg(""); }}
+              className="border border-gray-200 text-gray-500 font-bold px-4 py-2.5 rounded-xl text-sm">
+              مسح
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ===== TAB 2: ATTENDANCE NOTIFY ===== */}
+      {tab === "attendance" && (
+        <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm space-y-4">
+          <h3 className="font-black text-gray-800">📋 إشعار غياب المعلمين</h3>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs font-bold text-gray-500 mb-1 block">اختر اليوم</label>
+              <select value={selectedDay} onChange={e => setSelectedDay(Number(e.target.value))}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white">
+                {(week || []).map((d, i) => (
+                  <option key={i} value={i}>{d.day} — {d.dateH}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-bold text-gray-500 mb-1 block">رقم المشرف / الموجه (للإشعار)</label>
+              <input value={supervisorNum} onChange={e => setSupervisorNum(e.target.value)}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm" placeholder="05XXXXXXXX" dir="ltr" />
+            </div>
+          </div>
+
+          {/* Stats for selected day */}
+          <div className="grid grid-cols-3 gap-3">
+            {[
+              { label: "حاضر", count: teachers.filter((_, ti) => (attendance?.[ti]?.[selectedDay]?.status || "حاضر") === "حاضر").length, color: "green" },
+              { label: "متأخر", count: teachers.filter((_, ti) => (attendance?.[ti]?.[selectedDay]?.status || "حاضر") === "متأخر").length, color: "amber" },
+              { label: "غائب", count: teachers.filter((_, ti) => (attendance?.[ti]?.[selectedDay]?.status || "حاضر") === "غائب").length, color: "red" },
+            ].map(s => (
+              <div key={s.label} className={`bg-${s.color}-50 border border-${s.color}-200 rounded-xl p-3 text-center`}>
+                <div className={`text-2xl font-black text-${s.color}-600`}>{s.count}</div>
+                <div className={`text-xs font-bold text-${s.color}-500`}>{s.label}</div>
+              </div>
+            ))}
+          </div>
+
+          <div>
+            <label className="text-xs font-bold text-gray-500 mb-1 block">نص الرسالة (مُولَّد تلقائياً — يمكنك التعديل)</label>
+            <textarea value={absentMsg} onChange={e => setAbsentMsg(e.target.value)}
+              rows={8} className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm font-mono resize-none" />
+          </div>
+          <button onClick={() => sendSMS(supervisorNum, absentMsg)} disabled={sending}
+            className="bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white font-bold px-6 py-2.5 rounded-xl text-sm flex items-center gap-2">
+            {sending ? "⏳ جاري الإرسال..." : "📤 أرسل للمشرف"}
+          </button>
+        </div>
+      )}
+
+      {/* ===== TAB 3: BULK CLASS ===== */}
+      {tab === "bulk" && (
+        <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm space-y-4">
+          <h3 className="font-black text-gray-800">👨‍👦 رسالة جماعية لأولياء الأمور</h3>
+          <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-sm text-blue-700">
+            💡 أدخل أرقام أولياء الأمور مفصولة بفاصلة. يمكنك تجميعهم حسب الفصل يدوياً.
+          </div>
+          <div>
+            <label className="text-xs font-bold text-gray-500 mb-1 block">
+              أرقام أولياء الأمور
+              <span className="mr-2 text-gray-400 font-normal">({bulkNums.split(",").filter(n => n.trim().length > 5).length} رقم)</span>
+            </label>
+            <textarea value={bulkNums} onChange={e => setBulkNums(e.target.value)}
+              rows={3} className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm resize-none"
+              placeholder="0512345678,0598765432,0566778899,0544332211" dir="ltr" />
+          </div>
+
+          {/* Quick message templates */}
+          <div>
+            <label className="text-xs font-bold text-gray-500 mb-2 block">قوالب جاهزة</label>
+            <div className="flex gap-2 flex-wrap">
+              {[
+                { label: "دعوة اجتماع", msg: "أولياء الأمور الكرام\nيُعقد اجتماعاً بالمدرسة يوم ............\nالرجاء الحضور في الموعد المحدد\nمدرسة عبيدة بن الحارث المتوسطة" },
+                { label: "موعد الاختبارات", msg: "أولياء الأمور الكرام\nتبدأ الاختبارات يوم ............\nنتمنى لأبنائكم التوفيق\nمدرسة عبيدة بن الحارث المتوسطة" },
+                { label: "إجازة عارضة", msg: "أولياء الأمور الكرام\nتُعلم المدرسة بعدم الدراسة يوم ............\nمع التقدير\nمدرسة عبيدة بن الحارث المتوسطة" },
+                { label: "نشاط مدرسي", msg: "أولياء الأمور الكرام\nتقيم المدرسة نشاطاً بتاريخ ............\nنتشرف بحضوركم\nمدرسة عبيدة بن الحارث المتوسطة" },
+              ].map(t => (
+                <button key={t.label} onClick={() => setBulkMsg(t.msg)}
+                  className="bg-gray-100 hover:bg-teal-50 hover:text-teal-700 text-gray-600 text-xs font-bold px-3 py-1.5 rounded-lg border border-gray-200 transition-all">
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs font-bold text-gray-500 mb-1 block">
+              نص الرسالة
+              <span className="mr-2 text-gray-400 font-normal">({bulkMsg.length} حرف)</span>
+            </label>
+            <textarea value={bulkMsg} onChange={e => setBulkMsg(e.target.value)}
+              rows={5} className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm resize-none"
+              placeholder="اكتب رسالتك لأولياء الأمور..." />
+          </div>
+          <div className="flex gap-3 items-center">
+            <button onClick={() => sendSMS(bulkNums, bulkMsg)} disabled={sending}
+              className="bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white font-bold px-6 py-2.5 rounded-xl text-sm flex items-center gap-2">
+              {sending ? "⏳ جاري الإرسال..." : `📤 إرسال لـ ${bulkNums.split(",").filter(n => n.trim().length > 5).length} رقم`}
+            </button>
+            <button onClick={() => { setBulkNums(""); setBulkMsg(""); }}
+              className="border border-gray-200 text-gray-500 font-bold px-4 py-2.5 rounded-xl text-sm">
+              مسح
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Footer note */}
+      <div className="bg-gray-50 rounded-2xl px-5 py-4 border border-gray-200">
+        <p className="text-xs text-gray-500 font-bold mb-1">📌 ملاحظات مهمة:</p>
+        <ul className="text-xs text-gray-400 space-y-1 list-disc list-inside">
+          <li>الأرقام يجب أن تكون سعودية: 05XXXXXXXX أو 9665XXXXXXXX</li>
+          <li>كل رسالة SMS تستهلك رصيداً من حسابك في المدار التقني</li>
+          <li>الرسائل العربية: 70 حرف = رسالة واحدة — ما فوق ذلك = رسالتان</li>
+          <li>يمكن إرسال لأكثر من 500 رقم في طلب واحد (مفصولة بفاصلة)</li>
+        </ul>
+      </div>
+    </div>
+  );
+}
+
 function SettingsPage({ teachers, setTeachers, saveTeachers, week, setWeek, saveWeek, users, siteFont, setSiteFont, saveSiteFont }) {
   const [newT, setNewT] = useState("");
   const [editWeek, setEditWeek] = useState(false);
@@ -3217,7 +3499,7 @@ export default function SchoolWebsite() {
   useEffect(() => {
     const h = () => {
       const hash = window.location.hash.replace("#","") || "home";
-      if (["home","attendance","announcements","activities","settings","students","messages","surveys"].includes(hash)) setPage(hash);
+      if (["home","attendance","announcements","activities","settings","students","messages","surveys","sms"].includes(hash)) setPage(hash);
     };
     window.addEventListener("hashchange", h); h();
     return () => window.removeEventListener("hashchange", h);
@@ -3292,6 +3574,7 @@ export default function SchoolWebsite() {
     { id: "activities",    label: "الأنشطة",         icon: "⚡" },
     { id: "messages",      label: "رسائل الأهالي",  icon: "✉️" },
     { id: "surveys",       label: "الاستبيانات",     icon: "📊" },
+    { id: "sms",           label: "رسائل SMS",       icon: "📱" },
     { id: "settings",      label: "الإعدادات",       icon: "⚙️" },
   ];
 
@@ -3346,6 +3629,7 @@ export default function SchoolWebsite() {
         {page === "activities"    && <ActivitiesPage activities={activities} />}
         {page === "messages"      && <MessagesPage messages={messages} setMessages={setMessages} saveMessages={saveMessages} isParent={false} />}
         {page === "surveys"       && <SurveysPage surveys={surveys} setSurveys={setSurveys} saveSurveys={saveSurveys} isParent={false} />}
+        {page === "sms"          && <SMSPage teachers={teachers} attendance={attendance} week={week} />}
         {page === "settings"      && <SettingsPage teachers={teachers} setTeachers={setTeachers} saveTeachers={saveTeachers} week={week} setWeek={setWeek} saveWeek={saveWeek} users={users} siteFont={siteFont} setSiteFont={setSiteFont} saveSiteFont={saveSiteFont} />}
       </main>
       <footer className="text-center py-6 text-xs text-gray-400 border-t border-gray-200 bg-white mt-8">
