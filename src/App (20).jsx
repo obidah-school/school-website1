@@ -3123,7 +3123,7 @@ function SMSPage({ teachers, attendance, week }) {
     { id: "bulk",     label: "رسالة للأهالي", icon: "👨‍👦" },
   ];
 
-  // ===== SEND FUNCTION — عبر Vercel Serverless Function (api/send-sms.js) =====
+  // ===== SEND FUNCTION — مباشرة لـ API المدار التقني =====
   const sendSMS = async (numbers, message) => {
     if (!apiKey?.trim()) { setResult({ ok:false, topMsg:"🔑 أدخل مفتاح API في الإعدادات" }); return; }
     if (!numbers?.trim()) { setResult({ ok:false, topMsg:"📞 أدخل رقماً واحداً على الأقل" }); return; }
@@ -3134,38 +3134,81 @@ function SMSPage({ teachers, attendance, week }) {
       .map(n => n.trim()).filter(n => n.length >= 9)
       .map(n => n.startsWith("05") ? "966" + n.slice(1) : n);
 
-    try {
-      const r = await fetch("/api/send-sms", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          apiKey,
-          numbers: cleanNums,
-          message,
-          sender: sender || "School1",
-        }),
-      });
-      const data = await r.json();
+    const attempts = [];
 
-      if (data.success) {
-        setResult({ ok:true, msg:`✅ تم إرسال الرسالة بنجاح!\n📡 المسار: ${data.usedEndpoint}\n📋 الرد: ${data.response}` });
-      } else {
-        // عرض تقرير تشخيصي
-        const attempts = (data.tried || []).map((t, i) => ({
-          n: i+1,
-          label: `${t.url?.split("/api/v1/")[1] || t.url} [${t.body || ""}]`,
-          http: t.status || 0,
-          raw: t.response || t.error || "—",
-        }));
-        setResult({ ok:false, topMsg:"❌ لم يُرسَل — تقرير التشخيص:", attempts,
-          msg:"📸 أرسل صورة من صفحة SendSMS في توثيق Postman لنرى الـ body المطلوب" });
+    // === المحاولة 1: Mobile.net.sa API مباشرة ===
+    try {
+      const body1 = JSON.stringify({
+        token: apiKey,
+        sender: sender || "School1",
+        numbers: cleanNums,
+        message,
+      });
+      const r1 = await fetch("https://www.mobile.net.sa/api/v1/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
+        body: body1,
+      });
+      const txt1 = await r1.text();
+      attempts.push({ n:1, label:"mobile.net.sa /api/v1/send (JSON+Bearer)", http:r1.status, raw:txt1 });
+      if (r1.ok || txt1.includes("success") || txt1.includes("sent")) {
+        setSending(false);
+        setResult({ ok:true, msg:`✅ تم الإرسال بنجاح!\n📡 المسار: mobile.net.sa\n📋 الرد: ${txt1}` });
+        return;
       }
-    } catch(e) {
-      // إذا فشل /api/send-sms (مثلاً على GitHub Pages) جرب مباشرة
-      setResult({ ok:false, topMsg:"⚠️ تأكد أن ملف api/send-sms.js موجود في مشروعك على Vercel",
-        attempts: [{ n:1, label:"محلي /api/send-sms", http:0, raw:e.message }],
-        msg:"🔧 المشروع يحتاج Vercel لتشغيل الـ Serverless Functions — لا يعمل على GitHub Pages" });
-    }
+    } catch(e) { attempts.push({ n:1, label:"mobile.net.sa /api/v1/send", http:0, raw:e.message }); }
+
+    // === المحاولة 2: نفس الـ endpoint لكن بـ token في الـ body ===
+    try {
+      const body2 = new URLSearchParams({
+        token: apiKey,
+        sender: sender || "School1",
+        numbers: cleanNums.join(","),
+        message,
+      });
+      const r2 = await fetch("https://www.mobile.net.sa/api/v1/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: body2.toString(),
+      });
+      const txt2 = await r2.text();
+      attempts.push({ n:2, label:"mobile.net.sa /api/v1/send (form-urlencoded)", http:r2.status, raw:txt2 });
+      if (r2.ok || txt2.includes("success") || txt2.includes("sent")) {
+        setSending(false);
+        setResult({ ok:true, msg:`✅ تم الإرسال بنجاح!\n📡 المسار: mobile.net.sa (form)\n📋 الرد: ${txt2}` });
+        return;
+      }
+    } catch(e) { attempts.push({ n:2, label:"mobile.net.sa (form)", http:0, raw:e.message }); }
+
+    // === المحاولة 3: عبر corsproxy.io ===
+    try {
+      const body3 = JSON.stringify({
+        token: apiKey,
+        sender: sender || "School1",
+        numbers: cleanNums,
+        message,
+      });
+      const r3 = await fetch("https://corsproxy.io/?https://www.mobile.net.sa/api/v1/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
+        body: body3,
+      });
+      const txt3 = await r3.text();
+      attempts.push({ n:3, label:"corsproxy → mobile.net.sa (JSON)", http:r3.status, raw:txt3 });
+      if (r3.ok || txt3.includes("success") || txt3.includes("sent")) {
+        setSending(false);
+        setResult({ ok:true, msg:`✅ تم الإرسال بنجاح!\n📡 المسار: corsproxy → mobile.net.sa\n📋 الرد: ${txt3}` });
+        return;
+      }
+    } catch(e) { attempts.push({ n:3, label:"corsproxy → mobile.net.sa", http:0, raw:e.message }); }
+
+    // === كل المحاولات فشلت ===
+    setResult({
+      ok: false,
+      topMsg: "❌ لم يُرسَل — تقرير التشخيص:",
+      attempts,
+      msg: "📋 انسخ هذا التقرير وأرسله للمطور على واتساب: 0548454776",
+    });
     setSending(false);
   };
 
