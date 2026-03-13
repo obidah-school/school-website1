@@ -3126,39 +3126,37 @@ function SMSPage({ teachers, attendance, week }) {
 
   // ===== SEND FUNCTION =====
   const sendSMS = async (numbers, message) => {
-    if (!password) { setResult({ ok: false, msg: "أدخل كلمة المرور أولاً في الإعدادات ↑" }); return; }
-    if (!numbers || !numbers.trim()) { setResult({ ok: false, msg: "أدخل رقماً واحداً على الأقل" }); return; }
-    if (!message.trim()) { setResult({ ok: false, msg: "اكتب نص الرسالة" }); return; }
+    if (!password) { setResult({ ok:false, topMsg:"⚙️ أدخل كلمة المرور في الإعدادات أولاً", msg:"" }); return; }
+    if (!numbers?.trim()) { setResult({ ok:false, topMsg:"📞 أدخل رقماً واحداً على الأقل", msg:"" }); return; }
+    if (!message.trim()) { setResult({ ok:false, topMsg:"✏️ اكتب نص الرسالة", msg:"" }); return; }
     setSending(true); setResult(null);
     try {
       const resp = await fetch("/api/sms", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password, numbers, message, sender })
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({ username, password, numbers, message, sender })
       });
+
+      // إذا فشل الـ API نفسه (404 = الملف غير مرفوع)
+      if (resp.status === 404) {
+        setResult({ ok:false, topMsg:"❌ ملف api/sms.js غير موجود على Vercel", msg:"تأكد من رفع مجلد api/ على GitHub" });
+        setSending(false); return;
+      }
+
       const data = await resp.json();
 
       if (data.success === true) {
-        setResult({ ok: true, msg: `✅ تم الإرسال بنجاح!\n🔗 المسار الناجح: ${data.winningUrl || ""}\n📋 رد الخادم: ${data.rawResponse || ""}` });
+        setResult({ ok:true, msg:`✅ تم الإرسال بنجاح!\n🔗 المسار: ${data.url||""}\n📋 رد الخادم: ${data.raw||""}` });
       } else {
-        // بناء رسالة تشخيص مفصّلة
-        let diagMsg = "❌ لم يُرسَل — تقرير التشخيص:\n\n";
-        if (data.allAttempts) {
-          data.allAttempts.forEach(a => {
-            if (a.error) {
-              diagMsg += `🔴 محاولة ${a.attempt}: ${a.url}\n   خطأ شبكة: ${a.error}\n\n`;
-            } else {
-              diagMsg += `📌 محاولة ${a.attempt}: ${a.url}\n   HTTP: ${a.httpStatus} | رد: ${(a.raw||"فارغ").substring(0,100)}\n\n`;
-            }
-          });
-        } else {
-          diagMsg += data.error || "خطأ غير معروف";
-        }
-        diagMsg += "\n💡 انسخ هذا التقرير وأرسله للمطور";
-        setResult({ ok: false, msg: diagMsg });
+        setResult({
+          ok:false,
+          topMsg:"❌ لم يُرسَل — تقرير التشخيص:",
+          attempts: data.allAttempts || [],
+          msg: data.error || "تحقق من اسم المستخدم وكلمة المرور"
+        });
       }
-    } catch (e) {
-      setResult({ ok: false, msg: `❌ خطأ في الاتصال: ${e.message}\n\nتأكد أن:\n1. ملف api/sms.js مرفوع في GitHub\n2. الموقع على Vercel (ليس Netlify)` });
+    } catch(e) {
+      setResult({ ok:false, topMsg:"❌ خطأ في الاتصال", msg:`${e.message}\n\nتأكد أن:\n• ملف api/sms.js مرفوع في GitHub\n• الموقع على Vercel` });
     }
     setSending(false);
   };
@@ -3217,8 +3215,28 @@ function SMSPage({ teachers, attendance, week }) {
       </div>
 
       {result && (
-        <div className={`rounded-2xl px-5 py-3 text-sm font-bold whitespace-pre-wrap ${result.ok ? "bg-green-50 text-green-700 border border-green-200" : "bg-red-50 text-red-700 border border-red-200"}`}>
-          {result.msg}
+        <div className={`rounded-2xl px-5 py-4 text-sm font-bold ${result.ok ? "bg-green-50 text-green-700 border border-green-200" : "bg-red-50 text-red-700 border border-red-200"}`}>
+          {result.ok ? (
+            <span>{result.msg}</span>
+          ) : (
+            <div className="space-y-2">
+              <div className="font-black text-base">{result.topMsg || "❌ لم يُرسَل"}</div>
+              {result.attempts && result.attempts.length > 0 ? (
+                <div className="bg-white rounded-xl p-3 space-y-1 max-h-60 overflow-y-auto text-xs font-mono border border-red-100">
+                  {result.attempts.map((a,i) => (
+                    <div key={i} className={a.error ? "text-gray-400" : a.http===200?"text-blue-700":"text-red-600"}>
+                      <strong>#{a.n}</strong> HTTP:{a.http||"—"} | {(a.raw||a.error||"").substring(0,120)}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-xs">{result.msg}</div>
+              )}
+              <div className="text-xs text-red-500 bg-red-50 rounded-lg p-2 mt-2">
+                📋 انسخ هذا التقرير وأرسله للمطور على واتساب: 0548454776
+              </div>
+            </div>
+          )}
         </div>
       )}
 
