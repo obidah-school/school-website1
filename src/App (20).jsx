@@ -2852,6 +2852,8 @@ function AnnouncementsPage({ announcements, setAnnouncements, saveAnnouncements 
   const [showForm, setShowForm] = useState(false);
   const [newAnn, setNewAnn] = useState({ title: "", content: "", category: "إعلانات", priority: "عادي", bgColor: "" });
   const [filter, setFilter] = useState("الكل");
+  const [editId, setEditId] = useState(null);
+  const [editAnn, setEditAnn] = useState(null);
   const categories = ["الكل", "تعاميم", "إعلانات", "تدريب", "اجتماعات"];
   const pColors = { "عاجل": "red", "مهم": "amber", "عادي": "teal" };
   const cIcons = { "تعاميم": "📜", "إعلانات": "📢", "تدريب": "🎓", "اجتماعات": "🤝" };
@@ -2859,7 +2861,8 @@ function AnnouncementsPage({ announcements, setAnnouncements, saveAnnouncements 
     { label: "بدون", value: "" }, { label: "أخضر", value: "#DCFCE7" },
     { label: "أزرق", value: "#DBEAFE" }, { label: "بنفسجي", value: "#F3E8FF" },
     { label: "وردي", value: "#FFE4E6" }, { label: "أصفر", value: "#FEF3C7" },
-    { label: "تركوازي", value: "#CCFBF1" },
+    { label: "تركوازي", value: "#CCFBF1" }, { label: "برتقالي", value: "#FFEDD5" },
+    { label: "رمادي", value: "#F3F4F6" },
   ];
   const filtered = filter === "الكل" ? announcements : announcements.filter(a => a.category === filter);
 
@@ -2871,6 +2874,11 @@ function AnnouncementsPage({ announcements, setAnnouncements, saveAnnouncements 
   };
   const del = (id) => { const u = announcements.filter(a => a.id !== id); setAnnouncements(u); saveAnnouncements(u); };
   const pin = (id) => { const u = announcements.map(a => a.id === id ? { ...a, pinned: !a.pinned } : a); setAnnouncements(u); saveAnnouncements(u); };
+  const startEdit = (ann) => { setEditId(ann.id); setEditAnn({ ...ann }); };
+  const saveEdit = () => {
+    const u = announcements.map(a => a.id === editId ? { ...editAnn } : a);
+    setAnnouncements(u); saveAnnouncements(u); setEditId(null); setEditAnn(null);
+  };
 
   return (
     <div>
@@ -2912,24 +2920,67 @@ function AnnouncementsPage({ announcements, setAnnouncements, saveAnnouncements 
       </div>
       <div className="space-y-3">
         {filtered.sort((a,b) => (b.pinned?1:0)-(a.pinned?1:0)).map(ann => (
-          <div key={ann.id} className={`rounded-2xl p-5 shadow-sm border-r-4 hover:shadow-md ${ann.priority === "عاجل" ? "border-red-500" : ann.priority === "مهم" ? "border-amber-500" : "border-teal-500"}`}
+          <div key={ann.id} className={`rounded-2xl shadow-sm border-r-4 hover:shadow-md transition-all ${ann.priority === "عاجل" ? "border-red-500" : ann.priority === "مهم" ? "border-amber-500" : "border-teal-500"}`}
             style={{ backgroundColor: ann.bgColor || "#ffffff" }}>
-            <div className="flex items-start justify-between gap-3 mb-3">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-xl">{cIcons[ann.category] || "📌"}</span>
-                <h3 className="font-bold text-gray-900 text-lg">{ann.title}</h3>
-                {ann.pinned && <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full font-bold">📌 مثبّت</span>}
+
+            {/* وضع التعديل */}
+            {editId === ann.id ? (
+              <div className="p-5 space-y-3">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-sm font-black text-teal-700">✏️ تعديل الإعلان</span>
+                </div>
+                {/* تعديل العنوان */}
+                <input value={editAnn.title} onChange={e => setEditAnn(p => ({...p, title: e.target.value}))}
+                  className="w-full px-4 py-2.5 rounded-xl border-2 border-teal-300 focus:outline-none text-sm font-bold" placeholder="العنوان" />
+                {/* تعديل المحتوى */}
+                <RichEditor value={editAnn.content} onChange={v => setEditAnn(p => ({...p, content: v}))} />
+                {/* تعديل الخيارات */}
+                <div className="flex gap-2 flex-wrap items-center">
+                  <select value={editAnn.category} onChange={e => setEditAnn(p => ({...p, category: e.target.value}))}
+                    className="px-3 py-2 rounded-xl border border-gray-200 text-xs bg-white">
+                    {categories.filter(c => c !== "الكل").map(c => <option key={c}>{c}</option>)}</select>
+                  <select value={editAnn.priority} onChange={e => setEditAnn(p => ({...p, priority: e.target.value}))}
+                    className="px-3 py-2 rounded-xl border border-gray-200 text-xs bg-white">
+                    <option>عادي</option><option>مهم</option><option>عاجل</option></select>
+                  {/* لون خلفية البطاقة */}
+                  <div className="flex items-center gap-1 flex-wrap">
+                    <span className="text-xs text-gray-500 font-bold">🎨 خلفية البطاقة:</span>
+                    {annBgColors.map(c => (
+                      <button key={c.value} onClick={() => setEditAnn(p => ({...p, bgColor: c.value}))}
+                        className={`w-6 h-6 rounded-full border-2 transition-transform hover:scale-110 ${editAnn.bgColor === c.value ? "border-teal-500 scale-110" : "border-gray-300"}`}
+                        style={{ backgroundColor: c.value || "#fff" }} title={c.label}>
+                        {!c.value && <span className="text-xs text-gray-400 leading-none">✕</span>}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={saveEdit} className="bg-teal-600 text-white font-bold px-5 py-2 rounded-xl text-sm hover:bg-teal-700">💾 حفظ التعديلات</button>
+                  <button onClick={() => { setEditId(null); setEditAnn(null); }} className="border border-gray-200 text-gray-500 font-bold px-4 py-2 rounded-xl text-sm">إلغاء</button>
+                </div>
               </div>
-              <div className="flex gap-1">
-                <button onClick={() => pin(ann.id)} className="text-xs px-2 py-1 rounded-lg hover:bg-gray-100">{ann.pinned ? "إلغاء" : "📌"}</button>
-                <button onClick={() => del(ann.id)} className="text-xs px-2 py-1 rounded-lg hover:bg-red-50 text-red-500">حذف</button>
+            ) : (
+              /* وضع العرض */
+              <div className="p-5">
+                <div className="flex items-start justify-between gap-3 mb-3">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xl">{cIcons[ann.category] || "📌"}</span>
+                    <h3 className="font-bold text-gray-900 text-lg">{ann.title}</h3>
+                    {ann.pinned && <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full font-bold">📌 مثبّت</span>}
+                  </div>
+                  <div className="flex gap-1 flex-shrink-0">
+                    <button onClick={() => startEdit(ann)} className="text-xs px-2 py-1.5 rounded-lg hover:bg-blue-50 text-blue-500 font-bold border border-blue-100">✏️ تعديل</button>
+                    <button onClick={() => pin(ann.id)} className="text-xs px-2 py-1.5 rounded-lg hover:bg-yellow-50 font-bold border border-gray-100">{ann.pinned ? "📌 إلغاء" : "📌"}</button>
+                    <button onClick={() => del(ann.id)} className="text-xs px-2 py-1.5 rounded-lg hover:bg-red-50 text-red-500 font-bold border border-red-100">🗑️</button>
+                  </div>
+                </div>
+                <div className="text-gray-700 text-sm leading-relaxed mb-3" dangerouslySetInnerHTML={{ __html: ann.content }}></div>
+                <div className="flex items-center justify-between text-xs text-gray-400">
+                  <span>{ann.date}</span>
+                  <div className="flex gap-2"><Badge color="gray">{ann.category}</Badge><Badge color={pColors[ann.priority]}>{ann.priority}</Badge></div>
+                </div>
               </div>
-            </div>
-            <div className="text-gray-700 text-sm leading-relaxed mb-3" dangerouslySetInnerHTML={{ __html: ann.content }}></div>
-            <div className="flex items-center justify-between text-xs text-gray-400">
-              <span>{ann.date}</span>
-              <div className="flex gap-2"><Badge color="gray">{ann.category}</Badge><Badge color={pColors[ann.priority]}>{ann.priority}</Badge></div>
-            </div>
+            )}
           </div>
         ))}
       </div>
@@ -2937,41 +2988,154 @@ function AnnouncementsPage({ announcements, setAnnouncements, saveAnnouncements 
   );
 }
 
-function ActivitiesPage({ activities }) {
+function ActivitiesPage({ activities, setActivities, saveActivities }) {
   const [f, setF] = useState("الكل");
+  const [showForm, setShowForm] = useState(false);
+  const [editId, setEditId] = useState(null);
+  const [editAct, setEditAct] = useState(null);
+  const emptyAct = { title:"", description:"", type:"ثقافي", status:"قادم", date:"", responsible:"", image:"🎯" };
+  const [newAct, setNewAct] = useState(emptyAct);
+
   const types = ["الكل", "ديني", "رياضي", "علمي", "ثقافي", "ترفيهي"];
-  const tc = { "ديني": "green", "رياضي": "blue", "علمي": "purple", "ثقافي": "amber", "ترفيهي": "teal" };
-  const sc = { "قادم": "bg-blue-100 text-blue-700", "جاري": "bg-green-100 text-green-700", "مكتمل": "bg-gray-100 text-gray-600" };
+  const tc = { "ديني":"green", "رياضي":"blue", "علمي":"purple", "ثقافي":"amber", "ترفيهي":"teal" };
+  const sc = { "قادم":"bg-blue-100 text-blue-700", "جاري":"bg-green-100 text-green-700", "مكتمل":"bg-gray-100 text-gray-600" };
+  const icons = ["🎯","📚","⚽","🔬","🎨","🎵","🏆","🌍","💡","🤝","🎉","🏫","🌱","🦁","🎭","🖥️","📖","🏅","🌟","🎤"];
   const filtered = f === "الكل" ? activities : activities.filter(a => a.type === f);
+
+  const add = () => {
+    if (!newAct.title) return;
+    const u = [{ ...newAct, id: Date.now() }, ...activities];
+    setActivities(u); saveActivities(u); setNewAct(emptyAct); setShowForm(false);
+  };
+  const del = (id) => { const u = activities.filter(a => a.id !== id); setActivities(u); saveActivities(u); };
+  const startEdit = (act) => { setEditId(act.id); setEditAct({ ...act }); };
+  const saveEdit = () => {
+    const u = activities.map(a => a.id === editId ? { ...editAct } : a);
+    setActivities(u); saveActivities(u); setEditId(null); setEditAct(null);
+  };
+
+  const ActForm = ({ data, setData, onSave, onCancel, saveLabel }) => (
+    <div className="bg-white rounded-2xl p-5 border border-teal-200 shadow-sm space-y-4">
+      {/* الأيقونة */}
+      <div>
+        <label className="text-xs font-bold text-gray-500 mb-2 block">اختر أيقونة النشاط</label>
+        <div className="flex gap-2 flex-wrap">
+          {icons.map(ic => (
+            <button key={ic} onClick={() => setData(p=>({...p, image:ic}))}
+              className={`w-10 h-10 rounded-xl text-xl flex items-center justify-center border-2 transition-all ${data.image===ic?"border-teal-500 bg-teal-50":"border-gray-200 hover:border-teal-300"}`}>
+              {ic}
+            </button>
+          ))}
+        </div>
+      </div>
+      {/* العنوان */}
+      <div>
+        <label className="text-xs font-bold text-gray-500 mb-1 block">عنوان النشاط *</label>
+        <input value={data.title} onChange={e => setData(p=>({...p, title:e.target.value}))}
+          className="w-full px-4 py-2.5 rounded-xl border-2 border-gray-200 focus:border-teal-400 focus:outline-none text-sm" placeholder="اسم النشاط" />
+      </div>
+      {/* الوصف — محرر غني */}
+      <div>
+        <label className="text-xs font-bold text-gray-500 mb-1 block">الوصف (يدعم الألوان وأحجام الخط)</label>
+        <RichEditor value={data.description} onChange={v => setData(p=>({...p, description:v}))} />
+      </div>
+      {/* الحقول الأخرى */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div>
+          <label className="text-xs font-bold text-gray-500 mb-1 block">النوع</label>
+          <select value={data.type} onChange={e => setData(p=>({...p, type:e.target.value}))}
+            className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm bg-white">
+            {types.filter(t=>t!=="الكل").map(t=><option key={t}>{t}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="text-xs font-bold text-gray-500 mb-1 block">الحالة</label>
+          <select value={data.status} onChange={e => setData(p=>({...p, status:e.target.value}))}
+            className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm bg-white">
+            <option>قادم</option><option>جاري</option><option>مكتمل</option>
+          </select>
+        </div>
+        <div>
+          <label className="text-xs font-bold text-gray-500 mb-1 block">التاريخ</label>
+          <input value={data.date} onChange={e => setData(p=>({...p, date:e.target.value}))}
+            className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm" placeholder="مثال: ١٤٤٧/٨/١" />
+        </div>
+        <div>
+          <label className="text-xs font-bold text-gray-500 mb-1 block">المسؤول</label>
+          <input value={data.responsible} onChange={e => setData(p=>({...p, responsible:e.target.value}))}
+            className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm" placeholder="اسم المسؤول" />
+        </div>
+      </div>
+      <div className="flex gap-2">
+        <button onClick={onSave} disabled={!data.title}
+          className="bg-teal-600 hover:bg-teal-700 disabled:opacity-40 text-white font-bold px-6 py-2.5 rounded-xl text-sm">
+          {saveLabel}
+        </button>
+        <button onClick={onCancel} className="border border-gray-200 text-gray-500 font-bold px-4 py-2.5 rounded-xl text-sm">إلغاء</button>
+      </div>
+    </div>
+  );
+
   return (
     <div>
-      <div className="text-center mb-6">
-        <h2 className="text-2xl font-black text-teal-900 mb-1">الأنشطة المدرسية</h2>
+      <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
+        <h2 className="text-2xl font-black text-teal-900">الأنشطة المدرسية</h2>
+        <button onClick={() => { setShowForm(!showForm); setEditId(null); }}
+          className="bg-teal-600 text-white px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-teal-700">
+          {showForm ? "✕ إلغاء" : "+ نشاط جديد"}
+        </button>
       </div>
+
+      {showForm && (
+        <div className="mb-6">
+          <h3 className="font-bold text-teal-800 mb-3">إضافة نشاط جديد</h3>
+          <ActForm data={newAct} setData={setNewAct} onSave={add} onCancel={() => setShowForm(false)} saveLabel="✅ إضافة النشاط" />
+        </div>
+      )}
+
       <div className="grid grid-cols-3 gap-3 mb-5">
-        <StatCard icon="📅" label="قادمة" value={activities.filter(a => a.status === "قادم").length} color="bg-blue-50" />
-        <StatCard icon="🔄" label="جارية" value={activities.filter(a => a.status === "جاري").length} color="bg-green-50" />
-        <StatCard icon="✅" label="مكتملة" value={activities.filter(a => a.status === "مكتمل").length} color="bg-gray-50" />
+        <StatCard icon="📅" label="قادمة" value={activities.filter(a=>a.status==="قادم").length} color="bg-blue-50" />
+        <StatCard icon="🔄" label="جارية" value={activities.filter(a=>a.status==="جاري").length} color="bg-green-50" />
+        <StatCard icon="✅" label="مكتملة" value={activities.filter(a=>a.status==="مكتمل").length} color="bg-gray-50" />
       </div>
+
       <div className="flex gap-2 mb-5 overflow-x-auto pb-2">
         {types.map(type => (
           <button key={type} onClick={() => setF(type)}
-            className={`px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap ${f === type ? "bg-teal-600 text-white" : "bg-white text-gray-600 border border-gray-200"}`}>{type}</button>
+            className={`px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap ${f===type?"bg-teal-600 text-white":"bg-white text-gray-600 border border-gray-200"}`}>{type}</button>
         ))}
       </div>
+
       <div className="grid gap-4 sm:grid-cols-2">
         {filtered.map(act => (
           <div key={act.id} className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 hover:shadow-md transition-all">
-            <div className="bg-gradient-to-l from-teal-500 to-emerald-600 p-6 text-center"><span className="text-5xl">{act.image}</span></div>
-            <div className="p-4">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="font-bold text-gray-900">{act.title}</h3>
-                <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${sc[act.status]}`}>{act.status}</span>
+            {editId === act.id ? (
+              <div className="p-4">
+                <div className="text-sm font-black text-teal-700 mb-3">✏️ تعديل النشاط</div>
+                <ActForm data={editAct} setData={setEditAct} onSave={saveEdit} onCancel={() => { setEditId(null); setEditAct(null); }} saveLabel="💾 حفظ التعديلات" />
               </div>
-              <p className="text-gray-500 text-sm mb-3">{act.description}</p>
-              <div className="flex items-center justify-between text-xs text-gray-400"><span>📅 {act.date}</span><span>👤 {act.responsible}</span></div>
-              <div className="mt-2"><Badge color={tc[act.type]}>{act.type}</Badge></div>
-            </div>
+            ) : (
+              <>
+                <div className="bg-gradient-to-l from-teal-500 to-emerald-600 p-6 text-center relative">
+                  <span className="text-5xl">{act.image}</span>
+                  <div className="absolute top-2 left-2 flex gap-1">
+                    <button onClick={() => startEdit(act)} className="bg-white bg-opacity-20 hover:bg-opacity-40 text-white text-xs px-2 py-1 rounded-lg font-bold">✏️</button>
+                    <button onClick={() => del(act.id)} className="bg-red-500 bg-opacity-80 hover:bg-opacity-100 text-white text-xs px-2 py-1 rounded-lg font-bold">🗑️</button>
+                  </div>
+                </div>
+                <div className="p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="font-bold text-gray-900">{act.title}</h3>
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${sc[act.status]}`}>{act.status}</span>
+                  </div>
+                  <div className="text-gray-500 text-sm mb-3 leading-relaxed" dangerouslySetInnerHTML={{ __html: act.description }}></div>
+                  <div className="flex items-center justify-between text-xs text-gray-400">
+                    <span>📅 {act.date}</span><span>👤 {act.responsible}</span>
+                  </div>
+                  <div className="mt-2"><Badge color={tc[act.type]}>{act.type}</Badge></div>
+                </div>
+              </>
+            )}
           </div>
         ))}
       </div>
@@ -2992,7 +3156,909 @@ async function loadXLSX() {
   return window.XLSX;
 }
 
+function SMSPage({ teachers, attendance, week }) {
+  const [tab, setTab] = useState("contacts");
+  const [username, setUsername] = useState("966548454776");
+  const [password, setPassword] = useState("");
+  const [sender, setSender] = useState("School1");
+  const [showConfig, setShowConfig] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [result, setResult] = useState(null);
 
+  // ===== CONTACTS STATE =====
+  // Each contact: { id, name, phone, type: "student"|"teacher", class: "" }
+  const [contacts, setContacts] = useState([]);
+  const [contactsTab, setContactsTab] = useState("students"); // students | teachers
+  const [newName, setNewName] = useState("");
+  const [newPhone, setNewPhone] = useState("");
+  const [newClass, setNewClass] = useState("");
+  const [editId, setEditId] = useState(null);
+  const [editName, setEditName] = useState("");
+  const [editPhone, setEditPhone] = useState("");
+  const [editClass, setEditClass] = useState("");
+  const [searchContact, setSearchContact] = useState("");
+  const [selectedContacts, setSelectedContacts] = useState([]);
+  const [importMsg, setImportMsg] = useState("");
+
+  // Save contacts to localStorage
+  useEffect(() => {
+    try { localStorage.setItem("sms_contacts", JSON.stringify(contacts)); } catch {}
+  }, [contacts]);
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("sms_contacts");
+      if (saved) setContacts(JSON.parse(saved));
+    } catch {}
+  }, []);
+
+  const addContact = (type) => {
+    if (!newName.trim() || !newPhone.trim()) return;
+    const phone = newPhone.trim().replace(/\s/g, "");
+    setContacts(prev => [...prev, { id: Date.now(), name: newName.trim(), phone, type, class: newClass.trim() }]);
+    setNewName(""); setNewPhone(""); setNewClass("");
+  };
+
+  const deleteContact = (id) => setContacts(prev => prev.filter(c => c.id !== id));
+
+  const startEdit = (c) => { setEditId(c.id); setEditName(c.name); setEditPhone(c.phone); setEditClass(c.class || ""); };
+  const saveEdit = () => {
+    setContacts(prev => prev.map(c => c.id === editId ? { ...c, name: editName, phone: editPhone.replace(/\s/g,""), class: editClass } : c));
+    setEditId(null);
+  };
+
+  const importExcel = async (file, type) => {
+    try {
+      const XLSX = await loadXLSX();
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf);
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { header: 1 });
+      let added = 0;
+      const newContacts = [];
+      rows.forEach(row => {
+        // Try to find name and phone in the row
+        const cells = row.map(c => String(c || "").trim()).filter(Boolean);
+        if (cells.length < 1) return;
+        // Phone: cell containing 10+ digits starting with 05 or 9665
+        const phoneCell = cells.find(c => /^(05|9665|966)\d{7,}/.test(c.replace(/\s/g,"")));
+        // Name: longest non-numeric cell
+        const nameCell = cells.filter(c => !/^\d+$/.test(c) && c !== phoneCell).sort((a,b) => b.length - a.length)[0];
+        const classCell = cells.find(c => /فصل|صف|شعب|class/i.test(c) && c !== nameCell);
+        if (nameCell && phoneCell) {
+          newContacts.push({ id: Date.now() + Math.random(), name: nameCell, phone: phoneCell.replace(/\s/g,""), type, class: classCell || "" });
+          added++;
+        }
+      });
+      if (added > 0) {
+        setContacts(prev => {
+          const existingPhones = new Set(prev.map(c => c.phone));
+          const unique = newContacts.filter(c => !existingPhones.has(c.phone));
+          return [...prev, ...unique];
+        });
+        setImportMsg(`✅ تم استيراد ${added} جهة اتصال`);
+      } else {
+        setImportMsg("⚠️ لم يُعثر على أرقام بالصيغة المطلوبة. تأكد أن الملف يحتوي اسم ورقم في كل صف.");
+      }
+      setTimeout(() => setImportMsg(""), 4000);
+    } catch (e) { setImportMsg("❌ خطأ في قراءة الملف: " + e.message); }
+  };
+
+  const toggleSelect = (id) => setSelectedContacts(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  const selectAll = (type) => {
+    const ids = filteredContacts(type).map(c => c.id);
+    const allSelected = ids.every(id => selectedContacts.includes(id));
+    if (allSelected) setSelectedContacts(prev => prev.filter(id => !ids.includes(id)));
+    else setSelectedContacts(prev => [...new Set([...prev, ...ids])]);
+  };
+  const filteredContacts = (type) => contacts.filter(c => c.type === type && (
+    c.name.includes(searchContact) || c.phone.includes(searchContact) || (c.class||"").includes(searchContact)
+  ));
+  const selectedPhones = () => contacts.filter(c => selectedContacts.includes(c.id)).map(c => c.phone).join(",");
+
+  // Send tabs state
+  const [manualNums, setManualNums] = useState("");
+  const [manualMsg, setManualMsg] = useState("");
+  const [selectedDay, setSelectedDay] = useState(0);
+  const [supervisorNum, setSupervisorNum] = useState("");
+  const [absentMsg, setAbsentMsg] = useState("");
+  const [bulkNums, setBulkNums] = useState("");
+  const [bulkMsg, setBulkMsg] = useState("");
+
+  // Auto-build attendance message
+  useEffect(() => {
+    const di = selectedDay;
+    const dayLabel = week?.[di]?.day || `اليوم ${di + 1}`;
+    const dateLabel = week?.[di]?.dateH || "";
+    const absents = teachers.filter((_, ti) => (attendance?.[ti]?.[di]?.status || "حاضر") === "غائب").map((t, i) => `${i + 1}. ${t}`);
+    const lates = teachers.filter((_, ti) => (attendance?.[ti]?.[di]?.status || "حاضر") === "متأخر").map((t, i) => {
+      const r = attendance?.[teachers.indexOf(t)]?.[di] || {};
+      return `${i + 1}. ${t} (${r.lateType || "صباحي"} - ${r.lateMinutes || 0} دقيقة)`;
+    });
+    let msg = `📋 تقرير حضور ${dayLabel} ${dateLabel}\nمدرسة عبيدة بن الحارث المتوسطة\n\n`;
+    if (absents.length) msg += `❌ الغائبون (${absents.length}):\n${absents.join("\n")}\n\n`;
+    if (lates.length) msg += `🕐 المتأخرون (${lates.length}):\n${lates.join("\n")}\n`;
+    if (!absents.length && !lates.length) msg += `✅ جميع المعلمين حاضرون`;
+    setAbsentMsg(msg);
+  }, [selectedDay, teachers, attendance, week]);
+
+  const TABS = [
+    { id: "contacts", label: "جهات الاتصال", icon: "👥" },
+    { id: "manual",   label: "رسالة يدوية",  icon: "✍️" },
+    { id: "attendance", label: "إشعار الغياب", icon: "📋" },
+    { id: "bulk",     label: "رسالة للأهالي", icon: "👨‍👦" },
+  ];
+
+  // ===== SEND FUNCTION — مباشر بدون خادم وسيط =====
+  const sendSMS = async (numbers, message) => {
+    if (!password) { setResult({ ok:false, topMsg:"⚙️ أدخل كلمة المرور في الإعدادات أولاً" }); return; }
+    if (!numbers?.trim()) { setResult({ ok:false, topMsg:"📞 أدخل رقماً واحداً على الأقل" }); return; }
+    if (!message.trim()) { setResult({ ok:false, topMsg:"✏️ اكتب نص الرسالة" }); return; }
+    setSending(true); setResult(null);
+
+    const cleanNums = numbers.split(/[\n,،\s]+/)
+      .map(n => n.trim()).filter(n => n.length >= 9)
+      .map(n => n.startsWith("05") ? "966" + n.slice(1) : n)
+      .join(",");
+
+    const isArabic = /[\u0600-\u06FF]/.test(message);
+    const s = sender || "School1";
+
+    // الـ proxy الذي نجح في الاتصال
+    const proxy = (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+
+    const jsonBody = (extra={}) => JSON.stringify({ username, password, numbers:cleanNums, message, sender:s, msgType:isArabic?2:0, ...extra });
+    const formBody = new URLSearchParams({ username, password, numbers:cleanNums, message, sender:s }).toString();
+
+    const attempts = [
+      // مسارات مختلفة لـ mobile.net.sa
+      { label:"v1/sendSMS JSON",   url: proxy("https://app.mobile.net.sa/api/v1/sendSMS"),       method:"POST", headers:{"Content-Type":"application/json"}, body:jsonBody() },
+      { label:"v1/send JSON",      url: proxy("https://app.mobile.net.sa/api/v1/send"),           method:"POST", headers:{"Content-Type":"application/json"}, body:jsonBody() },
+      { label:"send JSON",         url: proxy("https://app.mobile.net.sa/api/send"),              method:"POST", headers:{"Content-Type":"application/json"}, body:jsonBody() },
+      { label:"sendsms JSON",      url: proxy("https://app.mobile.net.sa/api/sendsms"),           method:"POST", headers:{"Content-Type":"application/json"}, body:jsonBody() },
+      { label:"v2/sendSMS JSON",   url: proxy("https://app.mobile.net.sa/api/v2/sendSMS"),       method:"POST", headers:{"Content-Type":"application/json"}, body:jsonBody() },
+      { label:"webservice GET",    url: proxy(`https://app.mobile.net.sa/webservice/?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&numbers=${encodeURIComponent(cleanNums)}&message=${encodeURIComponent(message)}&sender=${encodeURIComponent(s)}`), method:"GET", headers:{}, body:null },
+      { label:"api/v1/sms/send",   url: proxy("https://app.mobile.net.sa/api/v1/sms/send"),      method:"POST", headers:{"Content-Type":"application/json"}, body:jsonBody() },
+      { label:"form-encoded",      url: proxy("https://app.mobile.net.sa/api/v1/sendSMS"),       method:"POST", headers:{"Content-Type":"application/x-www-form-urlencoded"}, body:formBody },
+      { label:"sms.mobile.net.sa", url: proxy("https://sms.mobile.net.sa/api/v1/sendSMS"),      method:"POST", headers:{"Content-Type":"application/json"}, body:jsonBody() },
+    ];
+
+    const allResults = [];
+    for (let i = 0; i < attempts.length; i++) {
+      const a = attempts[i];
+      try {
+        const opts = { method: a.method, headers: a.headers };
+        if (a.body) opts.body = a.body;
+        const r = await fetch(a.url, opts);
+        const text = await r.text();
+        let p = null; try { p = JSON.parse(text); } catch {}
+
+        const raw = text.substring(0, 150);
+        allResults.push({ n:i+1, label:a.label, http:r.status, raw });
+
+        const ok = p?.success===true || p?.code===0 || p?.code==="0" ||
+                   p?.status==="success" || p?.status==="sent" ||
+                   text.trim()==="0" || text.trim()==="00" ||
+                   (r.status===200 && p?.status !== "Error" && p?.message !== "Not found." && text.length < 30 && /^\d+$/.test(text.trim()));
+
+        if (ok) {
+          setSending(false);
+          setResult({ ok:true, msg:`✅ تم الإرسال بنجاح عبر: ${a.label}\n📋 رد الخادم: ${text}` });
+          return;
+        }
+      } catch(e) {
+        allResults.push({ n:i+1, label:a.label, http:0, raw:"خطأ: "+e.message });
+      }
+    }
+
+    setResult({ ok:false, topMsg:"❌ لم يُرسَل — تقرير التشخيص:", attempts:allResults,
+      msg:"يرجى البحث عن رابط API في إعدادات حسابك في mobile.net.sa" });
+    setSending(false);
+  };
+
+  // Send to selected contacts
+  const [sendMsg, setSendMsg] = useState("");
+  const sendToSelected = () => {
+    const phones = selectedPhones();
+    sendSMS(phones, sendMsg);
+  };
+
+  return (
+    <div className="space-y-5">
+      {/* Header */}
+      <div className="bg-gradient-to-l from-green-600 to-teal-700 rounded-2xl p-5 text-white flex items-center justify-between flex-wrap gap-4">
+        <div>
+          <h2 className="text-xl font-black">📱 مركز الرسائل النصية SMS</h2>
+          <p className="text-sm opacity-75 mt-1">إرسال مباشر عبر المدار التقني — mobile.net.sa</p>
+        </div>
+        <button onClick={() => setShowConfig(!showConfig)}
+          className="bg-white bg-opacity-20 hover:bg-opacity-30 px-4 py-2 rounded-xl text-sm font-bold border border-white border-opacity-30">
+          ⚙️ إعدادات الحساب
+        </button>
+      </div>
+
+      {/* Config */}
+      {showConfig && (
+        <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm">
+          <h3 className="font-black text-gray-800 mb-4">⚙️ إعدادات حساب المدار التقني</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <label className="text-xs font-bold text-gray-500 mb-1 block">اسم المستخدم</label>
+              <input value={username} onChange={e => setUsername(e.target.value)} className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm" placeholder="966XXXXXXXXX" dir="ltr" />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-gray-500 mb-1 block">كلمة المرور</label>
+              <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm" placeholder="••••••••" />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-gray-500 mb-1 block">اسم المرسل (Sender)</label>
+              <input value={sender} onChange={e => setSender(e.target.value)} className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm" placeholder="School1" />
+            </div>
+          </div>
+          <p className="text-xs text-amber-600 mt-3 bg-amber-50 rounded-xl px-3 py-2">⚠️ كلمة المرور تُحفظ في المتصفح فقط ولا تُرسل إلا عند الضغط على إرسال</p>
+        </div>
+      )}
+
+      {/* Tabs */}
+      <div className="flex gap-1 bg-gray-100 p-1 rounded-2xl overflow-x-auto">
+        {TABS.map(t => (
+          <button key={t.id} onClick={() => { setTab(t.id); setResult(null); }}
+            className={`flex-1 whitespace-nowrap py-2.5 px-3 rounded-xl text-xs font-bold transition-all ${tab === t.id ? "bg-white shadow text-teal-700" : "text-gray-500 hover:text-gray-700"}`}>
+            {t.icon} {t.label}
+          </button>
+        ))}
+      </div>
+
+      {result && (
+        <div className={`rounded-2xl px-5 py-4 text-sm font-bold ${result.ok ? "bg-green-50 text-green-700 border border-green-200" : "bg-red-50 text-red-700 border border-red-200"}`}>
+          {result.ok ? (
+            <span>{result.msg}</span>
+          ) : (
+            <div className="space-y-2">
+              <div className="font-black text-base">{result.topMsg || "❌ لم يُرسَل"}</div>
+              {result.attempts && result.attempts.length > 0 ? (
+                <div className="bg-white rounded-xl p-3 space-y-1 max-h-60 overflow-y-auto text-xs font-mono border border-red-100">
+                  {result.attempts.map((a,i) => (
+                    <div key={i} className={a.error ? "text-gray-400" : a.http===200?"text-blue-700":"text-red-600"}>
+                      <strong>#{a.n}</strong> HTTP:{a.http||"—"} | {(a.raw||a.error||"").substring(0,120)}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-xs">{result.msg}</div>
+              )}
+              <div className="text-xs text-red-500 bg-red-50 rounded-lg p-2 mt-2">
+                📋 انسخ هذا التقرير وأرسله للمطور على واتساب: 0548454776
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ===== TAB: CONTACTS ===== */}
+      {tab === "contacts" && (
+        <div className="space-y-4">
+          {/* Sub-tabs: students / teachers */}
+          <div className="flex gap-2">
+            {[{ id:"students", label:"👨‍🎓 أولياء أمور الطلاب" }, { id:"teachers", label:"👨‍🏫 المعلمون" }].map(t => (
+              <button key={t.id} onClick={() => setContactsTab(t.id)}
+                className={`flex-1 py-2.5 rounded-xl text-sm font-bold border transition-all ${contactsTab === t.id ? "bg-teal-600 text-white border-teal-600" : "bg-white text-gray-500 border-gray-200 hover:border-teal-300"}`}>
+                {t.label} <span className="mr-1 text-xs opacity-70">({contacts.filter(c=>c.type===t.id).length})</span>
+              </button>
+            ))}
+          </div>
+
+          {/* Import + Add */}
+          <div className="bg-white rounded-2xl border border-gray-200 p-5 space-y-4">
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              <h3 className="font-black text-gray-800">
+                {contactsTab === "students" ? "📥 استيراد / إضافة أولياء الأمور" : "📥 استيراد / إضافة المعلمين"}
+              </h3>
+              {/* Excel import */}
+              <label className="cursor-pointer bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 font-bold text-xs px-4 py-2 rounded-xl flex items-center gap-2">
+                📊 استيراد من Excel
+                <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={e => { if(e.target.files[0]) importExcel(e.target.files[0], contactsTab); e.target.value=""; }} />
+              </label>
+            </div>
+            {importMsg && <div className="text-sm font-bold text-center py-2 rounded-xl bg-gray-50 border">{importMsg}</div>}
+
+            {/* Excel format hint */}
+            <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-xs text-blue-700">
+              💡 <strong>صيغة ملف Excel:</strong> عمود للاسم وعمود للرقم (05XXXXXXXXX) — يمكن إضافة عمود للفصل/الصف اختيارياً. الملف يُضيف الجديد فقط دون حذف الموجود.
+            </div>
+
+            {/* Manual add form */}
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 pt-2 border-t border-gray-100">
+              <div className="sm:col-span-2">
+                <label className="text-xs font-bold text-gray-500 mb-1 block">الاسم</label>
+                <input value={newName} onChange={e => setNewName(e.target.value)}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm" placeholder="اسم الشخص" />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-gray-500 mb-1 block">رقم الجوال</label>
+                <input value={newPhone} onChange={e => setNewPhone(e.target.value)}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm" placeholder="05XXXXXXXX" dir="ltr" />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-gray-500 mb-1 block">{contactsTab === "students" ? "الفصل (اختياري)" : "التخصص (اختياري)"}</label>
+                <input value={newClass} onChange={e => setNewClass(e.target.value)}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm" placeholder={contactsTab === "students" ? "1أ، 2ب..." : "رياضيات..."} />
+              </div>
+              <div className="sm:col-span-4">
+                <button onClick={() => addContact(contactsTab)}
+                  disabled={!newName.trim() || !newPhone.trim()}
+                  className="bg-teal-600 hover:bg-teal-700 disabled:opacity-40 text-white font-bold px-5 py-2 rounded-xl text-sm">
+                  ➕ إضافة {contactsTab === "students" ? "ولي أمر" : "معلم"}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Contacts list */}
+          <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+            {/* Search + select all + send to selected */}
+            <div className="p-4 border-b border-gray-100 flex flex-wrap gap-3 items-center">
+              <input value={searchContact} onChange={e => setSearchContact(e.target.value)}
+                className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm" placeholder="🔍 بحث بالاسم أو الرقم أو الفصل..." />
+              <button onClick={() => selectAll(contactsTab)}
+                className="text-xs font-bold px-3 py-2 rounded-xl border border-gray-200 hover:bg-gray-50">
+                {filteredContacts(contactsTab).every(c => selectedContacts.includes(c.id)) ? "✗ إلغاء الكل" : "✓ تحديد الكل"}
+              </button>
+              {selectedContacts.length > 0 && (
+                <span className="text-xs font-bold text-teal-600 bg-teal-50 px-3 py-2 rounded-xl border border-teal-200">
+                  {selectedContacts.length} محدد
+                </span>
+              )}
+            </div>
+
+            {filteredContacts(contactsTab).length === 0 ? (
+              <div className="p-10 text-center text-gray-400">
+                <div className="text-4xl mb-3">{contactsTab === "students" ? "👨‍🎓" : "👨‍🏫"}</div>
+                <p className="font-bold">لا توجد جهات اتصال بعد</p>
+                <p className="text-xs mt-1">أضف يدوياً أو استورد من ملف Excel</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-gray-50 max-h-96 overflow-y-auto">
+                {filteredContacts(contactsTab).map(c => (
+                  <div key={c.id} className={`flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-all ${selectedContacts.includes(c.id) ? "bg-teal-50" : ""}`}>
+                    {/* Checkbox */}
+                    <input type="checkbox" checked={selectedContacts.includes(c.id)} onChange={() => toggleSelect(c.id)}
+                      className="w-4 h-4 accent-teal-600 cursor-pointer flex-shrink-0" />
+                    {editId === c.id ? (
+                      // Edit mode
+                      <div className="flex-1 grid grid-cols-3 gap-2">
+                        <input value={editName} onChange={e => setEditName(e.target.value)}
+                          className="border border-teal-300 rounded-lg px-2 py-1 text-xs" placeholder="الاسم" />
+                        <input value={editPhone} onChange={e => setEditPhone(e.target.value)}
+                          className="border border-teal-300 rounded-lg px-2 py-1 text-xs" placeholder="الرقم" dir="ltr" />
+                        <input value={editClass} onChange={e => setEditClass(e.target.value)}
+                          className="border border-teal-300 rounded-lg px-2 py-1 text-xs" placeholder="الفصل" />
+                      </div>
+                    ) : (
+                      <div className="flex-1 min-w-0">
+                        <div className="font-bold text-sm text-gray-800 truncate">{c.name}</div>
+                        <div className="text-xs text-gray-400 flex items-center gap-2">
+                          <span dir="ltr">{c.phone}</span>
+                          {c.class && <span className="bg-gray-100 px-2 py-0.5 rounded-full">{c.class}</span>}
+                        </div>
+                      </div>
+                    )}
+                    <div className="flex gap-1 flex-shrink-0">
+                      {editId === c.id ? (
+                        <>
+                          <button onClick={saveEdit} className="text-xs bg-teal-600 text-white px-3 py-1.5 rounded-lg font-bold">حفظ</button>
+                          <button onClick={() => setEditId(null)} className="text-xs border border-gray-200 px-3 py-1.5 rounded-lg font-bold">إلغاء</button>
+                        </>
+                      ) : (
+                        <>
+                          <button onClick={() => startEdit(c)} className="text-xs text-blue-600 hover:bg-blue-50 px-2 py-1.5 rounded-lg">✏️</button>
+                          <button onClick={() => deleteContact(c.id)} className="text-xs text-red-500 hover:bg-red-50 px-2 py-1.5 rounded-lg">🗑️</button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Send to selected footer */}
+            {selectedContacts.length > 0 && (
+              <div className="border-t border-gray-200 p-4 bg-teal-50 space-y-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-black text-teal-700">📤 إرسال لـ {selectedContacts.length} شخص محدد</span>
+                </div>
+                <textarea value={sendMsg} onChange={e => setSendMsg(e.target.value)}
+                  rows={3} className="w-full border border-teal-200 rounded-xl px-3 py-2 text-sm resize-none bg-white"
+                  placeholder="اكتب نص الرسالة..." />
+                <div className="flex gap-2">
+                  <button onClick={sendToSelected} disabled={sending || !sendMsg.trim()}
+                    className="bg-teal-600 hover:bg-teal-700 disabled:opacity-40 text-white font-bold px-5 py-2 rounded-xl text-sm">
+                    {sending ? "⏳ جاري الإرسال..." : `📤 إرسال الآن`}
+                  </button>
+                  <button onClick={() => setSelectedContacts([])}
+                    className="border border-gray-200 bg-white text-gray-500 font-bold px-4 py-2 rounded-xl text-sm">
+                    إلغاء التحديد
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ===== TAB: MANUAL ===== */}
+      {tab === "manual" && (
+        <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm space-y-4">
+          <h3 className="font-black text-gray-800">✍️ رسالة يدوية بأرقام مباشرة</h3>
+          <div>
+            <label className="text-xs font-bold text-gray-500 mb-1 block">أرقام الهاتف (مفصولة بفاصلة)</label>
+            <textarea value={manualNums} onChange={e => setManualNums(e.target.value)}
+              rows={2} className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm resize-none"
+              placeholder="0512345678,0598765432" dir="ltr" />
+            {selectedContacts.length > 0 && (
+              <button onClick={() => setManualNums(selectedPhones())}
+                className="mt-2 text-xs text-teal-600 font-bold hover:underline">
+                ← تعبئة من {selectedContacts.length} جهة محددة في قسم جهات الاتصال
+              </button>
+            )}
+          </div>
+          <div>
+            <label className="text-xs font-bold text-gray-500 mb-1 block">نص الرسالة <span className="text-gray-400 font-normal mr-1">({manualMsg.length} حرف)</span></label>
+            <textarea value={manualMsg} onChange={e => setManualMsg(e.target.value)}
+              rows={4} className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm resize-none" placeholder="اكتب نص رسالتك هنا..." />
+          </div>
+          <div className="flex gap-3">
+            <button onClick={() => sendSMS(manualNums, manualMsg)} disabled={sending}
+              className="bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white font-bold px-6 py-2.5 rounded-xl text-sm">
+              {sending ? "⏳ جاري الإرسال..." : "📤 إرسال الآن"}
+            </button>
+            <button onClick={() => { setManualNums(""); setManualMsg(""); }}
+              className="border border-gray-200 text-gray-500 font-bold px-4 py-2.5 rounded-xl text-sm">مسح</button>
+          </div>
+        </div>
+      )}
+
+      {/* ===== TAB: ATTENDANCE ===== */}
+      {tab === "attendance" && (
+        <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm space-y-4">
+          <h3 className="font-black text-gray-800">📋 إشعار غياب وتأخر المعلمين</h3>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs font-bold text-gray-500 mb-1 block">اليوم</label>
+              <select value={selectedDay} onChange={e => setSelectedDay(Number(e.target.value))}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white">
+                {(week || []).map((d, i) => <option key={i} value={i}>{d.day} — {d.dateH}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-bold text-gray-500 mb-1 block">رقم المشرف</label>
+              <input value={supervisorNum} onChange={e => setSupervisorNum(e.target.value)}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm" placeholder="05XXXXXXXX" dir="ltr" />
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            {[
+              { label:"حاضر", color:"green", count: teachers.filter((_,ti)=>(attendance?.[ti]?.[selectedDay]?.status||"حاضر")==="حاضر").length },
+              { label:"متأخر", color:"amber", count: teachers.filter((_,ti)=>(attendance?.[ti]?.[selectedDay]?.status||"حاضر")==="متأخر").length },
+              { label:"غائب", color:"red", count: teachers.filter((_,ti)=>(attendance?.[ti]?.[selectedDay]?.status||"حاضر")==="غائب").length },
+            ].map(s => (
+              <div key={s.label} className={`bg-${s.color}-50 border border-${s.color}-200 rounded-xl p-3 text-center`}>
+                <div className={`text-2xl font-black text-${s.color}-600`}>{s.count}</div>
+                <div className={`text-xs font-bold text-${s.color}-500`}>{s.label}</div>
+              </div>
+            ))}
+          </div>
+          <div>
+            <label className="text-xs font-bold text-gray-500 mb-1 block">نص الرسالة (مُولَّد تلقائياً — قابل للتعديل)</label>
+            <textarea value={absentMsg} onChange={e => setAbsentMsg(e.target.value)}
+              rows={8} className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm font-mono resize-none" />
+          </div>
+          <button onClick={() => sendSMS(supervisorNum, absentMsg)} disabled={sending}
+            className="bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white font-bold px-6 py-2.5 rounded-xl text-sm">
+            {sending ? "⏳ جاري الإرسال..." : "📤 أرسل للمشرف"}
+          </button>
+        </div>
+      )}
+
+      {/* ===== TAB: BULK ===== */}
+      {tab === "bulk" && (
+        <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm space-y-4">
+          <h3 className="font-black text-gray-800">👨‍👦 رسالة جماعية لأولياء الأمور</h3>
+          <div className="bg-teal-50 border border-teal-200 rounded-xl px-4 py-3 text-sm text-teal-700 flex items-center justify-between gap-3 flex-wrap">
+            <span>💡 يمكنك تحديد الأرقام من قسم <strong>جهات الاتصال</strong> ثم العودة هنا</span>
+            {selectedContacts.length > 0 && (
+              <button onClick={() => setBulkNums(selectedPhones())}
+                className="bg-teal-600 text-white font-bold text-xs px-3 py-1.5 rounded-lg">
+                ← تعبئة {selectedContacts.length} رقم محدد
+              </button>
+            )}
+          </div>
+          <div>
+            <label className="text-xs font-bold text-gray-500 mb-1 block">أرقام أولياء الأمور <span className="text-gray-400 font-normal mr-1">({bulkNums.split(",").filter(n=>n.trim().length>5).length} رقم)</span></label>
+            <textarea value={bulkNums} onChange={e => setBulkNums(e.target.value)}
+              rows={3} className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm resize-none"
+              placeholder="0512345678,0598765432,0566778899" dir="ltr" />
+          </div>
+          <div>
+            <label className="text-xs font-bold text-gray-500 mb-2 block">قوالب جاهزة</label>
+            <div className="flex gap-2 flex-wrap">
+              {[
+                { label:"دعوة اجتماع", msg:"أولياء الأمور الكرام\nيُعقد اجتماعاً بالمدرسة يوم ............\nالرجاء الحضور في الموعد المحدد\nمدرسة عبيدة بن الحارث المتوسطة" },
+                { label:"موعد الاختبارات", msg:"أولياء الأمور الكرام\nتبدأ الاختبارات يوم ............\nنتمنى لأبنائكم التوفيق\nمدرسة عبيدة بن الحارث المتوسطة" },
+                { label:"إجازة عارضة", msg:"أولياء الأمور الكرام\nتُعلم المدرسة بعدم الدراسة يوم ............\nمع التقدير\nمدرسة عبيدة بن الحارث المتوسطة" },
+                { label:"نشاط مدرسي", msg:"أولياء الأمور الكرام\nتقيم المدرسة نشاطاً بتاريخ ............\nنتشرف بحضوركم\nمدرسة عبيدة بن الحارث المتوسطة" },
+              ].map(t => (
+                <button key={t.label} onClick={() => setBulkMsg(t.msg)}
+                  className="bg-gray-100 hover:bg-teal-50 hover:text-teal-700 text-gray-600 text-xs font-bold px-3 py-1.5 rounded-lg border border-gray-200 transition-all">
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className="text-xs font-bold text-gray-500 mb-1 block">نص الرسالة <span className="text-gray-400 font-normal mr-1">({bulkMsg.length} حرف)</span></label>
+            <textarea value={bulkMsg} onChange={e => setBulkMsg(e.target.value)}
+              rows={5} className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm resize-none"
+              placeholder="اكتب رسالتك لأولياء الأمور..." />
+          </div>
+          <div className="flex gap-3">
+            <button onClick={() => sendSMS(bulkNums, bulkMsg)} disabled={sending}
+              className="bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white font-bold px-6 py-2.5 rounded-xl text-sm">
+              {sending ? "⏳ جاري الإرسال..." : `📤 إرسال لـ ${bulkNums.split(",").filter(n=>n.trim().length>5).length} رقم`}
+            </button>
+            <button onClick={() => { setBulkNums(""); setBulkMsg(""); }}
+              className="border border-gray-200 text-gray-500 font-bold px-4 py-2.5 rounded-xl text-sm">مسح</button>
+          </div>
+        </div>
+      )}
+
+      {/* Notes */}
+      <div className="bg-gray-50 rounded-2xl px-5 py-4 border border-gray-200">
+        <p className="text-xs text-gray-500 font-bold mb-1">📌 ملاحظات:</p>
+        <ul className="text-xs text-gray-400 space-y-1 list-disc list-inside">
+          <li>الأرقام السعودية: 05XXXXXXXX أو 9665XXXXXXXX</li>
+          <li>جهات الاتصال تُحفظ في المتصفح تلقائياً</li>
+          <li>الرسائل العربية: 70 حرف = رسالة واحدة</li>
+          <li>يمكن الإرسال لأكثر من 500 رقم في طلب واحد</li>
+        </ul>
+      </div>
+    </div>
+  );
+}
+
+
+// ==================== PROGRAM REPORT PAGE ====================
+function ProgramReportPage() {
+  const emptyReport = {
+    // الترويسة
+    schoolName: "مدرسة عبيدة بن الحارث المتوسطة",
+    region: "الإدارة العامة للتعليم بالمنطقة",
+    // بيانات التقرير
+    reportTitle: "",
+    executor: "",
+    participants: "",
+    location: "",
+    duration: "",
+    date: "",
+    beneficiaries: "",
+    field: "",
+    objectives: "",
+    steps: "",
+    // التوقيعات
+    activityLeaderName: "",
+    principalName: "",
+    // الشواهد
+    witnesses: [null, null, null, null],
+  };
+
+  const [report, setReport] = useState(() => {
+    try { const s = localStorage.getItem("prog_report"); return s ? JSON.parse(s) : emptyReport; } catch { return emptyReport; }
+  });
+  const [saved, setSaved] = useState(false);
+  const witnessRefs = [useRef(), useRef(), useRef(), useRef()];
+
+  const upd = (field, val) => setReport(p => ({ ...p, [field]: val }));
+
+  useEffect(() => {
+    try {
+      const toSave = { ...report, witnesses: report.witnesses.map(w => w ? w.dataUrl || null : null) };
+      localStorage.setItem("prog_report", JSON.stringify(toSave));
+    } catch {}
+    setSaved(true);
+    const t = setTimeout(() => setSaved(false), 1500);
+    return () => clearTimeout(t);
+  }, [report]);
+
+  const handleWitness = (idx, file) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+      const witnesses = [...report.witnesses];
+      witnesses[idx] = { dataUrl: e.target.result, name: file.name };
+      setReport(p => ({ ...p, witnesses }));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const removeWitness = (idx) => {
+    const witnesses = [...report.witnesses];
+    witnesses[idx] = null;
+    setReport(p => ({ ...p, witnesses }));
+  };
+
+  const downloadWitness = (w) => {
+    const a = document.createElement("a");
+    a.href = w.dataUrl;
+    a.download = w.name || "شاهد.jpg";
+    a.click();
+  };
+
+  const printReport = () => {
+    const win = window.open("", "_blank");
+    const witnessesHtml = report.witnesses.map((w, i) =>
+      w ? `<div class="witness-item"><img src="${w.dataUrl}" style="max-width:100%;max-height:220px;border-radius:8px;object-fit:contain;" /><div class="witness-label">شاهد ${i+1}</div></div>`
+        : `<div class="witness-item empty"><div class="empty-box">شاهد ${i+1}</div></div>`
+    ).join("");
+
+    win.document.write(`<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+<meta charset="UTF-8">
+<title>${report.reportTitle || "تقرير برنامج"}</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Cairo',sans-serif; background:#fff; color:#1e293b; direction:rtl; font-size:13px; }
+  .page { max-width:800px; margin:0 auto; padding:0; }
+
+  /* الترويسة */
+  .header { background:linear-gradient(135deg,#0f2540,#0d9488); color:white; padding:20px 28px; display:flex; align-items:center; justify-content:space-between; }
+  .header-right { text-align:right; }
+  .header-right .region { font-size:13px; opacity:.85; }
+  .header-right .school { font-size:16px; font-weight:900; margin-top:4px; }
+  .header-logo { display:flex; align-items:center; gap:12px; }
+  .logo-circle { width:60px; height:60px; border-radius:50%; background:white; display:flex; align-items:center; justify-content:center; font-size:28px; }
+  .header-left { text-align:left; font-size:11px; opacity:.75; }
+
+  /* عنوان التقرير */
+  .report-title-bar { background:#1e3a5f; color:white; text-align:center; padding:12px; font-size:17px; font-weight:900; }
+
+  /* الجدول */
+  .table-section { padding:0 16px; margin-top:12px; }
+  .row-2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px; }
+  .row-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:10px; }
+  .field-box { border:1.5px solid #0d9488; border-radius:8px; padding:8px 12px; }
+  .field-label { font-size:10px; color:#0d9488; font-weight:700; margin-bottom:4px; }
+  .field-value { font-size:12px; font-weight:600; min-height:20px; white-space:pre-wrap; }
+
+  .row-big { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px; }
+  .field-box-big { border:1.5px solid #0d9488; border-radius:8px; padding:10px 12px; min-height:100px; }
+
+  /* الشواهد */
+  .witnesses-title { text-align:center; color:#0d9488; font-weight:900; font-size:14px; margin:16px 0 10px; border-top:2px solid #0d9488; padding-top:10px; }
+  .witnesses-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; padding:0 16px; margin-bottom:16px; }
+  .witness-item { border:1.5px solid #0d9488; border-radius:8px; padding:8px; text-align:center; min-height:160px; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+  .witness-label { font-size:11px; color:#0d9488; font-weight:700; margin-top:6px; }
+  .empty-box { color:#ccc; font-size:12px; }
+
+  /* التوقيعات */
+  .signatures { display:grid; grid-template-columns:1fr 1fr; gap:20px; padding:10px 24px 16px; }
+  .sig-box { text-align:center; border-top:1.5px dashed #0d9488; padding-top:8px; }
+  .sig-title { font-size:11px; color:#64748b; }
+  .sig-name { font-size:13px; font-weight:700; margin-top:4px; }
+
+  /* الفوتر */
+  .footer { background:#0f2540; color:rgba(255,255,255,.6); text-align:center; padding:8px; font-size:10px; }
+
+  @media print { @page { size:A4; margin:0; } body { -webkit-print-color-adjust:exact; print-color-adjust:exact; } }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="header">
+    <div class="header-right">
+      <div class="region">${report.region}</div>
+      <div class="school">${report.schoolName}</div>
+    </div>
+    <div class="logo-circle">🏫</div>
+    <div class="header-left">وزارة التعليم<br/>Ministry of Education</div>
+  </div>
+
+  <div class="report-title-bar">${report.reportTitle || "تقرير برنامج"}</div>
+
+  <div class="table-section">
+    <div class="row-2">
+      <div class="field-box"><div class="field-label">المنفذ/ون:</div><div class="field-value">${report.executor}</div></div>
+      <div class="field-box"><div class="field-label">المشارك/ون:</div><div class="field-value">${report.participants}</div></div>
+    </div>
+    <div class="row-3">
+      <div class="field-box"><div class="field-label">مكان التنفيذ:</div><div class="field-value">${report.location}</div></div>
+      <div class="field-box"><div class="field-label">مدة التنفيذ:</div><div class="field-value">${report.duration}</div></div>
+      <div class="field-box"><div class="field-label">تاريخ التنفيذ:</div><div class="field-value">${report.date}</div></div>
+    </div>
+    <div class="row-2">
+      <div class="field-box"><div class="field-label">المستفيدون / العدد:</div><div class="field-value">${report.beneficiaries}</div></div>
+      <div class="field-box"><div class="field-label">المجال:</div><div class="field-value">${report.field}</div></div>
+    </div>
+    <div class="row-big">
+      <div class="field-box-big"><div class="field-label">الأهداف:</div><div class="field-value">${report.objectives}</div></div>
+      <div class="field-box-big"><div class="field-label">خطوات التنفيذ / الوصف:</div><div class="field-value">${report.steps}</div></div>
+    </div>
+  </div>
+
+  <div class="witnesses-title">— الشواهد —</div>
+  <div class="witnesses-grid">${witnessesHtml}</div>
+
+  <div class="signatures">
+    <div class="sig-box"><div class="sig-title">رائد النشاط</div><div class="sig-name">${report.activityLeaderName || "الاسم"}</div></div>
+    <div class="sig-box"><div class="sig-title">مدير المدرسة</div><div class="sig-name">${report.principalName || "الاسم"}</div></div>
+  </div>
+
+  <div class="footer">مدرسة عبيدة بن الحارث المتوسطة — بوابة الإدارة المدرسية الإلكترونية</div>
+</div>
+<script>window.onload=()=>{ window.print(); }</script>
+</body></html>`);
+    win.document.close();
+  };
+
+  const Field = ({ label, field, placeholder, multiline, half }) => (
+    <div className={half ? "" : ""}>
+      <label className="text-xs font-bold text-teal-700 mb-1 block">{label}</label>
+      {multiline ? (
+        <textarea value={report[field]} onChange={e => upd(field, e.target.value)} rows={5}
+          className="w-full border-2 border-gray-200 focus:border-teal-400 rounded-xl px-3 py-2 text-sm resize-none focus:outline-none"
+          placeholder={placeholder} />
+      ) : (
+        <input value={report[field]} onChange={e => upd(field, e.target.value)}
+          className="w-full border-2 border-gray-200 focus:border-teal-400 rounded-xl px-3 py-2 text-sm focus:outline-none"
+          placeholder={placeholder} />
+      )}
+    </div>
+  );
+
+  return (
+    <div className="space-y-5 max-w-4xl mx-auto">
+      {/* Header */}
+      <div className="bg-gradient-to-l from-teal-700 to-blue-900 rounded-2xl p-5 text-white flex items-center justify-between flex-wrap gap-4">
+        <div>
+          <h2 className="text-xl font-black">📋 تقرير برنامج / نشاط</h2>
+          <p className="text-sm opacity-75 mt-1">أدخل البيانات ثم اطبع أو احفظ كـ PDF</p>
+        </div>
+        <div className="flex gap-2">
+          {saved && <span className="bg-green-500 text-white text-xs font-bold px-3 py-1.5 rounded-xl">✅ حُفظ</span>}
+          <button onClick={printReport}
+            className="bg-white text-teal-700 font-black px-5 py-2.5 rounded-xl text-sm hover:bg-teal-50 flex items-center gap-2">
+            🖨️ طباعة / PDF
+          </button>
+          <button onClick={() => { setReport(emptyReport); }}
+            className="bg-white bg-opacity-20 text-white font-bold px-4 py-2.5 rounded-xl text-sm hover:bg-opacity-30">
+            🗑️ مسح
+          </button>
+        </div>
+      </div>
+
+      {/* ===== الترويسة ===== */}
+      <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
+        <h3 className="font-black text-gray-800 mb-4 flex items-center gap-2">
+          <span className="bg-teal-100 text-teal-700 px-3 py-1 rounded-lg text-sm">الترويسة</span>
+        </h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Field label="اسم المدرسة" field="schoolName" placeholder="مدرسة عبيدة بن الحارث المتوسطة" />
+          <Field label="الإدارة / المنطقة" field="region" placeholder="الإدارة العامة للتعليم بالمنطقة" />
+        </div>
+      </div>
+
+      {/* ===== عنوان التقرير ===== */}
+      <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
+        <h3 className="font-black text-gray-800 mb-4 flex items-center gap-2">
+          <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-lg text-sm">عنوان التقرير</span>
+        </h3>
+        <input value={report.reportTitle} onChange={e => upd("reportTitle", e.target.value)}
+          className="w-full border-2 border-blue-200 focus:border-blue-500 rounded-xl px-4 py-3 text-base font-bold focus:outline-none text-center"
+          placeholder="مثال: تقرير الاحتفاء باليوم الوطني ٩٥" />
+      </div>
+
+      {/* ===== بيانات التنفيذ ===== */}
+      <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
+        <h3 className="font-black text-gray-800 mb-4 flex items-center gap-2">
+          <span className="bg-teal-100 text-teal-700 px-3 py-1 rounded-lg text-sm">بيانات التنفيذ</span>
+        </h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+          <Field label="المنفذ/ون" field="executor" placeholder="جميع منسوبي المدرسة" />
+          <Field label="المشارك/ون" field="participants" placeholder="أولياء الأمور" />
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+          <Field label="مكان التنفيذ" field="location" placeholder="فناء المدرسة" />
+          <Field label="مدة التنفيذ" field="duration" placeholder="يوم واحد" />
+          <Field label="تاريخ التنفيذ" field="date" placeholder="١/٤/١٤٤٧ هـ" />
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Field label="المستفيدون / العدد" field="beneficiaries" placeholder="منسوبو المدرسة / أولياء الأمور" />
+          <Field label="المجال" field="field" placeholder="المواطنة" />
+        </div>
+      </div>
+
+      {/* ===== الأهداف والخطوات ===== */}
+      <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
+        <h3 className="font-black text-gray-800 mb-4 flex items-center gap-2">
+          <span className="bg-amber-100 text-amber-700 px-3 py-1 rounded-lg text-sm">الأهداف والتنفيذ</span>
+        </h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Field label="الأهداف" field="objectives" placeholder="١. تعزيز الهوية الوطنية&#10;٢. تنمية الانتماء&#10;٣. ..." multiline />
+          <Field label="خطوات التنفيذ / الوصف" field="steps" placeholder="١. إذاعة صباحية متنوعة&#10;٢. مسابقات&#10;٣. ..." multiline />
+        </div>
+      </div>
+
+      {/* ===== الشواهد ===== */}
+      <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
+        <h3 className="font-black text-gray-800 mb-4 flex items-center gap-2">
+          <span className="bg-purple-100 text-purple-700 px-3 py-1 rounded-lg text-sm">الشواهد (صور)</span>
+          <span className="text-xs text-gray-400 font-normal">أرفق حتى 4 صور كشواهد للنشاط</span>
+        </h3>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          {report.witnesses.map((w, i) => (
+            <div key={i} className="relative">
+              <div className="text-xs font-bold text-teal-700 mb-1 text-center">شاهد {i + 1}</div>
+              {w ? (
+                <div className="relative group rounded-xl overflow-hidden border-2 border-teal-300" style={{ aspectRatio:"4/3" }}>
+                  <img src={w.dataUrl} alt={`شاهد ${i+1}`} className="w-full h-full object-cover" />
+                  <div className="absolute inset-0 bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-all flex flex-col items-center justify-center gap-2">
+                    <button onClick={() => downloadWitness(w)}
+                      className="bg-white text-teal-700 font-bold text-xs px-3 py-1.5 rounded-lg w-20">⬇️ تحميل</button>
+                    <button onClick={() => removeWitness(i)}
+                      className="bg-red-500 text-white font-bold text-xs px-3 py-1.5 rounded-lg w-20">🗑️ حذف</button>
+                  </div>
+                </div>
+              ) : (
+                <label className="cursor-pointer block">
+                  <div className="border-2 border-dashed border-gray-300 hover:border-teal-400 rounded-xl flex flex-col items-center justify-center text-gray-400 hover:text-teal-500 transition-all bg-gray-50 hover:bg-teal-50"
+                    style={{ aspectRatio:"4/3" }}>
+                    <span className="text-3xl mb-1">📷</span>
+                    <span className="text-xs font-bold">إرفاق صورة</span>
+                  </div>
+                  <input type="file" accept="image/*" className="hidden"
+                    onChange={e => { if(e.target.files[0]) handleWitness(i, e.target.files[0]); e.target.value=""; }} />
+                </label>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ===== التوقيعات ===== */}
+      <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
+        <h3 className="font-black text-gray-800 mb-4 flex items-center gap-2">
+          <span className="bg-gray-100 text-gray-700 px-3 py-1 rounded-lg text-sm">التوقيعات</span>
+        </h3>
+        <div className="grid grid-cols-2 gap-6">
+          <div className="text-center">
+            <label className="text-xs font-bold text-gray-500 block mb-1">رائد النشاط</label>
+            <input value={report.activityLeaderName} onChange={e => upd("activityLeaderName", e.target.value)}
+              className="w-full border-b-2 border-dashed border-teal-400 text-center py-2 text-sm font-bold focus:outline-none bg-transparent"
+              placeholder="الاسم" />
+          </div>
+          <div className="text-center">
+            <label className="text-xs font-bold text-gray-500 block mb-1">مدير المدرسة</label>
+            <input value={report.principalName} onChange={e => upd("principalName", e.target.value)}
+              className="w-full border-b-2 border-dashed border-teal-400 text-center py-2 text-sm font-bold focus:outline-none bg-transparent"
+              placeholder="الاسم" />
+          </div>
+        </div>
+      </div>
+
+      {/* Preview bar */}
+      <div className="bg-teal-50 border border-teal-200 rounded-2xl px-5 py-4 flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <p className="text-sm font-black text-teal-700">✅ البيانات تُحفظ تلقائياً في المتصفح</p>
+          <p className="text-xs text-teal-500 mt-0.5">اضغط "طباعة / PDF" للحصول على نسخة جاهزة للطباعة أو الحفظ كـ PDF</p>
+        </div>
+        <button onClick={printReport}
+          className="bg-teal-600 hover:bg-teal-700 text-white font-black px-6 py-2.5 rounded-xl text-sm flex items-center gap-2">
+          🖨️ طباعة / حفظ PDF
+        </button>
+      </div>
+    </div>
+  );
+}
 
 function SettingsPage({ teachers, setTeachers, saveTeachers, week, setWeek, saveWeek, users, siteFont, setSiteFont, saveSiteFont }) {
   const [newT, setNewT] = useState("");
@@ -3232,7 +4298,7 @@ export default function SchoolWebsite() {
   useEffect(() => {
     const h = () => {
       const hash = window.location.hash.replace("#","") || "home";
-      if (["home","attendance","announcements","activities","settings","students","messages","surveys"].includes(hash)) setPage(hash);
+      if (["home","attendance","announcements","activities","settings","students","messages","surveys","sms","report"].includes(hash)) setPage(hash);
     };
     window.addEventListener("hashchange", h); h();
     return () => window.removeEventListener("hashchange", h);
@@ -3307,6 +4373,8 @@ export default function SchoolWebsite() {
     { id: "activities",    label: "الأنشطة",         icon: "⚡" },
     { id: "messages",      label: "رسائل الأهالي",  icon: "✉️" },
     { id: "surveys",       label: "الاستبيانات",     icon: "📊" },
+    { id: "sms",           label: "رسائل SMS",       icon: "📱" },
+    { id: "report",        label: "تقرير برنامج",    icon: "📋" },
     { id: "settings",      label: "الإعدادات",       icon: "⚙️" },
   ];
 
@@ -3358,9 +4426,11 @@ export default function SchoolWebsite() {
         {page === "attendance"    && <AttendancePage teachers={teachers} setTeachers={setTeachers} saveTeachers={saveTeachers} week={week} attendance={attendance} setAttendance={setAttendance} saveAttendance={saveAttendance} />}
         {page === "students"      && <StudentsPage classList={classList} setClassList={setClassList} saveClass={saveClass} deleteClass={deleteClass} />}
         {page === "announcements" && <AnnouncementsPage announcements={announcements} setAnnouncements={setAnnouncements} saveAnnouncements={saveAnnouncements} />}
-        {page === "activities"    && <ActivitiesPage activities={activities} />}
+        {page === "activities"    && <ActivitiesPage activities={activities} setActivities={setActivities} saveActivities={saveActivities} />}
         {page === "messages"      && <MessagesPage messages={messages} setMessages={setMessages} saveMessages={saveMessages} isParent={false} />}
         {page === "surveys"       && <SurveysPage surveys={surveys} setSurveys={setSurveys} saveSurveys={saveSurveys} isParent={false} />}
+        {page === "sms"           && <SMSPage teachers={teachers} attendance={attendance} week={week} />}
+        {page === "report"        && <ProgramReportPage />}
         {page === "settings"      && <SettingsPage teachers={teachers} setTeachers={setTeachers} saveTeachers={saveTeachers} week={week} setWeek={setWeek} saveWeek={saveWeek} users={users} siteFont={siteFont} setSiteFont={setSiteFont} saveSiteFont={saveSiteFont} />}
       </main>
       <footer className="text-center py-6 text-xs text-gray-400 border-t border-gray-200 bg-white mt-8">
