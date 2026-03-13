@@ -3134,19 +3134,32 @@ function SMSPage({ teachers, attendance, week }) {
       const resp = await fetch("/api/sms", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password, numbers: numbers.replace(/\s/g,""), message, sender })
+        body: JSON.stringify({ username, password, numbers, message, sender })
       });
       const data = await resp.json();
 
       if (data.success === true) {
-        setResult({ ok: true, msg: `✅ تم الإرسال بنجاح لـ ${data.cleanNumbersSent?.split(",").length || "?"} رقم` });
+        setResult({ ok: true, msg: `✅ تم الإرسال بنجاح!\n🔗 المسار الناجح: ${data.winningUrl || ""}\n📋 رد الخادم: ${data.rawResponse || ""}` });
       } else {
-        // عرض الرد الخام للتشخيص
-        const rawInfo = data.rawResponse ? `\n📋 رد الخادم: ${data.rawResponse.substring(0,200)}` : "";
-        const hint = data.debugNeeded ? "\n⚠️ الخادم لم يؤكد النجاح ولم يُبلّغ عن خطأ — تحقق من الرصيد واسم المرسل" : "";
-        setResult({ ok: false, msg: `❌ لم يُرسَل${rawInfo}${hint}\n\n💡 أرسل هذه المعلومات للمطور للمساعدة.`, raw: data.rawResponse });
+        // بناء رسالة تشخيص مفصّلة
+        let diagMsg = "❌ لم يُرسَل — تقرير التشخيص:\n\n";
+        if (data.allAttempts) {
+          data.allAttempts.forEach(a => {
+            if (a.error) {
+              diagMsg += `🔴 محاولة ${a.attempt}: ${a.url}\n   خطأ شبكة: ${a.error}\n\n`;
+            } else {
+              diagMsg += `📌 محاولة ${a.attempt}: ${a.url}\n   HTTP: ${a.httpStatus} | رد: ${(a.raw||"فارغ").substring(0,100)}\n\n`;
+            }
+          });
+        } else {
+          diagMsg += data.error || "خطأ غير معروف";
+        }
+        diagMsg += "\n💡 انسخ هذا التقرير وأرسله للمطور";
+        setResult({ ok: false, msg: diagMsg });
       }
-    } catch (e) { setResult({ ok: false, msg: `❌ خطأ في الاتصال: ${e.message}\nتأكد أن ملف api/sms.js مرفوع في GitHub` }); }
+    } catch (e) {
+      setResult({ ok: false, msg: `❌ خطأ في الاتصال: ${e.message}\n\nتأكد أن:\n1. ملف api/sms.js مرفوع في GitHub\n2. الموقع على Vercel (ليس Netlify)` });
+    }
     setSending(false);
   };
 
