@@ -3727,6 +3727,68 @@ function SMSPage({ teachers, attendance, week }) {
 
 
 // ==================== PROGRAM REPORT PAGE ====================
+// ===== محرر نصوص غني =====
+const COLORS_RF = ['#111827','#1d4ed8','#047857','#b91c1c','#92400e','#6d28d9'];
+const applySize = (px) => {
+  const sel = window.getSelection();
+  if (!sel || !sel.rangeCount) return;
+  const range = sel.getRangeAt(0);
+  if (range.collapsed) return;
+  const span = document.createElement('span');
+  span.style.fontSize = px;
+  try { range.surroundContents(span); } catch(e) {}
+};
+
+const RichField = ({ label, value, onChange, placeholder, rows }) => {
+  const elRef = React.useRef(null);
+  const [show, setShow] = React.useState(false);
+  const initialized = React.useRef(false);
+  React.useEffect(() => {
+    if (elRef.current && value && !initialized.current) {
+      elRef.current.innerHTML = value;
+      initialized.current = true;
+    }
+  }, []);
+  const cmd = (c, v) => { document.execCommand(c, false, v || null); elRef.current && elRef.current.focus(); };
+  const save = () => { if (elRef.current && onChange) onChange(elRef.current.innerHTML); };
+  const minH = ((rows || 5) * 24) + 'px';
+  return (
+    <div>
+      {label && <label className="text-xs font-bold text-teal-700 mb-1 block">{label}</label>}
+      <div className={`flex flex-wrap items-center gap-1 mb-1.5 p-1.5 bg-gray-50 rounded-xl border border-gray-200 ${show ? 'opacity-100' : 'opacity-50 hover:opacity-100'}`}>
+        <button type="button" onMouseDown={e => { e.preventDefault(); cmd('bold'); }} className="px-2 py-0.5 rounded text-xs font-black border border-gray-300 hover:bg-gray-200"><b>B</b></button>
+        <button type="button" onMouseDown={e => { e.preventDefault(); cmd('underline'); }} className="px-2 py-0.5 rounded text-xs border border-gray-300 hover:bg-gray-200 underline">U</button>
+        <button type="button" onMouseDown={e => { e.preventDefault(); cmd('italic'); }} className="px-2 py-0.5 rounded text-xs border border-gray-300 hover:bg-gray-200 italic">I</button>
+        <div className="w-px h-4 bg-gray-300 mx-0.5" />
+        {['13px','16px','20px','24px'].map((sz, idx) => (
+          <button type="button" key={sz} onMouseDown={e => { e.preventDefault(); applySize(sz); }} className="px-2 py-0.5 rounded text-xs border border-gray-300 hover:bg-blue-100">
+            {['صغير','متوسط','كبير','أكبر'][idx]}
+          </button>
+        ))}
+        <div className="w-px h-4 bg-gray-300 mx-0.5" />
+        {COLORS_RF.map(c => (
+          <button type="button" key={c} onMouseDown={e => { e.preventDefault(); cmd('foreColor', c); }} className="w-5 h-5 rounded-full border-2 border-white shadow-sm" style={{ background: c }} />
+        ))}
+        <div className="w-px h-4 bg-gray-300 mx-0.5" />
+        <button type="button" onMouseDown={e => { e.preventDefault(); cmd('removeFormat'); }} className="px-2 py-0.5 rounded text-xs border border-gray-300 hover:bg-red-100 text-red-500">✕</button>
+      </div>
+      <div
+        ref={elRef}
+        contentEditable
+        suppressContentEditableWarning
+        dir="rtl"
+        onFocus={() => setShow(true)}
+        onBlur={() => { setShow(false); save(); }}
+        onInput={save}
+        className="w-full border-2 border-gray-200 focus:border-teal-400 rounded-xl px-3 py-2 text-sm focus:outline-none"
+        style={{ minHeight: minH }}
+        data-ph={placeholder}
+      />
+
+    </div>
+  );
+};
+
 function ProgramReportPage() {
   const emptyReport = {
     // الترويسة
@@ -3912,70 +3974,11 @@ function ProgramReportPage() {
     win.document.close();
   };
 
-  // ===== محرر نصوص غني =====
-  const COLORS_RF = ['#111827','#1d4ed8','#047857','#b91c1c','#92400e','#6d28d9'];
-  const applySize = (px) => {
-    const sel = window.getSelection();
-    if (!sel || !sel.rangeCount) return;
-    const range = sel.getRangeAt(0);
-    if (range.collapsed) return;
-    const span = document.createElement('span');
-    span.style.fontSize = px;
-    try { range.surroundContents(span); } catch(e) {}
-  };
-
-  const RichField = ({ label, field, placeholder, rows }) => {
-    const elRef = React.useRef(null);
-    const [show, setShow] = React.useState(false);
-    React.useEffect(() => {
-      if (elRef.current && report[field]) {
-        elRef.current.innerHTML = report[field];
-      }
-    }, []);
-    const cmd = (c, v) => { document.execCommand(c, false, v || null); elRef.current && elRef.current.focus(); };
-    const save = () => { if (elRef.current) upd(field, elRef.current.innerHTML); };
-    const minH = ((rows || 5) * 24) + 'px';
-    return (
-      <div>
-        {label && <label className="text-xs font-bold text-teal-700 mb-1 block">{label}</label>}
-        <div className={`flex flex-wrap items-center gap-1 mb-1.5 p-1.5 bg-gray-50 rounded-xl border border-gray-200 ${show ? 'opacity-100' : 'opacity-50 hover:opacity-100'}`}>
-          <button type="button" onMouseDown={e => { e.preventDefault(); cmd('bold'); }} className="px-2 py-0.5 rounded text-xs font-black border border-gray-300 hover:bg-gray-200"><b>B</b></button>
-          <button type="button" onMouseDown={e => { e.preventDefault(); cmd('underline'); }} className="px-2 py-0.5 rounded text-xs border border-gray-300 hover:bg-gray-200 underline">U</button>
-          <button type="button" onMouseDown={e => { e.preventDefault(); cmd('italic'); }} className="px-2 py-0.5 rounded text-xs border border-gray-300 hover:bg-gray-200 italic">I</button>
-          <div className="w-px h-4 bg-gray-300 mx-0.5" />
-          {['13px','16px','20px','24px'].map((sz, idx) => (
-            <button type="button" key={sz} onMouseDown={e => { e.preventDefault(); applySize(sz); }} className="px-2 py-0.5 rounded text-xs border border-gray-300 hover:bg-blue-100">
-              {['صغير','متوسط','كبير','أكبر'][idx]}
-            </button>
-          ))}
-          <div className="w-px h-4 bg-gray-300 mx-0.5" />
-          {COLORS_RF.map(c => (
-            <button type="button" key={c} onMouseDown={e => { e.preventDefault(); cmd('foreColor', c); }} className="w-5 h-5 rounded-full border-2 border-white shadow-sm" style={{ background: c }} />
-          ))}
-          <div className="w-px h-4 bg-gray-300 mx-0.5" />
-          <button type="button" onMouseDown={e => { e.preventDefault(); cmd('removeFormat'); }} className="px-2 py-0.5 rounded text-xs border border-gray-300 hover:bg-red-100 text-red-500">✕</button>
-        </div>
-        <div
-          ref={elRef}
-          contentEditable
-          suppressContentEditableWarning
-          dir="rtl"
-          onFocus={() => setShow(true)}
-          onBlur={() => { setShow(false); save(); }}
-          onInput={save}
-          className="w-full border-2 border-gray-200 focus:border-teal-400 rounded-xl px-3 py-2 text-sm focus:outline-none"
-          style={{ minHeight: minH }}
-          data-ph={placeholder}
-        />
-
-      </div>
-    );
-  };
-
+  // حقل نص بسيط أو محرر غني
   const Field = ({ label, field, placeholder, multiline }) => (
     <div>
       {multiline
-        ? <RichField label={label} field={field} placeholder={placeholder} />
+        ? <RichField label={label} value={report[field] || ''} onChange={val => upd(field, val)} placeholder={placeholder} />
         : <>
             <label className="text-xs font-bold text-teal-700 mb-1 block">{label}</label>
             <input value={report[field] || ''} onChange={e => upd(field, e.target.value)}
