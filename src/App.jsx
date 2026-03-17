@@ -391,11 +391,11 @@ function SingleAnnouncementPage({ announcements, siteFont, annId }) {
           <div className={"bg-white rounded-2xl p-6 shadow-2xl border-r-4 " + (ann.pinned ? "border-amber-400" : "border-teal-400")}>
             <div className="flex items-center gap-2 mb-3">
               <span className="text-2xl">{cIcons[ann.category] || "📢"}</span>
-              <h1 className="font-black text-gray-800 text-lg flex-1">{ann.title}</h1>
+              <h1 className={"font-black flex-1 " + (ann.titleSize||"text-xl")} style={{color: ann.titleColor||"#1f2937"}}>{ann.title}</h1>
               {ann.pinned && <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-bold">📌 مثبت</span>}
             </div>
             <span className={"inline-block text-xs px-3 py-1 rounded-full font-bold mb-4 " + (priorityColor[ann.priority] || "bg-gray-100 text-gray-600")}>{ann.priority}</span>
-            <p className="text-gray-700 text-sm leading-loose mb-4">{ann.content}</p>
+            <div className="text-gray-700 text-sm leading-loose mb-4" dangerouslySetInnerHTML={{ __html: ann.content }}></div>
             <div className="flex items-center justify-between text-xs text-gray-400 border-t pt-3">
               <span>{ann.category}</span>
               <span>{ann.date}</span>
@@ -487,12 +487,12 @@ function PublicAnnouncementsPage({ announcements, siteFont, onLogin, onTeacherPo
               <div className="flex items-start justify-between gap-2 mb-2">
                 <div className="flex items-center gap-2 flex-1 min-w-0">
                   <span className="text-lg shrink-0">{cIcons[ann.category] || "📢"}</span>
-                  <span className="font-black text-gray-800 text-sm truncate">{ann.title}</span>
+                  <span className={"font-black truncate " + (ann.titleSize||"text-sm")} style={{color: ann.titleColor||"#1f2937"}}>{ann.title}</span>
                   {ann.pinned && <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-bold shrink-0">📌 مثبت</span>}
                 </div>
                 <span className={"text-xs px-2 py-0.5 rounded-full font-bold shrink-0 " + (priorityColor[ann.priority] || "bg-gray-100 text-gray-600")}>{ann.priority}</span>
               </div>
-              <p className="text-gray-600 text-sm leading-relaxed mb-2">{ann.content}</p>
+              <div className="text-gray-600 text-sm leading-relaxed mb-2" dangerouslySetInnerHTML={{ __html: ann.content }}></div>
               <div className="flex items-center justify-between text-xs text-gray-400">
                 <span>{ann.category}</span>
                 <span>{ann.date}</span>
@@ -4534,7 +4534,7 @@ function SurveysPage({ surveys, setSurveys, saveSurveys, isParent }) {
 
 function AnnouncementsPage({ announcements, setAnnouncements, saveAnnouncements }) {
   const [showForm, setShowForm] = useState(false);
-  const [newAnn, setNewAnn] = useState({ title: "", content: "", category: "إعلانات", priority: "عادي", bgColor: "" });
+  const [newAnn, setNewAnn] = useState({ title: "", content: "", category: "إعلانات", priority: "عادي", bgColor: "", titleColor: "#1f2937", titleSize: "text-xl" });
   const [filter, setFilter] = useState("الكل");
   const [editId, setEditId] = useState(null);
   const [editAnn, setEditAnn] = useState(null);
@@ -4554,7 +4554,7 @@ function AnnouncementsPage({ announcements, setAnnouncements, saveAnnouncements 
     if (!newAnn.title || !newAnn.content) return;
     const u = [{ ...newAnn, id: Date.now(), date: new Date().toLocaleDateString("ar-SA-u-nu-arab", { year: "numeric", month: "2-digit", day: "2-digit" }), pinned: false }, ...announcements];
     setAnnouncements(u); saveAnnouncements(u);
-    setNewAnn({ title: "", content: "", category: "إعلانات", priority: "عادي", bgColor: "" }); setShowForm(false);
+    setNewAnn({ title: "", content: "", category: "إعلانات", priority: "عادي", bgColor: "", titleColor: "#1f2937", titleSize: "text-xl" }); setShowForm(false);
   };
   const del = (id) => { const u = announcements.filter(a => a.id !== id); setAnnouncements(u); saveAnnouncements(u); };
   const pin = (id) => { const u = announcements.map(a => a.id === id ? { ...a, pinned: !a.pinned } : a); setAnnouncements(u); saveAnnouncements(u); };
@@ -4577,7 +4577,23 @@ function AnnouncementsPage({ announcements, setAnnouncements, saveAnnouncements 
           <h3 className="font-bold text-teal-800 mb-4">إضافة إعلان جديد</h3>
           <div className="space-y-3">
             <input type="text" placeholder="عنوان الإعلان" value={newAnn.title} onChange={e => setNewAnn(p => ({...p, title: e.target.value}))}
-              className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-teal-400 focus:outline-none text-sm" />
+              className={"w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-teal-400 focus:outline-none font-black " + (newAnn.titleSize||"text-xl")}
+              style={{ color: newAnn.titleColor || "#1f2937" }} />
+            <div className="flex gap-2 flex-wrap items-center">
+              <span className="text-xs font-bold text-gray-500">🎨 لون العنوان:</span>
+              {["#1f2937","#0d9488","#dc2626","#7c3aed","#d97706","#2563eb","#059669","#db2777"].map(c => (
+                <button key={c} onClick={() => setNewAnn(p=>({...p,titleColor:c}))}
+                  className={"w-7 h-7 rounded-full border-4 transition-transform hover:scale-110 " + (newAnn.titleColor===c?"border-gray-800 scale-110":"border-transparent")}
+                  style={{backgroundColor:c}} />
+              ))}
+              <span className="text-xs font-bold text-gray-500 mr-2">📏 حجم العنوان:</span>
+              {[{l:"صغير",v:"text-base"},{l:"متوسط",v:"text-xl"},{l:"كبير",v:"text-2xl"},{l:"كبير جداً",v:"text-3xl"}].map(s=>(
+                <button key={s.v} onClick={()=>setNewAnn(p=>({...p,titleSize:s.v}))}
+                  className={"px-2 py-1 rounded-lg text-xs font-bold border " + (newAnn.titleSize===s.v?"bg-teal-600 text-white border-teal-600":"bg-white text-gray-600 border-gray-200")}>
+                  {s.l}
+                </button>
+              ))}
+            </div>
             <RichEditor value={newAnn.content} onChange={v => setNewAnn(p => ({...p, content: v}))} />
             <div className="flex gap-3 flex-wrap items-center">
               <select value={newAnn.category} onChange={e => setNewAnn(p => ({...p, category: e.target.value}))}
@@ -4615,7 +4631,23 @@ function AnnouncementsPage({ announcements, setAnnouncements, saveAnnouncements 
                 </div>
                 {/* تعديل العنوان */}
                 <input value={editAnn.title} onChange={e => setEditAnn(p => ({...p, title: e.target.value}))}
-                  className="w-full px-4 py-2.5 rounded-xl border-2 border-teal-300 focus:outline-none text-sm font-bold" placeholder="العنوان" />
+                  className={"w-full px-4 py-2.5 rounded-xl border-2 border-teal-300 focus:outline-none font-black " + (editAnn.titleSize||"text-xl")}
+                  style={{color: editAnn.titleColor||"#1f2937"}} placeholder="العنوان" />
+                <div className="flex gap-2 flex-wrap items-center">
+                  <span className="text-xs font-bold text-gray-500">🎨 لون العنوان:</span>
+                  {["#1f2937","#0d9488","#dc2626","#7c3aed","#d97706","#2563eb","#059669","#db2777"].map(c => (
+                    <button key={c} onClick={() => setEditAnn(p=>({...p,titleColor:c}))}
+                      className={"w-7 h-7 rounded-full border-4 transition-transform hover:scale-110 " + (editAnn.titleColor===c?"border-gray-800 scale-110":"border-transparent")}
+                      style={{backgroundColor:c}} />
+                  ))}
+                  <span className="text-xs font-bold text-gray-500 mr-2">📏 حجم:</span>
+                  {[{l:"صغير",v:"text-base"},{l:"متوسط",v:"text-xl"},{l:"كبير",v:"text-2xl"},{l:"كبير جداً",v:"text-3xl"}].map(s=>(
+                    <button key={s.v} onClick={()=>setEditAnn(p=>({...p,titleSize:s.v}))}
+                      className={"px-2 py-1 rounded-lg text-xs font-bold border " + (editAnn.titleSize===s.v?"bg-teal-600 text-white border-teal-600":"bg-white text-gray-600 border-gray-200")}>
+                      {s.l}
+                    </button>
+                  ))}
+                </div>
                 {/* تعديل المحتوى */}
                 <RichEditor value={editAnn.content} onChange={v => setEditAnn(p => ({...p, content: v}))} />
                 {/* تعديل الخيارات */}
@@ -4649,7 +4681,7 @@ function AnnouncementsPage({ announcements, setAnnouncements, saveAnnouncements 
                 <div className="flex items-start justify-between gap-3 mb-3">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-xl">{cIcons[ann.category] || "📌"}</span>
-                    <h3 className="font-bold text-gray-900 text-lg">{ann.title}</h3>
+                    <h3 className={"font-bold " + (ann.titleSize||"text-lg")} style={{color: ann.titleColor||"#1f2937"}}>{ann.title}</h3>
                     {ann.pinned && <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full font-bold">📌 مثبّت</span>}
                   </div>
                   <div className="flex gap-1 flex-shrink-0 flex-wrap justify-end">
