@@ -6639,6 +6639,1367 @@ function TeacherAccountsSection() {
   );
 }
 
+
+// ===================================================================
+// ===== عداد الزوار =====
+// ===================================================================
+function VisitorCounter({ siteFont }) {
+  const [count, setCount] = useState(null);
+  useEffect(() => {
+    DB.get("school-visitor-count", 0).then(c => {
+      const n = (c || 0) + 1;
+      setCount(n);
+      DB.set("school-visitor-count", n);
+    });
+  }, []);
+  if (count === null) return null;
+  return (
+    <div className="flex items-center gap-1 text-xs text-teal-600 font-bold opacity-70">
+      <span>👁</span>
+      <span>{count.toLocaleString("ar-SA")} زيارة</span>
+    </div>
+  );
+}
+
+// ===================================================================
+// ===== صفحة الإذاعة المدرسية =====
+// ===================================================================
+function BroadcastPage() {
+  const defaultItems = [
+    { id: 1, title: "الافتتاح", icon: "🎙️", content: "بسم الله الرحمن الرحيم", type: "text" },
+    { id: 2, title: "آية قرآنية", icon: "📖", content: "", type: "text" },
+    { id: 3, title: "حديث شريف", icon: "🌿", content: "", type: "text" },
+    { id: 4, title: "كلمة الإذاعة", icon: "🎤", content: "", type: "text" },
+    { id: 5, title: "الأخبار والإعلانات", icon: "📢", content: "", type: "text" },
+    { id: 6, title: "نشاط ثقافي", icon: "💡", content: "", type: "text" },
+    { id: 7, title: "الخاتمة", icon: "🤲", content: "والسلام عليكم ورحمة الله وبركاته", type: "text" },
+  ];
+  const [items, setItems] = useState(defaultItems);
+  const [date, setDate] = useState(new Date().toLocaleDateString("ar-SA-u-nu-arab", {weekday:"long", year:"numeric", month:"long", day:"numeric"}));
+  const [schoolName] = useState("مدرسة عبيدة بن الحارث المتوسطة");
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    DB.get("school-broadcast", null).then(d => { if (d) setItems(d); });
+  }, []);
+
+  const save = () => {
+    DB.set("school-broadcast", items);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
+  const reset = () => { setItems(defaultItems); };
+
+  const update = (id, val) => setItems(items.map(i => i.id === id ? {...i, content: val} : i));
+
+  const print = () => {
+    const win = window.open("", "_blank");
+    win.document.write(`<!DOCTYPE html><html dir="rtl"><head>
+      <meta charset="utf-8"/>
+      <title>إذاعة المدرسة</title>
+      <style>
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; padding: 30px; color: #1a1a1a; direction: rtl; }
+        h1 { text-align: center; color: #0d9488; font-size: 22px; margin-bottom: 4px; }
+        .date { text-align: center; color: #666; font-size: 13px; margin-bottom: 24px; }
+        .item { margin-bottom: 20px; page-break-inside: avoid; }
+        .item-title { font-size: 15px; font-weight: bold; color: #0d9488; border-right: 4px solid #0d9488; padding-right: 10px; margin-bottom: 8px; }
+        .item-content { font-size: 14px; line-height: 2; background: #f8fffe; padding: 12px 16px; border-radius: 8px; white-space: pre-wrap; }
+        hr { border: none; border-top: 1px dashed #ccc; margin: 20px 0; }
+        @media print { body { padding: 10px; } }
+      </style>
+    </head><body>
+      <h1>🏫 ${schoolName}</h1>
+      <div class="date">إذاعة يوم ${date}</div>
+      <hr/>
+      ${items.map(i => `<div class="item"><div class="item-title">${i.icon} ${i.title}</div><div class="item-content">${i.content || "—"}</div></div>`).join("")}
+    </body></html>`);
+    win.document.close();
+    win.print();
+  };
+
+  return (
+    <div>
+      <div className="page-header-bar mb-6" style={{background:"linear-gradient(135deg,#0d9488,#065f46)"}}>
+        <h2 className="text-2xl font-black">🎙️ الإذاعة المدرسية</h2>
+        <p className="opacity-80 text-sm mt-1">أعد محتوى الإذاعة واطبعها بسهولة</p>
+      </div>
+      <div className="bg-white rounded-2xl p-4 shadow-sm border border-teal-100 mb-4 flex flex-wrap gap-3 items-center justify-between">
+        <div>
+          <label className="text-xs font-bold text-gray-500 mb-1 block">📅 تاريخ الإذاعة</label>
+          <input value={date} onChange={e => setDate(e.target.value)}
+            className="px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-teal-400 w-64" />
+        </div>
+        <div className="flex gap-2 flex-wrap">
+          <button onClick={save} className="px-4 py-2 rounded-xl bg-teal-600 text-white font-bold text-sm hover:bg-teal-700">
+            {saved ? "✅ تم الحفظ" : "💾 حفظ"}
+          </button>
+          <button onClick={print} className="px-4 py-2 rounded-xl bg-blue-600 text-white font-bold text-sm hover:bg-blue-700">
+            🖨️ طباعة
+          </button>
+          <button onClick={reset} className="px-4 py-2 rounded-xl bg-gray-100 text-gray-600 font-bold text-sm hover:bg-gray-200">
+            🔄 إعادة تعيين
+          </button>
+        </div>
+      </div>
+      <div className="space-y-4">
+        {items.map(item => (
+          <div key={item.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="flex items-center gap-2 px-5 py-3 bg-teal-50 border-b border-teal-100">
+              <span className="text-xl">{item.icon}</span>
+              <span className="font-black text-teal-800 text-sm">{item.title}</span>
+            </div>
+            <div className="p-4">
+              <textarea value={item.content} onChange={e => update(item.id, e.target.value)}
+                rows={4} placeholder={"اكتب " + item.title + " هنا..."}
+                className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-teal-400 focus:outline-none text-sm resize-none leading-loose" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ===================================================================
+// ===== صفحة تقسيم الطلاب لمجموعات =====
+// ===================================================================
+function GroupDividerPage() {
+  const [names, setNames] = useState("");
+  const [groupCount, setGroupCount] = useState(4);
+  const [groups, setGroups] = useState([]);
+  const [divided, setDivided] = useState(false);
+  const [groupNames, setGroupNames] = useState([]);
+
+  const divide = () => {
+    const list = names.split("\n").map(n => n.trim()).filter(Boolean);
+    if (list.length === 0) { alert("أدخل أسماء الطلاب أولاً"); return; }
+    const shuffled = [...list].sort(() => Math.random() - 0.5);
+    const result = Array.from({length: groupCount}, () => []);
+    shuffled.forEach((name, i) => result[i % groupCount].push(name));
+    setGroups(result);
+    setGroupNames(Array.from({length: groupCount}, (_, i) => "المجموعة " + (i + 1)));
+    setDivided(true);
+  };
+
+  const handleExcel = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const text = ev.target.result;
+      const lines = text.split("\n").map(l => l.split(",")[0].trim()).filter(Boolean);
+      setNames(lines.join("\n"));
+    };
+    reader.readAsText(file);
+  };
+
+  const print = () => {
+    const win = window.open("", "_blank");
+    win.document.write(`<!DOCTYPE html><html dir="rtl"><head>
+      <meta charset="utf-8"/><title>تقسيم المجموعات</title>
+      <style>
+        body{font-family:'Segoe UI',Tahoma,sans-serif;padding:20px;direction:rtl;}
+        h1{text-align:center;color:#0d9488;font-size:20px;margin-bottom:16px;}
+        .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;}
+        .group{border:2px solid #0d9488;border-radius:12px;padding:12px;}
+        .group-title{font-weight:bold;color:#0d9488;font-size:14px;margin-bottom:8px;text-align:center;border-bottom:1px dashed #ccc;padding-bottom:6px;}
+        .name{font-size:13px;padding:4px 0;border-bottom:1px solid #f0f0f0;}
+      </style>
+    </head><body>
+      <h1>🏫 مدرسة عبيدة بن الحارث المتوسطة — تقسيم المجموعات</h1>
+      <div class="grid">
+        ${groups.map((g, i) => `<div class="group"><div class="group-title">${groupNames[i]||"المجموعة "+(i+1)} (${g.length} طلاب)</div>${g.map(n => `<div class="name">• ${n}</div>`).join("")}</div>`).join("")}
+      </div>
+    </body></html>`);
+    win.document.close(); win.print();
+  };
+
+  const colors = ["bg-teal-50 border-teal-300","bg-blue-50 border-blue-300","bg-purple-50 border-purple-300","bg-amber-50 border-amber-300","bg-pink-50 border-pink-300","bg-green-50 border-green-300","bg-red-50 border-red-300","bg-indigo-50 border-indigo-300"];
+  const headerColors = ["bg-teal-500","bg-blue-500","bg-purple-500","bg-amber-500","bg-pink-500","bg-green-500","bg-red-500","bg-indigo-500"];
+
+  return (
+    <div>
+      <div className="page-header-bar mb-6" style={{background:"linear-gradient(135deg,#7c3aed,#4f46e5)"}}>
+        <h2 className="text-2xl font-black">👥 تقسيم الطلاب لمجموعات</h2>
+        <p className="opacity-80 text-sm mt-1">قسّم طلابك عشوائياً بضغطة واحدة</p>
+      </div>
+      {!divided ? (
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="text-sm font-black text-gray-700 mb-2 block">📋 أسماء الطلاب (سطر لكل اسم)</label>
+              <textarea value={names} onChange={e => setNames(e.target.value)} rows={12}
+                placeholder={"أحمد محمد\nسلطان علي\nعمر خالد\n..."}
+                className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-purple-400 focus:outline-none text-sm resize-none" />
+              <div className="mt-2">
+                <label className="flex items-center gap-2 cursor-pointer text-sm font-bold text-purple-600 hover:text-purple-700">
+                  <span>📥 استيراد من Excel/CSV</span>
+                  <input type="file" accept=".csv,.xlsx,.xls,.txt" className="hidden" onChange={handleExcel} />
+                </label>
+              </div>
+            </div>
+            <div>
+              <label className="text-sm font-black text-gray-700 mb-2 block">🔢 عدد المجموعات</label>
+              <div className="grid grid-cols-4 gap-2 mb-6">
+                {[2,3,4,5,6,7,8,10].map(n => (
+                  <button key={n} onClick={() => setGroupCount(n)}
+                    className={"py-3 rounded-xl font-black text-sm border-2 transition-all " + (groupCount===n?"bg-purple-600 text-white border-purple-600":"bg-white text-gray-600 border-gray-200 hover:border-purple-300")}>
+                    {n}
+                  </button>
+                ))}
+              </div>
+              <div className="bg-purple-50 rounded-2xl p-4 text-center">
+                <div className="text-4xl mb-2">👥</div>
+                <p className="text-sm font-bold text-purple-800">
+                  {names.split("\n").filter(Boolean).length} طالب ← {groupCount} مجموعات
+                </p>
+                <p className="text-xs text-purple-600 mt-1">
+                  تقريباً {Math.ceil(names.split("\n").filter(Boolean).length / groupCount)} طالب في كل مجموعة
+                </p>
+              </div>
+            </div>
+          </div>
+          <button onClick={divide} className="mt-6 w-full py-4 rounded-2xl font-black text-white text-lg"
+            style={{background:"linear-gradient(135deg,#7c3aed,#4f46e5)"}}>
+            🎲 قسّم المجموعات عشوائياً
+          </button>
+        </div>
+      ) : (
+        <div>
+          <div className="flex gap-2 mb-4 flex-wrap">
+            <button onClick={() => setDivided(false)} className="px-4 py-2 rounded-xl bg-gray-100 text-gray-600 font-bold text-sm hover:bg-gray-200">← تعديل</button>
+            <button onClick={divide} className="px-4 py-2 rounded-xl bg-purple-600 text-white font-bold text-sm hover:bg-purple-700">🔀 إعادة التقسيم</button>
+            <button onClick={print} className="px-4 py-2 rounded-xl bg-blue-600 text-white font-bold text-sm hover:bg-blue-700">🖨️ طباعة</button>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {groups.map((group, i) => (
+              <div key={i} className={"rounded-2xl border-2 overflow-hidden " + (colors[i % colors.length])}>
+                <div className={"px-4 py-2.5 flex items-center justify-between " + (headerColors[i % headerColors.length])}>
+                  <input value={groupNames[i]||""} onChange={e => { const ng = [...groupNames]; ng[i]=e.target.value; setGroupNames(ng); }}
+                    className="bg-transparent text-white font-black text-sm focus:outline-none w-full" />
+                  <span className="text-white text-xs opacity-80 shrink-0">{group.length} طلاب</span>
+                </div>
+                <div className="p-3 space-y-1">
+                  {group.map((name, j) => (
+                    <div key={j} className="text-sm font-bold text-gray-700 py-1 px-2 bg-white bg-opacity-60 rounded-lg">
+                      {j+1}. {name}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ===================================================================
+// ===== صفحة اختبارات الطلاب =====
+// ===================================================================
+function QuizPage() {
+  const [tab, setTab] = useState("create"); // create | take | results
+  const [quizzes, setQuizzes] = useState([]);
+  const [currentQuiz, setCurrentQuiz] = useState(null);
+  const [form, setForm] = useState({ title: "", description: "", questions: [] });
+  const [newQ, setNewQ] = useState({ text: "", type: "mcq", options: ["","","",""], answer: 0, points: 1 });
+  const [studentName, setStudentName] = useState("");
+  const [studentId, setStudentId] = useState("");
+  const [answers, setAnswers] = useState({});
+  const [submitted, setSubmitted] = useState(false);
+  const [score, setScore] = useState(null);
+  const [results, setResults] = useState([]);
+
+  useEffect(() => {
+    DB.get("school-quizzes", []).then(d => setQuizzes(Array.isArray(d) ? d : []));
+    DB.get("school-quiz-results", []).then(d => setResults(Array.isArray(d) ? d : []));
+  }, []);
+
+  const saveQuizzes = (q) => { setQuizzes(q); DB.set("school-quizzes", q); };
+  const saveResults = (r) => { setResults(r); DB.set("school-quiz-results", r); };
+
+  const addQuestion = () => {
+    if (!newQ.text.trim()) return;
+    setForm(f => ({...f, questions: [...f.questions, {...newQ, id: Date.now()}]}));
+    setNewQ({ text: "", type: "mcq", options: ["","","",""], answer: 0, points: 1 });
+  };
+
+  const saveQuiz = () => {
+    if (!form.title.trim() || form.questions.length === 0) { alert("أضف عنوان الاختبار وسؤالاً على الأقل"); return; }
+    const q = { ...form, id: Date.now(), createdAt: new Date().toLocaleDateString("ar-SA") };
+    saveQuizzes([q, ...quizzes]);
+    setForm({ title: "", description: "", questions: [] });
+    alert("✅ تم حفظ الاختبار!");
+  };
+
+  const submitQuiz = () => {
+    if (!studentName.trim()) { alert("أدخل اسمك"); return; }
+    let total = 0, earned = 0;
+    currentQuiz.questions.forEach(q => {
+      total += q.points;
+      if (q.type === "mcq" && answers[q.id] === q.answer) earned += q.points;
+      if (q.type === "truefalse" && answers[q.id] === q.answer) earned += q.points;
+    });
+    const result = { id: Date.now(), quizId: currentQuiz.id, quizTitle: currentQuiz.title, studentName, studentId, earned, total, percent: Math.round(earned/total*100), date: new Date().toLocaleDateString("ar-SA") };
+    saveResults([result, ...results]);
+    setScore(result);
+    setSubmitted(true);
+  };
+
+  const printResult = (r) => {
+    const win = window.open("","_blank");
+    win.document.write(`<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8"/><title>نتيجة الاختبار</title>
+    <style>body{font-family:sans-serif;padding:30px;direction:rtl;} h1{color:#0d9488;} .score{font-size:48px;font-weight:bold;text-align:center;color:${r.percent>=60?"#0d9488":"#dc2626"};}</style>
+    </head><body>
+    <h1>🏫 مدرسة عبيدة بن الحارث المتوسطة</h1>
+    <h2>نتيجة اختبار: ${r.quizTitle}</h2>
+    <p>الطالب: <strong>${r.studentName}</strong></p>
+    <p>رقم الهوية: ${r.studentId||"—"}</p>
+    <div class="score">${r.percent}%</div>
+    <p style="text-align:center">الدرجة: ${r.earned} من ${r.total}</p>
+    <p style="text-align:center">التاريخ: ${r.date}</p>
+    </body></html>`);
+    win.document.close(); win.print();
+  };
+
+  const tabStyle = (t) => "px-4 py-2.5 rounded-xl font-bold text-sm transition-all " + (tab===t?"bg-teal-600 text-white shadow":"bg-white text-gray-600 border border-gray-200 hover:border-teal-300");
+
+  return (
+    <div>
+      <div className="page-header-bar mb-6" style={{background:"linear-gradient(135deg,#0284c7,#0369a1)"}}>
+        <h2 className="text-2xl font-black">📝 اختبارات الطلاب</h2>
+        <p className="opacity-80 text-sm mt-1">أنشئ اختبارات وتابع نتائج طلابك</p>
+      </div>
+      <div className="flex gap-2 mb-6 flex-wrap">
+        <button onClick={() => setTab("create")} className={tabStyle("create")}>➕ إنشاء اختبار</button>
+        <button onClick={() => { setTab("take"); setSubmitted(false); setAnswers({}); setScore(null); }} className={tabStyle("take")}>📋 أداء الاختبار</button>
+        <button onClick={() => setTab("results")} className={tabStyle("results")}>📊 النتائج ({results.length})</button>
+      </div>
+
+      {tab === "create" && (
+        <div className="space-y-4">
+          <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+            <h3 className="font-black text-gray-800 mb-3">معلومات الاختبار</h3>
+            <input value={form.title} onChange={e => setForm(f=>({...f,title:e.target.value}))} placeholder="عنوان الاختبار"
+              className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-blue-400 focus:outline-none text-sm mb-2" />
+            <input value={form.description} onChange={e => setForm(f=>({...f,description:e.target.value}))} placeholder="وصف أو تعليمات (اختياري)"
+              className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-blue-400 focus:outline-none text-sm" />
+          </div>
+
+          {form.questions.length > 0 && (
+            <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+              <h3 className="font-black text-gray-800 mb-3">الأسئلة المضافة ({form.questions.length})</h3>
+              <div className="space-y-2">
+                {form.questions.map((q, i) => (
+                  <div key={q.id} className="flex items-center gap-2 p-3 bg-gray-50 rounded-xl text-sm">
+                    <span className="font-black text-blue-600 shrink-0">{i+1}.</span>
+                    <span className="flex-1 text-gray-700">{q.text}</span>
+                    <span className="text-xs text-gray-400">{q.type==="mcq"?"اختيار":"صح/خطأ"} • {q.points} درجة</span>
+                    <button onClick={() => setForm(f=>({...f, questions: f.questions.filter(x=>x.id!==q.id)}))} className="text-red-400 hover:text-red-600 font-bold text-xs">✕</button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+            <h3 className="font-black text-gray-800 mb-3">إضافة سؤال جديد</h3>
+            <div className="space-y-3">
+              <textarea value={newQ.text} onChange={e => setNewQ(q=>({...q,text:e.target.value}))} rows={2}
+                placeholder="نص السؤال" className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-blue-400 focus:outline-none text-sm resize-none" />
+              <div className="flex gap-3 flex-wrap items-center">
+                <div className="flex gap-2">
+                  <button onClick={() => setNewQ(q=>({...q,type:"mcq"}))} className={"px-3 py-2 rounded-xl text-xs font-bold border-2 " + (newQ.type==="mcq"?"bg-blue-600 text-white border-blue-600":"bg-white text-gray-600 border-gray-200")}>اختيار متعدد</button>
+                  <button onClick={() => setNewQ(q=>({...q,type:"truefalse"}))} className={"px-3 py-2 rounded-xl text-xs font-bold border-2 " + (newQ.type==="truefalse"?"bg-blue-600 text-white border-blue-600":"bg-white text-gray-600 border-gray-200")}>صح / خطأ</button>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-gray-500">الدرجة:</span>
+                  <input type="number" min="1" max="10" value={newQ.points} onChange={e => setNewQ(q=>({...q,points:Number(e.target.value)}))}
+                    className="w-16 px-2 py-1.5 rounded-lg border border-gray-200 text-xs text-center" />
+                </div>
+              </div>
+              {newQ.type === "mcq" ? (
+                <div className="space-y-2">
+                  {newQ.options.map((opt, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <button onClick={() => setNewQ(q=>({...q,answer:i}))}
+                        className={"w-7 h-7 rounded-full shrink-0 border-2 font-black text-xs " + (newQ.answer===i?"bg-green-500 text-white border-green-500":"bg-white border-gray-300")}>
+                        {["أ","ب","ج","د"][i]}
+                      </button>
+                      <input value={opt} onChange={e => { const o=[...newQ.options]; o[i]=e.target.value; setNewQ(q=>({...q,options:o})); }}
+                        placeholder={"الخيار " + (i+1)}
+                        className="flex-1 px-3 py-2 rounded-xl border border-gray-200 focus:border-blue-400 focus:outline-none text-sm" />
+                    </div>
+                  ))}
+                  <p className="text-xs text-gray-400">اضغط على حرف الإجابة الصحيحة (الأخضر)</p>
+                </div>
+              ) : (
+                <div className="flex gap-3">
+                  <button onClick={() => setNewQ(q=>({...q,answer:true}))} className={"px-6 py-3 rounded-xl font-black text-sm border-2 " + (newQ.answer===true?"bg-green-500 text-white border-green-500":"bg-white text-gray-600 border-gray-200")}>✅ صح</button>
+                  <button onClick={() => setNewQ(q=>({...q,answer:false}))} className={"px-6 py-3 rounded-xl font-black text-sm border-2 " + (newQ.answer===false?"bg-red-500 text-white border-red-500":"bg-white text-gray-600 border-gray-200")}>❌ خطأ</button>
+                </div>
+              )}
+              <button onClick={addQuestion} className="w-full py-2.5 rounded-xl bg-blue-600 text-white font-bold text-sm hover:bg-blue-700">+ إضافة السؤال</button>
+            </div>
+          </div>
+
+          <button onClick={saveQuiz} className="w-full py-4 rounded-2xl font-black text-white text-base" style={{background:"linear-gradient(135deg,#0284c7,#0369a1)"}}>
+            💾 حفظ الاختبار
+          </button>
+        </div>
+      )}
+
+      {tab === "take" && (
+        <div>
+          {!currentQuiz ? (
+            <div className="space-y-3">
+              {quizzes.length === 0 && <div className="bg-white rounded-2xl p-8 text-center text-gray-400"><div className="text-4xl mb-2">📭</div><p className="font-bold">لا توجد اختبارات بعد</p></div>}
+              {quizzes.map(q => (
+                <div key={q.id} className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex items-center justify-between gap-3 flex-wrap">
+                  <div>
+                    <h3 className="font-black text-gray-800">{q.title}</h3>
+                    <p className="text-xs text-gray-400 mt-1">{q.questions.length} سؤال • {q.createdAt}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={() => { setCurrentQuiz(q); setAnswers({}); setSubmitted(false); }}
+                      className="px-4 py-2 rounded-xl bg-blue-600 text-white font-bold text-sm hover:bg-blue-700">ابدأ الاختبار</button>
+                    <button onClick={() => { if(window.confirm("حذف الاختبار؟")) saveQuizzes(quizzes.filter(x=>x.id!==q.id)); }}
+                      className="px-3 py-2 rounded-xl bg-red-50 text-red-500 font-bold text-sm hover:bg-red-100">🗑️</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : submitted ? (
+            <div className="bg-white rounded-2xl p-8 text-center shadow-sm">
+              <div className={"text-6xl mb-4"}>{score.percent >= 60 ? "🎉" : "📚"}</div>
+              <h2 className="text-2xl font-black text-gray-800 mb-2">{score.percent >= 60 ? "أحسنت!" : "حاول مرة أخرى"}</h2>
+              <div className={"text-5xl font-black mb-2 " + (score.percent>=60?"text-green-600":"text-red-500")}>{score.percent}%</div>
+              <p className="text-gray-500 mb-1">الدرجة: <span className="font-black">{score.earned}</span> من <span className="font-black">{score.total}</span></p>
+              <p className="text-gray-400 text-sm mb-6">الطالب: {score.studentName}</p>
+              <div className="flex gap-2 justify-center flex-wrap">
+                <button onClick={() => printResult(score)} className="px-5 py-2.5 rounded-xl bg-blue-600 text-white font-bold text-sm">🖨️ طباعة النتيجة</button>
+                <button onClick={() => { setCurrentQuiz(null); setSubmitted(false); }} className="px-5 py-2.5 rounded-xl bg-gray-100 text-gray-600 font-bold text-sm">← الاختبارات</button>
+              </div>
+            </div>
+          ) : (
+            <div>
+              <div className="bg-blue-50 rounded-2xl p-5 mb-5 flex flex-wrap gap-3 items-end justify-between">
+                <div>
+                  <h3 className="font-black text-blue-800 text-lg">{currentQuiz.title}</h3>
+                  {currentQuiz.description && <p className="text-blue-600 text-sm mt-1">{currentQuiz.description}</p>}
+                </div>
+                <button onClick={() => setCurrentQuiz(null)} className="text-xs text-gray-500 font-bold hover:text-gray-700">← العودة</button>
+              </div>
+              <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 mb-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-black text-gray-500 mb-1 block">👤 اسم الطالب</label>
+                    <input value={studentName} onChange={e => setStudentName(e.target.value)} placeholder="أدخل اسمك الكامل"
+                      className="w-full px-4 py-2.5 rounded-xl border-2 border-gray-200 focus:border-blue-400 focus:outline-none text-sm" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-black text-gray-500 mb-1 block">🪪 رقم الهوية (اختياري)</label>
+                    <input value={studentId} onChange={e => setStudentId(e.target.value)} placeholder="رقم الهوية"
+                      className="w-full px-4 py-2.5 rounded-xl border-2 border-gray-200 focus:border-blue-400 focus:outline-none text-sm" />
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-4 mb-6">
+                {currentQuiz.questions.map((q, i) => (
+                  <div key={q.id} className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+                    <p className="font-black text-gray-800 mb-3"><span className="text-blue-600 ml-1">{i+1}.</span>{q.text} <span className="text-xs text-gray-400">({q.points} درجة)</span></p>
+                    {q.type === "mcq" ? (
+                      <div className="space-y-2">
+                        {q.options.filter(Boolean).map((opt, j) => (
+                          <button key={j} onClick={() => setAnswers(a=>({...a,[q.id]:j}))}
+                            className={"w-full text-right px-4 py-3 rounded-xl border-2 font-bold text-sm transition-all " + (answers[q.id]===j?"bg-blue-600 text-white border-blue-600":"bg-white text-gray-700 border-gray-200 hover:border-blue-300")}>
+                            <span className="font-black ml-2">{["أ","ب","ج","د"][j]}</span> {opt}
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="flex gap-3">
+                        <button onClick={() => setAnswers(a=>({...a,[q.id]:true}))} className={"flex-1 py-3 rounded-xl font-black border-2 " + (answers[q.id]===true?"bg-green-500 text-white border-green-500":"bg-white text-gray-600 border-gray-200 hover:border-green-300")}>✅ صح</button>
+                        <button onClick={() => setAnswers(a=>({...a,[q.id]:false}))} className={"flex-1 py-3 rounded-xl font-black border-2 " + (answers[q.id]===false?"bg-red-500 text-white border-red-500":"bg-white text-gray-600 border-gray-200 hover:border-red-300")}>❌ خطأ</button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <button onClick={submitQuiz} className="w-full py-4 rounded-2xl font-black text-white text-base" style={{background:"linear-gradient(135deg,#0284c7,#0369a1)"}}>
+                ✅ تسليم الاختبار
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {tab === "results" && (
+        <div>
+          <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+            <h3 className="font-black text-gray-800">نتائج الطلاب ({results.length})</h3>
+            {results.length > 0 && <button onClick={() => { if(window.confirm("حذف كل النتائج؟")) saveResults([]); }} className="text-xs text-red-500 font-bold px-3 py-1.5 rounded-lg bg-red-50">🗑️ حذف الكل</button>}
+          </div>
+          {results.length === 0 && <div className="bg-white rounded-2xl p-8 text-center text-gray-400"><div className="text-4xl mb-2">📭</div><p className="font-bold">لا توجد نتائج بعد</p></div>}
+          <div className="space-y-2">
+            {results.map(r => (
+              <div key={r.id} className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 flex items-center gap-3 flex-wrap">
+                <div className={"w-12 h-12 rounded-full flex items-center justify-center font-black text-sm text-white shrink-0 " + (r.percent>=60?"bg-green-500":"bg-red-500")}>{r.percent}%</div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-black text-gray-800 text-sm truncate">{r.studentName}</p>
+                  <p className="text-xs text-gray-400">{r.quizTitle} • {r.earned}/{r.total} • {r.date}</p>
+                </div>
+                <button onClick={() => printResult(r)} className="text-xs text-blue-600 font-bold px-3 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 shrink-0">🖨️</button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+// ===================================================================
+// ===== مؤقت الحصة =====
+// ===================================================================
+function ClassTimerPage() {
+  const presets = [
+    { label: "حصة كاملة", minutes: 45 },
+    { label: "نصف حصة", minutes: 22 },
+    { label: "نشاط ٥ دقائق", minutes: 5 },
+    { label: "نشاط ١٠ دقائق", minutes: 10 },
+    { label: "امتحان ٢٠ دقيقة", minutes: 20 },
+    { label: "مراجعة ١٥ دقيقة", minutes: 15 },
+  ];
+  const [total, setTotal] = useState(45 * 60);
+  const [remaining, setRemaining] = useState(45 * 60);
+  const [running, setRunning] = useState(false);
+  const [done, setDone] = useState(false);
+  const [customMin, setCustomMin] = useState(45);
+  const intervalRef = useRef(null);
+
+  useEffect(() => {
+    if (running) {
+      intervalRef.current = setInterval(() => {
+        setRemaining(r => {
+          if (r <= 1) { clearInterval(intervalRef.current); setRunning(false); setDone(true); return 0; }
+          return r - 1;
+        });
+      }, 1000);
+    } else clearInterval(intervalRef.current);
+    return () => clearInterval(intervalRef.current);
+  }, [running]);
+
+  const reset = (mins) => {
+    clearInterval(intervalRef.current);
+    setRunning(false); setDone(false);
+    setTotal(mins * 60); setRemaining(mins * 60);
+  };
+
+  const pct = total > 0 ? ((total - remaining) / total) * 100 : 0;
+  const mins = Math.floor(remaining / 60);
+  const secs = remaining % 60;
+  const color = remaining > total * 0.5 ? "#0d9488" : remaining > total * 0.25 ? "#f59e0b" : "#dc2626";
+  const r = 90, circ = 2 * Math.PI * r;
+
+  return (
+    <div>
+      <div className="page-header-bar mb-6" style={{background:"linear-gradient(135deg,#0369a1,#1e3a5f)"}}>
+        <h2 className="text-2xl font-black">⏱️ مؤقت الحصة</h2>
+        <p className="opacity-80 text-sm mt-1">إدارة وقت الحصة بدقة</p>
+      </div>
+      <div className="max-w-md mx-auto">
+        {/* الساعة الدائرية */}
+        <div className="bg-white rounded-3xl p-8 shadow-md border border-gray-100 text-center mb-4">
+          <svg width="220" height="220" className="mx-auto mb-4" viewBox="0 0 220 220">
+            <circle cx="110" cy="110" r={r} fill="none" stroke="#f0f0f0" strokeWidth="14"/>
+            <circle cx="110" cy="110" r={r} fill="none" stroke={color} strokeWidth="14"
+              strokeDasharray={circ} strokeDashoffset={circ * (1 - pct/100)}
+              strokeLinecap="round" transform="rotate(-90 110 110)"
+              style={{transition:"stroke-dashoffset 1s linear, stroke 0.5s"}}/>
+            <text x="110" y="105" textAnchor="middle" fontSize="36" fontWeight="bold" fill={color}>
+              {String(mins).padStart(2,"0")}:{String(secs).padStart(2,"0")}
+            </text>
+            <text x="110" y="135" textAnchor="middle" fontSize="13" fill="#9ca3af">
+              {done ? "انتهى الوقت!" : running ? "جارٍ التوقيت" : "متوقف"}
+            </text>
+          </svg>
+          {done && <div className="text-2xl animate-bounce mb-2">🔔 انتهى الوقت!</div>}
+          <div className="flex gap-3 justify-center">
+            <button onClick={() => setRunning(r => !r)} disabled={done}
+              className={"px-8 py-3 rounded-2xl font-black text-white text-lg transition-all " + (running ? "bg-amber-500 hover:bg-amber-600" : "bg-teal-600 hover:bg-teal-700") + (done?" opacity-40 cursor-not-allowed":"")} >
+              {running ? "⏸ إيقاف" : "▶ تشغيل"}
+            </button>
+            <button onClick={() => reset(customMin)} className="px-5 py-3 rounded-2xl font-black bg-gray-100 text-gray-600 hover:bg-gray-200">🔄</button>
+          </div>
+        </div>
+        {/* وقت مخصص */}
+        <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 mb-4">
+          <label className="text-xs font-black text-gray-500 mb-2 block">⏰ تحديد وقت مخصص (بالدقائق)</label>
+          <div className="flex gap-2">
+            <input type="number" min="1" max="180" value={customMin} onChange={e => setCustomMin(Number(e.target.value))}
+              className="flex-1 px-4 py-2.5 rounded-xl border-2 border-gray-200 focus:border-teal-400 focus:outline-none text-center font-black text-lg" />
+            <button onClick={() => reset(customMin)} className="px-5 py-2.5 rounded-xl bg-teal-600 text-white font-bold hover:bg-teal-700">تعيين</button>
+          </div>
+        </div>
+        {/* الضبط السريع */}
+        <div className="grid grid-cols-2 gap-2">
+          {presets.map(p => (
+            <button key={p.label} onClick={() => { setCustomMin(p.minutes); reset(p.minutes); }}
+              className="py-3 px-4 rounded-xl bg-white border border-gray-200 hover:border-teal-400 hover:bg-teal-50 font-bold text-sm text-gray-700 text-right transition-all shadow-sm">
+              ⚡ {p.label}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ===================================================================
+// ===== عجلة الحظ =====
+// ===================================================================
+function LuckyWheelPage() {
+  const [names, setNames] = useState("");
+  const [spinning, setSpinning] = useState(false);
+  const [winner, setWinner] = useState(null);
+  const [angle, setAngle] = useState(0);
+  const [history, setHistory] = useState([]);
+  const canvasRef = useRef(null);
+  const colors = ["#0d9488","#2563eb","#7c3aed","#db2777","#d97706","#059669","#dc2626","#0284c7","#65a30d","#9333ea"];
+
+  const nameList = names.split("\n").map(n=>n.trim()).filter(Boolean);
+
+  const drawWheel = (rot) => {
+    const canvas = canvasRef.current;
+    if (!canvas || nameList.length === 0) return;
+    const ctx = canvas.getContext("2d");
+    const cx = canvas.width / 2, cy = canvas.height / 2, r = cx - 10;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const slice = (2 * Math.PI) / nameList.length;
+    nameList.forEach((name, i) => {
+      const start = rot + i * slice, end = start + slice;
+      ctx.beginPath(); ctx.moveTo(cx, cy);
+      ctx.arc(cx, cy, r, start, end);
+      ctx.fillStyle = colors[i % colors.length];
+      ctx.fill();
+      ctx.strokeStyle = "white"; ctx.lineWidth = 2; ctx.stroke();
+      ctx.save(); ctx.translate(cx, cy); ctx.rotate(start + slice / 2);
+      ctx.textAlign = "right"; ctx.fillStyle = "white";
+      ctx.font = `bold ${Math.min(14, 100/nameList.length + 8)}px sans-serif`;
+      ctx.fillText(name.length > 10 ? name.substring(0,10)+"…" : name, r - 10, 5);
+      ctx.restore();
+    });
+    // المؤشر
+    ctx.beginPath(); ctx.moveTo(cx + r - 5, cy);
+    ctx.lineTo(cx + r + 20, cy - 10); ctx.lineTo(cx + r + 20, cy + 10);
+    ctx.fillStyle = "#1f2937"; ctx.fill();
+  };
+
+  useEffect(() => { drawWheel(angle * Math.PI / 180); }, [names, angle]);
+
+  const spin = () => {
+    if (spinning || nameList.length === 0) return;
+    setSpinning(true); setWinner(null);
+    const extra = 1800 + Math.random() * 1800;
+    const target = angle + extra;
+    const slice = 360 / nameList.length;
+    const finalAngle = target % 360;
+    const winIdx = Math.floor(((360 - finalAngle) % 360) / slice) % nameList.length;
+    let start = null;
+    const animate = (ts) => {
+      if (!start) start = ts;
+      const elapsed = ts - start, duration = 4000;
+      const progress = Math.min(elapsed / duration, 1);
+      const ease = 1 - Math.pow(1 - progress, 4);
+      const cur = angle + extra * ease;
+      setAngle(cur);
+      drawWheel((cur * Math.PI) / 180);
+      if (progress < 1) requestAnimationFrame(animate);
+      else {
+        setSpinning(false);
+        const w = nameList[winIdx];
+        setWinner(w);
+        setHistory(h => [{ name: w, time: new Date().toLocaleTimeString("ar-SA") }, ...h.slice(0,9)]);
+      }
+    };
+    requestAnimationFrame(animate);
+  };
+
+  const handleExcel = (e) => {
+    const file = e.target.files[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => { const lines = ev.target.result.split("\n").map(l=>l.split(",")[0].trim()).filter(Boolean); setNames(lines.join("\n")); };
+    reader.readAsText(file);
+  };
+
+  return (
+    <div>
+      <div className="page-header-bar mb-6" style={{background:"linear-gradient(135deg,#7c3aed,#db2777)"}}>
+        <h2 className="text-2xl font-black">🎯 عجلة الحظ</h2>
+        <p className="opacity-80 text-sm mt-1">اختر طالباً عشوائياً بطريقة ممتعة</p>
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div>
+          <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 mb-4">
+            <label className="text-sm font-black text-gray-700 mb-2 block">📋 أسماء الطلاب</label>
+            <textarea value={names} onChange={e => setNames(e.target.value)} rows={10}
+              placeholder={"أحمد محمد\nسلطان علي\nعمر خالد\n..."}
+              className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-purple-400 focus:outline-none text-sm resize-none mb-2" />
+            <label className="flex items-center gap-2 cursor-pointer text-sm font-bold text-purple-600">
+              📥 استيراد من Excel
+              <input type="file" accept=".csv,.txt" className="hidden" onChange={handleExcel} />
+            </label>
+          </div>
+          {history.length > 0 && (
+            <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+              <h3 className="font-black text-gray-700 text-sm mb-3">📜 سجل الاختيارات</h3>
+              <div className="space-y-1">
+                {history.map((h,i) => (
+                  <div key={i} className="flex items-center justify-between text-sm px-3 py-1.5 bg-gray-50 rounded-lg">
+                    <span className="font-bold text-gray-700">🏆 {h.name}</span>
+                    <span className="text-xs text-gray-400">{h.time}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+        <div className="text-center">
+          <div className="relative inline-block mb-4">
+            <canvas ref={canvasRef} width={300} height={300} className="rounded-full shadow-2xl cursor-pointer" onClick={spin} />
+            {nameList.length === 0 && (
+              <div className="absolute inset-0 flex items-center justify-center bg-gray-100 rounded-full">
+                <p className="text-gray-400 font-bold text-sm">أضف الأسماء أولاً</p>
+              </div>
+            )}
+          </div>
+          {winner && (
+            <div className="bg-gradient-to-l from-purple-600 to-pink-600 rounded-2xl p-5 text-white mb-4 animate-pulse">
+              <div className="text-3xl mb-1">🎉</div>
+              <p className="text-xl font-black">{winner}</p>
+              <p className="text-sm opacity-80 mt-1">الطالب المختار</p>
+            </div>
+          )}
+          <button onClick={spin} disabled={spinning || nameList.length === 0}
+            className={"w-full py-4 rounded-2xl font-black text-white text-lg transition-all " + (spinning||nameList.length===0?"opacity-40 cursor-not-allowed":"hover:shadow-xl")}
+            style={{background:"linear-gradient(135deg,#7c3aed,#db2777)"}}>
+            {spinning ? "🌀 جاري الدوران..." : "🎯 أدِر العجلة!"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ===================================================================
+// ===== بطاقة الخروج =====
+// ===================================================================
+function ExitTicketPage() {
+  const [question, setQuestion] = useState("");
+  const [responses, setResponses] = useState([]);
+  const [studentName, setStudentName] = useState("");
+  const [answer, setAnswer] = useState("");
+  const [submitted, setSubmitted] = useState(false);
+  const [mode, setMode] = useState("setup"); // setup | answer | results
+
+  useEffect(() => {
+    DB.get("school-exit-ticket", { question:"", responses:[] }).then(d => {
+      if (d && d.question) { setQuestion(d.question); setResponses(d.responses||[]); }
+    });
+  }, []);
+
+  const saveTicket = (q, r) => DB.set("school-exit-ticket", { question: q, responses: r });
+
+  const publish = () => {
+    if (!question.trim()) return;
+    setResponses([]); saveTicket(question, []); setMode("answer");
+  };
+
+  const submitAnswer = () => {
+    if (!studentName.trim() || !answer.trim()) { alert("أدخل اسمك وإجابتك"); return; }
+    const r = [...responses, { name: studentName, answer, time: new Date().toLocaleTimeString("ar-SA") }];
+    setResponses(r); saveTicket(question, r);
+    setSubmitted(true);
+  };
+
+  const print = () => {
+    const win = window.open("","_blank");
+    win.document.write(`<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8"/><title>بطاقات الخروج</title>
+    <style>body{font-family:sans-serif;padding:20px;direction:rtl;} h1{color:#0d9488;font-size:18px;} .card{border:1px solid #ccc;border-radius:8px;padding:12px;margin:8px 0;page-break-inside:avoid;} .q{font-weight:bold;color:#0d9488;margin-bottom:6px;} .name{font-size:12px;color:#666;} .ans{font-size:13px;margin-top:4px;}</style>
+    </head><body><h1>🚪 بطاقات الخروج — ${question}</h1>
+    ${responses.map(r=>`<div class="card"><div class="name">👤 ${r.name} — ${r.time}</div><div class="ans">💬 ${r.answer}</div></div>`).join("")}
+    </body></html>`);
+    win.document.close(); win.print();
+  };
+
+  return (
+    <div>
+      <div className="page-header-bar mb-6" style={{background:"linear-gradient(135deg,#059669,#065f46)"}}>
+        <h2 className="text-2xl font-black">🚪 بطاقة الخروج</h2>
+        <p className="opacity-80 text-sm mt-1">سؤال سريع قبل نهاية الحصة</p>
+      </div>
+      <div className="flex gap-2 mb-6">
+        {["setup","answer","results"].map(m => (
+          <button key={m} onClick={() => setMode(m)}
+            className={"px-4 py-2.5 rounded-xl font-bold text-sm " + (mode===m?"bg-teal-600 text-white":"bg-white text-gray-600 border border-gray-200")}>
+            {m==="setup"?"⚙️ إعداد السؤال":m==="answer"?"✏️ إجابة الطلاب":"📊 النتائج ("+responses.length+")"}
+          </button>
+        ))}
+      </div>
+
+      {mode === "setup" && (
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+          <label className="text-sm font-black text-gray-700 mb-2 block">💡 سؤال بطاقة الخروج</label>
+          <textarea value={question} onChange={e => setQuestion(e.target.value)} rows={3}
+            placeholder="مثال: ما أهم شيء تعلمته اليوم؟ أو ما سؤالك عن الدرس؟"
+            className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-teal-400 focus:outline-none text-sm resize-none mb-4" />
+          <button onClick={publish} className="w-full py-3 rounded-2xl bg-teal-600 text-white font-black hover:bg-teal-700">
+            📤 نشر السؤال للطلاب
+          </button>
+        </div>
+      )}
+
+      {mode === "answer" && (
+        <div className="max-w-md mx-auto">
+          {!submitted ? (
+            <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+              <div className="bg-teal-50 rounded-xl p-4 mb-5 text-center">
+                <p className="font-black text-teal-800 text-lg">{question || "لم يُنشر سؤال بعد"}</p>
+              </div>
+              <input value={studentName} onChange={e => setStudentName(e.target.value)} placeholder="اسمك الكامل"
+                className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-teal-400 focus:outline-none text-sm mb-3" />
+              <textarea value={answer} onChange={e => setAnswer(e.target.value)} rows={4}
+                placeholder="اكتب إجابتك هنا..."
+                className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-teal-400 focus:outline-none text-sm resize-none mb-4" />
+              <button onClick={submitAnswer} className="w-full py-3 rounded-2xl bg-teal-600 text-white font-black hover:bg-teal-700">
+                ✅ إرسال الإجابة
+              </button>
+            </div>
+          ) : (
+            <div className="bg-white rounded-2xl p-8 text-center shadow-sm">
+              <div className="text-5xl mb-3">✅</div>
+              <h3 className="font-black text-gray-800 text-xl mb-2">تم الإرسال!</h3>
+              <p className="text-gray-500 text-sm">شكراً {studentName}</p>
+              <button onClick={() => { setStudentName(""); setAnswer(""); setSubmitted(false); }}
+                className="mt-4 px-6 py-2.5 rounded-xl bg-teal-600 text-white font-bold text-sm">إجابة طالب آخر</button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {mode === "results" && (
+        <div>
+          <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+            <h3 className="font-black text-gray-800">الإجابات ({responses.length})</h3>
+            <div className="flex gap-2">
+              {responses.length > 0 && <button onClick={print} className="px-4 py-2 rounded-xl bg-blue-600 text-white font-bold text-sm">🖨️ طباعة</button>}
+              <button onClick={() => { setResponses([]); saveTicket(question, []); }} className="px-4 py-2 rounded-xl bg-red-50 text-red-500 font-bold text-sm">🗑️ مسح</button>
+            </div>
+          </div>
+          {responses.length === 0 && <div className="bg-white rounded-2xl p-8 text-center text-gray-400"><div className="text-4xl mb-2">📭</div><p className="font-bold">لا توجد إجابات بعد</p></div>}
+          <div className="space-y-3">
+            {responses.map((r,i) => (
+              <div key={i} className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="font-black text-gray-800 text-sm">👤 {r.name}</span>
+                  <span className="text-xs text-gray-400">{r.time}</span>
+                </div>
+                <p className="text-gray-700 text-sm leading-relaxed bg-gray-50 rounded-lg p-3">💬 {r.answer}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ===================================================================
+// ===== جدول الحصص الأسبوعي =====
+// ===================================================================
+function TimetablePage({ teachers }) {
+  const days = ["الأحد","الإثنين","الثلاثاء","الأربعاء","الخميس"];
+  const periods = [1,2,3,4,5,6,7,8];
+  const [timetable, setTimetable] = useState({});
+  const [selectedTeacher, setSelectedTeacher] = useState("الكل");
+
+  useEffect(() => {
+    DB.get("school-timetable", {}).then(d => setTimetable(d||{}));
+  }, []);
+
+  const save = (t) => { setTimetable(t); DB.set("school-timetable", t); };
+
+  const update = (day, period, value) => {
+    const t = { ...timetable, [`${day}-${period}`]: value };
+    save(t);
+  };
+
+  const print = () => {
+    const win = window.open("","_blank");
+    win.document.write(`<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8"/><title>جدول الحصص</title>
+    <style>body{font-family:sans-serif;direction:rtl;padding:20px;font-size:12px;} h1{color:#0d9488;text-align:center;} table{width:100%;border-collapse:collapse;margin-top:16px;} th,td{border:1px solid #ccc;padding:8px 6px;text-align:center;} th{background:#0d9488;color:white;font-size:11px;} td{font-size:11px;} .period{background:#f0fdfa;font-weight:bold;}</style>
+    </head><body><h1>🏫 جدول الحصص الأسبوعي — مدرسة عبيدة بن الحارث المتوسطة</h1>
+    <table><tr><th>الحصة</th>${days.map(d=>`<th>${d}</th>`).join("")}</tr>
+    ${periods.map(p=>`<tr><td class="period">الحصة ${p}</td>${days.map(d=>`<td>${timetable[d+"-"+p]||""}</td>`).join("")}</tr>`).join("")}
+    </table></body></html>`);
+    win.document.close(); win.print();
+  };
+
+  return (
+    <div>
+      <div className="page-header-bar mb-6" style={{background:"linear-gradient(135deg,#0369a1,#1e3a5f)"}}>
+        <h2 className="text-2xl font-black">🗓️ جدول الحصص الأسبوعي</h2>
+        <p className="opacity-80 text-sm mt-1">جدول أسبوعي قابل للتعديل والطباعة</p>
+      </div>
+      <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+        <p className="text-sm text-gray-500 font-bold">اضغط على أي خانة لتعديلها</p>
+        <button onClick={print} className="px-4 py-2 rounded-xl bg-blue-600 text-white font-bold text-sm hover:bg-blue-700">🖨️ طباعة الجدول</button>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm border-collapse bg-white rounded-2xl overflow-hidden shadow-sm">
+          <thead>
+            <tr>
+              <th className="px-3 py-3 text-white text-xs font-black" style={{background:"#0d9488"}}>الحصة</th>
+              {days.map(d => <th key={d} className="px-3 py-3 text-white text-xs font-black" style={{background:"#0d9488"}}>{d}</th>)}
+            </tr>
+          </thead>
+          <tbody>
+            {periods.map(p => (
+              <tr key={p} className={p%2===0?"bg-gray-50":""}>
+                <td className="px-3 py-2 text-center font-black text-teal-700 text-xs border border-gray-100">{p}</td>
+                {days.map(d => (
+                  <td key={d} className="border border-gray-100 p-1">
+                    <input value={timetable[`${d}-${p}`]||""} onChange={e => update(d,p,e.target.value)}
+                      placeholder="المادة / المعلم"
+                      className="w-full px-2 py-1.5 rounded-lg text-xs focus:outline-none focus:bg-teal-50 bg-transparent hover:bg-gray-50 transition-all text-center" />
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ===================================================================
+// ===== سجل الزيارات الصفية =====
+// ===================================================================
+function ClassVisitsPage({ teachers }) {
+  const [visits, setVisits] = useState([]);
+  const [form, setForm] = useState({ teacher:"", class:"", date: new Date().toLocaleDateString("ar-SA"), subject:"", strength:"", improvement:"", rating:4 });
+  const [showForm, setShowForm] = useState(false);
+
+  useEffect(() => {
+    DB.get("school-class-visits", []).then(d => setVisits(Array.isArray(d)?d:[]));
+  }, []);
+
+  const save = (v) => { setVisits(v); DB.set("school-class-visits", v); };
+
+  const add = () => {
+    if (!form.teacher || !form.class) { alert("أدخل اسم المعلم والفصل"); return; }
+    save([{ ...form, id: Date.now() }, ...visits]);
+    setForm({ teacher:"", class:"", date: new Date().toLocaleDateString("ar-SA"), subject:"", strength:"", improvement:"", rating:4 });
+    setShowForm(false);
+  };
+
+  const print = (v) => {
+    const win = window.open("","_blank");
+    win.document.write(`<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8"/><title>تقرير زيارة صفية</title>
+    <style>body{font-family:sans-serif;direction:rtl;padding:30px;} h1{color:#0d9488;font-size:18px;border-bottom:2px solid #0d9488;padding-bottom:8px;} .row{margin:12px 0;} .label{font-weight:bold;color:#0d9488;font-size:13px;} .val{font-size:13px;line-height:1.6;margin-top:4px;background:#f0fdfa;padding:8px 12px;border-radius:6px;} .stars{font-size:20px;margin-top:4px;}</style>
+    </head><body>
+    <h1>🏫 سجل الزيارة الصفية — مدرسة عبيدة بن الحارث المتوسطة</h1>
+    <div class="row"><div class="label">المعلم:</div><div class="val">${v.teacher}</div></div>
+    <div class="row"><div class="label">الفصل:</div><div class="val">${v.class}</div></div>
+    <div class="row"><div class="label">المادة:</div><div class="val">${v.subject||"—"}</div></div>
+    <div class="row"><div class="label">التاريخ:</div><div class="val">${v.date}</div></div>
+    <div class="row"><div class="label">نقاط القوة:</div><div class="val">${v.strength||"—"}</div></div>
+    <div class="row"><div class="label">نقاط التحسين:</div><div class="val">${v.improvement||"—"}</div></div>
+    <div class="row"><div class="label">التقييم:</div><div class="stars">${"⭐".repeat(v.rating)}</div></div>
+    </body></html>`);
+    win.document.close(); win.print();
+  };
+
+  return (
+    <div>
+      <div className="page-header-bar mb-6" style={{background:"linear-gradient(135deg,#b45309,#92400e)"}}>
+        <h2 className="text-2xl font-black">👁️ سجل الزيارات الصفية</h2>
+        <p className="opacity-80 text-sm mt-1">توثيق الزيارات الصفية ومتابعتها</p>
+      </div>
+      <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
+        <span className="text-sm font-bold text-gray-500">{visits.length} زيارة مسجلة</span>
+        <button onClick={() => setShowForm(!showForm)} className="px-4 py-2 rounded-xl bg-amber-600 text-white font-bold text-sm hover:bg-amber-700">
+          {showForm ? "✕ إلغاء" : "+ تسجيل زيارة"}
+        </button>
+      </div>
+      {showForm && (
+        <div className="bg-white rounded-2xl p-5 shadow-sm border border-amber-100 mb-5">
+          <h3 className="font-black text-amber-800 mb-4">تسجيل زيارة صفية جديدة</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+            <div>
+              <label className="text-xs font-bold text-gray-500 mb-1 block">المعلم</label>
+              <select value={form.teacher} onChange={e => setForm(f=>({...f,teacher:e.target.value}))}
+                className="w-full px-3 py-2.5 rounded-xl border-2 border-gray-200 focus:border-amber-400 focus:outline-none text-sm">
+                <option value="">اختر المعلم</option>
+                {teachers.map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-bold text-gray-500 mb-1 block">الفصل</label>
+              <input value={form.class} onChange={e => setForm(f=>({...f,class:e.target.value}))} placeholder="مثال: أول أ"
+                className="w-full px-3 py-2.5 rounded-xl border-2 border-gray-200 focus:border-amber-400 focus:outline-none text-sm" />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-gray-500 mb-1 block">المادة</label>
+              <input value={form.subject} onChange={e => setForm(f=>({...f,subject:e.target.value}))} placeholder="المادة الدراسية"
+                className="w-full px-3 py-2.5 rounded-xl border-2 border-gray-200 focus:border-amber-400 focus:outline-none text-sm" />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-gray-500 mb-1 block">التقييم</label>
+              <div className="flex gap-1">
+                {[1,2,3,4,5].map(n => (
+                  <button key={n} onClick={() => setForm(f=>({...f,rating:n}))}
+                    className={"text-2xl transition-transform hover:scale-110 " + (form.rating>=n?"":"opacity-30")}>⭐</button>
+                ))}
+              </div>
+            </div>
+          </div>
+          <div className="space-y-3">
+            <div>
+              <label className="text-xs font-bold text-gray-500 mb-1 block">✅ نقاط القوة</label>
+              <textarea value={form.strength} onChange={e => setForm(f=>({...f,strength:e.target.value}))} rows={2}
+                placeholder="ما الذي تميّز فيه المعلم؟"
+                className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 focus:border-amber-400 focus:outline-none text-sm resize-none" />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-gray-500 mb-1 block">📈 نقاط التحسين</label>
+              <textarea value={form.improvement} onChange={e => setForm(f=>({...f,improvement:e.target.value}))} rows={2}
+                placeholder="ما الذي يمكن تحسينه؟"
+                className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 focus:border-amber-400 focus:outline-none text-sm resize-none" />
+            </div>
+          </div>
+          <button onClick={add} className="mt-4 w-full py-3 rounded-2xl bg-amber-600 text-white font-black hover:bg-amber-700">💾 حفظ الزيارة</button>
+        </div>
+      )}
+      {visits.length === 0 && !showForm && <div className="bg-white rounded-2xl p-8 text-center text-gray-400"><div className="text-4xl mb-2">📭</div><p className="font-bold">لا توجد زيارات مسجلة</p></div>}
+      <div className="space-y-3">
+        {visits.map(v => (
+          <div key={v.id} className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+            <div className="flex items-start justify-between gap-3 flex-wrap mb-3">
+              <div>
+                <h3 className="font-black text-gray-800">{v.teacher}</h3>
+                <p className="text-xs text-gray-400 mt-0.5">{v.class} • {v.subject} • {v.date}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-lg">{"⭐".repeat(v.rating)}</span>
+                <button onClick={() => print(v)} className="text-xs text-blue-600 font-bold px-3 py-1.5 rounded-lg bg-blue-50">🖨️</button>
+                <button onClick={() => save(visits.filter(x=>x.id!==v.id))} className="text-xs text-red-500 font-bold px-3 py-1.5 rounded-lg bg-red-50">🗑️</button>
+              </div>
+            </div>
+            {v.strength && <div className="text-xs bg-green-50 rounded-lg p-2 mb-2"><span className="font-black text-green-700">✅ نقاط القوة:</span> <span className="text-gray-600">{v.strength}</span></div>}
+            {v.improvement && <div className="text-xs bg-amber-50 rounded-lg p-2"><span className="font-black text-amber-700">📈 التحسين:</span> <span className="text-gray-600">{v.improvement}</span></div>}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ===================================================================
+// ===== لوحة الشرف =====
+// ===================================================================
+function HonorBoardPage({ classList }) {
+  const [honorStudents, setHonorStudents] = useState([]);
+  const [form, setForm] = useState({ name:"", class:"", reason:"", badge:"🏆" });
+  const [showForm, setShowForm] = useState(false);
+  const badges = ["🏆","⭐","🥇","🎖️","🌟","💎","🔥","👑","🎯","✨"];
+
+  useEffect(() => {
+    DB.get("school-honor-board", []).then(d => setHonorStudents(Array.isArray(d)?d:[]));
+  }, []);
+
+  const save = (v) => { setHonorStudents(v); DB.set("school-honor-board", v); };
+
+  const add = () => {
+    if (!form.name.trim()) { alert("أدخل اسم الطالب"); return; }
+    save([{ ...form, id: Date.now(), date: new Date().toLocaleDateString("ar-SA") }, ...honorStudents]);
+    setForm({ name:"", class:"", reason:"", badge:"🏆" }); setShowForm(false);
+  };
+
+  const print = () => {
+    const win = window.open("","_blank");
+    win.document.write(`<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8"/><title>لوحة الشرف</title>
+    <style>body{font-family:sans-serif;direction:rtl;padding:30px;text-align:center;background:#fffbeb;} h1{color:#0d9488;font-size:22px;margin-bottom:4px;} .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:16px;margin-top:24px;} .card{background:white;border:2px solid #fde68a;border-radius:12px;padding:16px;} .badge{font-size:36px;} .name{font-weight:bold;font-size:14px;margin:8px 0 4px;} .class{font-size:12px;color:#666;} .reason{font-size:11px;color:#0d9488;margin-top:6px;}</style>
+    </head><body>
+    <h1>🏫 لوحة الشرف</h1><p style="color:#666;font-size:13px;">مدرسة عبيدة بن الحارث المتوسطة</p>
+    <div class="grid">${honorStudents.map(s=>`<div class="card"><div class="badge">${s.badge}</div><div class="name">${s.name}</div><div class="class">${s.class}</div><div class="reason">${s.reason||""}</div></div>`).join("")}</div>
+    </body></html>`);
+    win.document.close(); win.print();
+  };
+
+  return (
+    <div>
+      <div className="page-header-bar mb-6" style={{background:"linear-gradient(135deg,#d97706,#b45309)"}}>
+        <h2 className="text-2xl font-black">🏆 لوحة الشرف</h2>
+        <p className="opacity-80 text-sm mt-1">كرّم طلابك المتميزين</p>
+      </div>
+      <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
+        <span className="text-sm font-bold text-gray-500">{honorStudents.length} طالب متميز</span>
+        <div className="flex gap-2">
+          {honorStudents.length>0 && <button onClick={print} className="px-4 py-2 rounded-xl bg-blue-600 text-white font-bold text-sm">🖨️ طباعة</button>}
+          <button onClick={() => setShowForm(!showForm)} className="px-4 py-2 rounded-xl bg-amber-600 text-white font-bold text-sm hover:bg-amber-700">
+            {showForm?"✕ إلغاء":"+ إضافة طالب"}
+          </button>
+        </div>
+      </div>
+      {showForm && (
+        <div className="bg-white rounded-2xl p-5 shadow-sm border border-amber-100 mb-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+            <input value={form.name} onChange={e => setForm(f=>({...f,name:e.target.value}))} placeholder="اسم الطالب"
+              className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-amber-400 focus:outline-none text-sm" />
+            <input value={form.class} onChange={e => setForm(f=>({...f,class:e.target.value}))} placeholder="الفصل"
+              className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-amber-400 focus:outline-none text-sm" />
+          </div>
+          <input value={form.reason} onChange={e => setForm(f=>({...f,reason:e.target.value}))} placeholder="سبب التكريم (اختياري)"
+            className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-amber-400 focus:outline-none text-sm mb-3" />
+          <div className="flex gap-2 flex-wrap mb-3">
+            {badges.map(b => (
+              <button key={b} onClick={() => setForm(f=>({...f,badge:b}))}
+                className={"text-2xl p-2 rounded-xl border-2 transition-all " + (form.badge===b?"border-amber-400 bg-amber-50":"border-transparent hover:border-gray-200")}>
+                {b}
+              </button>
+            ))}
+          </div>
+          <button onClick={add} className="w-full py-3 rounded-2xl bg-amber-600 text-white font-black hover:bg-amber-700">✨ إضافة للوحة الشرف</button>
+        </div>
+      )}
+      {honorStudents.length === 0 && !showForm && <div className="bg-white rounded-2xl p-8 text-center text-gray-400"><div className="text-5xl mb-2">🏆</div><p className="font-bold">لوحة الشرف فارغة</p></div>}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+        {honorStudents.map(s => (
+          <div key={s.id} className="bg-white rounded-2xl p-4 text-center shadow-sm border-2 border-amber-200 hover:shadow-md transition-all relative group">
+            <button onClick={() => save(honorStudents.filter(x=>x.id!==s.id))} className="absolute top-2 left-2 text-xs text-red-400 opacity-0 group-hover:opacity-100 font-bold">✕</button>
+            <div className="text-4xl mb-2">{s.badge}</div>
+            <p className="font-black text-gray-800 text-sm">{s.name}</p>
+            <p className="text-xs text-gray-400 mt-0.5">{s.class}</p>
+            {s.reason && <p className="text-xs text-teal-600 mt-1 font-bold">{s.reason}</p>}
+            <p className="text-xs text-gray-300 mt-1">{s.date}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ===================================================================
+// ===== تتبع المهام =====
+// ===================================================================
+function TasksPage({ teachers }) {
+  const [tasks, setTasks] = useState([]);
+  const [form, setForm] = useState({ title:"", assignedTo:"", dueDate:"", priority:"عادي", notes:"" });
+  const [showForm, setShowForm] = useState(false);
+  const [filter, setFilter] = useState("الكل");
+
+  useEffect(() => {
+    DB.get("school-tasks", []).then(d => setTasks(Array.isArray(d)?d:[]));
+  }, []);
+
+  const save = (t) => { setTasks(t); DB.set("school-tasks", t); };
+  const add = () => {
+    if (!form.title.trim()) { alert("أدخل عنوان المهمة"); return; }
+    save([{ ...form, id: Date.now(), status:"لم تبدأ", createdAt: new Date().toLocaleDateString("ar-SA") }, ...tasks]);
+    setForm({ title:"", assignedTo:"", dueDate:"", priority:"عادي", notes:"" }); setShowForm(false);
+  };
+  const updateStatus = (id, status) => save(tasks.map(t => t.id===id ? {...t,status} : t));
+  const del = (id) => save(tasks.filter(t => t.id!==id));
+
+  const statuses = ["لم تبدأ","جارية","مكتملة","متأخرة"];
+  const statusColors = {"لم تبدأ":"bg-gray-100 text-gray-600","جارية":"bg-blue-100 text-blue-700","مكتملة":"bg-green-100 text-green-700","متأخرة":"bg-red-100 text-red-700"};
+  const priorityColors = {"عادي":"bg-gray-50 border-gray-200","مهم":"bg-amber-50 border-amber-200","عاجل":"bg-red-50 border-red-200"};
+  const filtered = filter==="الكل" ? tasks : tasks.filter(t=>t.status===filter);
+
+  return (
+    <div>
+      <div className="page-header-bar mb-6" style={{background:"linear-gradient(135deg,#4f46e5,#7c3aed)"}}>
+        <h2 className="text-2xl font-black">✅ تتبع المهام والتكليفات</h2>
+        <p className="opacity-80 text-sm mt-1">وزّع المهام وتابع إنجازها</p>
+      </div>
+      <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
+        <div className="flex gap-2 flex-wrap">
+          {["الكل",...statuses].map(s => (
+            <button key={s} onClick={() => setFilter(s)}
+              className={"px-3 py-1.5 rounded-xl text-xs font-bold border " + (filter===s?"bg-indigo-600 text-white border-indigo-600":"bg-white text-gray-600 border-gray-200")}>
+              {s} {s!=="الكل" && "("+tasks.filter(t=>t.status===s).length+")"}
+            </button>
+          ))}
+        </div>
+        <button onClick={() => setShowForm(!showForm)} className="px-4 py-2 rounded-xl bg-indigo-600 text-white font-bold text-sm hover:bg-indigo-700">
+          {showForm?"✕ إلغاء":"+ مهمة جديدة"}
+        </button>
+      </div>
+      {showForm && (
+        <div className="bg-white rounded-2xl p-5 shadow-sm border border-indigo-100 mb-5">
+          <div className="space-y-3">
+            <input value={form.title} onChange={e => setForm(f=>({...f,title:e.target.value}))} placeholder="عنوان المهمة"
+              className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-indigo-400 focus:outline-none text-sm" />
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <select value={form.assignedTo} onChange={e => setForm(f=>({...f,assignedTo:e.target.value}))}
+                className="px-3 py-2.5 rounded-xl border-2 border-gray-200 focus:border-indigo-400 focus:outline-none text-sm">
+                <option value="">تعيين إلى...</option>
+                {teachers.map(t=><option key={t} value={t}>{t}</option>)}
+              </select>
+              <input type="date" value={form.dueDate} onChange={e => setForm(f=>({...f,dueDate:e.target.value}))}
+                className="px-3 py-2.5 rounded-xl border-2 border-gray-200 focus:border-indigo-400 focus:outline-none text-sm" />
+              <select value={form.priority} onChange={e => setForm(f=>({...f,priority:e.target.value}))}
+                className="px-3 py-2.5 rounded-xl border-2 border-gray-200 focus:border-indigo-400 focus:outline-none text-sm">
+                <option>عادي</option><option>مهم</option><option>عاجل</option>
+              </select>
+            </div>
+            <textarea value={form.notes} onChange={e => setForm(f=>({...f,notes:e.target.value}))} rows={2}
+              placeholder="ملاحظات إضافية..." className="w-full px-4 py-2.5 rounded-xl border-2 border-gray-200 focus:border-indigo-400 focus:outline-none text-sm resize-none" />
+            <button onClick={add} className="w-full py-3 rounded-2xl bg-indigo-600 text-white font-black hover:bg-indigo-700">+ إضافة المهمة</button>
+          </div>
+        </div>
+      )}
+      {filtered.length===0 && <div className="bg-white rounded-2xl p-8 text-center text-gray-400"><div className="text-4xl mb-2">✅</div><p className="font-bold">لا توجد مهام</p></div>}
+      <div className="space-y-3">
+        {filtered.map(t => (
+          <div key={t.id} className={"bg-white rounded-2xl p-4 shadow-sm border-2 " + (priorityColors[t.priority]||"bg-white border-gray-100")}>
+            <div className="flex items-start justify-between gap-3 flex-wrap">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap mb-1">
+                  <h3 className={"font-black text-gray-800 text-sm " + (t.status==="مكتملة"?"line-through text-gray-400":"")}>{t.title}</h3>
+                  <span className={"text-xs px-2 py-0.5 rounded-full font-bold " + (statusColors[t.status]||"")}>{t.status}</span>
+                  {t.priority!=="عادي" && <span className={"text-xs px-2 py-0.5 rounded-full font-bold " + (t.priority==="عاجل"?"bg-red-100 text-red-700":"bg-amber-100 text-amber-700")}>{t.priority}</span>}
+                </div>
+                <div className="flex gap-3 text-xs text-gray-400 flex-wrap">
+                  {t.assignedTo && <span>👤 {t.assignedTo}</span>}
+                  {t.dueDate && <span>📅 {t.dueDate}</span>}
+                  <span>🕐 {t.createdAt}</span>
+                </div>
+                {t.notes && <p className="text-xs text-gray-500 mt-1">{t.notes}</p>}
+              </div>
+              <div className="flex gap-1 flex-wrap">
+                <select value={t.status} onChange={e => updateStatus(t.id, e.target.value)}
+                  className="text-xs px-2 py-1.5 rounded-lg border border-gray-200 bg-white focus:outline-none">
+                  {statuses.map(s=><option key={s}>{s}</option>)}
+                </select>
+                <button onClick={() => del(t.id)} className="text-xs text-red-400 font-bold px-2 py-1.5 rounded-lg hover:bg-red-50">🗑️</button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ===================================================================
+// ===== إحصائيات الغياب =====
+// ===================================================================
+function AbsenceStatsPage({ teachers, attendance, week }) {
+  const months = ["محرم","صفر","ربيع الأول","ربيع الآخر","جمادى الأولى","جمادى الآخرة","رجب","شعبان","رمضان","شوال","ذو القعدة","ذو الحجة"];
+  const absentTeachers = teachers.filter(t => {
+    return Object.values(attendance).some(dayAtt => dayAtt[t] === "غائب");
+  });
+  const teacherStats = teachers.map(t => {
+    const absent = Object.values(attendance).filter(d => d[t] === "غائب").length;
+    const late = Object.values(attendance).filter(d => d[t] === "متأخر").length;
+    const total = Object.values(attendance).filter(d => d[t]).length;
+    return { name: t, absent, late, total, present: total - absent - late };
+  }).sort((a,b) => b.absent - a.absent);
+
+  const totalDays = Object.keys(attendance).length;
+  const totalAbsences = teacherStats.reduce((s,t) => s+t.absent, 0);
+  const totalLate = teacherStats.reduce((s,t) => s+t.late, 0);
+
+  const barMax = Math.max(...teacherStats.map(t=>t.absent), 1);
+
+  return (
+    <div>
+      <div className="page-header-bar mb-6" style={{background:"linear-gradient(135deg,#dc2626,#991b1b)"}}>
+        <h2 className="text-2xl font-black">📊 إحصائيات الغياب</h2>
+        <p className="opacity-80 text-sm mt-1">تحليل شامل لغياب المعلمين</p>
+      </div>
+      {/* بطاقات الإحصاء */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+        {[
+          { label:"أيام مسجلة", value: totalDays, icon:"📅", color:"bg-blue-50 text-blue-700" },
+          { label:"إجمالي الغياب", value: totalAbsences, icon:"❌", color:"bg-red-50 text-red-700" },
+          { label:"إجمالي التأخر", value: totalLate, icon:"⚠️", color:"bg-amber-50 text-amber-700" },
+          { label:"المعلمون", value: teachers.length, icon:"👨‍🏫", color:"bg-teal-50 text-teal-700" },
+        ].map(s => (
+          <div key={s.label} className={"rounded-2xl p-4 text-center " + s.color}>
+            <div className="text-2xl mb-1">{s.icon}</div>
+            <div className="text-2xl font-black">{s.value}</div>
+            <div className="text-xs font-bold opacity-70 mt-0.5">{s.label}</div>
+          </div>
+        ))}
+      </div>
+      {/* الرسم البياني */}
+      <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 mb-6">
+        <h3 className="font-black text-gray-800 mb-4">📈 الغياب لكل معلم</h3>
+        {teacherStats.length === 0 && <p className="text-gray-400 text-sm text-center">لا توجد بيانات</p>}
+        <div className="space-y-3">
+          {teacherStats.filter(t=>t.absent>0||t.late>0).map(t => (
+            <div key={t.name}>
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs font-bold text-gray-700 truncate max-w-[60%]">{t.name}</span>
+                <span className="text-xs text-gray-400">{t.absent} غياب • {t.late} تأخر</span>
+              </div>
+              <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
+                <div className="h-full rounded-full bg-gradient-to-l from-red-500 to-red-400 transition-all"
+                  style={{width: (t.absent/barMax*100)+"%"}}/>
+              </div>
+            </div>
+          ))}
+          {teacherStats.every(t=>t.absent===0&&t.late===0) && (
+            <p className="text-center text-gray-400 py-4">🎉 لا يوجد غياب مسجل</p>
+          )}
+        </div>
+      </div>
+      {/* جدول التفاصيل */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="px-5 py-3 border-b border-gray-100">
+          <h3 className="font-black text-gray-800">تفاصيل كل معلم</h3>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-4 py-3 text-right text-xs font-black text-gray-500">المعلم</th>
+                <th className="px-4 py-3 text-center text-xs font-black text-red-600">غياب</th>
+                <th className="px-4 py-3 text-center text-xs font-black text-amber-600">تأخر</th>
+                <th className="px-4 py-3 text-center text-xs font-black text-green-600">حاضر</th>
+                <th className="px-4 py-3 text-center text-xs font-black text-gray-500">نسبة الحضور</th>
+              </tr>
+            </thead>
+            <tbody>
+              {teacherStats.map((t,i) => (
+                <tr key={t.name} className={i%2===0?"":"bg-gray-50"}>
+                  <td className="px-4 py-3 font-bold text-gray-800 text-sm">{t.name}</td>
+                  <td className="px-4 py-3 text-center font-black text-red-600">{t.absent}</td>
+                  <td className="px-4 py-3 text-center font-black text-amber-600">{t.late}</td>
+                  <td className="px-4 py-3 text-center font-black text-green-600">{t.present}</td>
+                  <td className="px-4 py-3 text-center">
+                    <span className={"text-xs font-black px-2 py-1 rounded-full " + (t.total===0?"bg-gray-100 text-gray-400":t.present/t.total>0.9?"bg-green-100 text-green-700":"bg-amber-100 text-amber-700")}>
+                      {t.total===0?"—":Math.round(t.present/t.total*100)+"%"}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function SchoolWebsite() {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
@@ -6761,6 +8122,17 @@ export default function SchoolWebsite() {
     { id: "raffle",        label: "سحب الطلاب",      icon: "🎰" },
     { id: "surveys",       label: "الاستبيانات",     icon: "📊" },
     { id: "report",        label: "تقرير برنامج",    icon: "📋" },
+    { id: "broadcast",     label: "الإذاعة المدرسية", icon: "🎙️" },
+    { id: "groupdivider",  label: "تقسيم المجموعات", icon: "👥" },
+    { id: "quiz",          label: "اختبارات الطلاب",  icon: "📝" },
+    { id: "classtimer",    label: "مؤقت الحصة",        icon: "⏱️" },
+    { id: "luckywheel",    label: "عجلة الحظ",          icon: "🎯" },
+    { id: "exitticket",    label: "بطاقة الخروج",       icon: "🚪" },
+    { id: "timetable",     label: "جدول الحصص",         icon: "🗓️" },
+    { id: "classvisits",   label: "الزيارات الصفية",    icon: "👁️" },
+    { id: "honorboard",    label: "لوحة الشرف",         icon: "🏆" },
+    { id: "tasks",         label: "تتبع المهام",        icon: "✅" },
+    { id: "absencestats",  label: "إحصائيات الغياب",   icon: "📊" },
   ];
 
   return (
@@ -6976,12 +8348,23 @@ export default function SchoolWebsite() {
         {page === "certificates"  && <CertificatesPage teachers={teachers} attendance={attendance} week={week} classList={classList} />}
         {page === "poll"          && <PollPage teachers={teachers} />}
         {page === "raffle"        && <RafflePage />}
+        {page === "broadcast"     && <BroadcastPage />}
+        {page === "groupdivider"  && <GroupDividerPage />}
+        {page === "quiz"          && <QuizPage />}
+        {page === "classtimer"    && <ClassTimerPage />}
+        {page === "luckywheel"    && <LuckyWheelPage />}
+        {page === "exitticket"    && <ExitTicketPage />}
+        {page === "timetable"     && <TimetablePage teachers={teachers} />}
+        {page === "classvisits"   && <ClassVisitsPage teachers={teachers} />}
+        {page === "honorboard"    && <HonorBoardPage classList={classList} />}
+        {page === "tasks"         && <TasksPage teachers={teachers} />}
+        {page === "absencestats"  && <AbsenceStatsPage teachers={teachers} attendance={attendance} week={week} />}
         {page === "settings"      && <SettingsPage teachers={teachers} setTeachers={setTeachers} saveTeachers={saveTeachers} week={week} setWeek={setWeek} saveWeek={saveWeek} users={users} siteFont={siteFont} setSiteFont={setSiteFont} saveSiteFont={saveSiteFont} />}
       </main>
       </div>{/* end relative z-10 */}
       <footer className="relative text-center py-6 text-xs border-t bg-white mt-8 overflow-hidden" style={{borderColor:"rgba(13,148,136,.15)"}}>
         <div className="absolute inset-0 opacity-5" style={{background:"linear-gradient(135deg,#0d9488,transparent)"}} />
-        <p className="relative text-teal-700 font-bold opacity-60">مدرسة عبيدة بن الحارث المتوسطة — بوابة الإدارة المدرسية الإلكترونية</p>
+        <div className="relative flex items-center justify-center gap-4 flex-wrap"><p className="text-teal-700 font-bold opacity-60">مدرسة عبيدة بن الحارث المتوسطة — بوابة الإدارة المدرسية الإلكترونية</p><VisitorCounter /></div>
         <p className="relative text-gray-400 mt-1">© ١٤٤٧ هـ — جميع الحقوق محفوظة</p>
       </footer>
     </div>
