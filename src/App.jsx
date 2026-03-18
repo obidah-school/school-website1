@@ -8497,11 +8497,46 @@ function AttendanceAnalysisPage() {
                   <h4 className="font-black text-amber-800 mb-3">⏱️ تفاصيل التأخر الصباحي</h4>
                   {emp.stats.latedays === 0
                     ? <p className="text-green-600 font-bold text-sm">✅ لا يوجد تأخر مسجّل</p>
-                    : <div className="space-y-2 text-sm">
-                        <div className="flex justify-between"><span className="text-gray-500">أيام التأخر:</span><span className="font-black text-amber-700">{emp.stats.latedays} يوم</span></div>
-                        <div className="flex justify-between"><span className="text-gray-500">إجمالي الدقائق:</span><span className="font-black text-amber-700">{emp.stats.totalLateMins} دقيقة</span></div>
-                        <div className="flex justify-between"><span className="text-gray-500">متوسط التأخر:</span><span className="font-black text-amber-700">{emp.stats.avgLateMins} دقيقة/يوم</span></div>
-                        <div className="flex justify-between"><span className="text-gray-500">معدل التأخر:</span><span className="font-black text-amber-700">{Math.round(emp.stats.latedays/emp.stats.totalDays*100)}% من أيام الدوام</span></div>
+                    : <div>
+                        {/* جدول الأيام المتأخرة */}
+                        <div className="overflow-x-auto mb-4 rounded-xl border border-amber-200">
+                          <table className="w-full text-xs">
+                            <thead>
+                              <tr className="bg-amber-500 text-white">
+                                <th className="px-3 py-2 text-right font-black">#</th>
+                                <th className="px-3 py-2 text-right font-black whitespace-nowrap">التاريخ</th>
+                                <th className="px-3 py-2 text-center font-black whitespace-nowrap">من (الحضور)</th>
+                                <th className="px-3 py-2 text-center font-black whitespace-nowrap">إلى (بداية الدوام)</th>
+                                <th className="px-3 py-2 text-center font-black whitespace-nowrap">دقائق التأخر</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {emp.records.filter(r => r.lateMins > 0).map((r, i) => (
+                                <tr key={i} className={i%2===0?"bg-amber-50":"bg-white"}>
+                                  <td className="px-3 py-2 text-right font-black text-amber-700">{i+1}</td>
+                                  <td className="px-3 py-2 text-right font-bold text-gray-700 whitespace-nowrap">{r.date}</td>
+                                  <td className="px-3 py-2 text-center font-black text-amber-600">{fmtTime(r.arrival)}</td>
+                                  <td className="px-3 py-2 text-center font-bold text-gray-500">{fmtTime(workStart)}</td>
+                                  <td className="px-3 py-2 text-center">
+                                    <span className="bg-amber-100 text-amber-800 font-black px-2 py-0.5 rounded-full">{r.lateMins} د</span>
+                                  </td>
+                                </tr>
+                              ))}
+                              {/* صف المجموع */}
+                              <tr className="bg-amber-600 text-white font-black">
+                                <td colSpan={4} className="px-3 py-2 text-right">المجموع</td>
+                                <td className="px-3 py-2 text-center">{emp.stats.totalLateMins} دقيقة</td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                        {/* الإحصاء */}
+                        <div className="space-y-2 text-sm border-t border-amber-100 pt-3">
+                          <div className="flex justify-between"><span className="text-gray-500">أيام التأخر:</span><span className="font-black text-amber-700">{emp.stats.latedays} يوم</span></div>
+                          <div className="flex justify-between"><span className="text-gray-500">إجمالي الدقائق:</span><span className="font-black text-amber-700">{emp.stats.totalLateMins} دقيقة</span></div>
+                          <div className="flex justify-between"><span className="text-gray-500">متوسط التأخر:</span><span className="font-black text-amber-700">{emp.stats.avgLateMins} دقيقة/يوم</span></div>
+                          <div className="flex justify-between"><span className="text-gray-500">معدل التأخر:</span><span className="font-black text-amber-700">{Math.round(emp.stats.latedays/emp.stats.totalDays*100)}% من أيام الدوام</span></div>
+                        </div>
                       </div>
                   }
                 </div>
