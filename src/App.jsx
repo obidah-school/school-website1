@@ -5024,7 +5024,7 @@ function SMSPage({ teachers, attendance, week, classList }) {
       const res = await fetch("/api/send-sms", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ apiKey, numbers, message, sender: sender || "School1" }),
+       body: JSON.stringify({ numbers, message, sender: sender || "School1" })
       });
       const data = await res.json();
       if (data.success) {
