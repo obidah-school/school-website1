@@ -8000,6 +8000,394 @@ function AbsenceStatsPage({ teachers, attendance, week }) {
   );
 }
 
+
+// ===================================================================
+// ===== صفحة تحليل الحضور والانصراف =====
+// ===================================================================
+function AttendanceAnalysisPage() {
+  const [employees, setEmployees] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [selectedEmp, setSelectedEmp] = useState(null);
+  const WORK_START = "07:00"; // وقت بدء الدوام الرسمي
+
+  const toMins = (t) => {
+    if (!t || t === "-") return null;
+    const [h, m] = t.split(":").map(Number);
+    return h * 60 + m;
+  };
+
+  const fmtMins = (mins) => {
+    if (mins === null || mins === undefined) return "—";
+    const h = Math.floor(Math.abs(mins) / 60);
+    const m = Math.abs(mins) % 60;
+    return (h > 0 ? h + "س " : "") + (m > 0 ? m + "د" : (h > 0 ? "" : "0د"));
+  };
+
+  const parseExcel = (file) => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = new Uint8Array(e.target.result);
+          const workbook = XLSX.read(data, { type: "array" });
+          const ws = workbook.Sheets[workbook.SheetNames[0]];
+          const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
+
+          // استخراج اسم الموظف
+          let empName = "موظف غير محدد", empId = "", empRole = "";
+          for (let i = 0; i < Math.min(5, rows.length); i++) {
+            const cell = rows[i].find(c => typeof c === "string" && c.includes("من:"));
+            if (cell) {
+              const lines = cell.split("\n");
+              const infoLine = lines.find(l => l.includes("-")) || lines[lines.length - 1];
+              const parts = infoLine.split("-").map(s => s.trim());
+              empName = parts[0] || "موظف";
+              empId = parts[1] || "";
+              empRole = parts[2] || "";
+              break;
+            }
+          }
+
+          // إيجاد صف الرؤوس
+          let headerRow = -1;
+          for (let i = 0; i < rows.length; i++) {
+            if (rows[i].includes("التاريخ") || rows[i].includes("حالة التحضير")) {
+              headerRow = i; break;
+            }
+          }
+          if (headerRow === -1) { resolve(null); return; }
+
+          const headers = rows[headerRow];
+          const colIdx = {
+            date: headers.findIndex(h => h === "التاريخ"),
+            status: headers.findIndex(h => String(h).includes("حالة")),
+            arrival: headers.findIndex(h => String(h).includes("توقيت الحضور")),
+            departure: headers.findIndex(h => String(h).includes("توقيت الإنصراف")),
+            actualHours: headers.findIndex(h => String(h).includes("الفعلي")),
+            early: headers.findIndex(h => String(h).includes("مبكر")),
+          };
+
+          const workStart = toMins(WORK_START);
+          const records = [];
+
+          for (let i = headerRow + 1; i < rows.length; i++) {
+            const row = rows[i];
+            if (!row[colIdx.date] || String(row[colIdx.date]).includes("المجموع")) continue;
+
+            const date = String(row[colIdx.date] || "").trim();
+            const status = String(row[colIdx.status] || "").trim();
+            const arrival = String(row[colIdx.arrival] || "").trim();
+            const departure = String(row[colIdx.departure] || "").trim();
+            const actualHours = String(row[colIdx.actualHours] || "").trim();
+
+            // تحديد نوع اليوم
+            const isWeekend = date.includes("الجمعة") || date.includes("السبت");
+            const isAbsent = status.includes("غياب");
+            const isPermission = status.includes("إذن") || status.includes("استئذان") || status.includes("إجازة");
+            const isAutoDepart = status.includes("تلقائي");
+            const isComplete = status.includes("مكتملة");
+
+            const arrivalMins = toMins(arrival);
+            const lateMins = (arrivalMins !== null && !isAbsent && !isWeekend)
+              ? Math.max(0, arrivalMins - workStart)
+              : 0;
+
+            const departureMins = toMins(departure);
+            const earlyDepartMins = (departureMins !== null && !isAbsent && !isWeekend && isAutoDepart)
+              ? 0
+              : (departureMins !== null && !isAbsent && !isWeekend)
+              ? Math.max(0, (workStart + 60 * 7) - departureMins)
+              : 0;
+
+            records.push({
+              date, status, arrival, departure, actualHours,
+              isWeekend, isAbsent, isPermission, isAutoDepart, isComplete,
+              lateMins, departureMins, arrivalMins,
+            });
+          }
+
+          // الإحصائيات
+          const workdays = records.filter(r => !r.isWeekend);
+          const absences = workdays.filter(r => r.isAbsent).length;
+          const permissions = workdays.filter(r => r.isPermission).length;
+          const latedays = workdays.filter(r => r.lateMins > 0);
+          const totalLateMins = latedays.reduce((s, r) => s + r.lateMins, 0);
+          const autoDeparts = workdays.filter(r => r.isAutoDepart).length;
+          const presentDays = workdays.filter(r => !r.isAbsent).length;
+
+          resolve({
+            empName, empId, empRole,
+            records,
+            stats: {
+              totalDays: workdays.length,
+              presentDays,
+              absences,
+              permissions,
+              latedays: latedays.length,
+              totalLateMins,
+              avgLateMins: latedays.length > 0 ? Math.round(totalLateMins / latedays.length) : 0,
+              autoDeparts,
+            }
+          });
+        } catch (err) {
+          console.error(err); resolve(null);
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    });
+  };
+
+  const handleFiles = async (files) => {
+    setLoading(true);
+    const results = [];
+    for (const file of files) {
+      const emp = await parseExcel(file);
+      if (emp) results.push(emp);
+    }
+    setEmployees(results);
+    if (results.length === 1) setSelectedEmp(results[0]);
+    setLoading(false);
+  };
+
+  const printReport = (emp) => {
+    const workStart = toMins(WORK_START);
+    const win = window.open("", "_blank");
+    win.document.write(`<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8"/>
+    <title>تقرير حضور ${emp.empName}</title>
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; direction: rtl; padding: 24px; font-size: 12px; color: #1a1a1a; }
+      .header { background: linear-gradient(135deg, #0d9488, #065f46); color: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; }
+      .header h1 { font-size: 18px; font-weight: 800; margin-bottom: 4px; }
+      .header p { opacity: 0.85; font-size: 12px; }
+      .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 20px; }
+      .stat { background: #f8fffe; border: 1.5px solid #0d9488; border-radius: 8px; padding: 10px; text-align: center; }
+      .stat .val { font-size: 22px; font-weight: 900; color: #0d9488; }
+      .stat .lbl { font-size: 10px; color: #666; margin-top: 2px; }
+      .stat.red { border-color: #dc2626; } .stat.red .val { color: #dc2626; }
+      .stat.amber { border-color: #d97706; } .stat.amber .val { color: #d97706; }
+      .stat.blue { border-color: #2563eb; } .stat.blue .val { color: #2563eb; }
+      table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+      th { background: #0d9488; color: white; padding: 8px 6px; font-size: 10px; font-weight: 700; text-align: center; }
+      td { padding: 6px 5px; text-align: center; font-size: 11px; border-bottom: 1px solid #f0f0f0; }
+      tr:nth-child(even) td { background: #f8fffe; }
+      .absent td { background: #fff1f2 !important; color: #991b1b; }
+      .late td { background: #fffbeb !important; }
+      .weekend td { background: #f5f5f5 !important; color: #9ca3af; }
+      .badge { display: inline-block; padding: 2px 6px; border-radius: 10px; font-size: 10px; font-weight: 700; }
+      .b-absent { background: #fee2e2; color: #991b1b; }
+      .b-late { background: #fef3c7; color: #92400e; }
+      .b-ok { background: #d1fae5; color: #065f46; }
+      .b-auto { background: #dbeafe; color: #1e40af; }
+      .b-weekend { background: #f3f4f6; color: #6b7280; }
+      .footer { margin-top: 20px; text-align: center; font-size: 10px; color: #9ca3af; border-top: 1px dashed #ccc; padding-top: 12px; }
+      @media print { body { padding: 10px; } }
+    </style>
+    </head><body>
+    <div class="header">
+      <h1>🏫 تقرير الحضور والانصراف</h1>
+      <p>مدرسة عبيدة بن الحارث المتوسطة</p>
+      <p style="margin-top:8px;font-size:14px;font-weight:700;">${emp.empName}</p>
+      <p>${emp.empId} ${emp.empRole ? "— " + emp.empRole : ""}</p>
+    </div>
+    <div class="stats">
+      <div class="stat"><div class="val">${emp.stats.totalDays}</div><div class="lbl">أيام الدوام</div></div>
+      <div class="stat red"><div class="val">${emp.stats.absences}</div><div class="lbl">أيام الغياب</div></div>
+      <div class="stat amber"><div class="val">${emp.stats.latedays}</div><div class="lbl">أيام التأخر</div></div>
+      <div class="stat amber"><div class="val">${emp.stats.totalLateMins}د</div><div class="lbl">إجمالي دقائق التأخر</div></div>
+      <div class="stat blue"><div class="val">${emp.stats.presentDays}</div><div class="lbl">أيام الحضور</div></div>
+      <div class="stat blue"><div class="val">${emp.stats.avgLateMins}د</div><div class="lbl">متوسط التأخر</div></div>
+      <div class="stat"><div class="val">${emp.stats.autoDeparts}</div><div class="lbl">انصراف تلقائي</div></div>
+      <div class="stat"><div class="val">${emp.stats.permissions}</div><div class="lbl">الاستئذانات</div></div>
+    </div>
+    <table>
+      <tr>
+        <th>#</th><th>التاريخ</th><th>الحالة</th>
+        <th>توقيت الحضور</th><th>تأخر الصباح</th>
+        <th>توقيت الانصراف</th><th>ساعات الدوام الفعلي</th>
+      </tr>
+      ${emp.records.map((r, i) => {
+        let rowClass = "";
+        if (r.isWeekend) rowClass = "weekend";
+        else if (r.isAbsent) rowClass = "absent";
+        else if (r.lateMins > 0) rowClass = "late";
+        let badgeClass = "b-ok", badgeText = r.status;
+        if (r.isWeekend) { badgeClass = "b-weekend"; }
+        else if (r.isAbsent) { badgeClass = "b-absent"; }
+        else if (r.lateMins > 0) { badgeClass = "b-late"; }
+        else if (r.isAutoDepart) { badgeClass = "b-auto"; }
+        const lateText = r.lateMins > 0 ? `<span style="color:#d97706;font-weight:700">${r.lateMins} دقيقة</span>` : (r.isAbsent || r.isWeekend ? "—" : '<span style="color:#059669">في الوقت</span>');
+        return `<tr class="${rowClass}">
+          <td>${i + 1}</td>
+          <td style="text-align:right;padding-right:8px">${r.date}</td>
+          <td><span class="badge ${badgeClass}">${r.status}</span></td>
+          <td>${r.arrival}</td>
+          <td>${lateText}</td>
+          <td>${r.departure}</td>
+          <td>${r.actualHours}</td>
+        </tr>`;
+      }).join("")}
+    </table>
+    <div class="footer">تاريخ الطباعة: ${new Date().toLocaleDateString("ar-SA")} — مدرسة عبيدة بن الحارث المتوسطة</div>
+    </body></html>`);
+    win.document.close(); win.print();
+  };
+
+  const statusBadge = (r) => {
+    if (r.isWeekend) return <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 font-bold">إجازة</span>;
+    if (r.isAbsent) return <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-bold">غياب</span>;
+    if (r.isPermission) return <span className="text-xs px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 font-bold">استئذان</span>;
+    if (r.isAutoDepart) return <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-bold">انصراف تلقائي</span>;
+    if (r.isComplete) return <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-bold">مكتملة</span>;
+    return <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 font-bold">{r.status}</span>;
+  };
+
+  return (
+    <div>
+      {/* شريط العنوان */}
+      <div className="page-header-bar mb-6" style={{background:"linear-gradient(135deg,#0369a1,#1e3a5f)"}}>
+        <h2 className="text-2xl font-black">📊 تحليل الحضور والانصراف</h2>
+        <p className="opacity-80 text-sm mt-1">رفع ملف Excel وتحليل حضور الموظف تلقائياً</p>
+      </div>
+
+      {/* رفع الملفات */}
+      <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 mb-6">
+        <label className="block cursor-pointer">
+          <div className="border-2 border-dashed border-blue-300 rounded-2xl p-8 text-center hover:border-blue-500 hover:bg-blue-50 transition-all">
+            <div className="text-5xl mb-3">📥</div>
+            <p className="font-black text-gray-700 text-lg mb-1">ارفع ملف Excel للحضور والانصراف</p>
+            <p className="text-sm text-gray-400 mb-3">يمكن رفع أكثر من ملف لتحليل عدة موظفين دفعة واحدة</p>
+            <span className="px-6 py-2.5 rounded-xl bg-blue-600 text-white font-bold text-sm inline-block">اختر الملفات (.xlsx)</span>
+            <input type="file" accept=".xlsx,.xls" multiple className="hidden"
+              onChange={e => handleFiles(Array.from(e.target.files))} />
+          </div>
+        </label>
+        {loading && (
+          <div className="text-center mt-4 text-blue-600 font-bold animate-pulse">⏳ جاري تحليل البيانات...</div>
+        )}
+      </div>
+
+      {/* قائمة الموظفين */}
+      {employees.length > 1 && (
+        <div className="flex gap-2 mb-5 flex-wrap">
+          {employees.map((emp, i) => (
+            <button key={i} onClick={() => setSelectedEmp(emp)}
+              className={"px-4 py-2.5 rounded-xl font-bold text-sm border-2 transition-all " +
+                (selectedEmp?.empName === emp.empName
+                  ? "bg-blue-600 text-white border-blue-600"
+                  : "bg-white text-gray-700 border-gray-200 hover:border-blue-300")}>
+              👤 {emp.empName}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* تقرير الموظف المحدد */}
+      {selectedEmp && (
+        <div>
+          {/* رأس التقرير */}
+          <div className="bg-gradient-to-l from-blue-700 to-blue-900 rounded-2xl p-6 mb-5 text-white flex items-center justify-between flex-wrap gap-3">
+            <div>
+              <h3 className="text-xl font-black mb-1">{selectedEmp.empName}</h3>
+              <p className="opacity-80 text-sm">{selectedEmp.empId} {selectedEmp.empRole && "— " + selectedEmp.empRole}</p>
+            </div>
+            <button onClick={() => printReport(selectedEmp)}
+              className="px-5 py-2.5 rounded-xl bg-white text-blue-700 font-black text-sm hover:bg-blue-50 transition-all">
+              🖨️ طباعة التقرير الكامل
+            </button>
+          </div>
+
+          {/* بطاقات الإحصاء */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+            {[
+              { label:"أيام الدوام", value: selectedEmp.stats.totalDays, icon:"📅", color:"bg-blue-50 text-blue-700 border-blue-200" },
+              { label:"أيام الحضور", value: selectedEmp.stats.presentDays, icon:"✅", color:"bg-green-50 text-green-700 border-green-200" },
+              { label:"أيام الغياب", value: selectedEmp.stats.absences, icon:"❌", color:"bg-red-50 text-red-700 border-red-200" },
+              { label:"الاستئذانات", value: selectedEmp.stats.permissions, icon:"🙋", color:"bg-purple-50 text-purple-700 border-purple-200" },
+              { label:"أيام التأخر", value: selectedEmp.stats.latedays, icon:"⚠️", color:"bg-amber-50 text-amber-700 border-amber-200" },
+              { label:"إجمالي دقائق التأخر", value: selectedEmp.stats.totalLateMins + "د", icon:"⏱️", color:"bg-amber-50 text-amber-700 border-amber-200" },
+              { label:"متوسط التأخر اليومي", value: selectedEmp.stats.avgLateMins + "د", icon:"📈", color:"bg-orange-50 text-orange-700 border-orange-200" },
+              { label:"انصراف تلقائي", value: selectedEmp.stats.autoDeparts, icon:"🔄", color:"bg-gray-50 text-gray-700 border-gray-200" },
+            ].map(s => (
+              <div key={s.label} className={"rounded-2xl p-4 border-2 text-center " + s.color}>
+                <div className="text-2xl mb-1">{s.icon}</div>
+                <div className="text-2xl font-black">{s.value}</div>
+                <div className="text-xs font-bold opacity-70 mt-0.5">{s.label}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* الجدول التفصيلي */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+              <h3 className="font-black text-gray-800">السجل التفصيلي اليومي</h3>
+              <span className="text-xs text-gray-400 font-bold">{selectedEmp.records.length} يوم</span>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gradient-to-l from-blue-700 to-blue-900 text-white">
+                    <th className="px-3 py-3 text-right text-xs font-black whitespace-nowrap">التاريخ</th>
+                    <th className="px-3 py-3 text-center text-xs font-black whitespace-nowrap">الحالة</th>
+                    <th className="px-3 py-3 text-center text-xs font-black whitespace-nowrap">توقيت الحضور</th>
+                    <th className="px-3 py-3 text-center text-xs font-black whitespace-nowrap">تأخر الصباح</th>
+                    <th className="px-3 py-3 text-center text-xs font-black whitespace-nowrap">توقيت الانصراف</th>
+                    <th className="px-3 py-3 text-center text-xs font-black whitespace-nowrap">ساعات الدوام الفعلي</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {selectedEmp.records.map((r, i) => {
+                    const rowBg = r.isWeekend
+                      ? "bg-gray-50 text-gray-400"
+                      : r.isAbsent
+                      ? "bg-red-50"
+                      : r.lateMins > 0
+                      ? "bg-amber-50"
+                      : i % 2 === 0 ? "" : "bg-blue-50/30";
+                    return (
+                      <tr key={i} className={rowBg}>
+                        <td className="px-3 py-2.5 text-right font-bold text-xs whitespace-nowrap">{r.date}</td>
+                        <td className="px-3 py-2.5 text-center">{statusBadge(r)}</td>
+                        <td className="px-3 py-2.5 text-center font-bold text-xs">
+                          {r.arrival === "-" ? <span className="text-gray-300">—</span> : (
+                            <span className={r.arrivalMins > toMins(WORK_START) ? "text-amber-600" : "text-green-600"}>
+                              {r.arrival}
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2.5 text-center font-black text-xs">
+                          {r.isWeekend || r.isAbsent ? <span className="text-gray-300">—</span>
+                            : r.lateMins > 0
+                            ? <span className="text-amber-600">⚠️ {r.lateMins} دقيقة</span>
+                            : <span className="text-green-600">✅ في الوقت</span>}
+                        </td>
+                        <td className="px-3 py-2.5 text-center font-bold text-xs">
+                          {r.departure === "-" ? <span className="text-gray-300">—</span> : (
+                            <span className={r.isAutoDepart ? "text-blue-600" : "text-gray-700"}>{r.departure}</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2.5 text-center font-bold text-xs text-gray-700">{r.actualHours}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {employees.length === 0 && !loading && (
+        <div className="bg-white rounded-2xl p-12 text-center text-gray-400 border border-dashed border-gray-200">
+          <div className="text-5xl mb-3">📊</div>
+          <p className="font-black text-gray-500 text-lg mb-1">ارفع ملف Excel للبدء</p>
+          <p className="text-sm">قم برفع تقرير الحضور والانصراف من نظام نور أو أي نظام آخر</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function SchoolWebsite() {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
@@ -8133,6 +8521,7 @@ export default function SchoolWebsite() {
     { id: "honorboard",    label: "لوحة الشرف",         icon: "🏆" },
     { id: "tasks",         label: "تتبع المهام",        icon: "✅" },
     { id: "absencestats",  label: "إحصائيات الغياب",   icon: "📊" },
+    { id: "attendancereport", label: "تحليل الحضور والانصراف", icon: "🗂️" },
   ];
 
   return (
@@ -8359,6 +8748,7 @@ export default function SchoolWebsite() {
         {page === "honorboard"    && <HonorBoardPage classList={classList} />}
         {page === "tasks"         && <TasksPage teachers={teachers} />}
         {page === "absencestats"  && <AbsenceStatsPage teachers={teachers} attendance={attendance} week={week} />}
+        {page === "attendancereport" && <AttendanceAnalysisPage />}
         {page === "settings"      && <SettingsPage teachers={teachers} setTeachers={setTeachers} saveTeachers={saveTeachers} week={week} setWeek={setWeek} saveWeek={saveWeek} users={users} siteFont={siteFont} setSiteFont={setSiteFont} saveSiteFont={saveSiteFont} />}
       </main>
       </div>{/* end relative z-10 */}
