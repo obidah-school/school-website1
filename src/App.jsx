@@ -5015,7 +5015,6 @@ function SMSPage({ teachers, attendance, week, classList }) {
 
   // ===== SEND FUNCTION — مباشر بدون خادم وسيط =====
   const sendSMS = async (numbers, message) => {
-    if (!apiKey.trim()) { setResult({ ok:false, topMsg:"⚙️ أدخل API Key في الإعدادات أولاً" }); return; }
     if (!numbers?.trim()) { setResult({ ok:false, topMsg:"📞 أدخل رقماً واحداً على الأقل" }); return; }
     if (!message.trim()) { setResult({ ok:false, topMsg:"✏️ اكتب نص الرسالة" }); return; }
     setSending(true); setResult(null);
