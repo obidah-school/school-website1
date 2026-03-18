@@ -7,7 +7,7 @@ module.exports = async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
   const { apiKey: clientKey, numbers, message, sender } = req.body || {};
- const apiKey = clientKey || process.env.SMS_API_KEY || "";
+const apiKey = clientKey || process.env.SMS_API_KEY || "";
 const senderName = sender || process.env.SMS_SENDER || "School1";
 
   if (!apiKey || !numbers || !message) {
