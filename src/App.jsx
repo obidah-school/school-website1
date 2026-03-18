@@ -8029,6 +8029,7 @@ function AttendanceAnalysisPage() {
       reader.onload = (e) => {
         try {
           const data = new Uint8Array(e.target.result);
+          const XLSX = window.XLSX;
           const workbook = XLSX.read(data, { type: "array" });
           const ws = workbook.Sheets[workbook.SheetNames[0]];
           const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
@@ -8139,6 +8140,15 @@ function AttendanceAnalysisPage() {
 
   const handleFiles = async (files) => {
     setLoading(true);
+    // تحميل مكتبة XLSX إذا لم تكن محملة
+    if (!window.XLSX) {
+      await new Promise((resolve, reject) => {
+        const s = document.createElement("script");
+        s.src = "https://unpkg.com/xlsx/dist/xlsx.full.min.js";
+        s.onload = resolve; s.onerror = reject;
+        document.head.appendChild(s);
+      });
+    }
     const results = [];
     for (const file of files) {
       const emp = await parseExcel(file);
@@ -8146,6 +8156,7 @@ function AttendanceAnalysisPage() {
     }
     setEmployees(results);
     if (results.length === 1) setSelectedEmp(results[0]);
+    else if (results.length > 1) setSelectedEmp(results[0]);
     setLoading(false);
   };
 
