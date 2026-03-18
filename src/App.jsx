@@ -8009,22 +8009,27 @@ function AttendanceAnalysisPage() {
   const [loading, setLoading] = useState(false);
   const [selectedEmp, setSelectedEmp] = useState(null);
   const [timeFormat, setTimeFormat] = useState("24");
-  const [workStartInput, setWorkStartInput] = useState("07:00");
-  const [workEndInput, setWorkEndInput] = useState("14:00");
-  const WORK_START = workStartInput;
-  const WORK_END = workEndInput;
+  const [workStart, setWorkStart] = useState("07:00");
+  const [workEnd, setWorkEnd] = useState("14:00");
+  const [activeTab, setActiveTab] = useState("summary"); // summary | details | chart
 
   const toMins = (t) => {
-    if (!t || t === "-") return null;
-    const [h, m] = t.split(":").map(Number);
+    if (!t || t === "-" || t === "00:00") return null;
+    const parts = t.split(":");
+    if (parts.length < 2) return null;
+    const [h, m] = parts.map(Number);
+    if (isNaN(h) || isNaN(m)) return null;
     return h * 60 + m;
   };
 
-  const fmtMins = (mins) => {
-    if (mins === null || mins === undefined) return "—";
+  const fmtMins = (mins, showSign = false) => {
+    if (mins === null || mins === undefined || mins === 0) return "—";
+    const sign = showSign && mins > 0 ? "+" : "";
     const h = Math.floor(Math.abs(mins) / 60);
     const m = Math.abs(mins) % 60;
-    return (h > 0 ? h + "س " : "") + (m > 0 ? m + "د" : (h > 0 ? "" : "0د"));
+    if (h > 0 && m > 0) return sign + h + "س " + m + "د";
+    if (h > 0) return sign + h + " ساعة";
+    return sign + m + " دقيقة";
   };
 
   const fmtTime = (t) => {
@@ -8033,9 +8038,28 @@ function AttendanceAnalysisPage() {
       const [h, m] = t.split(":").map(Number);
       const ampm = h >= 12 ? "م" : "ص";
       const h12 = h % 12 || 12;
-      return h12 + ":" + String(m).padStart(2,"0") + " " + ampm;
+      return h12 + ":" + String(m).padStart(2, "0") + " " + ampm;
     }
     return t;
+  };
+
+  const getRating = (stats) => {
+    const { totalDays, absences, latedays, totalLateMins, earlyDays } = stats;
+    if (totalDays === 0) return { label: "لا بيانات", color: "bg-gray-100 text-gray-600", score: 0, icon: "❓" };
+    const absenceRate = absences / totalDays;
+    const lateRate = latedays / totalDays;
+    const avgLate = totalDays > 0 ? totalLateMins / totalDays : 0;
+    let score = 100;
+    score -= absenceRate * 40;
+    score -= lateRate * 20;
+    score -= (avgLate / 60) * 15;
+    score -= (earlyDays / totalDays) * 15;
+    score = Math.max(0, Math.min(100, score));
+    if (score >= 90) return { label: "ممتاز", color: "bg-green-100 text-green-800", score: Math.round(score), icon: "🌟" };
+    if (score >= 75) return { label: "جيد جداً", color: "bg-teal-100 text-teal-800", score: Math.round(score), icon: "✅" };
+    if (score >= 60) return { label: "جيد", color: "bg-blue-100 text-blue-800", score: Math.round(score), icon: "👍" };
+    if (score >= 45) return { label: "مقبول", color: "bg-amber-100 text-amber-800", score: Math.round(score), icon: "⚠️" };
+    return { label: "يحتاج متابعة", color: "bg-red-100 text-red-800", score: Math.round(score), icon: "🚨" };
   };
 
   const parseExcel = (file) => {
@@ -8049,13 +8073,14 @@ function AttendanceAnalysisPage() {
           const ws = workbook.Sheets[workbook.SheetNames[0]];
           const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
 
-          // استخراج اسم الموظف
-          let empName = "موظف غير محدد", empId = "", empRole = "";
+          let empName = "موظف غير محدد", empId = "", empRole = "", dateRange = "";
           for (let i = 0; i < Math.min(5, rows.length); i++) {
             const cell = rows[i].find(c => typeof c === "string" && c.includes("من:"));
             if (cell) {
               const lines = cell.split("\n");
-              const infoLine = lines.find(l => l.includes("-")) || lines[lines.length - 1];
+              const rangeLine = lines.find(l => l.includes("من:")) || "";
+              dateRange = rangeLine.trim();
+              const infoLine = lines.find(l => l.includes("-") && !l.includes("من:")) || lines[lines.length - 1];
               const parts = infoLine.split("-").map(s => s.trim());
               empName = parts[0] || "موظف";
               empId = parts[1] || "";
@@ -8064,93 +8089,103 @@ function AttendanceAnalysisPage() {
             }
           }
 
-          // إيجاد صف الرؤوس
           let headerRow = -1;
           for (let i = 0; i < rows.length; i++) {
-            if (rows[i].includes("التاريخ") || rows[i].includes("حالة التحضير")) {
-              headerRow = i; break;
-            }
+            if (rows[i].some(c => String(c).includes("التاريخ"))) { headerRow = i; break; }
           }
           if (headerRow === -1) { resolve(null); return; }
 
           const headers = rows[headerRow];
           const colIdx = {
-            date: headers.findIndex(h => h === "التاريخ"),
+            date: headers.findIndex(h => String(h).includes("التاريخ")),
             status: headers.findIndex(h => String(h).includes("حالة")),
             arrival: headers.findIndex(h => String(h).includes("توقيت الحضور")),
-            departure: headers.findIndex(h => String(h).includes("توقيت الإنصراف")),
+            departure: headers.findIndex(h => String(h).includes("توقيت الإنصراف") || String(h).includes("توقيت الانصراف")),
             actualHours: headers.findIndex(h => String(h).includes("الفعلي")),
-            early: headers.findIndex(h => String(h).includes("مبكر")),
           };
 
-          const workStart = toMins(WORK_START);
+          const wsMinutes = toMins(workStart) || 7 * 60;
+          const weMinutes = toMins(workEnd) || 14 * 60;
           const records = [];
 
           for (let i = headerRow + 1; i < rows.length; i++) {
             const row = rows[i];
-            if (!row[colIdx.date] || String(row[colIdx.date]).includes("المجموع")) continue;
+            const dateVal = String(row[colIdx.date] || "").trim();
+            if (!dateVal || dateVal.includes("المجموع") || dateVal === "") continue;
 
-            const date = String(row[colIdx.date] || "").trim();
             const status = String(row[colIdx.status] || "").trim();
             const arrival = String(row[colIdx.arrival] || "").trim();
             const departure = String(row[colIdx.departure] || "").trim();
             const actualHours = String(row[colIdx.actualHours] || "").trim();
 
-            // تحديد نوع اليوم
-            const isWeekend = date.includes("الجمعة") || date.includes("السبت");
+            const isWeekend = dateVal.includes("الجمعة") || dateVal.includes("السبت");
             const isAbsent = status.includes("غياب");
             const isPermission = status.includes("إذن") || status.includes("استئذان") || status.includes("إجازة");
             const isAutoDepart = status.includes("تلقائي");
             const isComplete = status.includes("مكتملة");
 
             const arrivalMins = toMins(arrival);
-            const lateMins = (arrivalMins !== null && !isAbsent && !isWeekend)
-              ? Math.max(0, arrivalMins - workStart)
-              : 0;
-
             const departureMins = toMins(departure);
-            const workEnd = toMins(WORK_END);
-            const earlyDepartMins = (departureMins !== null && !isAbsent && !isWeekend && !isAutoDepart && departureMins < workEnd)
-              ? workEnd - departureMins
-              : 0;
+
+            // تأخر الصباح = وقت الحضور - وقت بدء الدوام
+            const lateMins = (arrivalMins !== null && !isAbsent && !isWeekend)
+              ? Math.max(0, arrivalMins - wsMinutes) : 0;
+
+            // للانصراف التلقائي: النظام يضيف 14 ساعة على وقت الحضور
+            // وقت الخروج الحقيقي = وقت الانصراف التلقائي (لأن النظام وضعه)
+            // نحسب: وقت الانصراف التلقائي - وقت نهاية الدوام الرسمي
+            const autoExtraMins = (isAutoDepart && departureMins !== null && !isAbsent && !isWeekend)
+              ? Math.max(0, departureMins - weMinutes) : 0;
+
+            // الانصراف المبكر = أقل من وقت نهاية الدوام (للأيام المكتملة فقط)
+            const earlyDepartMins = (!isAutoDepart && !isAbsent && !isWeekend && departureMins !== null && departureMins < weMinutes)
+              ? weMinutes - departureMins : 0;
+
+            // تصنيف اليوم
+            let dayType = "present";
+            if (isWeekend) dayType = "weekend";
+            else if (isAbsent) dayType = "absent";
+            else if (isPermission) dayType = "permission";
+            else if (isAutoDepart) dayType = "auto";
+            else if (isComplete) dayType = "complete";
 
             records.push({
-              date, status, arrival, departure, actualHours,
+              date: dateVal, status, arrival, departure, actualHours,
               isWeekend, isAbsent, isPermission, isAutoDepart, isComplete,
-              lateMins, earlyDepartMins, departureMins, arrivalMins,
+              lateMins, earlyDepartMins, autoExtraMins,
+              arrivalMins, departureMins, dayType,
             });
           }
 
-          // الإحصائيات
           const workdays = records.filter(r => !r.isWeekend);
-          const absences = workdays.filter(r => r.isAbsent).length;
-          const permissions = workdays.filter(r => r.isPermission).length;
-          const latedays = workdays.filter(r => r.lateMins > 0);
-          const totalLateMins = latedays.reduce((s, r) => s + r.lateMins, 0);
-          const autoDeparts = workdays.filter(r => r.isAutoDepart).length;
-          const presentDays = workdays.filter(r => !r.isAbsent).length;
+          const presentDays = workdays.filter(r => !r.isAbsent);
+          const absenceDays = workdays.filter(r => r.isAbsent);
+          const lateDays = workdays.filter(r => r.lateMins > 0);
           const earlyDays = workdays.filter(r => r.earlyDepartMins > 0);
+          const autoDays = workdays.filter(r => r.isAutoDepart);
+          const permDays = workdays.filter(r => r.isPermission);
+          const totalLateMins = lateDays.reduce((s, r) => s + r.lateMins, 0);
           const totalEarlyMins = earlyDays.reduce((s, r) => s + r.earlyDepartMins, 0);
+          const totalAutoExtraMins = autoDays.reduce((s, r) => s + r.autoExtraMins, 0);
 
-          resolve({
-            empName, empId, empRole,
-            records,
-            stats: {
-              totalDays: workdays.length,
-              presentDays,
-              absences,
-              permissions,
-              latedays: latedays.length,
-              totalLateMins,
-              avgLateMins: latedays.length > 0 ? Math.round(totalLateMins / latedays.length) : 0,
-              autoDeparts,
-              earlyDays: earlyDays.length,
-              totalEarlyMins,
-            }
-          });
-        } catch (err) {
-          console.error(err); resolve(null);
-        }
+          const stats = {
+            totalDays: workdays.length,
+            presentDays: presentDays.length,
+            absences: absenceDays.length,
+            permissions: permDays.length,
+            latedays: lateDays.length,
+            totalLateMins,
+            avgLateMins: lateDays.length > 0 ? Math.round(totalLateMins / lateDays.length) : 0,
+            earlyDays: earlyDays.length,
+            totalEarlyMins,
+            autoDeparts: autoDays.length,
+            totalAutoExtraMins,
+            avgAutoExtraMins: autoDays.length > 0 ? Math.round(totalAutoExtraMins / autoDays.length) : 0,
+            attendanceRate: workdays.length > 0 ? Math.round((presentDays.length / workdays.length) * 100) : 0,
+          };
+
+          resolve({ empName, empId, empRole, dateRange, records, stats });
+        } catch (err) { console.error(err); resolve(null); }
       };
       reader.readAsArrayBuffer(file);
     });
@@ -8158,7 +8193,6 @@ function AttendanceAnalysisPage() {
 
   const handleFiles = async (files) => {
     setLoading(true);
-    // تحميل مكتبة XLSX إذا لم تكن محملة
     if (!window.XLSX) {
       await new Promise((resolve, reject) => {
         const s = document.createElement("script");
@@ -8173,268 +8207,455 @@ function AttendanceAnalysisPage() {
       if (emp) results.push(emp);
     }
     setEmployees(results);
-    if (results.length === 1) setSelectedEmp(results[0]);
-    else if (results.length > 1) setSelectedEmp(results[0]);
+    setSelectedEmp(results[0] || null);
     setLoading(false);
   };
 
   const printReport = (emp) => {
-    const workStart = toMins(WORK_START);
+    const rating = getRating(emp.stats);
     const win = window.open("", "_blank");
+    const ratingBar = (val, max, color) =>
+      `<div style="background:#f0f0f0;border-radius:4px;height:10px;width:100%;margin-top:4px">
+        <div style="background:${color};height:10px;border-radius:4px;width:${Math.min(100,Math.round(val/max*100))}%"></div>
+      </div>`;
+
     win.document.write(`<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8"/>
     <title>تقرير حضور ${emp.empName}</title>
     <style>
-      * { box-sizing: border-box; margin: 0; padding: 0; }
-      body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; direction: rtl; padding: 24px; font-size: 12px; color: #1a1a1a; }
-      .header { background: linear-gradient(135deg, #0d9488, #065f46); color: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; }
-      .header h1 { font-size: 18px; font-weight: 800; margin-bottom: 4px; }
-      .header p { opacity: 0.85; font-size: 12px; }
-      .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 20px; }
-      .stat { background: #f8fffe; border: 1.5px solid #0d9488; border-radius: 8px; padding: 10px; text-align: center; }
-      .stat .val { font-size: 22px; font-weight: 900; color: #0d9488; }
-      .stat .lbl { font-size: 10px; color: #666; margin-top: 2px; }
-      .stat.red { border-color: #dc2626; } .stat.red .val { color: #dc2626; }
-      .stat.amber { border-color: #d97706; } .stat.amber .val { color: #d97706; }
-      .stat.blue { border-color: #2563eb; } .stat.blue .val { color: #2563eb; }
-      table { width: 100%; border-collapse: collapse; margin-top: 8px; }
-      th { background: #0d9488; color: white; padding: 8px 6px; font-size: 10px; font-weight: 700; text-align: center; }
-      td { padding: 6px 5px; text-align: center; font-size: 11px; border-bottom: 1px solid #f0f0f0; }
-      tr:nth-child(even) td { background: #f8fffe; }
-      .absent td { background: #fff1f2 !important; color: #991b1b; }
-      .late td { background: #fffbeb !important; }
-      .weekend td { background: #f5f5f5 !important; color: #9ca3af; }
-      .badge { display: inline-block; padding: 2px 6px; border-radius: 10px; font-size: 10px; font-weight: 700; }
-      .b-absent { background: #fee2e2; color: #991b1b; }
-      .b-late { background: #fef3c7; color: #92400e; }
-      .b-ok { background: #d1fae5; color: #065f46; }
-      .b-auto { background: #dbeafe; color: #1e40af; }
-      .b-weekend { background: #f3f4f6; color: #6b7280; }
-      .footer { margin-top: 20px; text-align: center; font-size: 10px; color: #9ca3af; border-top: 1px dashed #ccc; padding-top: 12px; }
-      @media print { body { padding: 10px; } }
-    </style>
-    </head><body>
+      *{box-sizing:border-box;margin:0;padding:0;}
+      body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;direction:rtl;padding:20px;font-size:11px;color:#111;}
+      .header{background:linear-gradient(135deg,#0d9488,#065f46);color:white;padding:16px 20px;border-radius:10px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;}
+      .header h1{font-size:16px;font-weight:800;} .header p{opacity:.8;font-size:11px;margin-top:2px;}
+      .rating-badge{background:rgba(255,255,255,.2);padding:8px 14px;border-radius:8px;text-align:center;}
+      .rating-badge .score{font-size:24px;font-weight:900;} .rating-badge .lbl{font-size:10px;opacity:.9;}
+      .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px;}
+      .stat{border:1.5px solid #e5e7eb;border-radius:8px;padding:8px;text-align:center;}
+      .stat .val{font-size:18px;font-weight:900;} .stat .lbl{font-size:9px;color:#666;margin-top:1px;}
+      .stat.red{border-color:#fca5a5;background:#fff1f2;} .stat.red .val{color:#dc2626;}
+      .stat.amber{border-color:#fcd34d;background:#fffbeb;} .stat.amber .val{color:#d97706;}
+      .stat.green{border-color:#6ee7b7;background:#f0fdf4;} .stat.green .val{color:#059669;}
+      .stat.blue{border-color:#93c5fd;background:#eff6ff;} .stat.blue .val{color:#2563eb;}
+      .stat.orange{border-color:#fdba74;background:#fff7ed;} .stat.orange .val{color:#ea580c;}
+      .section{margin-bottom:14px;}
+      .section-title{font-weight:800;font-size:12px;color:#0d9488;border-right:3px solid #0d9488;padding-right:8px;margin-bottom:8px;}
+      table{width:100%;border-collapse:collapse;}
+      th{background:#0d9488;color:white;padding:6px 4px;font-size:9px;font-weight:700;text-align:center;}
+      td{padding:5px 4px;text-align:center;font-size:10px;border-bottom:1px solid #f0f0f0;}
+      .row-absent td{background:#fff1f2;color:#991b1b;}
+      .row-late td{background:#fffbeb;}
+      .row-auto td{background:#eff6ff;}
+      .row-weekend td{background:#f9fafb;color:#9ca3af;}
+      .badge{display:inline-block;padding:1px 5px;border-radius:8px;font-size:9px;font-weight:700;}
+      .b-absent{background:#fee2e2;color:#991b1b;} .b-late{background:#fef3c7;color:#92400e;}
+      .b-ok{background:#d1fae5;color:#065f46;} .b-auto{background:#dbeafe;color:#1e40af;}
+      .b-weekend{background:#f3f4f6;color:#6b7280;} .b-early{background:#ffedd5;color:#c2410c;}
+      .footer{margin-top:16px;text-align:center;font-size:9px;color:#9ca3af;border-top:1px dashed #ccc;padding-top:8px;}
+      @media print{body{padding:8px;}}
+    </style></head><body>
+
     <div class="header">
-      <h1>🏫 تقرير الحضور والانصراف</h1>
-      <p>مدرسة عبيدة بن الحارث المتوسطة</p>
-      <p style="margin-top:8px;font-size:14px;font-weight:700;">${emp.empName}</p>
-      <p>${emp.empId} ${emp.empRole ? "— " + emp.empRole : ""}</p>
+      <div>
+        <h1>🏫 تقرير الحضور والانصراف</h1>
+        <p>مدرسة عبيدة بن الحارث المتوسطة</p>
+        <p style="margin-top:6px;font-size:13px;font-weight:700;">${emp.empName}</p>
+        <p>${emp.empId}${emp.empRole ? " — " + emp.empRole : ""}</p>
+        <p style="margin-top:2px;opacity:.7;">${emp.dateRange}</p>
+      </div>
+      <div class="rating-badge">
+        <div>${rating.icon}</div>
+        <div class="score">${rating.score}%</div>
+        <div class="lbl">${rating.label}</div>
+      </div>
     </div>
+
     <div class="stats">
+      <div class="stat green"><div class="val">${emp.stats.attendanceRate}%</div><div class="lbl">نسبة الحضور</div></div>
       <div class="stat"><div class="val">${emp.stats.totalDays}</div><div class="lbl">أيام الدوام</div></div>
+      <div class="stat green"><div class="val">${emp.stats.presentDays}</div><div class="lbl">أيام الحضور</div></div>
       <div class="stat red"><div class="val">${emp.stats.absences}</div><div class="lbl">أيام الغياب</div></div>
       <div class="stat amber"><div class="val">${emp.stats.latedays}</div><div class="lbl">أيام التأخر</div></div>
       <div class="stat amber"><div class="val">${emp.stats.totalLateMins}د</div><div class="lbl">إجمالي دقائق التأخر</div></div>
-      <div class="stat blue"><div class="val">${emp.stats.presentDays}</div><div class="lbl">أيام الحضور</div></div>
-      <div class="stat blue"><div class="val">${emp.stats.avgLateMins}د</div><div class="lbl">متوسط التأخر</div></div>
-      <div class="stat"><div class="val">${emp.stats.autoDeparts}</div><div class="lbl">انصراف تلقائي</div></div>
+      <div class="stat amber"><div class="val">${emp.stats.avgLateMins}د</div><div class="lbl">متوسط التأخر</div></div>
+      <div class="stat blue"><div class="val">${emp.stats.autoDeparts}</div><div class="lbl">انصراف تلقائي</div></div>
+      <div class="stat orange"><div class="val">${emp.stats.earlyDays}</div><div class="lbl">انصراف مبكر</div></div>
+      <div class="stat orange"><div class="val">${emp.stats.totalEarlyMins}د</div><div class="lbl">إجمالي الانصراف المبكر</div></div>
+      <div class="stat blue"><div class="val">${emp.stats.totalAutoExtraMins > 0 ? Math.floor(emp.stats.totalAutoExtraMins/60)+"س" : "0"}</div><div class="lbl">وقت تلقائي إضافي</div></div>
       <div class="stat"><div class="val">${emp.stats.permissions}</div><div class="lbl">الاستئذانات</div></div>
     </div>
-    <table>
-      <tr>
-        <th>#</th><th>التاريخ</th><th>الحالة</th>
-        <th>توقيت الحضور</th><th>تأخر الصباح</th>
-        <th>توقيت الانصراف</th><th>ساعات الدوام الفعلي</th>
-      </tr>
-      ${emp.records.map((r, i) => {
-        let rowClass = "";
-        if (r.isWeekend) rowClass = "weekend";
-        else if (r.isAbsent) rowClass = "absent";
-        else if (r.lateMins > 0) rowClass = "late";
-        let badgeClass = "b-ok", badgeText = r.status;
-        if (r.isWeekend) { badgeClass = "b-weekend"; }
-        else if (r.isAbsent) { badgeClass = "b-absent"; }
-        else if (r.lateMins > 0) { badgeClass = "b-late"; }
-        else if (r.isAutoDepart) { badgeClass = "b-auto"; }
-        const lateText = r.lateMins > 0 ? `<span style="color:#d97706;font-weight:700">${r.lateMins} دقيقة</span>` : (r.isAbsent || r.isWeekend ? "—" : '<span style="color:#059669">في الوقت</span>');
-        return `<tr class="${rowClass}">
-          <td>${i + 1}</td>
-          <td style="text-align:right;padding-right:8px">${r.date}</td>
-          <td><span class="badge ${badgeClass}">${r.status}</span></td>
-          <td>${r.arrival}</td>
-          <td>${lateText}</td>
-          <td>${r.departure}</td>
-          <td>${r.actualHours}</td>
-        </tr>`;
-      }).join("")}
-    </table>
-    <div class="footer">تاريخ الطباعة: ${new Date().toLocaleDateString("ar-SA")} — مدرسة عبيدة بن الحارث المتوسطة</div>
+
+    <div class="section">
+      <div class="section-title">السجل التفصيلي اليومي</div>
+      <table>
+        <tr>
+          <th>#</th><th>التاريخ</th><th>الحالة</th>
+          <th>توقيت الحضور</th><th>تأخر الصباح</th>
+          <th>توقيت الانصراف</th><th>الانصراف التلقائي (إضافي)</th>
+          <th>انصراف مبكر</th><th>ساعات الدوام الفعلي</th>
+        </tr>
+        ${emp.records.map((r, i) => {
+          let cls = "";
+          if (r.isWeekend) cls = "row-weekend";
+          else if (r.isAbsent) cls = "row-absent";
+          else if (r.isAutoDepart) cls = "row-auto";
+          else if (r.lateMins > 0) cls = "row-late";
+
+          let badgeCls = "b-ok";
+          if (r.isWeekend) badgeCls = "b-weekend";
+          else if (r.isAbsent) badgeCls = "b-absent";
+          else if (r.isAutoDepart) badgeCls = "b-auto";
+          else if (r.lateMins > 0) badgeCls = "b-late";
+          else if (r.earlyDepartMins > 0) badgeCls = "b-early";
+
+          const lateCell = r.lateMins > 0 ? `<span style="color:#d97706;font-weight:700">${r.lateMins}د</span>` : (r.isAbsent||r.isWeekend?"—":"✅");
+          const autoCell = r.isAutoDepart && r.autoExtraMins > 0 ? `<span style="color:#2563eb;font-weight:700">${Math.floor(r.autoExtraMins/60)}س${r.autoExtraMins%60>0?" "+r.autoExtraMins%60+"د":""} إضافي</span>` : "—";
+          const earlyCell = r.earlyDepartMins > 0 ? `<span style="color:#ea580c;font-weight:700">${r.earlyDepartMins}د مبكر</span>` : "—";
+
+          return `<tr class="${cls}">
+            <td>${i+1}</td>
+            <td style="text-align:right;padding-right:6px">${r.date}</td>
+            <td><span class="badge ${badgeCls}">${r.status}</span></td>
+            <td>${r.arrival}</td><td>${lateCell}</td>
+            <td>${r.departure}</td><td>${autoCell}</td>
+            <td>${earlyCell}</td><td>${r.actualHours}</td>
+          </tr>`;
+        }).join("")}
+      </table>
+    </div>
+    <div class="footer">تاريخ الطباعة: ${new Date().toLocaleDateString("ar-SA")} — وقت بدء الدوام: ${workStart} — وقت الانتهاء: ${workEnd}</div>
     </body></html>`);
     win.document.close(); win.print();
   };
 
-  const statusBadge = (r) => {
-    if (r.isWeekend) return <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 font-bold">إجازة</span>;
-    if (r.isAbsent) return <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-bold">غياب</span>;
-    if (r.isPermission) return <span className="text-xs px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 font-bold">استئذان</span>;
-    if (r.isAutoDepart) return <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-bold">انصراف تلقائي</span>;
-    if (r.isComplete) return <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-bold">مكتملة</span>;
-    return <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 font-bold">{r.status}</span>;
-  };
+  const emp = selectedEmp;
+  const rating = emp ? getRating(emp.stats) : null;
+
+  const StatCard = ({ icon, label, value, color, sub }) => (
+    <div className={"rounded-2xl p-4 border-2 text-center " + color}>
+      <div className="text-2xl mb-1">{icon}</div>
+      <div className="text-xl font-black">{value}</div>
+      <div className="text-xs font-bold opacity-70 mt-0.5">{label}</div>
+      {sub && <div className="text-xs opacity-50 mt-0.5">{sub}</div>}
+    </div>
+  );
 
   return (
     <div>
-      {/* شريط العنوان */}
-      <div className="page-header-bar mb-6" style={{background:"linear-gradient(135deg,#0369a1,#1e3a5f)"}}>
+      <div className="page-header-bar mb-5" style={{background:"linear-gradient(135deg,#0369a1,#1e3a5f)"}}>
         <h2 className="text-2xl font-black">📊 تحليل الحضور والانصراف</h2>
-        <p className="opacity-80 text-sm mt-1">رفع ملف Excel وتحليل حضور الموظف تلقائياً</p>
+        <p className="opacity-80 text-sm mt-1">تقرير شامل ودقيق لحضور الموظف</p>
       </div>
 
-      {/* إعدادات الوقت */}
-      <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 mb-4 flex flex-wrap gap-4 items-end">
-        <div>
-          <label className="text-xs font-black text-gray-500 mb-1 block">⏰ وقت بدء الدوام</label>
-          <input type="time" value={workStartInput} onChange={e => setWorkStartInput(e.target.value)}
-            className="px-3 py-2 rounded-xl border-2 border-gray-200 focus:border-blue-400 focus:outline-none text-sm font-bold" />
-        </div>
-        <div>
-          <label className="text-xs font-black text-gray-500 mb-1 block">🏁 وقت انتهاء الدوام</label>
-          <input type="time" value={workEndInput} onChange={e => setWorkEndInput(e.target.value)}
-            className="px-3 py-2 rounded-xl border-2 border-gray-200 focus:border-blue-400 focus:outline-none text-sm font-bold" />
-        </div>
-        <div>
-          <label className="text-xs font-black text-gray-500 mb-1 block">🕐 صيغة الوقت</label>
-          <select value={timeFormat} onChange={e => setTimeFormat(e.target.value)}
-            className="px-4 py-2 rounded-xl border-2 border-gray-200 focus:border-blue-400 focus:outline-none text-sm font-bold bg-white">
-            <option value="24">24 ساعة</option>
-            <option value="12">12 ساعة (ص/م)</option>
-          </select>
+      {/* إعدادات الدوام */}
+      <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 mb-4">
+        <p className="text-xs font-black text-gray-500 mb-3">⚙️ إعدادات أوقات الدوام</p>
+        <div className="flex flex-wrap gap-4 items-end">
+          <div>
+            <label className="text-xs font-bold text-gray-500 mb-1 block">⏰ بداية الدوام</label>
+            <input type="time" value={workStart} onChange={e => setWorkStart(e.target.value)}
+              className="px-3 py-2 rounded-xl border-2 border-gray-200 focus:border-blue-400 focus:outline-none text-sm font-bold" />
+          </div>
+          <div>
+            <label className="text-xs font-bold text-gray-500 mb-1 block">🏁 نهاية الدوام الرسمي</label>
+            <input type="time" value={workEnd} onChange={e => setWorkEnd(e.target.value)}
+              className="px-3 py-2 rounded-xl border-2 border-gray-200 focus:border-blue-400 focus:outline-none text-sm font-bold" />
+          </div>
+          <div>
+            <label className="text-xs font-bold text-gray-500 mb-1 block">🕐 صيغة الوقت</label>
+            <select value={timeFormat} onChange={e => setTimeFormat(e.target.value)}
+              className="px-4 py-2 rounded-xl border-2 border-gray-200 focus:border-blue-400 focus:outline-none text-sm font-bold bg-white">
+              <option value="24">24 ساعة</option>
+              <option value="12">12 ساعة (ص/م)</option>
+            </select>
+          </div>
+          <div className="text-xs text-blue-600 bg-blue-50 rounded-xl px-3 py-2 font-bold">
+            💡 الانصراف التلقائي = النظام يضيف 14س على وقت الحضور<br/>
+            الوقت الإضافي = وقت الانصراف التلقائي − نهاية الدوام الرسمي
+          </div>
         </div>
       </div>
 
       {/* رفع الملفات */}
-      <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 mb-6">
+      <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 mb-5">
         <label className="block cursor-pointer">
-          <div className="border-2 border-dashed border-blue-300 rounded-2xl p-8 text-center hover:border-blue-500 hover:bg-blue-50 transition-all">
-            <div className="text-5xl mb-3">📥</div>
-            <p className="font-black text-gray-700 text-lg mb-1">ارفع ملف Excel للحضور والانصراف</p>
-            <p className="text-sm text-gray-400 mb-3">يمكن رفع أكثر من ملف لتحليل عدة موظفين دفعة واحدة</p>
-            <span className="px-6 py-2.5 rounded-xl bg-blue-600 text-white font-bold text-sm inline-block">اختر الملفات (.xlsx)</span>
+          <div className="border-2 border-dashed border-blue-300 rounded-2xl p-6 text-center hover:border-blue-500 hover:bg-blue-50 transition-all">
+            <div className="text-4xl mb-2">📥</div>
+            <p className="font-black text-gray-700 mb-1">ارفع ملف Excel للحضور والانصراف</p>
+            <p className="text-xs text-gray-400 mb-3">يمكن رفع أكثر من ملف لتحليل عدة موظفين</p>
+            <span className="px-5 py-2 rounded-xl bg-blue-600 text-white font-bold text-sm">اختر الملفات (.xlsx)</span>
             <input type="file" accept=".xlsx,.xls" multiple className="hidden"
               onChange={e => handleFiles(Array.from(e.target.files))} />
           </div>
         </label>
-        {loading && (
-          <div className="text-center mt-4 text-blue-600 font-bold animate-pulse">⏳ جاري تحليل البيانات...</div>
-        )}
+        {loading && <div className="text-center mt-3 text-blue-600 font-bold animate-pulse">⏳ جاري تحليل البيانات...</div>}
       </div>
 
       {/* قائمة الموظفين */}
       {employees.length > 1 && (
-        <div className="flex gap-2 mb-5 flex-wrap">
-          {employees.map((emp, i) => (
-            <button key={i} onClick={() => setSelectedEmp(emp)}
+        <div className="flex gap-2 mb-4 flex-wrap">
+          {employees.map((e, i) => (
+            <button key={i} onClick={() => setSelectedEmp(e)}
               className={"px-4 py-2.5 rounded-xl font-bold text-sm border-2 transition-all " +
-                (selectedEmp?.empName === emp.empName
-                  ? "bg-blue-600 text-white border-blue-600"
-                  : "bg-white text-gray-700 border-gray-200 hover:border-blue-300")}>
-              👤 {emp.empName}
+                (selectedEmp?.empName === e.empName ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-700 border-gray-200 hover:border-blue-300")}>
+              👤 {e.empName}
             </button>
           ))}
         </div>
       )}
 
-      {/* تقرير الموظف المحدد */}
-      {selectedEmp && (
+      {/* التقرير */}
+      {emp && rating && (
         <div>
-          {/* رأس التقرير */}
-          <div className="bg-gradient-to-l from-blue-700 to-blue-900 rounded-2xl p-6 mb-5 text-white flex items-center justify-between flex-wrap gap-3">
-            <div>
-              <h3 className="text-xl font-black mb-1">{selectedEmp.empName}</h3>
-              <p className="opacity-80 text-sm">{selectedEmp.empId} {selectedEmp.empRole && "— " + selectedEmp.empRole}</p>
+          {/* رأس الموظف */}
+          <div className="bg-gradient-to-l from-blue-800 to-blue-950 rounded-2xl p-5 mb-5 text-white">
+            <div className="flex items-start justify-between flex-wrap gap-4">
+              <div>
+                <h3 className="text-xl font-black mb-0.5">{emp.empName}</h3>
+                <p className="opacity-70 text-sm">{emp.empId}{emp.empRole ? " — " + emp.empRole : ""}</p>
+                {emp.dateRange && <p className="opacity-60 text-xs mt-1">{emp.dateRange}</p>}
+              </div>
+              <div className="flex items-center gap-4 flex-wrap">
+                {/* تقييم المستوى */}
+                <div className={`px-5 py-3 rounded-2xl text-center ${rating.color}`}>
+                  <div className="text-3xl">{rating.icon}</div>
+                  <div className="text-2xl font-black">{rating.score}%</div>
+                  <div className="text-xs font-black mt-0.5">{rating.label}</div>
+                </div>
+                {/* نسبة الحضور */}
+                <div className="text-center">
+                  <div className="text-4xl font-black text-green-300">{emp.stats.attendanceRate}%</div>
+                  <div className="text-xs opacity-70">نسبة الحضور</div>
+                  <div className="w-24 h-2 bg-white bg-opacity-20 rounded-full mt-1 overflow-hidden">
+                    <div className="h-full rounded-full bg-green-400 transition-all" style={{width: emp.stats.attendanceRate+"%"}}/>
+                  </div>
+                </div>
+                <button onClick={() => printReport(emp)}
+                  className="px-4 py-2.5 rounded-xl bg-white text-blue-700 font-black text-sm hover:bg-blue-50">
+                  🖨️ طباعة
+                </button>
+              </div>
             </div>
-            <button onClick={() => printReport(selectedEmp)}
-              className="px-5 py-2.5 rounded-xl bg-white text-blue-700 font-black text-sm hover:bg-blue-50 transition-all">
-              🖨️ طباعة التقرير الكامل
-            </button>
           </div>
 
           {/* بطاقات الإحصاء */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
-            {[
-              { label:"أيام الدوام", value: selectedEmp.stats.totalDays, icon:"📅", color:"bg-blue-50 text-blue-700 border-blue-200" },
-              { label:"أيام الحضور", value: selectedEmp.stats.presentDays, icon:"✅", color:"bg-green-50 text-green-700 border-green-200" },
-              { label:"أيام الغياب", value: selectedEmp.stats.absences, icon:"❌", color:"bg-red-50 text-red-700 border-red-200" },
-              { label:"الاستئذانات", value: selectedEmp.stats.permissions, icon:"🙋", color:"bg-purple-50 text-purple-700 border-purple-200" },
-              { label:"أيام التأخر", value: selectedEmp.stats.latedays, icon:"⚠️", color:"bg-amber-50 text-amber-700 border-amber-200" },
-              { label:"إجمالي دقائق التأخر", value: selectedEmp.stats.totalLateMins + "د", icon:"⏱️", color:"bg-amber-50 text-amber-700 border-amber-200" },
-              { label:"متوسط التأخر اليومي", value: selectedEmp.stats.avgLateMins + "د", icon:"📈", color:"bg-orange-50 text-orange-700 border-orange-200" },
-              { label:"انصراف تلقائي", value: selectedEmp.stats.autoDeparts, icon:"🔄", color:"bg-gray-50 text-gray-700 border-gray-200" },
-              { label:"أيام الانصراف المبكر", value: selectedEmp.stats.earlyDays, icon:"🏃", color:"bg-orange-50 text-orange-700 border-orange-200" },
-              { label:"إجمالي دقائق الانصراف المبكر", value: selectedEmp.stats.totalEarlyMins + "د", icon:"⬅️", color:"bg-orange-50 text-orange-700 border-orange-200" },
-            ].map(s => (
-              <div key={s.label} className={"rounded-2xl p-4 border-2 text-center " + s.color}>
-                <div className="text-2xl mb-1">{s.icon}</div>
-                <div className="text-2xl font-black">{s.value}</div>
-                <div className="text-xs font-bold opacity-70 mt-0.5">{s.label}</div>
-              </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 mb-5">
+            <StatCard icon="📅" label="أيام الدوام" value={emp.stats.totalDays} color="bg-blue-50 text-blue-700 border-blue-200" />
+            <StatCard icon="✅" label="أيام الحضور" value={emp.stats.presentDays} color="bg-green-50 text-green-700 border-green-200" />
+            <StatCard icon="❌" label="أيام الغياب" value={emp.stats.absences} color="bg-red-50 text-red-700 border-red-200"
+              sub={emp.stats.totalDays > 0 ? Math.round(emp.stats.absences/emp.stats.totalDays*100)+"% من الأيام" : ""} />
+            <StatCard icon="🙋" label="الاستئذانات" value={emp.stats.permissions} color="bg-purple-50 text-purple-700 border-purple-200" />
+            <StatCard icon="⚠️" label="أيام التأخر" value={emp.stats.latedays} color="bg-amber-50 text-amber-700 border-amber-200" />
+            <StatCard icon="⏱️" label="إجمالي دقائق التأخر" value={emp.stats.totalLateMins + "د"} color="bg-amber-50 text-amber-700 border-amber-200"
+              sub={"متوسط " + emp.stats.avgLateMins + "د/يوم"} />
+            <StatCard icon="🔄" label="انصراف تلقائي" value={emp.stats.autoDeparts} color="bg-blue-50 text-blue-700 border-blue-200"
+              sub={"وقت إضافي: " + fmtMins(emp.stats.totalAutoExtraMins)} />
+            <StatCard icon="🏃" label="انصراف مبكر" value={emp.stats.earlyDays} color="bg-orange-50 text-orange-700 border-orange-200"
+              sub={emp.stats.totalEarlyMins + "د إجمالي"} />
+          </div>
+
+          {/* تبويبات */}
+          <div className="flex gap-2 mb-4 flex-wrap">
+            {[{id:"summary",label:"📈 ملخص بصري"},{id:"details",label:"📋 السجل التفصيلي"},{id:"auto",label:"🔄 الانصراف التلقائي"}].map(t => (
+              <button key={t.id} onClick={() => setActiveTab(t.id)}
+                className={"px-4 py-2.5 rounded-xl font-bold text-sm border-2 transition-all " +
+                  (activeTab===t.id?"bg-blue-600 text-white border-blue-600":"bg-white text-gray-600 border-gray-200 hover:border-blue-300")}>
+                {t.label}
+              </button>
             ))}
           </div>
 
-          {/* الجدول التفصيلي */}
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-              <h3 className="font-black text-gray-800">السجل التفصيلي اليومي</h3>
-              <span className="text-xs text-gray-400 font-bold">{selectedEmp.records.length} يوم</span>
+          {/* ملخص بصري */}
+          {activeTab === "summary" && (
+            <div className="space-y-4">
+              {/* شريط الحضور */}
+              <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+                <h4 className="font-black text-gray-800 mb-4">📊 توزيع أيام الدوام</h4>
+                <div className="space-y-3">
+                  {[
+                    { label: "أيام الحضور", val: emp.stats.presentDays, total: emp.stats.totalDays, color: "bg-green-500", textColor: "text-green-700" },
+                    { label: "أيام الغياب", val: emp.stats.absences, total: emp.stats.totalDays, color: "bg-red-500", textColor: "text-red-700" },
+                    { label: "أيام التأخر", val: emp.stats.latedays, total: emp.stats.presentDays, color: "bg-amber-500", textColor: "text-amber-700" },
+                    { label: "انصراف تلقائي", val: emp.stats.autoDeparts, total: emp.stats.presentDays, color: "bg-blue-500", textColor: "text-blue-700" },
+                    { label: "انصراف مبكر", val: emp.stats.earlyDays, total: emp.stats.presentDays, color: "bg-orange-500", textColor: "text-orange-700" },
+                  ].map(item => (
+                    <div key={item.label}>
+                      <div className="flex justify-between mb-1">
+                        <span className={"text-xs font-bold " + item.textColor}>{item.label}</span>
+                        <span className={"text-xs font-black " + item.textColor}>{item.val} ({item.total > 0 ? Math.round(item.val/item.total*100) : 0}%)</span>
+                      </div>
+                      <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
+                        <div className={"h-full rounded-full transition-all " + item.color}
+                          style={{width: (item.total > 0 ? Math.min(100, item.val/item.total*100) : 0)+"%"}}/>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* ملخص التأخر والانصراف */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="bg-white rounded-2xl p-5 shadow-sm border border-amber-100">
+                  <h4 className="font-black text-amber-800 mb-3">⏱️ تفاصيل التأخر الصباحي</h4>
+                  {emp.stats.latedays === 0
+                    ? <p className="text-green-600 font-bold text-sm">✅ لا يوجد تأخر مسجّل</p>
+                    : <div className="space-y-2 text-sm">
+                        <div className="flex justify-between"><span className="text-gray-500">أيام التأخر:</span><span className="font-black text-amber-700">{emp.stats.latedays} يوم</span></div>
+                        <div className="flex justify-between"><span className="text-gray-500">إجمالي الدقائق:</span><span className="font-black text-amber-700">{emp.stats.totalLateMins} دقيقة</span></div>
+                        <div className="flex justify-between"><span className="text-gray-500">متوسط التأخر:</span><span className="font-black text-amber-700">{emp.stats.avgLateMins} دقيقة/يوم</span></div>
+                        <div className="flex justify-between"><span className="text-gray-500">معدل التأخر:</span><span className="font-black text-amber-700">{Math.round(emp.stats.latedays/emp.stats.totalDays*100)}% من أيام الدوام</span></div>
+                      </div>
+                  }
+                </div>
+                <div className="bg-white rounded-2xl p-5 shadow-sm border border-blue-100">
+                  <h4 className="font-black text-blue-800 mb-3">🔄 تفاصيل الانصراف التلقائي</h4>
+                  {emp.stats.autoDeparts === 0
+                    ? <p className="text-green-600 font-bold text-sm">✅ لا يوجد انصراف تلقائي</p>
+                    : <div className="space-y-2 text-sm">
+                        <div className="flex justify-between"><span className="text-gray-500">عدد الأيام:</span><span className="font-black text-blue-700">{emp.stats.autoDeparts} يوم</span></div>
+                        <div className="flex justify-between"><span className="text-gray-500">الوقت الإضافي المجمّع:</span><span className="font-black text-blue-700">{fmtMins(emp.stats.totalAutoExtraMins)}</span></div>
+                        <div className="flex justify-between"><span className="text-gray-500">متوسط الوقت الإضافي:</span><span className="font-black text-blue-700">{fmtMins(emp.stats.avgAutoExtraMins)}/يوم</span></div>
+                        <div className="text-xs text-blue-500 mt-2 bg-blue-50 rounded-lg p-2">💡 الانصراف التلقائي = النظام لم يسجّل خروجاً فعلياً فأضاف 14 ساعة على الحضور. الوقت الإضافي = ما بعد {workEnd}</div>
+                      </div>
+                  }
+                </div>
+              </div>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-gradient-to-l from-blue-700 to-blue-900 text-white">
-                    <th className="px-3 py-3 text-right text-xs font-black whitespace-nowrap">التاريخ</th>
-                    <th className="px-3 py-3 text-center text-xs font-black whitespace-nowrap">الحالة</th>
-                    <th className="px-3 py-3 text-center text-xs font-black whitespace-nowrap">توقيت الحضور</th>
-                    <th className="px-3 py-3 text-center text-xs font-black whitespace-nowrap">تأخر الصباح</th>
-                    <th className="px-3 py-3 text-center text-xs font-black whitespace-nowrap">توقيت الانصراف</th>
-                    <th className="px-3 py-3 text-center text-xs font-black whitespace-nowrap">انصراف مبكر</th>
-                    <th className="px-3 py-3 text-center text-xs font-black whitespace-nowrap">ساعات الدوام الفعلي</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {selectedEmp.records.map((r, i) => {
-                    const rowBg = r.isWeekend
-                      ? "bg-gray-50 text-gray-400"
-                      : r.isAbsent
-                      ? "bg-red-50"
-                      : r.lateMins > 0
-                      ? "bg-amber-50"
-                      : i % 2 === 0 ? "" : "bg-blue-50/30";
-                    return (
-                      <tr key={i} className={rowBg}>
-                        <td className="px-3 py-2.5 text-right font-bold text-xs whitespace-nowrap">{r.date}</td>
-                        <td className="px-3 py-2.5 text-center">{statusBadge(r)}</td>
-                        <td className="px-3 py-2.5 text-center font-bold text-xs">
-                          {r.arrival === "-" ? <span className="text-gray-300">—</span> : (
-                            <span className={r.arrivalMins > toMins(WORK_START) ? "text-amber-600" : "text-green-600"}>
-                              {fmtTime(r.arrival)}
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-3 py-2.5 text-center font-black text-xs">
-                          {r.isWeekend || r.isAbsent ? <span className="text-gray-300">—</span>
-                            : r.lateMins > 0
-                            ? <span className="text-amber-600">⚠️ {r.lateMins} دقيقة</span>
-                            : <span className="text-green-600">✅ في الوقت</span>}
-                        </td>
-                        <td className="px-3 py-2.5 text-center font-bold text-xs">
-                          {r.departure === "-" ? <span className="text-gray-300">—</span> : (
-                            <span className={r.isAutoDepart ? "text-blue-600" : "text-gray-700"}>{fmtTime(r.departure)}</span>
-                          )}
-                        </td>
-                        <td className="px-3 py-2.5 text-center font-black text-xs">
-                          {r.isWeekend || r.isAbsent ? <span className="text-gray-300">—</span>
-                            : r.earlyDepartMins > 0
-                            ? <span className="text-orange-600">🏃 {r.earlyDepartMins} دقيقة</span>
-                            : r.isAutoDepart ? <span className="text-blue-400 text-xs">تلقائي</span>
-                            : <span className="text-green-600">✅ كامل</span>}
-                        </td>
-                        <td className="px-3 py-2.5 text-center font-bold text-xs text-gray-700">{r.actualHours}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+          )}
+
+          {/* السجل التفصيلي */}
+          {activeTab === "details" && (
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+              <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between flex-wrap gap-2">
+                <h3 className="font-black text-gray-800">السجل التفصيلي اليومي</h3>
+                <div className="flex gap-2 text-xs flex-wrap">
+                  <span className="px-2 py-1 rounded-full bg-red-100 text-red-700 font-bold">❌ غياب</span>
+                  <span className="px-2 py-1 rounded-full bg-amber-100 text-amber-700 font-bold">⚠️ تأخر</span>
+                  <span className="px-2 py-1 rounded-full bg-blue-100 text-blue-700 font-bold">🔄 تلقائي</span>
+                  <span className="px-2 py-1 rounded-full bg-orange-100 text-orange-700 font-bold">🏃 مبكر</span>
+                </div>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr style={{background:"linear-gradient(135deg,#1e40af,#1e3a5f)"}} className="text-white">
+                      <th className="px-3 py-3 text-right font-black whitespace-nowrap">التاريخ</th>
+                      <th className="px-3 py-3 text-center font-black whitespace-nowrap">الحالة</th>
+                      <th className="px-3 py-3 text-center font-black whitespace-nowrap">وقت الحضور</th>
+                      <th className="px-3 py-3 text-center font-black whitespace-nowrap">تأخر الصباح</th>
+                      <th className="px-3 py-3 text-center font-black whitespace-nowrap">وقت الانصراف</th>
+                      <th className="px-3 py-3 text-center font-black whitespace-nowrap">وقت تلقائي إضافي</th>
+                      <th className="px-3 py-3 text-center font-black whitespace-nowrap">انصراف مبكر</th>
+                      <th className="px-3 py-3 text-center font-black whitespace-nowrap">ساعات الدوام</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {emp.records.map((r, i) => {
+                      const rowBg = r.isWeekend ? "bg-gray-50 text-gray-400"
+                        : r.isAbsent ? "bg-red-50"
+                        : r.isAutoDepart ? "bg-blue-50/40"
+                        : r.lateMins > 0 ? "bg-amber-50"
+                        : i % 2 === 0 ? "" : "bg-slate-50/50";
+                      return (
+                        <tr key={i} className={rowBg}>
+                          <td className="px-3 py-2.5 text-right font-bold whitespace-nowrap">{r.date}</td>
+                          <td className="px-3 py-2.5 text-center">
+                            {r.isWeekend ? <span className="px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 font-bold text-xs">إجازة</span>
+                              : r.isAbsent ? <span className="px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-bold text-xs">غياب</span>
+                              : r.isAutoDepart ? <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-bold text-xs">تلقائي</span>
+                              : r.isPermission ? <span className="px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 font-bold text-xs">استئذان</span>
+                              : <span className="px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-bold text-xs">مكتملة</span>}
+                          </td>
+                          <td className="px-3 py-2.5 text-center font-bold">
+                            {r.arrival === "-" ? <span className="text-gray-300">—</span>
+                              : <span className={r.lateMins > 0 ? "text-amber-600" : "text-green-600"}>{fmtTime(r.arrival)}</span>}
+                          </td>
+                          <td className="px-3 py-2.5 text-center font-black">
+                            {r.isWeekend || r.isAbsent ? <span className="text-gray-300">—</span>
+                              : r.lateMins > 0 ? <span className="text-amber-600">⚠️ {r.lateMins}د</span>
+                              : <span className="text-green-500">✅</span>}
+                          </td>
+                          <td className="px-3 py-2.5 text-center font-bold">
+                            {r.departure === "-" ? <span className="text-gray-300">—</span>
+                              : <span className={r.isAutoDepart ? "text-blue-600" : "text-gray-700"}>{fmtTime(r.departure)}</span>}
+                          </td>
+                          <td className="px-3 py-2.5 text-center font-black">
+                            {r.isAutoDepart && r.autoExtraMins > 0
+                              ? <span className="text-blue-600">+{fmtMins(r.autoExtraMins)}</span>
+                              : <span className="text-gray-300">—</span>}
+                          </td>
+                          <td className="px-3 py-2.5 text-center font-black">
+                            {r.earlyDepartMins > 0 ? <span className="text-orange-600">🏃 {r.earlyDepartMins}د</span>
+                              : r.isAutoDepart ? <span className="text-blue-400 text-xs">تلقائي</span>
+                              : r.isAbsent || r.isWeekend ? <span className="text-gray-300">—</span>
+                              : <span className="text-green-500">✅</span>}
+                          </td>
+                          <td className="px-3 py-2.5 text-center font-bold text-gray-700">{r.actualHours}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* تفاصيل الانصراف التلقائي */}
+          {activeTab === "auto" && (
+            <div>
+              <div className="bg-blue-50 rounded-2xl p-4 mb-4 border border-blue-200">
+                <p className="font-black text-blue-800 text-sm mb-1">📌 كيف يعمل الانصراف التلقائي؟</p>
+                <p className="text-blue-700 text-xs leading-relaxed">
+                  عندما لا يُسجَّل انصراف فعلي، يضيف النظام تلقائياً 14 ساعة على وقت الحضور.<br/>
+                  مثال: حضور 06:39 → انصراف تلقائي 20:39<br/>
+                  الوقت الإضافي = وقت الانصراف التلقائي (20:39) - نهاية الدوام الرسمي ({workEnd}) = {toMins("20:39") !== null ? fmtMins((toMins("20:39") || 0) - (toMins(workEnd) || 0)) : "—"}
+                </p>
+              </div>
+              {emp.stats.autoDeparts === 0
+                ? <div className="bg-white rounded-2xl p-8 text-center text-gray-400"><div className="text-4xl mb-2">✅</div><p className="font-bold">لا يوجد انصراف تلقائي</p></div>
+                : (
+                  <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                    <div className="px-5 py-3 bg-blue-600 text-white flex justify-between items-center">
+                      <span className="font-black">أيام الانصراف التلقائي ({emp.stats.autoDeparts} يوم)</span>
+                      <span className="text-sm opacity-80">الوقت الإضافي الإجمالي: {fmtMins(emp.stats.totalAutoExtraMins)}</span>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead className="bg-blue-50">
+                          <tr>
+                            <th className="px-4 py-2.5 text-right text-xs font-black text-blue-800">التاريخ</th>
+                            <th className="px-4 py-2.5 text-center text-xs font-black text-blue-800">وقت الحضور</th>
+                            <th className="px-4 py-2.5 text-center text-xs font-black text-blue-800">وقت الانصراف التلقائي</th>
+                            <th className="px-4 py-2.5 text-center text-xs font-black text-blue-800">نهاية الدوام الرسمي</th>
+                            <th className="px-4 py-2.5 text-center text-xs font-black text-blue-800">الوقت الإضافي</th>
+                            <th className="px-4 py-2.5 text-center text-xs font-black text-blue-800">التأخر الصباحي</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {emp.records.filter(r => r.isAutoDepart).map((r, i) => (
+                            <tr key={i} className={i%2===0?"":"bg-blue-50/30"}>
+                              <td className="px-4 py-2.5 text-right font-bold text-gray-700 whitespace-nowrap">{r.date}</td>
+                              <td className="px-4 py-2.5 text-center font-bold text-green-600">{fmtTime(r.arrival)}</td>
+                              <td className="px-4 py-2.5 text-center font-bold text-blue-600">{fmtTime(r.departure)}</td>
+                              <td className="px-4 py-2.5 text-center font-bold text-gray-500">{fmtTime(workEnd)}</td>
+                              <td className="px-4 py-2.5 text-center font-black text-blue-700">
+                                {r.autoExtraMins > 0 ? <span className="bg-blue-100 px-2 py-0.5 rounded-full">+{fmtMins(r.autoExtraMins)}</span> : "—"}
+                              </td>
+                              <td className="px-4 py-2.5 text-center font-black">
+                                {r.lateMins > 0 ? <span className="text-amber-600">⚠️ {r.lateMins}د</span> : <span className="text-green-500">✅</span>}
+                              </td>
+                            </tr>
+                          ))}
+                          <tr className="bg-blue-100 font-black">
+                            <td colSpan={4} className="px-4 py-2.5 text-right text-blue-800">الإجمالي</td>
+                            <td className="px-4 py-2.5 text-center text-blue-800">+{fmtMins(emp.stats.totalAutoExtraMins)}</td>
+                            <td className="px-4 py-2.5 text-center text-amber-700">{emp.records.filter(r=>r.isAutoDepart&&r.lateMins>0).reduce((s,r)=>s+r.lateMins,0)}د</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+            </div>
+          )}
         </div>
       )}
 
