@@ -3329,7 +3329,7 @@ ${siteUrl}
 
 مع تحيات إدارة مدرسة عبيدة بن الحارث المتوسطة`
       );
-      window.open(\`https://wa.me/\${phone}?text=\${msg}\`, "_blank");
+      window.open(`https://wa.me/${phone}?text=${msg}`, "_blank");
     }
   };
 
@@ -3353,7 +3353,7 @@ ${siteUrl}
 
 مع تحيات إدارة مدرسة عبيدة بن الحارث المتوسطة`
     );
-    window.open(\`https://wa.me/\${phone}?text=\${msg}\`, "_blank");
+    window.open(`https://wa.me/${phone}?text=${msg}`, "_blank");
   };
 
   const evals = student.evals || [];
