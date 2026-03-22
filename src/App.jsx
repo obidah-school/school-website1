@@ -42,11 +42,11 @@ const DEFAULT_TEACHERS = [
 
 const DEFAULT_WEEK = {
   days: [
-    { name: "الأحد", dateH: "01/09/1447", dateM: "01/03/2026" },
-    { name: "الاثنين", dateH: "02/09/1447", dateM: "02/03/2026" },
-    { name: "الثلاثاء", dateH: "03/09/1447", dateM: "03/03/2026" },
-    { name: "الأربعاء", dateH: "04/09/1447", dateM: "04/03/2026" },
-    { name: "الخميس", dateH: "05/09/1447", dateM: "05/03/2026" },
+    { name: "الأحد",    dateH: "10/10/1447", dateM: "05/04/2026" },
+    { name: "الاثنين",  dateH: "11/10/1447", dateM: "06/04/2026" },
+    { name: "الثلاثاء", dateH: "12/10/1447", dateM: "07/04/2026" },
+    { name: "الأربعاء", dateH: "13/10/1447", dateM: "08/04/2026" },
+    { name: "الخميس",  dateH: "14/10/1447", dateM: "09/04/2026" },
   ]
 };
 
@@ -6874,71 +6874,120 @@ function SettingsPage({ teachers, setTeachers, saveTeachers, week, setWeek, save
           </div>
         </div>
 
-        {/* إنشاء أسبوع سريع من التاريخ الهجري */}
+        {/* ===== إنشاء أسبوع بالقوائم المنسدلة ===== */}
         {(() => {
-          const [hijriInput, setHijriInput] = React.useState(week.days[0]?.dateH || "");
-          const [hijriErr, setHijriErr] = React.useState("");
-          const [hijriPreview, setHijriPreview] = React.useState(null);
-          const handleHijriChange = (val) => {
-            setHijriInput(val); setHijriErr(""); setHijriPreview(null);
-            const p = parseHijriInput(val);
-            if (p.valid) {
-              try { const preview = generateWeekDaysFromHijri(p.d, p.m, p.y); setHijriPreview(preview); }
-              catch(e) { setHijriErr("تاريخ غير صحيح"); }
-            }
-          };
-          const handleGenerate = () => {
-            const p = parseHijriInput(hijriInput);
-            if (!p.valid) { setHijriErr("أدخل التاريخ بصيغة: يوم/شهر/سنة — مثال: 01/09/1447"); return; }
+          const [calType,  setCalType]  = React.useState("hijri");
+          const [selDay,   setSelDay]   = React.useState(10);
+          const [selMonth, setSelMonth] = React.useState(10);
+          const [selYear,  setSelYear]  = React.useState(1447);
+          const [preview,  setPreview]  = React.useState(null);
+          const [err,      setErr]      = React.useState("");
+
+          const GREG_M = ["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"];
+          const yearOptions = calType === "hijri"
+            ? Array.from({length:20},(_,i)=>1440+i)
+            : Array.from({length:10},(_,i)=>2023+i);
+
+          const doGenerate = () => {
+            setErr("");
             try {
-              const generated = generateWeekDaysFromHijri(p.d, p.m, p.y);
-              setTmpWeek(generated); setWeek(generated); saveWeek(generated);
-              setEditWeek(false); setHijriPreview(null);
-            } catch(e) { setHijriErr("تعذر تحويل التاريخ، تأكد من صحته"); }
+              const gen = calType === "hijri"
+                ? generateWeekDaysFromHijri(selDay, selMonth, selYear)
+                : generateWeekDays(`${selYear}-${String(selMonth).padStart(2,"0")}-${String(selDay).padStart(2,"0")}`);
+              setPreview(gen);
+            } catch(e) { setErr("تاريخ غير صحيح — تأكد أن اليوم المختار هو الأحد"); }
           };
+
+          const doConfirm = () => {
+            if (!preview) return;
+            setWeek(preview); saveWeek(preview); setPreview(null);
+          };
+
+          React.useEffect(() => { setPreview(null); setErr(""); }, [calType, selDay, selMonth, selYear]);
+
           return (
-            <div className="bg-gradient-to-l from-amber-50 to-teal-50 border border-teal-200 rounded-2xl p-4 mb-4">
-              <div className="text-xs font-black text-teal-800 mb-3 flex items-center gap-2">
-                🌙 إنشاء أسبوع من التاريخ الهجري
-                <span className="text-gray-400 font-normal">(أدخل تاريخ يوم الأحد)</span>
+            <div className="bg-gradient-to-l from-amber-50 to-teal-50 border-2 border-teal-200 rounded-2xl p-4 mb-4">
+              <div className="font-black text-teal-800 text-sm mb-3 flex items-center gap-2">
+                📅 تحديد أسبوع جديد
+                <span className="text-xs text-gray-400 font-normal">اختر تاريخ يوم الأحد</span>
               </div>
-              <div className="flex gap-2 items-start flex-wrap">
-                <div className="flex-1 min-w-48">
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={hijriInput}
-                      onChange={e => handleHijriChange(e.target.value)}
-                      onKeyDown={e => e.key === "Enter" && handleGenerate()}
-                      placeholder="مثال: 01/09/1447"
-                      className={"w-full px-4 py-2.5 rounded-xl border-2 text-sm text-center font-bold focus:outline-none transition-all " + (hijriErr?"border-red-400 bg-red-50":hijriPreview?"border-green-400 bg-green-50":"border-teal-300 bg-white")}
-                      style={{fontFamily:"inherit", letterSpacing:"0.05em"}}
-                      dir="ltr"
-                    />
-                    {hijriPreview && (
-                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-green-500 text-sm">✓</span>
-                    )}
-                  </div>
-                  {hijriErr && <div className="text-xs text-red-500 font-bold mt-1">{hijriErr}</div>}
+
+              {/* نوع التقويم */}
+              <div className="flex gap-2 mb-3">
+                {[{v:"hijri",l:"🌙 هجري"},{v:"gregorian",l:"☀️ ميلادي"}].map(t => (
+                  <button key={t.v} onClick={() => {
+                    setCalType(t.v);
+                    setSelDay(1); setSelMonth(1);
+                    setSelYear(t.v==="hijri" ? 1447 : 2026);
+                  }} className={"flex-1 py-2 rounded-xl text-sm font-black transition-all border-2 " +
+                    (calType===t.v ? "border-teal-500 bg-teal-600 text-white" : "border-gray-200 bg-white text-gray-600 hover:border-teal-300")}>
+                    {t.l}
+                  </button>
+                ))}
+              </div>
+
+              {/* القوائم المنسدلة */}
+              <div className="grid grid-cols-3 gap-2 mb-3">
+                <div>
+                  <label className="text-xs font-bold text-gray-500 block mb-1">اليوم</label>
+                  <select value={selDay} onChange={e => setSelDay(Number(e.target.value))}
+                    className="w-full px-2 py-2.5 rounded-xl border-2 border-gray-200 focus:border-teal-400 focus:outline-none text-sm font-bold bg-white text-center"
+                    style={{fontFamily:"inherit"}}>
+                    {Array.from({length: calType==="hijri" ? 30 : 31}, (_,i) => i+1).map(d => (
+                      <option key={d} value={d}>{String(d).padStart(2,"0")}</option>
+                    ))}
+                  </select>
                 </div>
-                <button onClick={handleGenerate}
-                  className="py-2.5 px-5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-sm font-black transition-all flex items-center gap-2">
-                  📅 توليد الأسبوع
-                </button>
+                <div>
+                  <label className="text-xs font-bold text-gray-500 block mb-1">الشهر</label>
+                  <select value={selMonth} onChange={e => setSelMonth(Number(e.target.value))}
+                    className="w-full px-2 py-2.5 rounded-xl border-2 border-gray-200 focus:border-teal-400 focus:outline-none text-sm font-bold bg-white"
+                    style={{fontFamily:"inherit"}}>
+                    {(calType==="hijri" ? HIJRI_MONTHS : GREG_M).map((m,i) => (
+                      <option key={i+1} value={i+1}>{m}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-500 block mb-1">السنة</label>
+                  <select value={selYear} onChange={e => setSelYear(Number(e.target.value))}
+                    className="w-full px-2 py-2.5 rounded-xl border-2 border-gray-200 focus:border-teal-400 focus:outline-none text-sm font-bold bg-white text-center"
+                    style={{fontFamily:"inherit"}}>
+                    {yearOptions.map(y => (
+                      <option key={y} value={y}>{y} {calType==="hijri"?"هـ":"م"}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
-              {/* معاينة مباشرة */}
-              {hijriPreview && (
-                <div className="mt-3 grid grid-cols-5 gap-1">
-                  {hijriPreview.days.map((d,i) => (
-                    <div key={i} className="bg-white rounded-xl p-2 text-center border border-teal-200">
+
+              {/* أزرار */}
+              <div className="flex gap-2">
+                <button onClick={doGenerate}
+                  className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-sm font-black transition-all">
+                  👁️ معاينة الأسبوع
+                </button>
+                {preview && (
+                  <button onClick={doConfirm}
+                    className="flex-1 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-sm font-black transition-all animate-pulse">
+                    ✅ تأكيد وحفظ
+                  </button>
+                )}
+              </div>
+
+              {err && <div className="mt-2 text-xs text-red-600 font-bold bg-red-50 border border-red-200 px-3 py-2 rounded-xl">{err}</div>}
+
+              {/* معاينة الأيام */}
+              {preview && (
+                <div className="mt-3 grid grid-cols-5 gap-1.5">
+                  {preview.days.map((d,i) => (
+                    <div key={i} className="bg-white rounded-xl p-2 text-center border-2 border-teal-200 shadow-sm">
                       <div className="text-xs font-black text-teal-800">{d.name}</div>
-                      <div className="text-xs text-amber-700 font-bold mt-0.5">{d.dateH}</div>
-                      <div className="text-xs text-gray-400 mt-0.5">{d.dateM}</div>
+                      <div className="text-xs text-amber-700 font-bold mt-1">🌙 {d.dateH}</div>
+                      <div className="text-xs text-gray-500 mt-0.5">☀️ {d.dateM}</div>
                     </div>
                   ))}
                 </div>
               )}
-              <div className="text-xs text-gray-400 mt-2">الصيغة: يوم/شهر/سنة هجرية — مثال: <span className="font-bold text-teal-700">01/09/1447</span></div>
             </div>
           );
         })()}
