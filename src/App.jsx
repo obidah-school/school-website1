@@ -5269,13 +5269,6 @@ function ActivitiesPage({ activities, setActivities, saveActivities }) {
 }
 
 // ==================== SMS PAGE ====================
-// ---- helper: load XLSX dynamically ----
-async function loadXLSX() {
-  if (window.XLSX) return window.XLSX;
-  await loadXLSX();
-  return window.XLSX;
-}
-
 function SMSPage({ teachers, attendance, week, classList }) {
   const [tab, setTab] = useState("contacts");
   const [apiKey, setApiKey] = useState(() => localStorage.getItem("sms_apikey") || "");
