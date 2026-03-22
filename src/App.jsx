@@ -7118,7 +7118,7 @@ function GroupDividerPage() {
       const text = ev;
       const lines = text.split("\n").map(l => l.split(",")[0].trim()).filter(Boolean);
       setNames(lines.join("\n"));
-    };
+    });
   };
 
   const print = () => {
