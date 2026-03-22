@@ -698,11 +698,36 @@ function HomePage({ teachers, announcements, activities, navigate }) {
   );
 }
 
-function AttendancePage({ teachers, setTeachers, saveTeachers, week, attendance, setAttendance, saveAttendance }) {
+function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, saveWeek, attendance, setAttendance, saveAttendance }) {
   const [selectedDay, setSelectedDay] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
   const [showSummary, setShowSummary] = useState(false);
   const [showExcelImport, setShowExcelImport] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [dpCalType, setDpCalType] = useState("hijri");
+  const [dpDay,   setDpDay]   = useState(10);
+  const [dpMonth, setDpMonth] = useState(10);
+  const [dpYear,  setDpYear]  = useState(1447);
+  const [dpPreview, setDpPreview] = useState(null);
+  const GREG_M_ATT = ["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"];
+
+  const handleDpGenerate = () => {
+    try {
+      const gen = dpCalType === "hijri"
+        ? generateWeekDaysFromHijri(dpDay, dpMonth, dpYear)
+        : generateWeekDays(`${dpYear}-${String(dpMonth).padStart(2,"0")}-${String(dpDay).padStart(2,"0")}`);
+      setDpPreview(gen);
+    } catch(e) { alert("تاريخ غير صحيح"); }
+  };
+
+  const handleDpConfirm = () => {
+    if (!dpPreview) return;
+    if (setWeek) setWeek(dpPreview);
+    if (saveWeek) saveWeek(dpPreview);
+    setDpPreview(null);
+    setShowDatePicker(false);
+    setSelectedDay(0);
+  };
 
   // تحديث حقل في سجل الحضور
   const updateField = (ti, di, field, value) => {
@@ -915,10 +940,10 @@ function AttendancePage({ teachers, setTeachers, saveTeachers, week, attendance,
         </div>
       )}
 
-      {/* أيام الأسبوع */}
-      <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
+      {/* أيام الأسبوع + تغيير التاريخ */}
+      <div className="flex gap-2 mb-2 overflow-x-auto pb-1 items-start">
         {week.days.map((day, i) => (
-          <button key={i} onClick={() => { setSelectedDay(i); setShowSummary(false); }}
+          <button key={i} onClick={() => { setSelectedDay(i); setShowSummary(false); setShowDatePicker(false); }}
             className={`flex-shrink-0 px-4 py-2.5 rounded-xl text-sm font-bold transition-all ${!showSummary && selectedDay === i ? "bg-teal-600 text-white shadow-md" : "bg-white text-gray-600 border-2 border-gray-100 hover:border-teal-200"}`}>
             <div className="font-black">{day.name}</div>
             <div className="text-xs font-bold opacity-80">🌙 {day.dateH}</div>
@@ -931,7 +956,94 @@ function AttendancePage({ teachers, setTeachers, saveTeachers, week, attendance,
             )}
           </button>
         ))}
+        {/* زر تغيير الأسبوع */}
+        <button onClick={() => { setShowDatePicker(p=>!p); setDpPreview(null); }}
+          className={`flex-shrink-0 px-3 py-2.5 rounded-xl text-sm font-black transition-all border-2 ${showDatePicker ? "bg-amber-500 text-white border-amber-500" : "bg-white text-amber-600 border-amber-300 hover:bg-amber-50"}`}>
+          📅<br/><span className="text-xs">تغيير</span>
+        </button>
       </div>
+
+      {/* لوحة تغيير التاريخ */}
+      {showDatePicker && (
+        <div className="bg-gradient-to-l from-amber-50 to-teal-50 border-2 border-amber-300 rounded-2xl p-4 mb-4 shadow-lg">
+          <div className="font-black text-teal-800 text-sm mb-3 flex items-center justify-between">
+            <span>📅 تحديد أسبوع جديد <span className="text-xs text-gray-400 font-normal mr-1">(اختر تاريخ يوم الأحد)</span></span>
+            <button onClick={() => { setShowDatePicker(false); setDpPreview(null); }} className="text-gray-400 hover:text-gray-600 text-lg font-bold">✕</button>
+          </div>
+
+          {/* نوع التقويم */}
+          <div className="flex gap-2 mb-3">
+            {[{v:"hijri",l:"🌙 هجري"},{v:"gregorian",l:"☀️ ميلادي"}].map(t => (
+              <button key={t.v} onClick={() => { setDpCalType(t.v); setDpDay(1); setDpMonth(1); setDpYear(t.v==="hijri"?1447:2026); setDpPreview(null); }}
+                className={"flex-1 py-2 rounded-xl text-sm font-black transition-all border-2 " +
+                  (dpCalType===t.v ? "border-teal-500 bg-teal-600 text-white" : "border-gray-200 bg-white text-gray-600 hover:border-teal-300")}>
+                {t.l}
+              </button>
+            ))}
+          </div>
+
+          {/* القوائم المنسدلة */}
+          <div className="grid grid-cols-3 gap-2 mb-3">
+            <div>
+              <label className="text-xs font-bold text-gray-500 block mb-1">اليوم</label>
+              <select value={dpDay} onChange={e => { setDpDay(Number(e.target.value)); setDpPreview(null); }}
+                className="w-full px-2 py-2.5 rounded-xl border-2 border-gray-200 focus:border-teal-400 focus:outline-none text-sm font-bold bg-white text-center"
+                style={{fontFamily:"inherit"}}>
+                {Array.from({length: dpCalType==="hijri" ? 30 : 31}, (_,i) => i+1).map(d => (
+                  <option key={d} value={d}>{String(d).padStart(2,"0")}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-bold text-gray-500 block mb-1">الشهر</label>
+              <select value={dpMonth} onChange={e => { setDpMonth(Number(e.target.value)); setDpPreview(null); }}
+                className="w-full px-2 py-2.5 rounded-xl border-2 border-gray-200 focus:border-teal-400 focus:outline-none text-sm font-bold bg-white"
+                style={{fontFamily:"inherit"}}>
+                {(dpCalType==="hijri" ? HIJRI_MONTHS : GREG_M_ATT).map((m,i) => (
+                  <option key={i+1} value={i+1}>{m}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-bold text-gray-500 block mb-1">السنة</label>
+              <select value={dpYear} onChange={e => { setDpYear(Number(e.target.value)); setDpPreview(null); }}
+                className="w-full px-2 py-2.5 rounded-xl border-2 border-gray-200 focus:border-teal-400 focus:outline-none text-sm font-bold bg-white text-center"
+                style={{fontFamily:"inherit"}}>
+                {(dpCalType==="hijri" ? Array.from({length:20},(_,i)=>1440+i) : Array.from({length:10},(_,i)=>2023+i)).map(y => (
+                  <option key={y} value={y}>{y} {dpCalType==="hijri"?"هـ":"م"}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* أزرار */}
+          <div className="flex gap-2">
+            <button onClick={handleDpGenerate}
+              className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-sm font-black transition-all">
+              👁️ معاينة الأسبوع
+            </button>
+            {dpPreview && (
+              <button onClick={handleDpConfirm}
+                className="flex-1 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-sm font-black transition-all">
+                ✅ تطبيق وحفظ
+              </button>
+            )}
+          </div>
+
+          {/* معاينة */}
+          {dpPreview && (
+            <div className="mt-3 grid grid-cols-5 gap-1.5">
+              {dpPreview.days.map((d,i) => (
+                <div key={i} className="bg-white rounded-xl p-2 text-center border-2 border-teal-200 shadow-sm">
+                  <div className="text-xs font-black text-teal-800">{d.name}</div>
+                  <div className="text-xs text-amber-700 font-bold mt-1">🌙 {d.dateH}</div>
+                  <div className="text-xs text-gray-400 mt-0.5">☀️ {d.dateM}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* بحث */}
       <input type="text" placeholder="🔍 بحث عن معلم أو إداري..." value={searchQuery}
@@ -9924,7 +10036,7 @@ export default function SchoolWebsite() {
       <main className="max-w-6xl mx-auto px-4 py-6">
         {page === "home"          && <HomePage teachers={teachers} announcements={announcements} activities={activities} navigate={navigate} />}
         {page === "student-absence" && <StudentAbsencePage />}
-        {page === "attendance"    && <AttendancePage teachers={teachers} setTeachers={setTeachers} saveTeachers={saveTeachers} week={week} attendance={attendance} setAttendance={setAttendance} saveAttendance={saveAttendance} />}
+        {page === "attendance"    && <AttendancePage teachers={teachers} setTeachers={setTeachers} saveTeachers={saveTeachers} week={week} setWeek={setWeek} saveWeek={saveWeek} attendance={attendance} setAttendance={setAttendance} saveAttendance={saveAttendance} />}
         {page === "students"      && <StudentsPage classList={classList} setClassList={setClassList} saveClass={saveClass} deleteClass={deleteClass} onSendNote={handleSendNote} messages={messages} />}
         {page === "announcements" && <AnnouncementsPage announcements={announcements} setAnnouncements={setAnnouncements} saveAnnouncements={saveAnnouncements} />}
         {page === "activities"    && <ActivitiesPage activities={activities} setActivities={setActivities} saveActivities={saveActivities} />}
