@@ -448,15 +448,16 @@ let _xlsxLoaded = false;
 function loadXLSX() {
   return new Promise((res) => {
     if (window.XLSX || _xlsxLoaded) return res();
-    loadXLSX().then(() => { _xlsxLoaded = true; res(); });
+    const s = document.createElement("script");
+    s.src = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
+    s.onload = () => { _xlsxLoaded = true; res(); };
+    document.head.appendChild(s);
   });
 }
 // فتح نافذة طباعة
 function printWindow(html) {
   const w = window.open("", "_blank");
-  if (!w) return;
-  w.document.write(html);
-  w.document.close();
+  if (w) { w.document.write(html); w.document.close(); }
 }
 
 function PublicAnnouncementsPage({ announcements, siteFont, onLogin, onTeacherPortal, onParentPortal, onStudentRaffle }) {
@@ -631,17 +632,17 @@ function HomePage({ teachers, announcements, activities, navigate, attendance, w
   const todayLate    = teachers.filter((_,ti) => (attendance[ti]?.[todayDi]?.status || "حاضر") === "متأخر").length;
   const todayPresent = teachers.length - todayAbsent - todayLate;
   const attendRate   = teachers.length > 0 ? Math.round((todayPresent / teachers.length) * 100) : 100;
-  const totalStudents = classList.reduce((s,c) => s + (c.students||[]).filter(st=>st.name).length, 0);
+  const totalStudents = classList.reduce((s,c) => s + c.students.filter(st=>st.name).length, 0);
   const unreadMsgs  = messages.filter(m => !m.read && m.type !== "teacher_note").length;
   const unreadNotes = messages.filter(m => !m.read && m.type === "teacher_note").length;
   const recentAnn   = [...announcements].slice(0,3);
   const upcomingAct = activities.filter(a => a.status === "قادم").slice(0,3);
   const weekStats = (() => {
     let total=0, present=0;
-    (week.days||[]).forEach((_,di) => { teachers.forEach((_,ti) => { const st=attendance[ti]?.[di]?.status||"حاضر"; total++; if(st==="حاضر") present++; }); });
+    week.days.forEach((_,di) => { teachers.forEach((_,ti) => { const st=attendance[ti]?.[di]?.status||"حاضر"; total++; if(st==="حاضر") present++; }); });
     return total > 0 ? Math.round(present/total*100) : 100;
   })();
-  const mostAbsent = teachers.map((name,ti) => ({ name, count: (week.days||[]).filter((_,di) => (attendance[ti]?.[di]?.status||"حاضر")==="غائب").length })).filter(t=>t.count>0).sort((a,b)=>b.count-a.count).slice(0,3);
+  const mostAbsent = teachers.map((name,ti) => ({ name, count: week.days.filter((_,di) => (attendance[ti]?.[di]?.status||"حاضر")==="غائب").length })).filter(t=>t.count>0).sort((a,b)=>b.count-a.count).slice(0,3);
   const kpiColor = (v,good,warn) => v>=good?"#22c55e":v>=warn?"#f59e0b":"#ef4444";
   const kpiBg   = (v,good,warn) => v>=good?"#dcfce7":v>=warn?"#fef3c7":"#fee2e2";
 
@@ -8320,76 +8321,6 @@ function GradeAnalysisPage() {
 }
 
 
-// مكوّن منتقي الأسبوع
-function WeekPickerWidget({ week, setWeek, saveWeek, setEditWeek }) {
-  const [calType,  setCalType]  = useState("hijri");
-  const [selDay,   setSelDay]   = useState(10);
-  const [selMonth, setSelMonth] = useState(10);
-  const [selYear,  setSelYear]  = useState(1447);
-  const [preview,  setPreview]  = useState(null);
-  const [err,      setErr]      = useState("");
-  const GREG_M = ["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"];
-  const yearOptions = calType==="hijri" ? Array.from({length:20},(_,i)=>1440+i) : Array.from({length:10},(_,i)=>2023+i);
-  const doGenerate = () => {
-    setErr("");
-    try {
-      const gen = calType==="hijri"
-        ? generateWeekDaysFromHijri(selDay, selMonth, selYear)
-        : generateWeekDays(`${selYear}-${String(selMonth).padStart(2,"0")}-${String(selDay).padStart(2,"0")}`);
-      setPreview(gen);
-    } catch(e) { setErr("تاريخ غير صحيح"); }
-  };
-  const doConfirm = () => {
-    if (!preview) return;
-    setWeek(preview); saveWeek(preview); setPreview(null);
-    if (setEditWeek) setEditWeek(false);
-  };
-  useEffect(() => { setPreview(null); setErr(""); }, [calType, selDay, selMonth, selYear]);
-  return (
-    <div className="bg-gradient-to-l from-amber-50 to-teal-50 border-2 border-teal-200 rounded-2xl p-4 mb-4">
-      <div className="font-black text-teal-800 text-sm mb-3">📅 تحديد أسبوع جديد <span className="text-xs text-gray-400 font-normal">— اختر يوم الأحد</span></div>
-      <div className="flex gap-2 mb-3">
-        {[{v:"hijri",l:"🌙 هجري"},{v:"gregorian",l:"☀️ ميلادي"}].map(t=>(
-          <button key={t.v} onClick={()=>{setCalType(t.v);setSelDay(1);setSelMonth(1);setSelYear(t.v==="hijri"?1447:2026);setPreview(null);}}
-            className={"flex-1 py-2 rounded-xl text-sm font-black border-2 transition-all "+(calType===t.v?"border-teal-500 bg-teal-600 text-white":"border-gray-200 bg-white text-gray-600 hover:border-teal-300")}>
-            {t.l}
-          </button>
-        ))}
-      </div>
-      <div className="grid grid-cols-3 gap-2 mb-3">
-        <div><label className="text-xs font-bold text-gray-500 block mb-1">اليوم</label>
-          <select value={selDay} onChange={e=>setSelDay(Number(e.target.value))} className="w-full px-2 py-2.5 rounded-xl border-2 border-gray-200 text-sm font-bold bg-white text-center focus:border-teal-400 focus:outline-none" style={{fontFamily:"inherit"}}>
-            {Array.from({length:calType==="hijri"?30:31},(_,i)=>i+1).map(d=><option key={d} value={d}>{String(d).padStart(2,"0")}</option>)}
-          </select></div>
-        <div><label className="text-xs font-bold text-gray-500 block mb-1">الشهر</label>
-          <select value={selMonth} onChange={e=>setSelMonth(Number(e.target.value))} className="w-full px-2 py-2.5 rounded-xl border-2 border-gray-200 text-sm font-bold bg-white focus:border-teal-400 focus:outline-none" style={{fontFamily:"inherit"}}>
-            {(calType==="hijri"?HIJRI_MONTHS:GREG_M).map((m,i)=><option key={i+1} value={i+1}>{m}</option>)}
-          </select></div>
-        <div><label className="text-xs font-bold text-gray-500 block mb-1">السنة</label>
-          <select value={selYear} onChange={e=>setSelYear(Number(e.target.value))} className="w-full px-2 py-2.5 rounded-xl border-2 border-gray-200 text-sm font-bold bg-white text-center focus:border-teal-400 focus:outline-none" style={{fontFamily:"inherit"}}>
-            {yearOptions.map(y=><option key={y} value={y}>{y} {calType==="hijri"?"هـ":"م"}</option>)}
-          </select></div>
-      </div>
-      <div className="flex gap-2">
-        <button onClick={doGenerate} className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-sm font-black">👁️ معاينة</button>
-        {preview && <button onClick={doConfirm} className="flex-1 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-sm font-black">✅ تأكيد وحفظ</button>}
-      </div>
-      {err && <div className="mt-2 text-xs text-red-600 font-bold bg-red-50 px-3 py-2 rounded-xl">{err}</div>}
-      {preview && (
-        <div className="mt-3 grid grid-cols-5 gap-1.5">
-          {preview.days.map((d,i)=>(
-            <div key={i} className="bg-white rounded-xl p-2 text-center border-2 border-teal-200">
-              <div className="text-xs font-black text-teal-800">{d.name}</div>
-              <div className="text-xs text-amber-700 font-bold mt-1">🌙 {d.dateH}</div>
-              <div className="text-xs text-gray-500 mt-0.5">☀️ {d.dateM}</div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
 function SettingsPage({ teachers, setTeachers, saveTeachers, week, setWeek, saveWeek, users, siteFont, setSiteFont, saveSiteFont, weekArchive, archiveCurrentWeek }) {
   const [newT, setNewT] = useState("");
   const [editWeek, setEditWeek] = useState(false);
@@ -8440,8 +8371,122 @@ function SettingsPage({ teachers, setTeachers, saveTeachers, week, setWeek, save
         </div>
 
         {/* ===== إنشاء أسبوع بالقوائم المنسدلة ===== */}
-        <WeekPickerWidget week={week} setWeek={setWeek} saveWeek={saveWeek} setEditWeek={setEditWeek} />
+        {(() => {
+          const [calType,  setCalType]  = React.useState("hijri");
+          const [selDay,   setSelDay]   = React.useState(10);
+          const [selMonth, setSelMonth] = React.useState(10);
+          const [selYear,  setSelYear]  = React.useState(1447);
+          const [preview,  setPreview]  = React.useState(null);
+          const [err,      setErr]      = React.useState("");
 
+          const GREG_M = ["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"];
+          const yearOptions = calType === "hijri"
+            ? Array.from({length:20},(_,i)=>1440+i)
+            : Array.from({length:10},(_,i)=>2023+i);
+
+          const doGenerate = () => {
+            setErr("");
+            try {
+              const gen = calType === "hijri"
+                ? generateWeekDaysFromHijri(selDay, selMonth, selYear)
+                : generateWeekDays(`${selYear}-${String(selMonth).padStart(2,"0")}-${String(selDay).padStart(2,"0")}`);
+              setPreview(gen);
+            } catch(e) { setErr("تاريخ غير صحيح — تأكد أن اليوم المختار هو الأحد"); }
+          };
+
+          const doConfirm = () => {
+            if (!preview) return;
+            setWeek(preview); saveWeek(preview); setPreview(null);
+          };
+
+          React.useEffect(() => { setPreview(null); setErr(""); }, [calType, selDay, selMonth, selYear]);
+
+          return (
+            <div className="bg-gradient-to-l from-amber-50 to-teal-50 border-2 border-teal-200 rounded-2xl p-4 mb-4">
+              <div className="font-black text-teal-800 text-sm mb-3 flex items-center gap-2">
+                📅 تحديد أسبوع جديد
+                <span className="text-xs text-gray-400 font-normal">اختر تاريخ يوم الأحد</span>
+              </div>
+
+              {/* نوع التقويم */}
+              <div className="flex gap-2 mb-3">
+                {[{v:"hijri",l:"🌙 هجري"},{v:"gregorian",l:"☀️ ميلادي"}].map(t => (
+                  <button key={t.v} onClick={() => {
+                    setCalType(t.v);
+                    setSelDay(1); setSelMonth(1);
+                    setSelYear(t.v==="hijri" ? 1447 : 2026);
+                  }} className={"flex-1 py-2 rounded-xl text-sm font-black transition-all border-2 " +
+                    (calType===t.v ? "border-teal-500 bg-teal-600 text-white" : "border-gray-200 bg-white text-gray-600 hover:border-teal-300")}>
+                    {t.l}
+                  </button>
+                ))}
+              </div>
+
+              {/* القوائم المنسدلة */}
+              <div className="grid grid-cols-3 gap-2 mb-3">
+                <div>
+                  <label className="text-xs font-bold text-gray-500 block mb-1">اليوم</label>
+                  <select value={selDay} onChange={e => setSelDay(Number(e.target.value))}
+                    className="w-full px-2 py-2.5 rounded-xl border-2 border-gray-200 focus:border-teal-400 focus:outline-none text-sm font-bold bg-white text-center"
+                    style={{fontFamily:"inherit"}}>
+                    {Array.from({length: calType==="hijri" ? 30 : 31}, (_,i) => i+1).map(d => (
+                      <option key={d} value={d}>{String(d).padStart(2,"0")}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-500 block mb-1">الشهر</label>
+                  <select value={selMonth} onChange={e => setSelMonth(Number(e.target.value))}
+                    className="w-full px-2 py-2.5 rounded-xl border-2 border-gray-200 focus:border-teal-400 focus:outline-none text-sm font-bold bg-white"
+                    style={{fontFamily:"inherit"}}>
+                    {(calType==="hijri" ? HIJRI_MONTHS : GREG_M).map((m,i) => (
+                      <option key={i+1} value={i+1}>{m}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-500 block mb-1">السنة</label>
+                  <select value={selYear} onChange={e => setSelYear(Number(e.target.value))}
+                    className="w-full px-2 py-2.5 rounded-xl border-2 border-gray-200 focus:border-teal-400 focus:outline-none text-sm font-bold bg-white text-center"
+                    style={{fontFamily:"inherit"}}>
+                    {yearOptions.map(y => (
+                      <option key={y} value={y}>{y} {calType==="hijri"?"هـ":"م"}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* أزرار */}
+              <div className="flex gap-2">
+                <button onClick={doGenerate}
+                  className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-sm font-black transition-all">
+                  👁️ معاينة الأسبوع
+                </button>
+                {preview && (
+                  <button onClick={doConfirm}
+                    className="flex-1 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-sm font-black transition-all animate-pulse">
+                    ✅ تأكيد وحفظ
+                  </button>
+                )}
+              </div>
+
+              {err && <div className="mt-2 text-xs text-red-600 font-bold bg-red-50 border border-red-200 px-3 py-2 rounded-xl">{err}</div>}
+
+              {/* معاينة الأيام */}
+              {preview && (
+                <div className="mt-3 grid grid-cols-5 gap-1.5">
+                  {preview.days.map((d,i) => (
+                    <div key={i} className="bg-white rounded-xl p-2 text-center border-2 border-teal-200 shadow-sm">
+                      <div className="text-xs font-black text-teal-800">{d.name}</div>
+                      <div className="text-xs text-amber-700 font-bold mt-1">🌙 {d.dateH}</div>
+                      <div className="text-xs text-gray-500 mt-0.5">☀️ {d.dateM}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {/* عرض وتعديل الأيام */}
         {editWeek ? (
@@ -11005,7 +11050,6 @@ function AttendanceAnalysisPage() {
     </div>
   );
 }
-
 
 export default function SchoolWebsite() {
   const [loading, setLoading] = useState(true);
