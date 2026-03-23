@@ -11007,28 +11007,6 @@ function AttendanceAnalysisPage() {
 }
 
 
-class ErrorBoundary extends React.Component {
-  constructor(props) { super(props); this.state = { error: null }; }
-  static getDerivedStateFromError(e) { return { error: e }; }
-  componentDidCatch(e, info) { console.error("CRASH:", e, info); }
-  render() {
-    if (this.state.error) {
-      return (
-        <div style={{padding:24,background:"#fee2e2",minHeight:"100vh",direction:"rtl",fontFamily:"monospace"}}>
-          <h2 style={{color:"#991b1b",fontSize:20,fontWeight:"bold",marginBottom:12}}>⚠️ خطأ في التطبيق</h2>
-          <pre style={{background:"#fff",padding:12,borderRadius:8,fontSize:12,overflow:"auto",color:"#7f1d1d"}}>
-            {this.state.error.toString()}
-          </pre>
-          <button onClick={()=>this.setState({error:null})} style={{marginTop:12,background:"#dc2626",color:"#fff",padding:"8px 16px",borderRadius:8,border:"none",cursor:"pointer"}}>
-            إعادة المحاولة
-          </button>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
-}
-
 export default function SchoolWebsite() {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
@@ -11203,7 +11181,6 @@ export default function SchoolWebsite() {
   ];
 
   return (
-    <ErrorBoundary>
     <div dir="rtl" className="min-h-screen relative overflow-x-hidden" style={{ fontFamily: siteFont, background: "linear-gradient(160deg, #f0fdfa 0%, #ecfdf5 25%, #f5f5f4 60%, #fefce8 100%)" }}>
 
       {/* ── رذاذ الزوايا المتحرك ── */}
@@ -11439,7 +11416,6 @@ export default function SchoolWebsite() {
         <div className="relative flex items-center justify-center gap-4 flex-wrap"><p className="text-teal-700 font-bold opacity-60">مدرسة عبيدة بن الحارث المتوسطة — بوابة الإدارة المدرسية الإلكترونية</p><VisitorCounter /></div>
         <p className="relative text-gray-400 mt-1">© ١٤٤٧ هـ — جميع الحقوق محفوظة</p>
       </footer>
-    </ErrorBoundary>
     </div>
   );
 }
