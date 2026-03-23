@@ -3593,7 +3593,6 @@ function TeacherPortal({ classList, setClassList, saveClass, siteFont, onBack, a
         مدرسة عبيدة بن الحارث المتوسطة — بوابة المعلم © ١٤٤٧ هـ
       </footer>
     </div>
-    </>
   );
 }
 // ===== ثوابت التقييم الأسبوعي =====
