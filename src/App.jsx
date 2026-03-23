@@ -11250,11 +11250,11 @@ export default function SchoolWebsite() {
     { id: "classvisits",   label: "الزيارات الصفية",    icon: "👁️" },
     { id: "honorboard",    label: "لوحة الشرف",         icon: "🏆" },
     { id: "tasks",         label: "تتبع المهام",        icon: "✅" },
-    { id: "absencestats",  label: "إحصائيات الغياب",   icon: "📊" },
-    { id: "attendancereport", label: "تحليل الحضور والانصراف", icon: "🗂️" },
-    { id: "monthlyreport",    label: "التقرير الشهري/الفصلي",  icon: "📋" },
     { id: "gradeanalysis",    label: "تحليل درجات الطلاب",     icon: "📊" },
     { id: "teacherprofile",   label: "ملف المعلم",             icon: "👨‍🏫" },
+    { id: "monthlyreport",    label: "التقرير الشهري/الفصلي",  icon: "📋" },
+    { id: "absencestats",  label: "إحصائيات الغياب",   icon: "📊" },
+    { id: "attendancereport", label: "تحليل الحضور والانصراف", icon: "🗂️" },
   ];
 
   return (
