@@ -453,7 +453,10 @@ function loadXLSX() {
 }
 // فتح نافذة طباعة
 function printWindow(html) {
-  printWindow(html);
+  const w = window.open("", "_blank");
+  if (!w) return;
+  w.document.write(html);
+  w.document.close();
 }
 
 function PublicAnnouncementsPage({ announcements, siteFont, onLogin, onTeacherPortal, onParentPortal, onStudentRaffle }) {
