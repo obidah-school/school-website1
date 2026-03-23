@@ -7761,55 +7761,173 @@ function GradeAnalysisPage() {
     try {
       const XLSX = await loadXLSX();
       const buf = await file.arrayBuffer();
-      const wb = XLSX.read(buf);
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json(ws, { header:1 });
-      if (rows.length < 2) { setXlsxMsg("⚠️ الملف لا يحتوي على بيانات كافية"); setXlsxLoading(false); return; }
-      
-      const hdrs = (rows[0]||[]).map(h=>String(h||"").trim());
-      const nameIdx = hdrs.findIndex(h=>h.includes("اسم")||h.toLowerCase().includes("name"));
-      const semIdx  = hdrs.findIndex(h=>h.includes("فصل")||h.includes("semester")||h.toLowerCase().includes("sem"));
-      
-      if (nameIdx<0) { setXlsxMsg("⚠️ لم يُعثر على عمود 'اسم الطالب'. تأكد من وجود رأس عمود يحتوي على كلمة 'اسم'"); setXlsxLoading(false); return; }
-      
-      const subjNames_local = Object.keys(GA_SUBJECTS[stage]||{});
-      const subjIndices = {};
-      subjNames_local.forEach(subj => {
-        const cwIdx = hdrs.findIndex(h => h.includes(subj.substring(0,4)) && (h.includes("أعمال")||h.includes("سنة")||h.includes("cw")||!h.includes("نهائي")));
-        const feIdx = hdrs.findIndex(h => h.includes(subj.substring(0,4)) && (h.includes("نهائي")||h.includes("fe")||h.includes("اختبار")));
-        const totalIdx = hdrs.findIndex(h => h.includes(subj.substring(0,4)) && (h.includes("مجموع")||h.includes("total")||h.includes("درجة")));
-        subjIndices[subj] = { cwIdx, feIdx, totalIdx };
-      });
-      
-      const newStudents = rows.slice(1).filter(r=>r[nameIdx]).map(r => {
-        const grades = {};
-        const m_subj = GA_SUBJECTS[stage]||{};
-        subjNames_local.forEach(subj => {
-          const m = GA_MODELS[m_subj[subj]]||GA_MODELS["4"];
-          const idx = subjIndices[subj];
-          const total = idx.totalIdx>=0 ? Number(r[idx.totalIdx])||0 : null;
-          if (total !== null) {
-            const feRatio = m.fe>0 ? m.fe/100 : 0;
-            grades[subj] = { cw: Math.round(total*(1-feRatio)), fe: Math.round(total*feRatio) };
-          } else {
-            const cw = idx.cwIdx>=0 ? Math.min(Number(r[idx.cwIdx])||0, m.cw) : 0;
-            const fe = idx.feIdx>=0 ? Math.min(Number(r[idx.feIdx])||0, m.fe) : 0;
-            grades[subj] = { cw, fe };
+      const wb = XLSX.read(buf, {type:"array"});
+      const newStudents = [];
+
+      // خريطة المواد الإنجليزية → العربية (نموذج وزارة التعليم)
+      const EN_TO_AR = {
+        "math": "الرياضيات",
+        "science": "العلوم",
+        "english": "اللغة الإنجليزية",
+        "arabic": "اللغة العربية",
+        "quran": "القرآن الكريم والدراسات الإسلامية",
+        "islamic": "القرآن الكريم والدراسات الإسلامية",
+        "social": "الدراسات الاجتماعية",
+        "digital": "المهارات الرقمية",
+        "art": "التربية الفنية",
+        "physical": "التربية البدنية والدفاع عن النفس",
+        "1mh": "المهارات الحياتية والأسرية",
+        "life": "المهارات الحياتية والأسرية",
+        "critical": "التفكير الناقد",
+      };
+
+      // كل ورقة = طالب واحد (نموذج وزارة التعليم السعودية)
+      for (const sheetName of wb.SheetNames) {
+        const ws = wb.Sheets[sheetName];
+        // قراءة الخلايا بالمؤشر (row, col) مباشرة لتجاوز مشكلة الدمج
+        const ref = ws["!ref"];
+        if (!ref) continue;
+        const range = XLSX.utils.decode_range(ref);
+        const getCell = (r, c) => {
+          const addr = XLSX.utils.encode_cell({r, c});
+          const cell = ws[addr];
+          return cell ? cell.v : null;
+        };
+
+        // اسم الطالب: صف 28 (index 27)، عمود 35 (index 34)
+        let studentName = "";
+        for (let c = 0; c <= 44; c++) {
+          const v = String(getCell(27, c) || "");
+          if (v.includes("اسم الطالب:")) {
+            studentName = v.replace("اسم الطالب:","").replace(/[:‏]/g,"").trim();
+            break;
           }
+        }
+        if (!studentName || studentName.length < 2) continue;
+
+        // رقم الهوية: صف 29 (index 28)
+        let nationalId = "";
+        for (let c = 0; c <= 44; c++) {
+          const prev = String(getCell(28, c) || "");
+          if (prev.includes("Identity") || prev.includes("رقم")) {
+            nationalId = String(getCell(28, c+1) || getCell(28, c+2) || "");
+            break;
+          }
+        }
+
+        // الفصل الدراسي: صف 15 (index 14)
+        let sem = "الفصل الأول";
+        for (let c = 0; c <= 44; c++) {
+          const v = String(getCell(14, c) || "");
+          if (v.includes("الثاني") && v.includes("فصل")) { sem = "الفصل الثاني"; break; }
+          if (v.includes("الأول") && v.includes("فصل")) { sem = "الفصل الأول"; break; }
+        }
+
+        // المعدل العام والتقدير: صفوف 49-50 (index 48-49)
+        let gpa = "";
+        let generalGrade = "";
+        for (let c = 0; c <= 44; c++) {
+          const r49 = getCell(48, c);
+          if (r49 && String(r49).includes("%")) { gpa = String(r49).replace("%","").trim(); }
+          const r50 = getCell(49, c);
+          if (r50 && ["ممتاز","جيد جداً","جيد","مقبول","ضعيف"].includes(String(r50).trim())) {
+            generalGrade = String(r50).trim();
+          }
+        }
+
+        // درجات المواد: صفوف 35-47 (index 34-46)
+        // الأعمدة الفعلية: 18=اسم إنجليزي، 24=تقدير، 28=موزونة، 34=مجموع/100، 38=نهائي، 40=أدوات
+        const grades = {};
+        const m_subj = GA_SUBJECTS[stage] || {};
+        const subjectRows = [];
+
+        for (let r = 34; r <= 47; r++) {
+          const engName = String(getCell(r, 17) || "").toLowerCase().trim();
+          const gradeAr = String(getCell(r, 23) || "").trim();
+          const weighted = Number(getCell(r, 27)) || 0;
+          const total100 = Number(getCell(r, 33)) || 0;
+          const finalExam = Number(getCell(r, 37)) || 0;
+          const evalTools = Number(getCell(r, 39)) || 0;
+          const shortTests = Number(getCell(r, 41)) || 0;
+
+          if (!engName || total100 === 0) continue;
+
+          // تطابق الاسم الإنجليزي مع المواد
+          let matchedSubj = null;
+          const engLower = engName.toLowerCase();
+
+          // أولاً: مطابقة مباشرة
+          for (const [key, arSubj] of Object.entries(EN_TO_AR)) {
+            if (engLower.includes(key)) {
+              // تحقق أنها في قائمة مواد المرحلة المختارة
+              for (const subj of Object.keys(m_subj)) {
+                if (subj === arSubj || subj.includes(arSubj.substring(0,4))) {
+                  matchedSubj = subj; break;
+                }
+              }
+              if (matchedSubj) break;
+            }
+          }
+
+          if (!matchedSubj) continue;
+
+          const m = GA_MODELS[m_subj[matchedSubj]] || GA_MODELS["4"];
+          const cw = Math.min(Math.max(0, total100 - finalExam), m.cw);
+          const feScore = Math.min(Math.max(0, finalExam), m.fe);
+
+          grades[matchedSubj] = {
+            cw: m.fe > 0 ? cw : Math.min(total100, m.cw),
+            fe: m.fe > 0 ? feScore : 0,
+            total: total100,
+            finalExam,
+            evalTools,
+            shortTests,
+            weighted,
+            gradeAr,
+          };
+
+          subjectRows.push({
+            subj: matchedSubj,
+            engName,
+            gradeAr,
+            total: total100,
+            finalExam,
+            evalTools,
+            shortTests,
+            weighted,
+          });
+        }
+
+        if (Object.keys(grades).length === 0) continue;
+
+        newStudents.push({
+          id: Date.now() + Math.random()*1e5,
+          name: studentName,
+          nationalId,
+          sem,
+          stage,
+          grades,
+          gpa,
+          generalGrade,
+          subjectRows,
         });
-        return { id:Date.now()+Math.random()*1e5, name:String(r[nameIdx]).trim(), sem:semIdx>=0?String(r[semIdx]||"الفصل الأول"):"الفصل الأول", stage, grades };
-      });
-      
+      }
+
+      if (newStudents.length === 0) {
+        setXlsxMsg("⚠️ لم يُعثر على بيانات. تأكد أن الملف بنموذج وزارة التعليم (كل ورقة = طالب)");
+        setXlsxLoading(false); return;
+      }
+
       setStudents(p=>[...p.filter(s=>s.stage!==stage), ...newStudents]);
-      setXlsxMsg(`✅ تم استيراد ${newStudents.length} طالب من الفصل بنجاح!`);
+      setXlsxMsg(`✅ تم استيراد ${newStudents.length} طالب بكامل بياناتهم!`);
       setTimeout(()=>setTab("dashboard"),1500);
-    } catch(e) { setXlsxMsg("❌ خطأ في قراءة الملف: "+e.message); }
+    } catch(e) { setXlsxMsg("❌ خطأ: "+e.message); }
     setXlsxLoading(false);
   };
 
   const getModel = (sub) => GA_MODELS[subjMap[sub]] || GA_MODELS["4"];
-  const subTotal = (sc) => sc ? Math.min((sc.cw||0)+(sc.fe||0),100) : 0;
-  const stuAvg   = (s)  => { const sc=subjNames.map(n=>subTotal(s.grades?.[n])); return sc.length ? Math.round(sc.reduce((a,b)=>a+b,0)/sc.length*10)/10 : 0; };
+  const subTotal = (sc) => { if (!sc) return 0; if (sc.total !== undefined) return sc.total; return Math.min((sc.cw||0)+(sc.fe||0),100); };
+  const stuAvg   = (s)  => { if (s.gpa) return Math.round(parseFloat(s.gpa)*10)/10; const sc=subjNames.map(n=>subTotal(s.grades?.[n])); return sc.length ? Math.round(sc.reduce((a,b)=>a+b,0)/sc.length*10)/10 : 0; };
   const filtered = students.filter(s=>s.stage===stage&&(sem==="الكل"||s.sem===sem));
 
   const analytics = React.useMemo(()=>{
@@ -8053,13 +8171,13 @@ function GradeAnalysisPage() {
       )}
 
       {tab==="dashboard" && (
-        <div className="space-y-4">
+        <div className="space-y-5">
           {!analytics ? (
             <div className="bg-white rounded-2xl p-12 text-center shadow-sm border">
               <div className="text-5xl mb-3">📊</div>
-              <div className="font-black text-gray-600 mb-2">لا توجد بيانات بعد</div>
-              <div className="text-sm text-gray-400">اضغط "بيانات تجريبية" لتجربة النظام أو أضف طلاباً يدوياً</div>
-              <button onClick={loadDemo} className="mt-4 px-6 py-2.5 rounded-xl bg-indigo-600 text-white font-black text-sm hover:bg-indigo-700">🔄 تحميل بيانات تجريبية</button>
+              <div className="font-black text-gray-600 mb-2">لا توجد بيانات</div>
+              <div className="text-sm text-gray-400 mb-4">ارفع ملف Excel أو اضغط "بيانات تجريبية"</div>
+              <button onClick={()=>setTab("excel")} className="px-6 py-2.5 rounded-xl bg-indigo-600 text-white font-black text-sm">📤 استيراد بيانات</button>
             </div>
           ) : (
             <>
@@ -8079,41 +8197,87 @@ function GradeAnalysisPage() {
                 ))}
               </div>
 
-              {/* رسم أعمدة + رادار */}
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-                  <h3 className="font-black text-gray-800 mb-3 text-sm">📊 متوسط الدرجات حسب المادة</h3>
-                  <BarChart data={subjNames.map(s=>({label:s.substring(0,6),value:analytics.ss[s]?.avg||0}))} max={100}/>
-                </div>
-                <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-                  <h3 className="font-black text-gray-800 mb-3 text-sm">🌐 مخطط الرادار</h3>
-                  <RadarChart data={subjNames.map(s=>({label:s,value:analytics.ss[s]?.avg||0}))}/>
-                </div>
-              </div>
-
-              {/* توزيع التقديرات */}
+              {/* رسم الأعمدة — متوسط درجة كل مادة */}
               <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-                <h3 className="font-black text-gray-800 mb-4 text-sm">🎯 توزيع التقديرات</h3>
-                <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
-                  {[{l:"ممتاز",min:90},{l:"جيد جداً",min:80,max:90},{l:"جيد",min:70,max:80},{l:"مقبول",min:60,max:70},{l:"ضعيف",min:50,max:60},{l:"راسب",max:50}].map(gr=>{
-                    const count=analytics.ranked.filter(s=>gr.max?(s.avg>=(gr.min||0)&&s.avg<gr.max):(s.avg>=gr.min)).length;
-                    const g=gaGradeLabel(gr.min||0);
-                    return(
-                      <div key={gr.l} className="rounded-xl p-3 text-center" style={{background:g.bg}}>
-                        <div className="text-2xl font-black" style={{color:g.c}}>{count}</div>
-                        <div className="text-xs font-bold mt-0.5" style={{color:g.c}}>{gr.l}</div>
-                        <div className="text-xs mt-0.5" style={{color:g.c,opacity:.6}}>{Math.round(count/analytics.total*100)}%</div>
+                <h3 className="font-black text-gray-800 mb-4 text-sm">📊 متوسط الدرجة لكل مادة</h3>
+                <div className="space-y-2">
+                  {subjNames.map((sub,i)=>{
+                    const avg=analytics.ss[sub]?.avg||0;
+                    const g=gaGradeLabel(avg);
+                    const m=getModel(sub);
+                    const pct=avg;
+                    return (
+                      <div key={sub} className="flex items-center gap-3">
+                        <div className="text-xs font-bold text-gray-600 text-right flex-shrink-0" style={{width:130,fontSize:11}}>{sub.substring(0,14)}</div>
+                        <div className="flex-1 h-6 rounded-lg overflow-hidden" style={{background:"#f3f4f6"}}>
+                          <div className="h-full rounded-lg flex items-center justify-end pr-2 transition-all duration-700"
+                            style={{width:pct+"%", background:g.bg, border:`1px solid ${g.c}44`}}>
+                            <span className="text-xs font-black" style={{color:g.c}}>{avg}%</span>
+                          </div>
+                        </div>
+                        <div className="text-xs px-2 py-0.5 rounded-full font-bold flex-shrink-0"
+                          style={{background:m.type==="ختامي"?"#fef3c7":"#dcfce7",color:m.type==="ختامي"?"#b45309":"#166534",fontSize:10}}>
+                          {m.name}
+                        </div>
                       </div>
                     );
                   })}
                 </div>
               </div>
+
+              {/* توزيع التقديرات — رسم دائري */}
+              <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+                <h3 className="font-black text-gray-800 mb-4 text-sm">🎯 توزيع التقديرات</h3>
+                <div className="flex flex-wrap gap-2 justify-center mb-4">
+                  {[{l:"ممتاز",min:90},{l:"جيد جداً",min:80,max:90},{l:"جيد",min:70,max:80},{l:"مقبول",min:60,max:70},{l:"ضعيف",min:50,max:60},{l:"دون المستوى",max:50}].map(gr=>{
+                    const count=analytics.ranked.filter(s=>gr.max?(s.avg>=(gr.min||0)&&s.avg<gr.max):(s.avg>=gr.min)).length;
+                    const pct=Math.round(count/analytics.total*100);
+                    const g=gaGradeLabel(gr.min||0);
+                    const w=Math.max(pct,2);
+                    return count>0?(
+                      <div key={gr.l} className="text-center">
+                        <div className="rounded-2xl px-3 py-2 mb-1" style={{background:g.bg,minWidth:60}}>
+                          <div className="text-xl font-black" style={{color:g.c}}>{count}</div>
+                          <div className="text-xs font-bold" style={{color:g.c,opacity:.8}}>{gr.l}</div>
+                          <div className="text-xs" style={{color:g.c,opacity:.6}}>{pct}%</div>
+                        </div>
+                      </div>
+                    ):null;
+                  })}
+                </div>
+                {/* شريط تراكمي */}
+                <div className="h-8 rounded-xl overflow-hidden flex" style={{direction:"ltr"}}>
+                  {[
+                    {l:"ممتاز",min:90,c:"#10b981"},{l:"جيد جداً",min:80,max:90,c:"#3b82f6"},
+                    {l:"جيد",min:70,max:80,c:"#84cc16"},{l:"مقبول",min:60,max:70,c:"#f59e0b"},
+                    {l:"ضعيف",min:50,max:60,c:"#f97316"},{l:"دون المستوى",max:50,c:"#ef4444"},
+                  ].map(gr=>{
+                    const count=analytics.ranked.filter(s=>gr.max?(s.avg>=(gr.min||0)&&s.avg<gr.max):(s.avg>=gr.min)).length;
+                    const pct=count/analytics.total*100;
+                    return pct>0?<div key={gr.l} title={`${gr.l}: ${count} طالب`} style={{width:pct+"%",background:gr.c,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                      {pct>8&&<span style={{color:"#fff",fontSize:10,fontWeight:700}}>{Math.round(pct)}%</span>}
+                    </div>:null;
+                  })}
+                </div>
+                <div className="flex flex-wrap gap-2 mt-2 justify-center">
+                  {[{l:"ممتاز",c:"#10b981"},{l:"جيد جداً",c:"#3b82f6"},{l:"جيد",c:"#84cc16"},{l:"مقبول",c:"#f59e0b"},{l:"دون المستوى",c:"#ef4444"}].map(x=>(
+                    <span key={x.l} className="flex items-center gap-1 text-xs text-gray-500">
+                      <span className="inline-block w-3 h-3 rounded" style={{background:x.c}}/>
+                      {x.l}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              {/* مخطط الرادار */}
+              <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+                <h3 className="font-black text-gray-800 mb-3 text-sm">🌐 مخطط الرادار — نقاط القوة والضعف</h3>
+                <RadarChart data={subjNames.map(s=>({label:s,value:analytics.ss[s]?.avg||0}))}/>
+              </div>
             </>
           )}
         </div>
       )}
-
-      {/* ══ بيانات الطلاب ══ */}
       {tab==="students" && (
         <div className="space-y-4">
           <div className="flex gap-2 flex-wrap">
@@ -8283,38 +8447,93 @@ function GradeAnalysisPage() {
 
       {/* ══ التحليل الشامل ══ */}
       {tab==="analysis" && !analytics && (
-        <div className="bg-white rounded-2xl p-12 text-center shadow-sm border"><div className="text-4xl mb-2">📈</div><div className="font-black text-gray-400">أضف بيانات طلاب أولاً</div></div>
+        <div className="bg-white rounded-2xl p-12 text-center shadow-sm border"><div className="text-4xl mb-2">📈</div><div className="font-black text-gray-400">أضف بيانات أولاً</div></div>
       )}
       {tab==="analysis" && analytics && (
-        <div className="space-y-4">
+        <div className="space-y-5">
+          {/* تحليل مفصّل لكل مادة */}
           <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-            <h3 className="font-black text-gray-800 mb-4 text-sm">📊 تحليل المواد</h3>
-            <div className="space-y-3">
+            <h3 className="font-black text-gray-800 mb-4 text-sm">📚 التحليل الإحصائي لكل مادة</h3>
+            <div className="space-y-4">
               {subjNames.map((sub,i)=>{
-                const s=analytics.ss[sub]; const g=gaGradeLabel(s.avg); const m=getModel(sub);
-                return(
-                  <div key={sub}>
-                    <div className="flex items-center justify-between mb-1 flex-wrap gap-1">
+                const s=analytics.ss[sub]; if(!s) return null;
+                const g=gaGradeLabel(s.avg); const m=getModel(sub);
+                const avgFinal=filtered.reduce((sum,st)=>sum+(st.grades?.[sub]?.finalExam||0),0)/Math.max(filtered.length,1);
+                const avgTools=filtered.reduce((sum,st)=>sum+(st.grades?.[sub]?.evalTools||0),0)/Math.max(filtered.length,1);
+                const avgShort=filtered.reduce((sum,st)=>sum+(st.grades?.[sub]?.shortTests||0),0)/Math.max(filtered.length,1);
+                const hasDetail=filtered.some(st=>st.grades?.[sub]?.finalExam!==undefined);
+                return (
+                  <div key={sub} className="border-2 rounded-2xl overflow-hidden" style={{borderColor:g.c+"33"}}>
+                    {/* رأس المادة */}
+                    <div className="flex items-center justify-between px-4 py-3" style={{background:g.bg}}>
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-black text-gray-700">{sub}</span>
-                        <span className="text-xs px-1.5 py-0.5 rounded-full font-bold" style={{background:m.type==="ختامي"?"#fef3c7":"#dcfce7",color:m.type==="ختامي"?"#b45309":"#166534"}}>{m.name}</span>
+                        <span className="font-black text-sm" style={{color:g.c}}>{sub}</span>
+                        <span className="text-xs px-2 py-0.5 rounded-full font-bold" style={{background:"#fff8",color:g.c}}>{m.name} — {m.type}</span>
                       </div>
-                      <div className="flex items-center gap-2 text-xs">
-                        <span className="text-gray-400">↑{s.max} ↓{s.min} σ{s.sd}</span>
-                        <span className="font-black px-2 py-0.5 rounded-full" style={{background:g.bg,color:g.c}}>{s.avg}%</span>
-                        <span className="text-gray-400">نجاح {s.pr}%</span>
+                      <div className="flex items-center gap-3">
+                        <div className="text-center">
+                          <div className="text-lg font-black" style={{color:g.c}}>{s.avg}%</div>
+                          <div className="text-xs" style={{color:g.c,opacity:.7}}>المتوسط</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-sm font-black" style={{color:g.c}}>{s.pr}%</div>
+                          <div className="text-xs" style={{color:g.c,opacity:.7}}>نجاح</div>
+                        </div>
                       </div>
                     </div>
-                    <div className="h-3 rounded-full" style={{background:"#f3f4f6"}}>
-                      <div className="h-full rounded-full" style={{width:s.avg+"%",background:GA_CC[i%GA_CC.length]}}/>
+                    {/* شريط المتوسط */}
+                    <div className="px-4 pt-3 pb-1">
+                      <div className="flex items-center justify-between text-xs text-gray-400 mb-1">
+                        <span>أدنى: {s.min}%</span><span>أعلى: {s.max}%</span>
+                      </div>
+                      <div className="relative h-4 rounded-full overflow-hidden" style={{background:"#f3f4f6"}}>
+                        <div className="absolute h-full rounded-full" style={{width:s.avg+"%",background:g.c,opacity:.7}}/>
+                        <div className="absolute h-full w-0.5 bg-gray-800" style={{right:s.avg+"%"}}/>
+                        <div className="absolute h-full rounded-full border-2" style={{right:s.min+"%",left:(100-s.max)+"%",borderColor:g.c+"66",background:"transparent"}}/>
+                      </div>
+                    </div>
+                    {/* مكونات الدرجة */}
+                    {hasDetail && (
+                      <div className="px-4 pb-3 pt-2">
+                        <div className="text-xs font-bold text-gray-500 mb-2">توزيع المكونات (متوسط الفصل)</div>
+                        <div className="grid grid-cols-3 gap-2">
+                          {m.fe>0 && <div className="bg-blue-50 rounded-xl p-2 text-center">
+                            <div className="text-base font-black text-blue-700">{Math.round(avgFinal*10)/10}</div>
+                            <div className="text-xs text-blue-500 font-bold">اختبار نهائي</div>
+                            <div className="text-xs text-blue-400">من {m.fe}</div>
+                          </div>}
+                          <div className="bg-amber-50 rounded-xl p-2 text-center">
+                            <div className="text-base font-black text-amber-700">{Math.round(avgTools*10)/10}</div>
+                            <div className="text-xs text-amber-500 font-bold">أدوات تقييم</div>
+                          </div>
+                          {avgShort>0 && <div className="bg-purple-50 rounded-xl p-2 text-center">
+                            <div className="text-base font-black text-purple-700">{Math.round(avgShort*10)/10}</div>
+                            <div className="text-xs text-purple-500 font-bold">اختبارات قصيرة</div>
+                          </div>}
+                        </div>
+                      </div>
+                    )}
+                    {/* توزيع الطلاب في هذه المادة */}
+                    <div className="px-4 pb-3">
+                      <div className="text-xs font-bold text-gray-500 mb-1">توزيع الطلاب</div>
+                      <div className="h-5 rounded-lg overflow-hidden flex" style={{direction:"ltr"}}>
+                        {[{min:90,c:"#10b981"},{min:80,max:90,c:"#3b82f6"},{min:70,max:80,c:"#84cc16"},{min:60,max:70,c:"#f59e0b"},{min:50,max:60,c:"#f97316"},{max:50,c:"#ef4444"}].map((gr,j)=>{
+                          const cnt=filtered.filter(st=>{const v=subTotal(st.grades?.[sub]);return gr.max?(v>=(gr.min||0)&&v<gr.max):(v>=gr.min);}).length;
+                          const pct=cnt/filtered.length*100;
+                          return pct>0?<div key={j} title={`${cnt} طالب`} style={{width:pct+"%",background:gr.c,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                            {pct>8&&<span style={{color:"#fff",fontSize:10,fontWeight:700}}>{cnt}</span>}
+                          </div>:null;
+                        })}
+                      </div>
                     </div>
                   </div>
                 );
               })}
             </div>
           </div>
+          {/* إحصائيات عامة */}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {[{l:"المعدل العام",v:analytics.oa+"%",c:"#6366f1"},{l:"أعلى معدل",v:analytics.mx+"%",c:"#10b981"},{l:"أدنى معدل",v:analytics.mn+"%",c:"#ef4444"},{l:"أقوى مادة",v:analytics.best.substring(0,8),c:"#0ea5e9"},{l:"أضعف مادة",v:analytics.worst.substring(0,8),c:"#f97316"},{l:"ناجح",v:analytics.passed,c:"#10b981"},{l:"دور ثانٍ",v:analytics.failed,c:"#ef4444"},{l:"إجمالي",v:analytics.total,c:"#7c3aed"}].map(k=>(
+            {[{l:"المعدل العام",v:analytics.oa+"%",c:"#6366f1"},{l:"أعلى معدل",v:analytics.mx+"%",c:"#10b981"},{l:"أدنى معدل",v:analytics.mn+"%",c:"#ef4444"},{l:"الانحراف المعياري",v:analytics.sd,c:"#f59e0b"},{l:"أقوى مادة",v:(analytics.best||"").substring(0,8),c:"#0ea5e9"},{l:"أضعف مادة",v:(analytics.worst||"").substring(0,8),c:"#f97316"},{l:"ناجح",v:analytics.passed,c:"#10b981"},{l:"دور ثانٍ",v:analytics.failed,c:"#ef4444"}].map(k=>(
               <div key={k.l} className="bg-white rounded-2xl p-3 shadow-sm border border-gray-100 text-center">
                 <div className="text-xs font-bold text-gray-400 mb-1">{k.l}</div>
                 <div className="font-black text-lg" style={{color:k.c}}>{k.v}</div>
@@ -8323,7 +8542,6 @@ function GradeAnalysisPage() {
           </div>
         </div>
       )}
-
       {/* ══ ترتيب الأوائل ══ */}
       {tab==="ranking" && (
         <div className="space-y-4">
@@ -8366,10 +8584,17 @@ function GradeAnalysisPage() {
                         return(
                           <tr key={s.id} style={{background:i===0?"#fef3c7":i===1?"#ede9fe":i===2?"#ffedd5":i%2===0?"#fff":"#f8fafc"}}>
                             <td className="px-3 py-3 font-black text-lg">{i<3?["🥇","🥈","🥉"][i]:i+1}</td>
-                            <td className="px-3 py-3 font-bold text-gray-800">{s.name}</td>
+                            <td className="px-3 py-3 font-bold text-gray-800">
+                              {s.name}
+                              {s.nationalId && <div className="text-xs text-gray-400">{s.nationalId}</div>}
+                            </td>
                             <td className="px-3 py-3 text-center font-black" style={{color:"#6366f1"}}>{s.avg}%</td>
                             <td className="px-3 py-3 text-center text-xs text-gray-400">{s.sem.replace("الفصل","ف")}</td>
-                            <td className="px-3 py-3 text-center"><span className="text-xs font-black px-2 py-1 rounded-full" style={{background:g.bg,color:g.c}}>{g.l}</span></td>
+                            <td className="px-3 py-3 text-center">
+                              <span className="text-xs font-black px-2 py-1 rounded-full" style={{background:g.bg,color:g.c}}>
+                                {s.generalGrade || g.l}
+                              </span>
+                            </td>
                           </tr>
                         );
                       })}
@@ -8384,50 +8609,133 @@ function GradeAnalysisPage() {
 
       {/* ══ مقارنة الفصلين ══ */}
       {tab==="comparison" && (
-        <div className="space-y-4">
+        <div className="space-y-5">
           {(() => {
-            const semData = {};
-            ["الفصل الأول","الفصل الثاني"].forEach(s=>{
+            const sems=["الفصل الأول","الفصل الثاني"];
+            const semData={};
+            sems.forEach(s=>{
               const ss=students.filter(x=>x.stage===stage&&x.sem===s);
               if(!ss.length) return;
               const avgs=ss.map(x=>stuAvg(x));
+              const oa=Math.round(avgs.reduce((a,b)=>a+b,0)/avgs.length*10)/10;
               const subAvgs={};
-              subjNames.forEach(sub=>{ const scores=ss.map(x=>subTotal(x.grades?.[sub])); subAvgs[sub]=scores.length?Math.round(scores.reduce((a,b)=>a+b,0)/scores.length*10)/10:0; });
-              semData[s]={overall:Math.round(avgs.reduce((a,b)=>a+b,0)/avgs.length*10)/10,subAvgs};
+              subjNames.forEach(sub=>{
+                const scores=ss.map(x=>subTotal(x.grades?.[sub]));
+                const avg=scores.reduce((a,b)=>a+b,0)/scores.length;
+                const finalAvg=ss.reduce((sum,st)=>sum+(st.grades?.[sub]?.finalExam||0),0)/ss.length;
+                const toolsAvg=ss.reduce((sum,st)=>sum+(st.grades?.[sub]?.evalTools||0),0)/ss.length;
+                subAvgs[sub]={avg:Math.round(avg*10)/10,finalAvg:Math.round(finalAvg*10)/10,toolsAvg:Math.round(toolsAvg*10)/10,count:ss.length};
+              });
+              semData[s]={overall:oa,subAvgs,count:ss.length,passRate:Math.round(avgs.filter(a=>a>=50).length/avgs.length*100)};
             });
-            const sems=Object.keys(semData);
-            if(!sems.length) return <div className="bg-white rounded-2xl p-12 text-center shadow-sm border"><div className="text-4xl mb-2">🔄</div><div className="font-black text-gray-400">أضف بيانات الفصلين أولاً</div></div>;
-            return(
+            const avSems=Object.keys(semData);
+            if(!avSems.length) return (
+              <div className="bg-white rounded-2xl p-12 text-center shadow-sm border">
+                <div className="text-4xl mb-2">🔄</div>
+                <div className="font-black text-gray-400">أضف بيانات الفصلين للمقارنة</div>
+                <div className="text-xs text-gray-300 mt-1">استورد ملف الفصل الأول وملف الفصل الثاني</div>
+              </div>
+            );
+            const colors=["#6366f1","#0d9488"];
+            return (
               <>
-                {sems.length>=2 && (
-                  <div className="grid grid-cols-2 gap-3">
-                    {sems.map(s=>{
-                      const d=semData[s]; const g=gaGradeLabel(d.overall);
-                      return <div key={s} className="rounded-2xl p-4 text-center" style={{background:g.bg}}><div className="text-xs font-bold mb-1" style={{color:g.c}}>{s}</div><div className="text-3xl font-black" style={{color:g.c}}>{d.overall}%</div><div className="text-xs font-bold" style={{color:g.c}}>{g.l}</div></div>;
-                    })}
-                  </div>
-                )}
-                <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-                  <h3 className="font-black text-gray-800 mb-4 text-sm">📊 مقارنة المواد بين الفصلين</h3>
-                  <div className="space-y-3">
-                    {subjNames.map((sub,i)=>(
-                      <div key={sub}>
-                        <div className="text-xs font-black text-gray-700 mb-1">{sub}</div>
-                        <div className="space-y-1">
-                          {sems.map((s,si)=>{
-                            const v=semData[s]?.subAvgs[sub]||0;
-                            return(
-                              <div key={s} className="flex items-center gap-2">
-                                <span className="text-xs text-gray-400 w-16 flex-shrink-0">{s.replace("الفصل ","ف")}</span>
-                                <div className="flex-1 h-2.5 rounded-full bg-gray-100">
-                                  <div className="h-full rounded-full" style={{width:v+"%",background:si===0?"#6366f1":"#0ea5e9"}}/>
-                                </div>
-                                <span className="text-xs font-black w-10 text-right" style={{color:si===0?"#6366f1":"#0ea5e9"}}>{v}%</span>
-                              </div>
-                            );
-                          })}
+                {/* ملخص الفصلين */}
+                <div className="grid gap-3" style={{gridTemplateColumns:`repeat(${avSems.length},1fr)`}}>
+                  {avSems.map((s,i)=>{
+                    const d=semData[s]; const g=gaGradeLabel(d.overall);
+                    return (
+                      <div key={s} className="rounded-2xl p-5 text-center" style={{background:g.bg,border:`2px solid ${g.c}44`}}>
+                        <div className="text-sm font-black mb-2" style={{color:g.c}}>{s}</div>
+                        <div className="text-3xl font-black" style={{color:g.c}}>{d.overall}%</div>
+                        <div className="text-xs font-bold mt-1" style={{color:g.c,opacity:.7}}>{g.l}</div>
+                        <div className="flex justify-center gap-4 mt-2 text-xs" style={{color:g.c,opacity:.7}}>
+                          <span>{d.count} طالب</span>
+                          <span>نجاح {d.passRate}%</span>
                         </div>
                       </div>
+                    );
+                  })}
+                </div>
+
+                {/* مقارنة مادة بمادة */}
+                <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+                  <h3 className="font-black text-gray-800 mb-4 text-sm">📊 مقارنة المواد بين الفصلين</h3>
+                  <div className="space-y-4">
+                    {subjNames.map(sub=>{
+                      const vals=avSems.map(s=>semData[s]?.subAvgs[sub]?.avg||0);
+                      const maxVal=Math.max(...vals,1);
+                      const diff=vals.length>=2?Math.round((vals[0]-vals[1])*10)/10:0;
+                      return (
+                        <div key={sub} className="border border-gray-100 rounded-xl p-3">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-xs font-black text-gray-700">{sub}</span>
+                            {vals.length>=2 && <span className={"text-xs font-black px-2 py-0.5 rounded-full "+(diff>0?"bg-green-100 text-green-700":diff<0?"bg-red-100 text-red-700":"bg-gray-100 text-gray-500")}>
+                              {diff>0?"+":""}{diff}% {diff>0?"▲":diff<0?"▼":"="}
+                            </span>}
+                          </div>
+                          <div className="space-y-1.5">
+                            {avSems.map((s,i)=>{
+                              const val=semData[s]?.subAvgs[sub]?.avg||0;
+                              const g=gaGradeLabel(val);
+                              return (
+                                <div key={s} className="flex items-center gap-2">
+                                  <span className="text-xs text-gray-400 flex-shrink-0" style={{width:60,fontSize:10}}>{s.replace("الفصل","ف")}</span>
+                                  <div className="flex-1 h-5 rounded-lg overflow-hidden" style={{background:"#f3f4f6"}}>
+                                    <div className="h-full rounded-lg flex items-center justify-end pr-2"
+                                      style={{width:(val/maxVal*100)+"%",background:colors[i],opacity:.85}}>
+                                      <span className="text-white text-xs font-black">{val}%</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                          {/* مقارنة المكونات إذا وجدت */}
+                          {avSems.length>=2 && semData[avSems[0]]?.subAvgs[sub]?.finalAvg>0 && (
+                            <div className="grid grid-cols-2 gap-2 mt-2">
+                              <div className="bg-blue-50 rounded-lg p-2">
+                                <div className="text-xs text-blue-500 font-bold mb-1">اختبار نهائي</div>
+                                <div className="flex justify-between text-xs font-black text-blue-700">
+                                  {avSems.map(s=><span key={s}>{semData[s]?.subAvgs[sub]?.finalAvg||0}</span>)}
+                                </div>
+                              </div>
+                              <div className="bg-amber-50 rounded-lg p-2">
+                                <div className="text-xs text-amber-500 font-bold mb-1">أدوات تقييم</div>
+                                <div className="flex justify-between text-xs font-black text-amber-700">
+                                  {avSems.map(s=><span key={s}>{semData[s]?.subAvgs[sub]?.toolsAvg||0}</span>)}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* منحنى التحصيل الدراسي */}
+                <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+                  <h3 className="font-black text-gray-800 mb-4 text-sm">📈 توزيع المعدلات</h3>
+                  <div className="flex items-end gap-1 justify-center" style={{height:120}}>
+                    {[50,55,60,65,70,75,80,85,90,95,100].map((threshold,j)=>{
+                      return avSems.map((s,i)=>{
+                        const cnt=students.filter(x=>x.stage===stage&&x.sem===s).filter(x=>{const avg=stuAvg(x);return avg>=threshold&&avg<threshold+5;}).length;
+                        const maxCnt=Math.max(...[50,55,60,65,70,75,80,85,90,95,100].map(t=>students.filter(x=>x.stage===stage&&x.sem===s).filter(x=>{const avg=stuAvg(x);return avg>=t&&avg<t+5;}).length),1);
+                        const h=cnt>0?Math.round(cnt/maxCnt*100):2;
+                        return <div key={s+threshold} title={`${s}: ${cnt} طالب في ${threshold}-${threshold+5}%`}
+                          className="rounded-t-lg flex-1 transition-all" style={{height:h+"%",background:colors[i],opacity:.7+(i*0.15),maxWidth:20}}/>;
+                      });
+                    })}
+                  </div>
+                  <div className="flex justify-between text-xs text-gray-400 mt-1 px-1">
+                    <span>50%</span><span>65%</span><span>80%</span><span>95%</span>
+                  </div>
+                  <div className="flex gap-4 justify-center mt-2">
+                    {avSems.map((s,i)=>(
+                      <span key={s} className="flex items-center gap-1 text-xs text-gray-500">
+                        <span className="inline-block w-3 h-3 rounded" style={{background:colors[i]}}/>
+                        {s.replace("الفصل","الفصل ")}
+                      </span>
                     ))}
                   </div>
                 </div>
@@ -8436,7 +8744,6 @@ function GradeAnalysisPage() {
           })()}
         </div>
       )}
-
       {/* ══ التقرير ══ */}
       {tab==="report" && (
         <div className="space-y-4">
