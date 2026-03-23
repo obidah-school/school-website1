@@ -7742,7 +7742,7 @@ function gaGradeLabel(p){ if(p>=90) return{l:"ممتاز",c:"#10b981",bg:"#dcfce
 function GradeAnalysisPage() {
   const [stage,   setStage]   = useState("متوسط");
   const [sem,     setSem]     = useState("الكل");
-  const [tab,     setTab]     = useState("excel");
+  const [tab,     setTab]     = useState("excel"); // default
   const [students,setStudents]= useState([]);
   const [showForm,setShowForm]= useState(false);
   const [editId,  setEditId]  = useState(null);
@@ -7920,7 +7920,7 @@ function GradeAnalysisPage() {
 
       setStudents(p=>[...p.filter(s=>s.stage!==stage), ...newStudents]);
       setXlsxMsg(`✅ تم استيراد ${newStudents.length} طالب بكامل بياناتهم!`);
-      setTimeout(()=>setTab("dashboard"),1500);
+      setTimeout(()=>setTab("general"),1500);
     } catch(e) { setXlsxMsg("❌ خطأ: "+e.message); }
     setXlsxLoading(false);
   };
@@ -8035,7 +8035,16 @@ function GradeAnalysisPage() {
     printWindow(`<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8"><title>تقرير تحليل الدرجات</title><link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;600;700;900&display=swap" rel="stylesheet"><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Tajawal';direction:rtl;color:#1e293b;background:#fff;padding:20px}.hd{background:linear-gradient(135deg,#0f172a,#6366f1);color:white;padding:20px;border-radius:12px;margin-bottom:20px}.hd h1{font-size:18px;font-weight:900}.kpi{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}.kc{background:#f8fafc;border-radius:10px;padding:12px;text-align:center}.kv{font-size:22px;font-weight:900}.kl{font-size:11px;color:#64748b}h3{font-size:14px;font-weight:800;margin:16px 0 8px;color:#1e3a5f;border-right:3px solid #6366f1;padding-right:8px}table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:16px}th{background:#0f172a;color:#e2e8f0;padding:8px;text-align:right;font-size:11px}td{padding:7px 8px;border-bottom:1px solid #f0f4f8}.footer{text-align:center;margin-top:16px;font-size:10px;color:#94a3b8;border-top:1px solid #e2e8f0;padding-top:10px}@media print{@page{size:A4;margin:1.5cm}body{padding:0}}</style></head><body><div class="hd"><h1>📊 تقرير تحليل الدرجات — دليل وزارة التعليم 2025</h1><p style="opacity:.8;font-size:12px;margin-top:4px">المرحلة: ${stage} | الفصل: ${sem} | ${r.total} طالب | ${new Date().toLocaleDateString("ar-SA")}</p></div><div class="kpi"><div class="kc"><div class="kv" style="color:#6366f1">${r.oa}%</div><div class="kl">المعدل العام</div></div><div class="kc"><div class="kv" style="color:#10b981">${r.passRate}%</div><div class="kl">نسبة النجاح</div></div><div class="kc"><div class="kv" style="color:#10b981">${r.passed}</div><div class="kl">ناجح</div></div><div class="kc"><div class="kv" style="color:#ef4444">${r.failed}</div><div class="kl">دور ثانٍ</div></div></div><h3>تحليل المواد حسب نماذج التقويم</h3><table><thead><tr><th>المادة</th><th>النموذج</th><th>النوع</th><th>المتوسط</th><th>أعلى</th><th>أدنى</th><th>نجاح</th><th>التقدير</th></tr></thead><tbody>${subRows}</tbody></table><h3>بيانات الطلاب</h3><table><thead><tr><th>#</th><th>الاسم</th><th>الفصل</th>${subjNames.map(s=>`<th>${s.substring(0,8)}</th>`).join("")}<th>المعدل</th><th>التقدير</th></tr></thead><tbody>${rows}</tbody></table><div style="background:#f0f9ff;border-radius:10px;padding:14px;margin-bottom:16px"><h3 style="margin-top:0">💡 التوصيات</h3><div style="font-size:12px;line-height:2">• المادة الأضعف: <strong>${r.worst}</strong> بمتوسط ${r.ss[r.worst]?.avg}% — تحتاج دعماً إضافياً<br>${r.failed>0?`• يوجد <strong>${r.failed}</strong> طالب يحتاج اختبار الدور الثاني — يحتفظ بـ40 ويُختبر من 60`:"• جميع الطلاب ناجحون 🎉"}<br>• نسبة النجاح ${r.passRate}% ${r.passRate>=90?"ممتازة 🎉":r.passRate>=70?"جيدة":"تحتاج تحسيناً"}</div></div><div class="footer">مدرسة عبيدة بن الحارث المتوسطة — نظام تحليل الدرجات © ١٤٤٧ هـ</div><script>window.onload=()=>window.print()</script></body></html>`);
   };
 
-  const TABS=[{id:"excel",l:"📤 استيراد إكسل"},{id:"dashboard",l:"📊 لوحة القيادة"},{id:"students",l:"👨‍🎓 بيانات الطلاب"},{id:"models",l:"⚖️ نماذج التقويم"},{id:"analysis",l:"📈 التحليل الشامل"},{id:"ranking",l:"🏆 ترتيب الأوائل"},{id:"comparison",l:"🔄 مقارنة الفصلين"},{id:"report",l:"📋 التقرير"}];
+  const TABS=[
+    {id:"excel",      l:"📤 استيراد"},
+    {id:"general",    l:"📊 الإحصائي العام"},
+    {id:"subjects",   l:"📚 تحليل المواد"},
+    {id:"classes",    l:"🏫 تحليل الفصول"},
+    {id:"studata",    l:"📋 بيانات الطلاب"},
+    {id:"ranking",    l:"🏆 ترتيب الأوائل"},
+    {id:"comparison", l:"🔄 مقارنة الفصلين"},
+    {id:"report",     l:"📄 التقرير"},
+  ];
 
   return (
     <div dir="rtl" className="space-y-4">
@@ -8542,6 +8551,299 @@ function GradeAnalysisPage() {
           </div>
         </div>
       )}
+      {/* ══ التحليل الإحصائي العام ══ */}
+      {tab==="general" && (
+        <div className="space-y-5">
+          {!analytics ? (
+            <div className="bg-white rounded-2xl p-12 text-center shadow-sm border">
+              <div className="text-4xl mb-2">📊</div>
+              <div className="font-black text-gray-400">استورد بيانات أولاً</div>
+              <button onClick={()=>setTab("excel")} className="mt-3 px-5 py-2 rounded-xl bg-indigo-600 text-white font-black text-sm">📤 استيراد</button>
+            </div>
+          ) : (
+            <>
+              {/* بطاقات دائرية رئيسية */}
+              <div className="grid grid-cols-3 gap-4">
+                {[
+                  {label:"العدد الكلي", value:analytics.total, suffix:"", color:"#10b981"},
+                  {label:"متوسط الدرجات", value:analytics.oa, suffix:"%", color:"#6366f1"},
+                  {label:"التقدير العام", value:gaGradeLabel(analytics.oa).l, suffix:"", color:gaGradeLabel(analytics.oa).c, isText:true},
+                ].map(item=>(
+                  <div key={item.label} className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex flex-col items-center gap-3">
+                    <div className="relative" style={{width:110,height:110}}>
+                      <svg viewBox="0 0 110 110" width="110" height="110">
+                        <circle cx="55" cy="55" r="48" fill="none" stroke="#f3f4f6" strokeWidth="8"/>
+                        <circle cx="55" cy="55" r="48" fill="none" stroke={item.color} strokeWidth="8"
+                          strokeDasharray={`${item.isText?301:Math.min((item.value/100)*301,301)} 301`}
+                          strokeLinecap="round" transform="rotate(-90 55 55)"
+                          style={{transition:"stroke-dasharray 1s ease"}}/>
+                      </svg>
+                      <div className="absolute inset-0 flex items-center justify-center flex-col">
+                        <span className="font-black text-gray-800" style={{fontSize:item.isText?14:20}}>{item.value}{item.suffix}</span>
+                      </div>
+                    </div>
+                    <div className="text-sm font-black text-gray-500">{item.label}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* تحليل كل مادة */}
+              {subjNames.map(sub=>{
+                const s=analytics.ss[sub]; if(!s) return null;
+                const g=gaGradeLabel(s.avg);
+                const counts={};
+                const labels=[{l:"ممتاز",min:90},{l:"جيد جداً",min:80,max:90},{l:"جيد",min:70,max:80},{l:"مقبول",min:60,max:70},{l:"ضعيف",min:50,max:60},{l:"دون المستوى",max:50}];
+                labels.forEach(gr=>{
+                  counts[gr.l]=filtered.filter(st=>{
+                    const v=subTotal(st.grades?.[sub]);
+                    return gr.max?(v>=(gr.min||0)&&v<gr.max):(v>=gr.min);
+                  }).length;
+                });
+                const passed=filtered.filter(st=>subTotal(st.grades?.[sub])>=60).length;
+                const failed=filtered.length-passed;
+                return (
+                  <div key={sub} className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+                    <h3 className="font-black text-blue-700 text-base mb-4 text-right">{sub}</h3>
+                    <div className="grid grid-cols-3 gap-3 mb-3">
+                      <div className="rounded-2xl p-3 text-center bg-gray-50 border border-gray-200">
+                        <div className="text-sm text-gray-500 font-bold mb-1">العدد الكلي</div>
+                        <div className="text-2xl font-black text-gray-800">{filtered.length}</div>
+                      </div>
+                      <div className="rounded-2xl p-3 text-center bg-green-50 border border-green-200">
+                        <div className="text-sm text-green-600 font-bold mb-1">الناجحون</div>
+                        <div className="text-2xl font-black text-green-700">{passed}</div>
+                        {Object.entries(counts).filter(([k,v])=>v>0&&["ممتاز","جيد جداً","جيد","مقبول"].includes(k)).map(([k,v])=>(
+                          <div key={k} className="text-xs text-green-600">{k}: {v}</div>
+                        ))}
+                      </div>
+                      <div className="rounded-2xl p-3 text-center bg-red-50 border border-red-200">
+                        <div className="text-sm text-red-500 font-bold mb-1">المتعثرون</div>
+                        <div className="text-2xl font-black text-red-600">{failed}</div>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="rounded-2xl p-3 text-center bg-green-50 border border-green-200">
+                        <div className="text-xs text-green-500 font-bold mb-1">متوسط الدرجات</div>
+                        <div className="text-xl font-black text-green-700">{s.avg}</div>
+                        <div className="text-xs text-green-500">{s.avg}%</div>
+                      </div>
+                      <div className="rounded-2xl p-3 text-center bg-green-50 border border-green-200">
+                        <div className="text-xs text-green-500 font-bold mb-1">أعلى درجة</div>
+                        <div className="text-xl font-black text-green-700">{s.max}</div>
+                      </div>
+                      <div className="rounded-2xl p-3 text-center bg-red-50 border border-red-200">
+                        <div className="text-xs text-red-500 font-bold mb-1">أقل درجة</div>
+                        <div className="text-xl font-black text-red-600">{s.min}</div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ══ تحليل المواد الدراسية ══ */}
+      {tab==="subjects" && (
+        <div className="space-y-4">
+          {!analytics ? (
+            <div className="bg-white rounded-2xl p-12 text-center shadow-sm border"><div className="text-4xl mb-2">📚</div><div className="font-black text-gray-400">استورد بيانات أولاً</div></div>
+          ) : (
+            <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead style={{background:"#1e3a5f"}}>
+                    <tr>
+                      <th className="px-3 py-3 text-right text-xs text-gray-200 font-bold">الرقم</th>
+                      <th className="px-3 py-3 text-right text-xs text-gray-200 font-bold">المادة</th>
+                      <th className="px-3 py-3 text-center text-xs text-gray-200 font-bold">العدد</th>
+                      <th className="px-3 py-3 text-center text-xs text-red-300 font-bold">ضعيف</th>
+                      <th className="px-3 py-3 text-center text-xs text-red-300 font-bold">%</th>
+                      <th className="px-3 py-3 text-center text-xs text-orange-300 font-bold">مقبول</th>
+                      <th className="px-3 py-3 text-center text-xs text-orange-300 font-bold">%</th>
+                      <th className="px-3 py-3 text-center text-xs text-yellow-300 font-bold">جيد</th>
+                      <th className="px-3 py-3 text-center text-xs text-yellow-300 font-bold">%</th>
+                      <th className="px-3 py-3 text-center text-xs text-blue-300 font-bold">جيد جداً</th>
+                      <th className="px-3 py-3 text-center text-xs text-blue-300 font-bold">%</th>
+                      <th className="px-3 py-3 text-center text-xs text-green-300 font-bold">ممتاز</th>
+                      <th className="px-3 py-3 text-center text-xs text-green-300 font-bold">%</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(() => {
+                      const totals={dha:0,maq:0,jay:0,jayjay:0,mum:0,total:0};
+                      return [...subjNames.map((sub,i)=>{
+                        const n=filtered.length;
+                        const dha=filtered.filter(s=>subTotal(s.grades?.[sub])>=50&&subTotal(s.grades?.[sub])<60).length;
+                        const maq=filtered.filter(s=>subTotal(s.grades?.[sub])>=60&&subTotal(s.grades?.[sub])<70).length;
+                        const jay=filtered.filter(s=>subTotal(s.grades?.[sub])>=70&&subTotal(s.grades?.[sub])<80).length;
+                        const jayjay=filtered.filter(s=>subTotal(s.grades?.[sub])>=80&&subTotal(s.grades?.[sub])<90).length;
+                        const mum=filtered.filter(s=>subTotal(s.grades?.[sub])>=90).length;
+                        totals.dha+=dha; totals.maq+=maq; totals.jay+=jay; totals.jayjay+=jayjay; totals.mum+=mum; totals.total+=n;
+                        const pct=v=>n>0?(v/n*100).toFixed(1)+"%":"0.0%";
+                        return (
+                          <tr key={sub} className={i%2===0?"":"bg-gray-50"}>
+                            <td className="px-3 py-2.5 text-gray-400 font-bold text-center">{i+1}</td>
+                            <td className="px-3 py-2.5 font-bold text-gray-800" style={{maxWidth:120}}>{sub.substring(0,18)}{sub.length>18?"...":""}</td>
+                            <td className="px-3 py-2.5 text-center font-bold text-gray-700">{n}</td>
+                            <td className="px-3 py-2.5 text-center font-black text-red-600">{dha}</td>
+                            <td className="px-3 py-2.5 text-center text-red-400 text-xs">{pct(dha)}</td>
+                            <td className="px-3 py-2.5 text-center font-black text-orange-600">{maq}</td>
+                            <td className="px-3 py-2.5 text-center text-orange-400 text-xs">{pct(maq)}</td>
+                            <td className="px-3 py-2.5 text-center font-black text-yellow-600">{jay}</td>
+                            <td className="px-3 py-2.5 text-center text-yellow-500 text-xs">{pct(jay)}</td>
+                            <td className="px-3 py-2.5 text-center font-black text-blue-600">{jayjay}</td>
+                            <td className="px-3 py-2.5 text-center text-blue-400 text-xs">{pct(jayjay)}</td>
+                            <td className="px-3 py-2.5 text-center font-black text-green-600">{mum}</td>
+                            <td className="px-3 py-2.5 text-center text-green-400 text-xs">{pct(mum)}</td>
+                          </tr>
+                        );
+                      }),
+                      <tr key="total" className="border-t-2 border-blue-200 bg-blue-50">
+                        <td colSpan={2} className="px-3 py-3 font-black text-blue-700 text-right">المجموع</td>
+                        <td className="px-3 py-3 text-center font-black text-blue-700">{totals.total}</td>
+                        <td className="px-3 py-3 text-center font-black text-red-600">{totals.dha}</td>
+                        <td className="px-3 py-3 text-center text-red-400 text-xs">{totals.total>0?(totals.dha/totals.total*100).toFixed(1)+"%":"0%"}</td>
+                        <td className="px-3 py-3 text-center font-black text-orange-600">{totals.maq}</td>
+                        <td className="px-3 py-3 text-center text-orange-400 text-xs">{totals.total>0?(totals.maq/totals.total*100).toFixed(1)+"%":"0%"}</td>
+                        <td className="px-3 py-3 text-center font-black text-yellow-600">{totals.jay}</td>
+                        <td className="px-3 py-3 text-center text-yellow-500 text-xs">{totals.total>0?(totals.jay/totals.total*100).toFixed(1)+"%":"0%"}</td>
+                        <td className="px-3 py-3 text-center font-black text-blue-600">{totals.jayjay}</td>
+                        <td className="px-3 py-3 text-center text-blue-400 text-xs">{totals.total>0?(totals.jayjay/totals.total*100).toFixed(1)+"%":"0%"}</td>
+                        <td className="px-3 py-3 text-center font-black text-green-600">{totals.mum}</td>
+                        <td className="px-3 py-3 text-center text-green-400 text-xs">{totals.total>0?(totals.mum/totals.total*100).toFixed(1)+"%":"0%"}</td>
+                      </tr>
+                      ];
+                    })()}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ══ تحليل الفصول الدراسية ══ */}
+      {tab==="classes" && (
+        <div className="space-y-4">
+          {!analytics ? (
+            <div className="bg-white rounded-2xl p-12 text-center shadow-sm border"><div className="text-4xl mb-2">🏫</div><div className="font-black text-gray-400">استورد بيانات أولاً</div></div>
+          ) : (
+            <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead style={{background:"#1e3a5f"}}>
+                    <tr>
+                      <th className="px-4 py-3 text-right text-xs text-gray-200 font-bold">الرقم</th>
+                      <th className="px-4 py-3 text-right text-xs text-gray-200 font-bold">الصف</th>
+                      <th className="px-4 py-3 text-center text-xs text-gray-200 font-bold">العدد</th>
+                      <th className="px-4 py-3 text-center text-xs text-gray-300 font-bold">غائب</th>
+                      <th className="px-4 py-3 text-center text-xs text-red-300 font-bold">ضعيف</th>
+                      <th className="px-4 py-3 text-center text-xs text-orange-300 font-bold">مقبول</th>
+                      <th className="px-4 py-3 text-center text-xs text-yellow-300 font-bold">جيد</th>
+                      <th className="px-4 py-3 text-center text-xs text-blue-300 font-bold">جيد جداً</th>
+                      <th className="px-4 py-3 text-center text-xs text-green-300 font-bold">ممتاز</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(() => {
+                      const sems=sem==="الكل"?["الفصل الأول","الفصل الثاني"]:([sem]);
+                      const rows=[];
+                      let tot={n:0,gh:0,dh:0,mq:0,jy:0,jj:0,mm:0};
+                      sems.forEach((s,idx)=>{
+                        const ss=filtered.filter(x=>x.sem===s||sem!=="الكل");
+                        if(!ss.length) return;
+                        const n=ss.length;
+                        const gh=0;
+                        const dh=ss.filter(x=>stuAvg(x)>=50&&stuAvg(x)<60).length;
+                        const mq=ss.filter(x=>stuAvg(x)>=60&&stuAvg(x)<70).length;
+                        const jy=ss.filter(x=>stuAvg(x)>=70&&stuAvg(x)<80).length;
+                        const jj=ss.filter(x=>stuAvg(x)>=80&&stuAvg(x)<90).length;
+                        const mm=ss.filter(x=>stuAvg(x)>=90).length;
+                        tot.n+=n; tot.gh+=gh; tot.dh+=dh; tot.mq+=mq; tot.jy+=jy; tot.jj+=jj; tot.mm+=mm;
+                        rows.push(
+                          <tr key={s} className={idx%2===0?"":"bg-gray-50"}>
+                            <td className="px-4 py-3 text-center text-gray-400 font-bold">{idx+1}</td>
+                            <td className="px-4 py-3 font-bold text-gray-800">{stage} — {s}</td>
+                            <td className="px-4 py-3 text-center font-black text-gray-700">{n}</td>
+                            <td className="px-4 py-3 text-center font-black text-gray-500">{gh}</td>
+                            <td className="px-4 py-3 text-center font-black text-red-600">{dh}</td>
+                            <td className="px-4 py-3 text-center font-black text-orange-600">{mq}</td>
+                            <td className="px-4 py-3 text-center font-black text-yellow-600">{jy}</td>
+                            <td className="px-4 py-3 text-center font-black text-blue-600">{jj}</td>
+                            <td className="px-4 py-3 text-center font-black text-green-600">{mm}</td>
+                          </tr>
+                        );
+                      });
+                      rows.push(
+                        <tr key="total" className="bg-blue-50 border-t-2 border-blue-200">
+                          <td colSpan={2} className="px-4 py-3 font-black text-blue-700 text-right">المجموع</td>
+                          <td className="px-4 py-3 text-center font-black text-blue-700">{tot.n}</td>
+                          <td className="px-4 py-3 text-center font-black text-gray-600">{tot.gh}</td>
+                          <td className="px-4 py-3 text-center font-black text-red-600">{tot.dh}</td>
+                          <td className="px-4 py-3 text-center font-black text-orange-600">{tot.mq}</td>
+                          <td className="px-4 py-3 text-center font-black text-yellow-600">{tot.jy}</td>
+                          <td className="px-4 py-3 text-center font-black text-blue-600">{tot.jj}</td>
+                          <td className="px-4 py-3 text-center font-black text-green-600">{tot.mm}</td>
+                        </tr>
+                      );
+                      return rows;
+                    })()}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ══ بيانات الطلاب الكاملة ══ */}
+      {tab==="studata" && (
+        <div className="space-y-4">
+          {filtered.length===0 ? (
+            <div className="bg-white rounded-2xl p-12 text-center shadow-sm border"><div className="text-4xl mb-2">👨‍🎓</div><div className="font-black text-gray-400">استورد بيانات أولاً</div></div>
+          ) : (
+            <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100">
+              <div className="overflow-x-auto">
+                <table className="w-full" style={{fontSize:12}}>
+                  <thead style={{background:"#1e3a5f",position:"sticky",top:0,zIndex:10}}>
+                    <tr>
+                      <th className="px-3 py-3 text-right text-gray-200 font-bold whitespace-nowrap">الرقم</th>
+                      <th className="px-3 py-3 text-right text-gray-200 font-bold whitespace-nowrap">اسم الطالب/ة</th>
+                      {subjNames.map(s=><th key={s} className="px-2 py-3 text-center text-gray-200 font-bold" style={{minWidth:70}}>{s.substring(0,8)}{s.length>8?"...":""}</th>)}
+                      <th className="px-3 py-3 text-center text-green-300 font-bold">المعدل</th>
+                      <th className="px-3 py-3 text-center text-yellow-300 font-bold">التقدير</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[...filtered].sort((a,b)=>stuAvg(b)-stuAvg(a)).map((s,i)=>{
+                      const avg=stuAvg(s);
+                      const g=gaGradeLabel(avg);
+                      const gradeColor=v=>v>=90?"#16a34a":v>=80?"#2563eb":v>=70?"#ca8a04":v>=60?"#ea580c":v>=50?"#dc2626":"#991b1b";
+                      return (
+                        <tr key={s.id} className={i%2===0?"":"bg-gray-50"} style={{borderBottom:"1px solid #f3f4f6"}}>
+                          <td className="px-3 py-2 text-center text-gray-400 font-bold">{i+1}</td>
+                          <td className="px-3 py-2 font-bold text-gray-800 whitespace-nowrap">{s.name}</td>
+                          {subjNames.map(sub=>{
+                            const v=subTotal(s.grades?.[sub]);
+                            return <td key={sub} className="px-2 py-2 text-center font-black" style={{color:v>0?gradeColor(v):"#9ca3af"}}>{v||"—"}</td>;
+                          })}
+                          <td className="px-3 py-2 text-center font-black" style={{color:"#6366f1"}}>{avg}%</td>
+                          <td className="px-3 py-2 text-center">
+                            <span className="px-2 py-0.5 rounded-full text-xs font-black" style={{background:g.bg,color:g.c}}>{s.generalGrade||g.l}</span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ══ ترتيب الأوائل ══ */}
       {tab==="ranking" && (
         <div className="space-y-4">
@@ -8572,24 +8874,28 @@ function GradeAnalysisPage() {
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead style={{background:"#0f172a"}}><tr>
-                      <th className="px-3 py-3 text-right text-xs text-gray-300 font-bold">الترتيب</th>
+                      <th className="px-3 py-3 text-center text-xs text-gray-300 font-bold">الترتيب</th>
                       <th className="px-3 py-3 text-right text-xs text-gray-300 font-bold">الاسم</th>
-                      <th className="px-3 py-3 text-center text-xs text-gray-300 font-bold">المعدل</th>
-                      <th className="px-3 py-3 text-center text-xs text-gray-300 font-bold">الفصل</th>
-                      <th className="px-3 py-3 text-center text-xs text-gray-300 font-bold">التقدير</th>
+                      <th className="px-3 py-3 text-center text-xs text-green-300 font-bold">المعدل %</th>
+                      {subjNames.slice(0,5).map(s=><th key={s} className="px-2 py-3 text-center text-xs text-gray-300 font-bold" style={{minWidth:55}}>{s.substring(0,6)}</th>)}
+                      <th className="px-3 py-3 text-center text-xs text-yellow-300 font-bold">التقدير</th>
                     </tr></thead>
                     <tbody>
                       {analytics.ranked.map((s,i)=>{
                         const g=gaGradeLabel(s.avg);
                         return(
                           <tr key={s.id} style={{background:i===0?"#fef3c7":i===1?"#ede9fe":i===2?"#ffedd5":i%2===0?"#fff":"#f8fafc"}}>
-                            <td className="px-3 py-3 font-black text-lg">{i<3?["🥇","🥈","🥉"][i]:i+1}</td>
+                            <td className="px-3 py-3 font-black text-lg text-center">{i<3?["🥇","🥈","🥉"][i]:i+1}</td>
                             <td className="px-3 py-3 font-bold text-gray-800">
                               {s.name}
                               {s.nationalId && <div className="text-xs text-gray-400">{s.nationalId}</div>}
                             </td>
-                            <td className="px-3 py-3 text-center font-black" style={{color:"#6366f1"}}>{s.avg}%</td>
-                            <td className="px-3 py-3 text-center text-xs text-gray-400">{s.sem.replace("الفصل","ف")}</td>
+                            <td className="px-3 py-3 text-center font-black text-lg" style={{color:"#6366f1"}}>{s.avg}%</td>
+                            {subjNames.slice(0,5).map(sub=>{
+                              const v=subTotal(s.grades?.[sub]);
+                              const gc=gaGradeLabel(v);
+                              return <td key={sub} className="px-2 py-3 text-center font-black text-sm" style={{color:v>0?gc.c:"#9ca3af"}}>{v||"—"}</td>;
+                            })}
                             <td className="px-3 py-3 text-center">
                               <span className="text-xs font-black px-2 py-1 rounded-full" style={{background:g.bg,color:g.c}}>
                                 {s.generalGrade || g.l}
@@ -9368,6 +9674,412 @@ function LessonRecommendPage({ classList }) {
           <div className="font-black text-gray-600">اختر فصلاً وطالباً لعرض التوصيات</div>
         </div>
       )}
+    </div>
+  );
+}
+
+
+// ===== النماذج الرسمية — الدليل الإجرائي =====
+const SCHOOL_NAME = "مدرسة عبيدة بن الحارث المتوسطة";
+const FORM_GREEN = "#2d6a4f";
+const FORM_LIGHT = "#d8f3dc";
+
+function OfficialFormsPage({ teachers, attendance, week }) {
+  const [accounts, setAccounts] = useState([]);
+  const [selectedTeacher, setSelectedTeacher] = useState("");
+  const [formType, setFormType] = useState("warning"); // warning | deduct_late | absence_investigate | absence_deduct
+  const [formData, setFormData] = useState({
+    date: "", dateH: "", timeFrom: "", timeTo: "", absFrom: "", absTo: "",
+    type: "تأخر", days: "", spec: "", rank: "", jobNo: "", jobTitle: "",
+    nationalId: "", reason: "", lateHours: "",
+  });
+
+  useEffect(() => {
+    DB.get("school-teacher-accounts", []).then(d => setAccounts(Array.isArray(d)?d:[]));
+  }, []);
+
+  // اختيار معلم — يملأ بياناته تلقائياً
+  const handleSelectTeacher = (name) => {
+    setSelectedTeacher(name);
+    const acc = accounts.find(a => a.name === name) || {};
+    setFormData(p => ({ ...p, nationalId: acc.id || "" }));
+    // حساب أيام الغياب التلقائي
+    const ti = teachers.indexOf(name);
+    const absDays = ti >= 0 ? week.days.filter((_,di) => (attendance[ti]?.[di]?.status||"حاضر")==="غائب").length : 0;
+    const lateMins = ti >= 0 ? week.days.reduce((s,_,di) => {
+      const r = attendance[ti]?.[di]||{};
+      return s + (r.status==="متأخر" ? (parseInt(r.lateMinutes)||0) : 0);
+    }, 0) : 0;
+    setFormData(p => ({ ...p, days: absDays > 0 ? String(absDays) : "", lateHours: lateMins > 0 ? `${Math.floor(lateMins/60)} ساعة و ${lateMins%60} دقيقة` : "" }));
+  };
+
+  const FORM_TYPES = [
+    { id:"warning",           label:"تنبيه على تأخر / انصراف", code:"و.م.ع.ن.-٠٢-٠٢" },
+    { id:"deduct_late",       label:"قرار حسم ساعات تأخر وخروج مبكر", code:"و.م.ع.ن.-٠٣-٠٢" },
+    { id:"absence_investigate",label:"مساءلة غياب", code:"و.م.ع.ن.-٠٤-٠٢" },
+    { id:"absence_deduct",    label:"قرار حسم غياب", code:"و.م.ع.ن.-٠٥-٠٢" },
+  ];
+
+  const currentForm = FORM_TYPES.find(f => f.id === formType);
+
+  const printForm = () => {
+    const t = selectedTeacher || "___________";
+    const nid = formData.nationalId || "___________";
+    const dateH = formData.dateH || "١٤ هـ  /  /";
+    const spec = formData.spec || "___________";
+    const rank = formData.rank || "___________";
+    const jobNo = formData.jobNo || "___________";
+    const jobTitle = formData.jobTitle || "___________";
+
+    const headerStyle = `background:${FORM_GREEN};color:#fff;padding:6px 10px;font-weight:bold;font-size:13px`;
+    const cellStyle = `border:1px solid #aaa;padding:6px 10px;font-size:12px`;
+    const tableHdr = `<table border="1" cellpadding="6" style="border-collapse:collapse;width:100%;font-size:12px;margin-bottom:12px">
+      <tr style="${headerStyle}">
+        <th>الاسم</th><th>التخصص</th><th>المستوى / المرتبة</th><th>رقم الوظيفة</th><th>العمل الحالي</th>
+      </tr>
+      <tr>
+        <td style="${cellStyle}">${t}</td>
+        <td style="${cellStyle}">${spec}</td>
+        <td style="${cellStyle}">${rank}</td>
+        <td style="${cellStyle}">${jobNo}</td>
+        <td style="${cellStyle}">${jobTitle}</td>
+      </tr>
+    </table>`;
+
+    let body = "";
+
+    if (formType === "warning") {
+      const warnType = formData.type === "تأخر" ?
+        `تأخركم من بداية العمل ، وحضوركم الساعة ( ${formData.timeFrom||"    "} )` :
+        formData.type === "مغادرة" ?
+        `عدم تواجدكم أثناء العمل من الساعة ( ${formData.timeFrom||"    "} ) إلى الساعة ( ${formData.timeTo||"    "} )` :
+        `انصرافكم مبكراً قبل نهاية العمل من الساعة ( ${formData.timeFrom||"    "} )`;
+
+      body = `
+        <div style="display:flex;justify-content:space-between;margin-bottom:10px">
+          <div><b>اسم النموذج : تنبيه على تأخر / انصراف</b></div>
+          <div><b>رمز النموذج : (و.م.ع.ن.-٠٢-٠٢)</b></div>
+        </div>
+        <table border="1" cellpadding="5" style="border-collapse:collapse;width:100%;margin-bottom:12px">
+          <tr><td style="${headerStyle};text-align:right" colspan="2">المدرسة</td><td colspan="3">${SCHOOL_NAME}</td></tr>
+          <tr><td style="${headerStyle};text-align:right" colspan="2">السجل المدني</td><td colspan="3">${nid}</td></tr>
+        </table>
+        ${tableHdr}
+        <p>المكرم المعلم / <u>${t}</u> وفقه الله</p>
+        <p>السلام عليكم ورحمة الله وبركاته &nbsp;&nbsp;&nbsp;&nbsp; وبعد :</p>
+        <p>إنه في يوم ............... الموافق ${dateH} اتضح ما يلي :</p>
+        <p style="margin-right:20px">- ${warnType}</p>
+        <p>عليه نأمل توضيح أسباب ذلك مع إرفاق ما يؤيد عذركم ،،، ولكم تحياتي</p>
+        <div style="display:flex;justify-content:space-between;margin-top:15px">
+          <div>التاريخ : ${dateH}</div>
+          <div>التوقيع : ___________</div>
+          <div>قائد المدرسة : ___________</div>
+        </div>
+        <div style="border-top:2px dashed #aaa;margin:20px 0"></div>
+        <p><b>المكرم / مدير مدرسة ___________</b></p>
+        <p>السلام عليكم ورحمة الله وبركاته<br>أفيدكم بأن أسباب ذلك ما يلي :</p>
+        <div style="border-bottom:1px solid #aaa;height:25px;margin:8px 0"></div>
+        <div style="border-bottom:1px solid #aaa;height:25px;margin:8px 0"></div>
+        <div style="display:flex;justify-content:space-between;margin-top:15px">
+          <div>التاريخ : ${dateH}</div>
+          <div>التوقيع : ___________</div>
+          <div>الاسم : ${t}</div>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-top:20px;border:1px solid #aaa;padding:10px;border-radius:8px">
+          <div><b>رأي قائد المدرسة :</b></div>
+          <div>□ عذره مقبول</div>
+          <div>□ عذره غير مقبول ويحسم عليه</div>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-top:10px">
+          <div>التاريخ : ${dateH}</div>
+          <div>التوقيع : ___________</div>
+          <div>قائد المدرسة : ___________</div>
+        </div>
+        <p style="font-size:11px;margin-top:15px;color:#555"><b>ملاحظة :</b> ترفق بطاقة المساءلة مع أصل القرار في حالة عدم قبول العذر ، أصله للملفه بالإدارة.</p>
+      `;
+    } else if (formType === "deduct_late") {
+      body = `
+        <div style="text-align:center;margin-bottom:15px"><h3>نموذج رقم (١٩)</h3></div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:10px">
+          <div><b>اسم النموذج : قرار حسم مجموع ساعات تأخر وخروج مبكر</b></div>
+          <div><b>رمز النموذج : (و.م.ع.ن.-٠٣-٠٢)</b></div>
+        </div>
+        <table border="1" cellpadding="5" style="border-collapse:collapse;width:100%;margin-bottom:12px">
+          <tr><td style="${headerStyle};text-align:right" colspan="2">المدرسة</td><td colspan="3">${SCHOOL_NAME}</td></tr>
+          <tr><td style="${headerStyle};text-align:right" colspan="2">السجل المدني</td><td colspan="3">${nid}</td></tr>
+        </table>
+        ${tableHdr}
+        <p>إن مدير المدرسة ، وبناءً على صلاحياته ، وبناءً على المادة (٢١) من نظام الخدمة المدنية وبناءً على موافقة معالي الوزير على إعطاء بعض الصلاحيات لمديري المدارس بالقرار رقم ١/١١٣٩ وتاريخ ١٤٣١/٣/١٧هـ ، ولبلوغ ساعات التأخر عن العمل والخروج المبكر من العمل ( <u>${formData.lateHours||"    "}</u> ) ساعة ، وحيث إن عذره غير مقبول ، وبمقتضى النظام .</p>
+        <p><b>يقرر ما يلي :</b></p>
+        <p>(١) حسم مدة الغياب الموضحة بعاليه وعددها ( <u>${formData.days||"    "}</u> ) يوماً من راتبه .</p>
+        <p>(٢) على إدارة شؤون الموظفين ( تنفيذ الأنظمة ) تنفيذ إجراء الحسم واستبعادها من خدماته وإرسال القرار للملف بالإدارة .</p>
+        <p style="text-align:center"><b>والله الموفق</b></p>
+        <div style="margin-top:20px">
+          <p>الرئيس المباشر</p>
+          <p>الاسم : ___________</p>
+          <p>الختم</p>
+          <p>التوقيع : ___________</p>
+          <p>التاريخ : ${dateH}</p>
+        </div>
+        <div style="font-size:11px;margin-top:15px;color:#555">
+          <p>صورة / للموظفين لمتابعة تنفيذ الحسم ( تنفيذ الأنظمة )</p>
+          <p>صورة / لمكتب التعليم</p>
+          <p>صورة/ للملف بالمدرسة</p>
+        </div>
+      `;
+    } else if (formType === "absence_investigate") {
+      body = `
+        <div style="display:flex;justify-content:space-between;margin-bottom:10px">
+          <div><b>اسم النموذج : مساءلة غياب</b></div>
+          <div><b>رمز النموذج : (و.م.ع.ن.-٠٤-٠٢)</b></div>
+        </div>
+        <table border="1" cellpadding="5" style="border-collapse:collapse;width:100%;margin-bottom:12px">
+          <tr><td style="${headerStyle};text-align:right" colspan="2">المدرسة</td><td colspan="5">${SCHOOL_NAME}</td></tr>
+          <tr><td style="${headerStyle};text-align:right" colspan="2">السجل المدني</td><td colspan="5">${nid}</td></tr>
+        </table>
+        <table border="1" cellpadding="5" style="border-collapse:collapse;width:100%;font-size:12px;margin-bottom:12px">
+          <tr style="${headerStyle}"><th>الاسم</th><th>التخصص</th><th>المستوى/المرتبة</th><th>رقم الوظيفة</th><th>العمل الحالي</th><th>عدد أيام الغياب</th></tr>
+          <tr><td>${t}</td><td>${spec}</td><td>${rank}</td><td>${jobNo}</td><td>${jobTitle}</td><td style="text-align:center;font-weight:bold;color:red">${formData.days||"    "}</td></tr>
+        </table>
+        <div style="display:flex;justify-content:space-between;border:1px solid #aaa;padding:8px;margin-bottom:15px">
+          <span>إنه في يوم .......... الموافق ${dateH} تغيبت عن العمل إلى يوم</span>
+          <span>الموافق ${dateH}</span>
+        </div>
+        <p><b>(١) طلب الإفادة</b></p>
+        <p>المكرم / <u>${t}</u> وفقه الله</p>
+        <p>السلام عليكم ورحمة الله وبركاته ،،،</p>
+        <p>من خلال متابعة سجل العمل تبين تغيابكم خلال الفترة الموضحة بعاليه ، أمل الإفادة عن أسباب ذلك وعليكم تقديم ما يؤيد عذركم خلال أسبوع من تاريخه ، علماً بأنه في حالة عدم الالتزام سيتم اتخاذ اللازم حسب التعليمات .</p>
+        <div style="display:flex;justify-content:space-between;margin-top:10px">
+          <div>التاريخ : ${dateH}</div>
+          <div>التوقيع : ___________</div>
+          <div>اسم الرئيس المباشر : ___________</div>
+        </div>
+        <div style="border-top:2px dashed #aaa;margin:20px 0"></div>
+        <p><b>(٢) الإفادة</b></p>
+        <p>المكرم / قائد المدرسة وفقه الله</p>
+        <p>السلام عليكم ورحمة الله وبركاته وبعد:</p>
+        <p>أفيدكم أن غيابي كان للأسباب التالية :</p>
+        <div style="border-bottom:1px solid #aaa;height:25px;margin:8px 0"></div>
+        <div style="border-bottom:1px solid #aaa;height:25px;margin:8px 0"></div>
+        <p>وسأقوم بتقديم ما يثبت ذلك خلال أسبوع من تاريخه</p>
+        <div style="display:flex;justify-content:space-between;margin-top:10px">
+          <div>التاريخ : ${dateH}</div><div>التوقيع : ___________</div><div>اسم المعلم : ${t}</div>
+        </div>
+        <div style="border-top:2px dashed #aaa;margin:20px 0"></div>
+        <p><b>(٣) مدير المدرسة :</b></p>
+        <p style="margin-right:15px">أ. تحتسب له إجازة مرضية بعد التأكد من نظامية التقرير</p>
+        <p style="margin-right:15px">ب. يحتسب من رصيده للإجازات الاضطرارية لقبول عذره إذا كان له رصيد وإلا يحسم عليه</p>
+        <p style="margin-right:15px">ج. يعتمد الحسم لعدم قبول عذره</p>
+        <div style="display:flex;justify-content:space-between;margin-top:10px">
+          <div>التاريخ : ${dateH}</div><div>التوقيع : ___________</div><div>اسم الرئيس المباشر : ___________</div>
+        </div>
+        <div style="border:1px solid #aaa;padding:10px;margin-top:15px;border-radius:6px;font-size:11px">
+          <p><b>ملحوظات هامة :</b></p>
+          <p>١ - تستكمل الاستمارة من المدير المباشر وإصدار القرار بموجبه.</p>
+          <p>٢ - إذا سبق إجازة الأسبوع غياب وألحقها غياب تحتسب مدة الغياب كاملة.</p>
+          <p>٣ - يجب أن يوضح المتغيب أسباب غيابه فور تسلمه الاستمارة ويعيدها لمديره المباشر.</p>
+          <p>٤ - يعطي المتغيب مدة أسبوع لتقديم ما يؤيد عذره فإذا انقضت المدة الزمنية واستمر عذره يتم الاستمارة تستكمل لإصدار قرار الحسم.</p>
+        </div>
+      `;
+    } else if (formType === "absence_deduct") {
+      body = `
+        <div style="display:flex;justify-content:space-between;margin-bottom:10px">
+          <div><b>النموذج : قرار حسم غياب</b></div>
+          <div><b>رمز النموذج : (و.م.ع.ن.-٠٥-٠٢)</b></div>
+        </div>
+        <table border="1" cellpadding="5" style="border-collapse:collapse;width:100%;margin-bottom:12px">
+          <tr><td style="${headerStyle};text-align:right" colspan="2">المدرسة</td><td colspan="5">${SCHOOL_NAME}</td></tr>
+          <tr><td style="${headerStyle};text-align:right" colspan="2">السجل المدني</td><td colspan="5">${nid}</td></tr>
+        </table>
+        <table border="1" cellpadding="5" style="border-collapse:collapse;width:100%;font-size:12px;margin-bottom:15px">
+          <tr style="${headerStyle}"><th>الاسم</th><th>التخصص</th><th>المستوى/المرتبة</th><th>الدرجة</th><th>رقم الوظيفة</th><th>العمل الحالي</th><th>عدد أيام الغياب</th></tr>
+          <tr><td>${t}</td><td>${spec}</td><td>${rank}</td><td></td><td>${jobNo}</td><td>${jobTitle}</td><td style="text-align:center;font-weight:bold;color:red">${formData.days||"    "}</td></tr>
+        </table>
+        <div style="border:1px solid #aaa;padding:6px;margin-bottom:10px">الأيام الواجب حسمها ليحدد التاريخ</div>
+        <p>إن قائد المدرسة ...............</p>
+        <p>بناءً على صلاحياته ، وبناءً على المادة (٢١) من نظام الخدمة المدنية ، وبناءً على موافقة معالي الوزير على إعطاء بعض الصلاحيات لمديري المدارس بالقرار رقم ١/١١٣٩ وتاريخ ١٤٢١/٣/١٧هـ ، ولغياب المعلم الموضح أسمه أعلاه ، حيث إن عذره غير مقبول ، وبمقتضى النظام .</p>
+        <p><b>يقرر ما يلي :</b></p>
+        <p>(١) حسم مدة الغياب الموضحة بعاليه وعددها ( <u>${formData.days||"    "}</u> ) يوماً من راتبه .</p>
+        <p>(٢) على إدارة شؤون الموظفين ( تنفيذ الأنظمة ) تنفيذ إجراء الحسم واستبعادها من خدماته وأصل القرار للملف بالإدارة مع الأساس .</p>
+        <p style="text-align:center"><b>والله الموفق ......</b></p>
+        <div style="margin-top:20px">
+          <p>الرئيس المباشر</p>
+          <p>الختم</p>
+          <p>الاسم : ___________</p>
+          <p>التوقيع : ___________</p>
+          <p>التاريخ : ${dateH}</p>
+        </div>
+        <div style="font-size:11px;margin-top:20px;color:#555">
+          <p><b>ملاحظة / لن يتم استلام قرار الحسم بدون المساءلة</b></p>
+          <p>صورة/ لشؤون الموظفين لمتابعة تنفيذ الحسم ( تنفيذ الأنظمة ) .</p>
+          <p>صورة / لمكتب التعليم .</p>
+          <p>صورة / للملف بالمدرسة .</p>
+        </div>
+      `;
+    }
+
+    printWindow(`<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="utf-8">
+    <title>${currentForm?.label}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
+    <style>
+      *{margin:0;padding:0;box-sizing:border-box}
+      body{font-family:'Cairo',sans-serif;direction:rtl;padding:25px 30px;color:#1a1a1a;font-size:13px;line-height:1.8}
+      p{margin:6px 0}
+      u{border-bottom:1px solid #333;text-decoration:none;display:inline-block;min-width:80px}
+      h3{font-size:16px;font-weight:900;text-align:center}
+      @media print{@page{size:A4;margin:1.5cm}body{padding:0}}
+    </style></head>
+    <body>${body}<script>window.onload=()=>window.print()</script></body></html>`);
+  };
+
+  return (
+    <div dir="rtl" className="space-y-4">
+      {/* رأس الصفحة */}
+      <div className="rounded-3xl overflow-hidden shadow-xl" style={{background:`linear-gradient(135deg,${FORM_GREEN},#40916c)`}}>
+        <div className="p-6 text-white">
+          <h2 className="text-2xl font-black mb-1">📋 النماذج الرسمية</h2>
+          <p className="opacity-80 text-sm">نماذج الدليل الإجرائي — وزارة التعليم السعودية</p>
+        </div>
+      </div>
+
+      {/* اختيار النموذج */}
+      <div className="grid grid-cols-2 gap-3">
+        {FORM_TYPES.map(ft=>(
+          <button key={ft.id} onClick={()=>setFormType(ft.id)}
+            className="p-4 rounded-2xl border-2 text-right transition-all"
+            style={{
+              borderColor: formType===ft.id ? FORM_GREEN : "#e5e7eb",
+              background: formType===ft.id ? FORM_LIGHT : "#fff",
+            }}>
+            <div className="font-black text-sm" style={{color:formType===ft.id?FORM_GREEN:"#374151"}}>{ft.label}</div>
+            <div className="text-xs mt-1 font-bold" style={{color:"#6b7280"}}>{ft.code}</div>
+          </button>
+        ))}
+      </div>
+
+      {/* بيانات النموذج */}
+      <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 space-y-4">
+        <h3 className="font-black text-sm" style={{color:FORM_GREEN}}>📝 {currentForm?.label}</h3>
+
+        {/* اختيار المعلم */}
+        <div>
+          <label className="text-xs font-bold text-gray-500 block mb-1">اسم المعلم *</label>
+          <select value={selectedTeacher} onChange={e=>handleSelectTeacher(e.target.value)}
+            className="w-full px-3 py-2.5 rounded-xl border-2 border-gray-200 text-sm font-bold focus:outline-none"
+            style={{fontFamily:"inherit", borderColor:selectedTeacher?FORM_GREEN:"#e5e7eb"}}>
+            <option value="">— اختر المعلم —</option>
+            {teachers.map(t=><option key={t} value={t}>{t}</option>)}
+          </select>
+        </div>
+
+        {selectedTeacher && (
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-bold text-gray-500 block mb-1">رقم الهوية / السجل المدني</label>
+              <input value={formData.nationalId} onChange={e=>setFormData(p=>({...p,nationalId:e.target.value}))}
+                placeholder="يُجلب تلقائياً من الحسابات" className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 text-sm focus:outline-none"
+                style={{fontFamily:"inherit"}}/>
+            </div>
+            <div>
+              <label className="text-xs font-bold text-gray-500 block mb-1">التخصص</label>
+              <input value={formData.spec} onChange={e=>setFormData(p=>({...p,spec:e.target.value}))}
+                placeholder="التخصص" className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 text-sm focus:outline-none"
+                style={{fontFamily:"inherit"}}/>
+            </div>
+            <div>
+              <label className="text-xs font-bold text-gray-500 block mb-1">المستوى / المرتبة</label>
+              <input value={formData.rank} onChange={e=>setFormData(p=>({...p,rank:e.target.value}))}
+                placeholder="مثال: الثامنة" className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 text-sm focus:outline-none"
+                style={{fontFamily:"inherit"}}/>
+            </div>
+            <div>
+              <label className="text-xs font-bold text-gray-500 block mb-1">رقم الوظيفة</label>
+              <input value={formData.jobNo} onChange={e=>setFormData(p=>({...p,jobNo:e.target.value}))}
+                placeholder="رقم الوظيفة" className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 text-sm focus:outline-none"
+                style={{fontFamily:"inherit"}}/>
+            </div>
+            <div>
+              <label className="text-xs font-bold text-gray-500 block mb-1">العمل الحالي</label>
+              <input value={formData.jobTitle} onChange={e=>setFormData(p=>({...p,jobTitle:e.target.value}))}
+                placeholder="مثال: معلم" className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 text-sm focus:outline-none"
+                style={{fontFamily:"inherit"}}/>
+            </div>
+            <div>
+              <label className="text-xs font-bold text-gray-500 block mb-1">التاريخ الهجري</label>
+              <input value={formData.dateH} onChange={e=>setFormData(p=>({...p,dateH:e.target.value}))}
+                placeholder="١٤ هـ  /  /" className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 text-sm focus:outline-none"
+                style={{fontFamily:"inherit"}}/>
+            </div>
+
+            {(formType==="warning") && (
+              <>
+                <div>
+                  <label className="text-xs font-bold text-gray-500 block mb-1">نوع المخالفة</label>
+                  <select value={formData.type} onChange={e=>setFormData(p=>({...p,type:e.target.value}))}
+                    className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 text-sm focus:outline-none"
+                    style={{fontFamily:"inherit"}}>
+                    <option>تأخر</option>
+                    <option>مغادرة أثناء العمل</option>
+                    <option>انصراف مبكر</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-500 block mb-1">الساعة من</label>
+                  <input value={formData.timeFrom} onChange={e=>setFormData(p=>({...p,timeFrom:e.target.value}))}
+                    placeholder="مثال: ٧:٣٠" className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 text-sm focus:outline-none"
+                    style={{fontFamily:"inherit"}}/>
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-500 block mb-1">إلى الساعة</label>
+                  <input value={formData.timeTo} onChange={e=>setFormData(p=>({...p,timeTo:e.target.value}))}
+                    placeholder="مثال: ٨:٠٠" className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 text-sm focus:outline-none"
+                    style={{fontFamily:"inherit"}}/>
+                </div>
+              </>
+            )}
+
+            {(formType==="absence_investigate"||formType==="absence_deduct") && (
+              <div>
+                <label className="text-xs font-bold text-gray-500 block mb-1">عدد أيام الغياب</label>
+                <input value={formData.days} onChange={e=>setFormData(p=>({...p,days:e.target.value}))}
+                  placeholder="يُحسب تلقائياً من سجل الحضور"
+                  className="w-full px-3 py-2 rounded-xl border-2 text-sm focus:outline-none font-black text-center"
+                  style={{fontFamily:"inherit", borderColor:formData.days?"#dc2626":"#e5e7eb", color:formData.days?"#dc2626":"#374151"}}/>
+              </div>
+            )}
+
+            {formType==="deduct_late" && (
+              <div>
+                <label className="text-xs font-bold text-gray-500 block mb-1">مجموع ساعات التأخر</label>
+                <input value={formData.lateHours} onChange={e=>setFormData(p=>({...p,lateHours:e.target.value}))}
+                  placeholder="يُحسب تلقائياً" className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 text-sm focus:outline-none"
+                  style={{fontFamily:"inherit"}}/>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* معاينة */}
+        {selectedTeacher && (
+          <div className="rounded-2xl p-4 border-2" style={{background:FORM_LIGHT, borderColor:FORM_GREEN+"44"}}>
+            <div className="text-xs font-black mb-2" style={{color:FORM_GREEN}}>👁️ معاينة البيانات</div>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div><span className="text-gray-500">الاسم:</span> <strong>{selectedTeacher}</strong></div>
+              <div><span className="text-gray-500">الهوية:</span> <strong>{formData.nationalId||"—"}</strong></div>
+              <div><span className="text-gray-500">المدرسة:</span> <strong>{SCHOOL_NAME}</strong></div>
+              {formData.days&&<div><span className="text-gray-500">الغياب:</span> <strong className="text-red-600">{formData.days} أيام</strong></div>}
+              {formData.lateHours&&<div><span className="text-gray-500">التأخر:</span> <strong className="text-amber-600">{formData.lateHours}</strong></div>}
+            </div>
+          </div>
+        )}
+
+        <button onClick={printForm} disabled={!selectedTeacher}
+          className="w-full py-4 rounded-2xl text-white font-black text-base disabled:opacity-40 transition-all hover:shadow-xl flex items-center justify-center gap-3"
+          style={{background:`linear-gradient(135deg,${FORM_GREEN},#40916c)`}}>
+          🖨️ طباعة النموذج الرسمي
+          <span className="text-sm opacity-70 font-normal">— {currentForm?.label}</span>
+        </button>
+      </div>
     </div>
   );
 }
@@ -12134,7 +12846,7 @@ export default function SchoolWebsite() {
       const hash = window.location.hash.replace("#","") || "home";
       if (hash.startsWith("ann-")) { setDirectAnnId(hash.replace("ann-","")); return; }
       setDirectAnnId(null);
-      if (["home","attendance","announcements","activities","settings","students","messages","surveys","sms","report","gradeanalysis","monthlyreport","teacherprofile","absencestats","attendancereport","student-absence","strategies","calendar","gallery","certificates","poll","raffle","broadcast","groupdivider","quiz","classtimer","luckywheel","exitticket","timetable","classvisits","honorboard","tasks","dailyquiz","aiteacher","lessonrecommend"].includes(hash)) setPage(hash);
+      if (["home","attendance","announcements","activities","settings","students","messages","surveys","sms","report","gradeanalysis","monthlyreport","teacherprofile","absencestats","attendancereport","student-absence","strategies","calendar","gallery","certificates","poll","raffle","broadcast","groupdivider","quiz","classtimer","luckywheel","exitticket","timetable","classvisits","honorboard","tasks","dailyquiz","aiteacher","lessonrecommend","officialforms"].includes(hash)) setPage(hash);
     };
     window.addEventListener("hashchange", h); h();
     return () => window.removeEventListener("hashchange", h);
@@ -12273,6 +12985,7 @@ export default function SchoolWebsite() {
     { id: "monthlyreport",    label: "التقرير الشهري/الفصلي",  icon: "📋" },
     { id: "absencestats",  label: "إحصائيات الغياب",   icon: "📊" },
     { id: "attendancereport", label: "تحليل الحضور والانصراف", icon: "🗂️" },
+    { id: "officialforms",    label: "النماذج الرسمية",          icon: "📋" },
     { id: "dailyquiz",     label: "الاختبار اليومي",     icon: "🎯" },
     { id: "aiteacher",     label: "مساعد المعلم الذكي",  icon: "🤖" },
     { id: "lessonrecommend",label: "التوصية بالدروس",    icon: "💡" },
@@ -12595,6 +13308,7 @@ export default function SchoolWebsite() {
         {page === "teacherprofile" && <TeacherProfilePage teachers={teachers} attendance={attendance} week={week} weekArchive={weekArchive} classList={classList} />}
         {page === "attendancereport" && <AttendanceAnalysisPage />}
         {page === "dailyquiz"      && <DailyQuizPage classList={classList} />}
+        {page === "officialforms"  && <OfficialFormsPage teachers={teachers} attendance={attendance} week={week} />}
         {page === "aiteacher"      && <AITeacherPage />}
         {page === "lessonrecommend"&& <LessonRecommendPage classList={classList} />}
         {page === "settings"      && <SettingsPage teachers={teachers} setTeachers={setTeachers} saveTeachers={saveTeachers} week={week} setWeek={setWeek} saveWeek={saveWeek} users={users} siteFont={siteFont} setSiteFont={setSiteFont} saveSiteFont={saveSiteFont} weekArchive={weekArchive} archiveCurrentWeek={archiveCurrentWeek} />}
