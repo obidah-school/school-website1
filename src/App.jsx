@@ -622,202 +622,166 @@ function LoginPage({ users, onLogin, siteFont, onParentPortal, onTeacherPortal, 
 function HomePage({ teachers, announcements, activities, navigate, attendance, week, messages, classList, weekArchive }) {
   const today = new Date();
   const todayStr = today.toLocaleDateString("ar-SA", { weekday:"long", year:"numeric", month:"long", day:"numeric" });
-
-  // حساب إحصائيات اليوم (آخر يوم في الأسبوع الحالي بحسب المؤشر)
-  const dayNames = ["الأحد","الاثنين","الثلاثاء","الأربعاء","الخميس"];
-  const jsDay = today.getDay(); // 0=Sun
+  const jsDay = today.getDay();
   const todayDi = jsDay <= 4 ? jsDay : 0;
-  const todayAbsent = teachers.filter((_,ti) => (attendance[ti]?.[todayDi]?.status || "حاضر") === "غائب").length;
-  const todayLate   = teachers.filter((_,ti) => (attendance[ti]?.[todayDi]?.status || "حاضر") === "متأخر").length;
+  const todayAbsent  = teachers.filter((_,ti) => (attendance[ti]?.[todayDi]?.status || "حاضر") === "غائب").length;
+  const todayLate    = teachers.filter((_,ti) => (attendance[ti]?.[todayDi]?.status || "حاضر") === "متأخر").length;
   const todayPresent = teachers.length - todayAbsent - todayLate;
-  const attendRate = teachers.length > 0 ? Math.round((todayPresent / teachers.length) * 100) : 100;
-
-  // إجمالي الطلاب
+  const attendRate   = teachers.length > 0 ? Math.round((todayPresent / teachers.length) * 100) : 100;
   const totalStudents = classList.reduce((s,c) => s + c.students.filter(st=>st.name).length, 0);
-
-  // رسائل غير مقروءة
-  const unreadMsgs = messages.filter(m => !m.read && m.type !== "teacher_note").length;
+  const unreadMsgs  = messages.filter(m => !m.read && m.type !== "teacher_note").length;
   const unreadNotes = messages.filter(m => !m.read && m.type === "teacher_note").length;
-
-  // آخر 3 إعلانات
-  const recentAnn = [...announcements].slice(0,3);
-
-  // الأنشطة القادمة
+  const recentAnn   = [...announcements].slice(0,3);
   const upcomingAct = activities.filter(a => a.status === "قادم").slice(0,3);
-
-  // معدل الحضور هذا الأسبوع
   const weekStats = (() => {
     let total=0, present=0;
-    week.days.forEach((_,di) => {
-      teachers.forEach((_,ti) => {
-        const st = attendance[ti]?.[di]?.status || "حاضر";
-        total++;
-        if (st === "حاضر") present++;
-      });
-    });
+    week.days.forEach((_,di) => { teachers.forEach((_,ti) => { const st=attendance[ti]?.[di]?.status||"حاضر"; total++; if(st==="حاضر") present++; }); });
     return total > 0 ? Math.round(present/total*100) : 100;
   })();
-
-  // أكثر معلم غياباً هذا الأسبوع
-  const mostAbsent = teachers.map((name,ti) => ({
-    name, count: week.days.filter((_,di) => (attendance[ti]?.[di]?.status||"حاضر")==="غائب").length
-  })).filter(t=>t.count>0).sort((a,b)=>b.count-a.count).slice(0,3);
-
-  const kpiColor = (v,good,warn) => v>=good ? "#22c55e" : v>=warn ? "#f59e0b" : "#ef4444";
-  const kpiBg   = (v,good,warn) => v>=good ? "#dcfce7" : v>=warn ? "#fef3c7" : "#fee2e2";
+  const mostAbsent = teachers.map((name,ti) => ({ name, count: week.days.filter((_,di) => (attendance[ti]?.[di]?.status||"حاضر")==="غائب").length })).filter(t=>t.count>0).sort((a,b)=>b.count-a.count).slice(0,3);
+  const kpiColor = (v,good,warn) => v>=good?"#22c55e":v>=warn?"#f59e0b":"#ef4444";
+  const kpiBg   = (v,good,warn) => v>=good?"#dcfce7":v>=warn?"#fef3c7":"#fee2e2";
 
   return (
-    <div dir="rtl" className="space-y-5">
-      {/* ── ترويسة لوحة التحكم ── */}
-      <div className="rounded-3xl overflow-hidden shadow-xl" style={{background:"linear-gradient(135deg,#0f4c75 0%,#1B6CA8 50%,#0d9488 100%)", minHeight:140}}>
-        <div className="p-6 text-white flex items-center justify-between flex-wrap gap-4">
-          <div className="flex items-center gap-4">
-            <SchoolLogo size="md" animate={false} />
-            <div>
-              <h1 className="text-xl font-black">مدرسة عبيدة بن الحارث المتوسطة</h1>
-              <p className="opacity-70 text-sm mt-0.5">لوحة التحكم الإدارية — {todayStr}</p>
-            </div>
+    <div>
+      {/* ── الترويسة الأصلية ── */}
+      <div className="bg-gradient-to-l from-teal-600 via-teal-700 to-emerald-800 rounded-3xl p-8 mb-6 text-white text-center shadow-xl" style={{overflow:"hidden",position:"relative"}}>
+        <div style={{position:"absolute",inset:0,background:"radial-gradient(circle at 50% 0%,rgba(212,175,55,.15) 0%,transparent 60%)",pointerEvents:"none"}} />
+        <div className="flex justify-center mb-4 relative z-10">
+          <SchoolLogo size="xl" animate={true} />
+        </div>
+        <h1 className="text-xl font-black relative z-10 mt-2">مدرسة عبيدة بن الحارث المتوسطة</h1>
+        <p className="opacity-80 text-base relative z-10 mt-1">بوابة الإدارة المدرسية الإلكترونية</p>
+        <p className="opacity-60 text-sm mt-1 relative z-10">{todayStr}</p>
+        {/* شريط حضور اليوم */}
+        <div className="flex items-center justify-center gap-6 mt-4 relative z-10">
+          <div className="text-center bg-white bg-opacity-15 rounded-2xl px-5 py-2">
+            <div className="text-2xl font-black">{attendRate}%</div>
+            <div className="text-xs opacity-70">حضور اليوم</div>
           </div>
-          <div className="flex items-center gap-2 bg-white bg-opacity-15 rounded-2xl px-4 py-2">
-            <div className="text-center">
-              <div className="text-2xl font-black">{attendRate}%</div>
-              <div className="text-xs opacity-70">حضور اليوم</div>
-            </div>
-            <div className="w-px h-10 bg-white bg-opacity-30 mx-2" />
-            <div className="text-center">
-              <div className="text-2xl font-black">{weekStats}%</div>
-              <div className="text-xs opacity-70">حضور الأسبوع</div>
-            </div>
+          <div className="w-px h-10 bg-white bg-opacity-30"/>
+          <div className="text-center bg-white bg-opacity-15 rounded-2xl px-5 py-2">
+            <div className="text-2xl font-black">{weekStats}%</div>
+            <div className="text-xs opacity-70">حضور الأسبوع</div>
           </div>
         </div>
-        {/* شريط تقدم الحضور */}
-        <div className="h-2 flex">
-          <div style={{width:attendRate+"%", background:"#22c55e", transition:"width 1s"}}/>
-          <div style={{width:(todayLate/teachers.length*100)+"%", background:"#f59e0b"}}/>
-          <div style={{width:(todayAbsent/teachers.length*100)+"%", background:"#ef4444"}}/>
+        {/* شريط تقدم */}
+        <div className="h-1.5 flex mt-4 rounded-full overflow-hidden relative z-10">
+          <div style={{width:attendRate+"%",background:"#22c55e"}}/>
+          <div style={{width:(todayLate/Math.max(teachers.length,1)*100)+"%",background:"#f59e0b"}}/>
+          <div style={{width:(todayAbsent/Math.max(teachers.length,1)*100)+"%",background:"#ef4444"}}/>
         </div>
       </div>
 
       {/* ── بطاقات KPI ── */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {[
-          { icon:"✅", label:"حاضر اليوم",   value:todayPresent, sub:teachers.length+" معلم", bg:kpiBg(attendRate,90,75), color:kpiColor(attendRate,90,75), action:"attendance" },
-          { icon:"❌", label:"غائب اليوم",    value:todayAbsent,  sub:todayAbsent>0?"يحتاج متابعة":"ممتاز", bg:todayAbsent===0?"#dcfce7":"#fee2e2", color:todayAbsent===0?"#16a34a":"#dc2626", action:"attendance" },
-          { icon:"⚠️", label:"متأخر اليوم",  value:todayLate,    sub:todayLate>0?"تأخر صباحي":"لا تأخر", bg:todayLate===0?"#dcfce7":"#fef3c7", color:todayLate===0?"#16a34a":"#b45309", action:"attendance" },
-          { icon:"👨‍🎓", label:"الطلاب",      value:totalStudents, sub:classList.length+" فصل", bg:"#eff6ff", color:"#1d4ed8", action:"students" },
-        ].map(k => (
-          <div key={k.label} className="rounded-2xl p-4 cursor-pointer hover:scale-105 transition-transform shadow-sm"
-            style={{background:k.bg, border:`1px solid ${k.color}22`}}
-            onClick={() => navigate(k.action)}>
-            <div className="text-2xl mb-1">{k.icon}</div>
-            <div className="text-3xl font-black" style={{color:k.color}}>{k.value}</div>
-            <div className="text-xs font-bold mt-1" style={{color:k.color, opacity:0.8}}>{k.label}</div>
-            <div className="text-xs mt-0.5" style={{color:k.color, opacity:0.6}}>{k.sub}</div>
-          </div>
-        ))}
+      <div className="grid grid-cols-2 gap-3 mb-6 sm:grid-cols-4">
+        <div className="rounded-2xl p-4 text-center cursor-pointer hover:scale-105 transition-transform shadow-sm"
+          style={{background:kpiBg(attendRate,90,75)}} onClick={()=>navigate("attendance")}>
+          <div className="text-3xl mb-1">✅</div>
+          <div className="text-3xl font-black" style={{color:kpiColor(attendRate,90,75)}}>{todayPresent}</div>
+          <div className="text-xs font-bold mt-1 opacity-80" style={{color:kpiColor(attendRate,90,75)}}>حاضر اليوم</div>
+          <div className="text-xs opacity-60" style={{color:kpiColor(attendRate,90,75)}}>{teachers.length} معلم</div>
+        </div>
+        <div className="rounded-2xl p-4 text-center cursor-pointer hover:scale-105 transition-transform shadow-sm"
+          style={{background:todayAbsent===0?"#dcfce7":"#fee2e2"}} onClick={()=>navigate("attendance")}>
+          <div className="text-3xl mb-1">❌</div>
+          <div className="text-3xl font-black" style={{color:todayAbsent===0?"#16a34a":"#dc2626"}}>{todayAbsent}</div>
+          <div className="text-xs font-bold mt-1 opacity-80" style={{color:todayAbsent===0?"#16a34a":"#dc2626"}}>غائب اليوم</div>
+          <div className="text-xs opacity-60" style={{color:todayAbsent===0?"#16a34a":"#dc2626"}}>{todayAbsent>0?"يحتاج متابعة":"ممتاز"}</div>
+        </div>
+        <div className="rounded-2xl p-4 text-center cursor-pointer hover:scale-105 transition-transform shadow-sm"
+          style={{background:todayLate===0?"#dcfce7":"#fef3c7"}} onClick={()=>navigate("attendance")}>
+          <div className="text-3xl mb-1">⚠️</div>
+          <div className="text-3xl font-black" style={{color:todayLate===0?"#16a34a":"#b45309"}}>{todayLate}</div>
+          <div className="text-xs font-bold mt-1 opacity-80" style={{color:todayLate===0?"#16a34a":"#b45309"}}>متأخر اليوم</div>
+          <div className="text-xs opacity-60" style={{color:todayLate===0?"#16a34a":"#b45309"}}>{todayLate>0?"تأخر صباحي":"لا تأخر"}</div>
+        </div>
+        <div className="rounded-2xl p-4 text-center cursor-pointer hover:scale-105 transition-transform shadow-sm"
+          style={{background:"#eff6ff"}} onClick={()=>navigate("students")}>
+          <div className="text-3xl mb-1">👨‍🎓</div>
+          <div className="text-3xl font-black" style={{color:"#1d4ed8"}}>{totalStudents}</div>
+          <div className="text-xs font-bold mt-1 opacity-80" style={{color:"#1d4ed8"}}>الطلاب</div>
+          <div className="text-xs opacity-60" style={{color:"#1d4ed8"}}>{classList.length} فصل</div>
+        </div>
       </div>
 
-      {/* ── صف ثانٍ: التنبيهات + الرسائل + المعلمون ── */}
-      <div className="grid gap-4 sm:grid-cols-3">
-
-        {/* تنبيهات */}
+      {/* ── تنبيهات + إعلانات + أنشطة ── */}
+      <div className="grid gap-4 sm:grid-cols-3 mb-6">
         <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
           <h3 className="font-black text-gray-800 mb-3 flex items-center gap-2 text-sm">
             🔔 التنبيهات
-            {(unreadMsgs+unreadNotes) > 0 && (
-              <span className="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full animate-pulse">{unreadMsgs+unreadNotes}</span>
-            )}
+            {(unreadMsgs+unreadNotes)>0 && <span className="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full animate-pulse">{unreadMsgs+unreadNotes}</span>}
           </h3>
           <div className="space-y-2">
-            {todayAbsent > 0 && (
-              <div className="flex items-center gap-2 bg-red-50 rounded-xl px-3 py-2 cursor-pointer" onClick={()=>navigate("attendance")}>
-                <span className="text-red-500">❌</span>
-                <span className="text-xs font-bold text-red-700">{todayAbsent} معلم غائب اليوم</span>
-              </div>
-            )}
-            {todayLate > 0 && (
-              <div className="flex items-center gap-2 bg-amber-50 rounded-xl px-3 py-2 cursor-pointer" onClick={()=>navigate("attendance")}>
-                <span className="text-amber-500">⚠️</span>
-                <span className="text-xs font-bold text-amber-700">{todayLate} معلم متأخر اليوم</span>
-              </div>
-            )}
-            {unreadMsgs > 0 && (
-              <div className="flex items-center gap-2 bg-blue-50 rounded-xl px-3 py-2 cursor-pointer" onClick={()=>navigate("messages")}>
-                <span className="text-blue-500">✉️</span>
-                <span className="text-xs font-bold text-blue-700">{unreadMsgs} رسالة غير مقروءة</span>
-              </div>
-            )}
-            {unreadNotes > 0 && (
-              <div className="flex items-center gap-2 bg-amber-50 rounded-xl px-3 py-2 cursor-pointer" onClick={()=>navigate("messages")}>
-                <span>📨</span>
-                <span className="text-xs font-bold text-amber-700">{unreadNotes} ملاحظة معلم لم يُردّ عليها</span>
-              </div>
-            )}
-            {todayAbsent===0 && todayLate===0 && unreadMsgs===0 && unreadNotes===0 && (
-              <div className="text-center py-4">
-                <div className="text-2xl mb-1">🎉</div>
-                <div className="text-xs text-gray-400 font-bold">لا توجد تنبيهات</div>
-              </div>
-            )}
+            {todayAbsent>0 && <div className="flex items-center gap-2 bg-red-50 rounded-xl px-3 py-2 cursor-pointer" onClick={()=>navigate("attendance")}><span className="text-red-500">❌</span><span className="text-xs font-bold text-red-700">{todayAbsent} معلم غائب اليوم</span></div>}
+            {todayLate>0  && <div className="flex items-center gap-2 bg-amber-50 rounded-xl px-3 py-2 cursor-pointer" onClick={()=>navigate("attendance")}><span className="text-amber-500">⚠️</span><span className="text-xs font-bold text-amber-700">{todayLate} معلم متأخر اليوم</span></div>}
+            {unreadMsgs>0 && <div className="flex items-center gap-2 bg-blue-50 rounded-xl px-3 py-2 cursor-pointer" onClick={()=>navigate("messages")}><span className="text-blue-500">✉️</span><span className="text-xs font-bold text-blue-700">{unreadMsgs} رسالة غير مقروءة</span></div>}
+            {unreadNotes>0&& <div className="flex items-center gap-2 bg-amber-50 rounded-xl px-3 py-2 cursor-pointer" onClick={()=>navigate("messages")}><span>📨</span><span className="text-xs font-bold text-amber-700">{unreadNotes} ملاحظة بلا رد</span></div>}
+            {todayAbsent===0&&todayLate===0&&unreadMsgs===0&&unreadNotes===0 && <div className="text-center py-3"><div className="text-2xl mb-1">🎉</div><div className="text-xs text-gray-400 font-bold">لا توجد تنبيهات</div></div>}
           </div>
         </div>
-
-        {/* آخر الإعلانات */}
         <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
           <h3 className="font-black text-gray-800 mb-3 flex items-center justify-between text-sm">
             <span>📢 آخر الإعلانات</span>
-            <button onClick={()=>navigate("announcements")} className="text-xs text-teal-600 font-bold hover:underline">الكل</button>
+            <button onClick={()=>navigate("announcements")} className="text-xs text-teal-600 font-bold">الكل</button>
           </h3>
-          {recentAnn.length === 0 ? (
-            <div className="text-center py-4 text-xs text-gray-400">لا توجد إعلانات</div>
-          ) : (
-            <div className="space-y-2">
-              {recentAnn.map(a => (
-                <div key={a.id} className="flex items-start gap-2 bg-gray-50 rounded-xl px-3 py-2">
-                  <span className="text-lg flex-shrink-0">{a.emoji || "📢"}</span>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-xs font-black text-gray-800 truncate">{a.title}</div>
-                    <div className="text-xs text-gray-400 mt-0.5">{a.date}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+          {recentAnn.length===0 ? <div className="text-center py-4 text-xs text-gray-400">لا توجد إعلانات</div> :
+            <div className="space-y-2">{recentAnn.map(a=>(
+              <div key={a.id} className="flex items-start gap-2 bg-gray-50 rounded-xl px-3 py-2">
+                <span className="text-lg flex-shrink-0">{a.emoji||"📢"}</span>
+                <div className="flex-1 min-w-0"><div className="text-xs font-black text-gray-800 truncate">{a.title}</div><div className="text-xs text-gray-400 mt-0.5">{a.date}</div></div>
+              </div>))}
+            </div>}
         </div>
-
-        {/* الأنشطة القادمة */}
         <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
           <h3 className="font-black text-gray-800 mb-3 flex items-center justify-between text-sm">
             <span>📅 الأنشطة القادمة</span>
-            <button onClick={()=>navigate("activities")} className="text-xs text-teal-600 font-bold hover:underline">الكل</button>
+            <button onClick={()=>navigate("activities")} className="text-xs text-teal-600 font-bold">الكل</button>
           </h3>
-          {upcomingAct.length === 0 ? (
-            <div className="text-center py-4 text-xs text-gray-400">لا توجد أنشطة قادمة</div>
-          ) : (
-            <div className="space-y-2">
-              {upcomingAct.map(a => (
-                <div key={a.id} className="flex items-start gap-2 bg-teal-50 rounded-xl px-3 py-2">
-                  <span className="text-lg flex-shrink-0">{a.image || "⚡"}</span>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-xs font-black text-gray-800 truncate">{a.title}</div>
-                    <div className="text-xs text-teal-600 mt-0.5 font-bold">{a.dateH}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+          {upcomingAct.length===0 ? <div className="text-center py-4 text-xs text-gray-400">لا توجد أنشطة قادمة</div> :
+            <div className="space-y-2">{upcomingAct.map(a=>(
+              <div key={a.id} className="flex items-start gap-2 bg-teal-50 rounded-xl px-3 py-2">
+                <span className="text-lg flex-shrink-0">{a.image||"⚡"}</span>
+                <div className="flex-1 min-w-0"><div className="text-xs font-black text-gray-800 truncate">{a.title}</div><div className="text-xs text-teal-600 mt-0.5 font-bold">{a.dateH}</div></div>
+              </div>))}
+            </div>}
+        </div>
+      </div>
+
+      {/* ── رؤية المدرسة ورسالتها (مُعادة) ── */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
+        <div className="text-center mb-6">
+          <h3 className="text-xl font-black text-teal-900 mb-1">رؤيتنا ورسالتنا</h3>
+          <div className="w-16 h-1 bg-teal-500 rounded-full mx-auto"></div>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-3">
+          <div className="bg-gradient-to-b from-teal-50 to-white rounded-2xl p-5 text-center border border-teal-100">
+            <div className="text-3xl mb-3">🔭</div>
+            <h4 className="font-black text-teal-800 mb-2">الرؤية</h4>
+            <p className="text-sm text-gray-600 leading-relaxed">بيئة تعليمية محفّزة تصنع جيلاً واعياً ومبدعاً قادراً على بناء مستقبل وطنه.</p>
+          </div>
+          <div className="bg-gradient-to-b from-emerald-50 to-white rounded-2xl p-5 text-center border border-emerald-100">
+            <div className="text-3xl mb-3">🎯</div>
+            <h4 className="font-black text-emerald-800 mb-2">الرسالة</h4>
+            <p className="text-sm text-gray-600 leading-relaxed">تقديم تعليم نوعي يُراعي الفروق الفردية في شراكة فاعلة بين المدرسة والأسرة.</p>
+          </div>
+          <div className="bg-gradient-to-b from-green-50 to-white rounded-2xl p-5 text-center border border-green-100">
+            <div className="text-3xl mb-3">⭐</div>
+            <h4 className="font-black text-green-800 mb-2">أهدافنا</h4>
+            <p className="text-sm text-gray-600 leading-relaxed">تعزيز القيم الإسلامية ورفع التحصيل الدراسي وتطوير مهارات المعلمين.</p>
+          </div>
         </div>
       </div>
 
       {/* ── الغياب هذا الأسبوع ── */}
-      {mostAbsent.length > 0 && (
-        <div className="bg-white rounded-2xl p-5 shadow-sm border border-red-100">
+      {mostAbsent.length>0 && (
+        <div className="bg-white rounded-2xl p-5 shadow-sm border border-red-100 mb-6">
           <h3 className="font-black text-gray-800 mb-3 text-sm flex items-center gap-2">
             ⚠️ الأكثر غياباً هذا الأسبوع
             <button onClick={()=>navigate("absencestats")} className="text-xs text-red-500 font-bold hover:underline mr-auto">تحليل كامل</button>
           </h3>
           <div className="grid gap-2 sm:grid-cols-3">
-            {mostAbsent.map(t => (
+            {mostAbsent.map(t=>(
               <div key={t.name} className="flex items-center justify-between bg-red-50 rounded-xl px-4 py-3">
                 <span className="text-sm font-bold text-gray-800 truncate">{t.name}</span>
                 <span className="text-xs bg-red-500 text-white px-2 py-0.5 rounded-full font-bold flex-shrink-0 mr-2">{t.count} أيام</span>
@@ -828,23 +792,22 @@ function HomePage({ teachers, announcements, activities, navigate, attendance, w
       )}
 
       {/* ── الأسبوع الحالي ── */}
-      <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+      <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 mb-6">
         <h3 className="font-black text-gray-800 mb-3 text-sm">📊 حضور الأسبوع الحالي</h3>
         <div className="grid grid-cols-5 gap-2">
-          {week.days.map((day, di) => {
-            const abs = teachers.filter((_,ti)=>(attendance[ti]?.[di]?.status||"حاضر")==="غائب").length;
-            const late = teachers.filter((_,ti)=>(attendance[ti]?.[di]?.status||"حاضر")==="متأخر").length;
-            const rate = teachers.length > 0 ? Math.round(((teachers.length-abs)/teachers.length)*100) : 100;
-            const col = rate>=95?"#22c55e":rate>=85?"#f59e0b":"#ef4444";
-            return (
-              <div key={di} className="rounded-xl p-2 text-center border border-gray-100 cursor-pointer hover:shadow-md transition-all"
-                style={{borderColor: col+"44", background: col+"11"}}
-                onClick={()=>navigate("attendance")}>
+          {week.days.map((day,di)=>{
+            const abs=teachers.filter((_,ti)=>(attendance[ti]?.[di]?.status||"حاضر")==="غائب").length;
+            const late=teachers.filter((_,ti)=>(attendance[ti]?.[di]?.status||"حاضر")==="متأخر").length;
+            const rate=teachers.length>0?Math.round(((teachers.length-abs)/teachers.length)*100):100;
+            const col=rate>=95?"#22c55e":rate>=85?"#f59e0b":"#ef4444";
+            return(
+              <div key={di} className="rounded-xl p-2 text-center border cursor-pointer hover:shadow-md transition-all"
+                style={{borderColor:col+"44",background:col+"11"}} onClick={()=>navigate("attendance")}>
                 <div className="text-xs font-black text-gray-700">{day.name}</div>
                 <div className="text-xs text-amber-600 font-bold">🌙 {day.dateH}</div>
                 <div className="text-lg font-black mt-1" style={{color:col}}>{rate}%</div>
-                {abs>0 && <div className="text-xs text-red-500 font-bold">{abs}غ</div>}
-                {late>0 && <div className="text-xs text-amber-500 font-bold">{late}ت</div>}
+                {abs>0&&<div className="text-xs text-red-500 font-bold">{abs}غ</div>}
+                {late>0&&<div className="text-xs text-amber-500 font-bold">{late}ت</div>}
               </div>
             );
           })}
@@ -854,17 +817,17 @@ function HomePage({ teachers, announcements, activities, navigate, attendance, w
       {/* ── روابط سريعة ── */}
       <div className="grid grid-cols-4 gap-3 sm:grid-cols-8">
         {[
-          {id:"attendance",    icon:"📋", label:"الحضور",    color:"#0d9488"},
-          {id:"students",      icon:"👨‍🎓", label:"التقييمات", color:"#7c3aed"},
-          {id:"messages",      icon:"✉️",  label:"الرسائل",   color:"#2563eb"},
-          {id:"announcements", icon:"📢",  label:"الإعلانات", color:"#d97706"},
-          {id:"absencestats",  icon:"📊",  label:"الإحصائيات",color:"#dc2626"},
-          {id:"monthlyreport", icon:"📋",  label:"التقارير",  color:"#0d9488"},
-          {id:"teacherprofile",icon:"👨‍🏫", label:"ملف المعلم",color:"#7c3aed"},
-          {id:"settings",      icon:"⚙️",  label:"الإعدادات", color:"#64748b"},
-        ].map(p => (
+          {id:"attendance",    icon:"📋", label:"الحضور",     color:"#0d9488"},
+          {id:"students",      icon:"👨‍🎓", label:"التقييمات",  color:"#7c3aed"},
+          {id:"messages",      icon:"✉️",  label:"الرسائل",    color:"#2563eb"},
+          {id:"announcements", icon:"📢",  label:"الإعلانات",  color:"#d97706"},
+          {id:"absencestats",  icon:"📊",  label:"الغياب",     color:"#dc2626"},
+          {id:"gradeanalysis", icon:"📊",  label:"الدرجات",    color:"#6366f1"},
+          {id:"monthlyreport", icon:"📋",  label:"التقارير",   color:"#0d9488"},
+          {id:"settings",      icon:"⚙️",  label:"الإعدادات",  color:"#64748b"},
+        ].map(p=>(
           <button key={p.id} onClick={()=>navigate(p.id)}
-            className="bg-white rounded-2xl p-4 flex flex-col items-center gap-2 hover:shadow-md transition-all border border-gray-100 hover:scale-105">
+            className="bg-white rounded-2xl p-3 flex flex-col items-center gap-1.5 hover:shadow-md transition-all border border-gray-100 hover:scale-105">
             <span className="text-2xl">{p.icon}</span>
             <span className="text-xs font-black" style={{color:p.color}}>{p.label}</span>
           </button>
@@ -7773,7 +7736,7 @@ function gaGradeLabel(p){ if(p>=90) return{l:"ممتاز",c:"#10b981",bg:"#dcfce
 function GradeAnalysisPage() {
   const [stage,   setStage]   = useState("متوسط");
   const [sem,     setSem]     = useState("الكل");
-  const [tab,     setTab]     = useState("dashboard");
+  const [tab,     setTab]     = useState("students");
   const [students,setStudents]= useState([]);
   const [showForm,setShowForm]= useState(false);
   const [editId,  setEditId]  = useState(null);
