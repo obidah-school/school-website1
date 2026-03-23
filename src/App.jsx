@@ -11350,66 +11350,148 @@ export default function SchoolWebsite() {
         </svg>
       </div>
       <div className="relative z-10">
-      <nav className="bg-white shadow-md sticky top-0 z-50 border-b border-teal-100">
+      <nav className="bg-white shadow-lg sticky top-0 z-50 border-b border-teal-100" style={{fontFamily:"'Cairo', 'Noto Naskh Arabic', sans-serif"}}>
         <div className="max-w-6xl mx-auto px-4">
-          <div className="flex items-center justify-between h-16">
+
+          {/* ── صف أول: الشعار + اسم المدرسة + بيانات المستخدم ── */}
+          <div className="flex items-center justify-between py-2.5 border-b border-gray-100">
             <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate("home")}>
               <SchoolLogo size="sm" animate={false} />
-              <div className="hidden sm:block"><h1 className="font-black text-teal-900 text-sm">مدرسة عبيدة بن الحارث</h1><p className="text-xs text-gray-400">المتوسطة — ١٤٤٧ هـ</p></div>
-            </div>
-            <div className="hidden lg:flex items-center gap-0.5 relative">
-              {pages.map(p => (
-                <button key={p.id} onClick={() => { navigate(p.id); setShowExtra(false); }}
-                  className={`flex-shrink-0 px-2 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${page === p.id ? "bg-teal-600 text-white" : "text-gray-600 hover:bg-teal-50"}`}>
-                  <span className="ml-0.5">{p.icon}</span>{p.label}
-                </button>
-              ))}
-              {/* قائمة المزيد */}
-              <div className="relative">
-                <button onClick={() => setShowExtra(!showExtra)}
-                  className={`flex-shrink-0 px-2 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-0.5 ${extraPages.some(p=>p.id===page) ? "bg-purple-600 text-white" : "text-gray-600 hover:bg-purple-50"}`}>
-                  ✨ المزيد {showExtra ? "▴" : "▾"}
-                </button>
-                {showExtra && (
-                  <div className="absolute top-full right-0 mt-1 bg-white rounded-2xl shadow-xl border border-gray-100 py-2 z-50 min-w-44">
-                    {extraPages.map(p => (
-                      <button key={p.id} onClick={() => { navigate(p.id); setShowExtra(false); }}
-                        className={`w-full text-right px-4 py-2.5 text-sm font-bold hover:bg-purple-50 transition-all flex items-center gap-2 ${page === p.id ? "text-purple-700 bg-purple-50" : "text-gray-700"}`}>
-                        <span>{p.icon}</span>{p.label}
-                      </button>
-                    ))}
-                  </div>
-                )}
+              <div>
+                <h1 className="font-black text-teal-900" style={{fontSize:"15px",letterSpacing:"-0.3px"}}>مدرسة عبيدة بن الحارث</h1>
+                <p className="text-gray-400 font-bold" style={{fontSize:"11px"}}>المتوسطة — ١٤٤٧ هـ</p>
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              <div className="hidden sm:flex items-center gap-2 bg-gray-50 rounded-xl px-3 py-2">
-                <div className="w-7 h-7 rounded-full bg-teal-100 flex items-center justify-center text-teal-700 text-xs font-bold">{user.name.charAt(0)}</div>
-                <div className="text-xs"><div className="font-bold text-gray-700">{user.name}</div><div className="text-gray-400">{user.role}</div></div>
+            <div className="flex items-center gap-2">
+              <div className="hidden sm:flex items-center gap-2 rounded-full px-4 py-2 border border-teal-100 bg-teal-50">
+                <div className="w-8 h-8 rounded-full bg-teal-600 flex items-center justify-center text-white font-black text-sm">{user.name.charAt(0)}</div>
+                <div><div className="font-black text-gray-800 text-sm">{user.name}</div><div className="text-gray-400 text-xs">{user.role}</div></div>
               </div>
-              <button onClick={() => setUser(null)} className="text-xs text-red-500 font-bold px-2 py-1 rounded-lg hover:bg-red-50 hidden sm:block">خروج</button>
+              <button onClick={() => setUser(null)} className="hidden sm:flex items-center gap-1 text-xs text-red-500 font-black px-3 py-2 rounded-full border border-red-200 hover:bg-red-50 transition-all">
+                🚪 خروج
+              </button>
               <button onClick={() => setMenuOpen(!menuOpen)} className="lg:hidden p-2 rounded-xl hover:bg-gray-100 text-2xl">{menuOpen ? "✕" : "☰"}</button>
             </div>
           </div>
-          {menuOpen && (
-            <div className="lg:hidden pb-4 space-y-1">
+
+          {/* ── صف ثانٍ: أزرار التنقل (desktop) ── */}
+          <div className="hidden lg:block py-2">
+            {/* الصف الأول من الأزرار */}
+            <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
               {pages.map(p => (
-                <button key={p.id} onClick={() => { navigate(p.id); setMenuOpen(false); }}
-                  className={`w-full text-right px-4 py-3 rounded-xl text-sm font-bold ${page === p.id ? "bg-teal-600 text-white" : "text-gray-600 hover:bg-teal-50"}`}>
-                  <span className="ml-2">{p.icon}</span>{p.label}
+                <button key={p.id} onClick={() => { navigate(p.id); setShowExtra(false); }}
+                  className="flex-shrink-0 transition-all"
+                  style={{
+                    padding: "7px 18px",
+                    borderRadius: "999px",
+                    fontSize: "13px",
+                    fontWeight: "800",
+                    fontFamily: "'Cairo', sans-serif",
+                    letterSpacing: "-0.2px",
+                    background: page === p.id
+                      ? "linear-gradient(135deg,#0d9488,#0f766e)"
+                      : "#f1f5f9",
+                    color: page === p.id ? "#fff" : "#475569",
+                    border: page === p.id ? "none" : "1.5px solid #e2e8f0",
+                    boxShadow: page === p.id ? "0 4px 12px rgba(13,148,136,0.35)" : "none",
+                    transform: page === p.id ? "scale(1.05)" : "scale(1)",
+                  }}>
+                  <span style={{marginLeft:"5px",fontSize:"15px"}}>{p.icon}</span>
+                  {p.label}
                 </button>
               ))}
-              <div className="border-t border-gray-100 my-2" />
-              <div className="px-4 pb-1"><span className="text-xs text-purple-500 font-black">✨ صفحات إضافية</span></div>
-              {extraPages.map(p => (
-                <button key={p.id} onClick={() => { navigate(p.id); setMenuOpen(false); }}
-                  className={`w-full text-right px-4 py-3 rounded-xl text-sm font-bold ${page === p.id ? "bg-purple-600 text-white" : "text-gray-600 hover:bg-purple-50"}`}>
-                  <span className="ml-2">{p.icon}</span>{p.label}
+            </div>
+            {/* الصف الثاني: صفحات إضافية مباشرة */}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {extraPages.slice(0,9).map(p => (
+                <button key={p.id} onClick={() => { navigate(p.id); setShowExtra(false); }}
+                  className="flex-shrink-0 transition-all"
+                  style={{
+                    padding: "5px 14px",
+                    borderRadius: "999px",
+                    fontSize: "12px",
+                    fontWeight: "700",
+                    fontFamily: "'Cairo', sans-serif",
+                    background: page === p.id
+                      ? "linear-gradient(135deg,#7c3aed,#6d28d9)"
+                      : "#faf5ff",
+                    color: page === p.id ? "#fff" : "#7c3aed",
+                    border: page === p.id ? "none" : "1.5px solid #e9d5ff",
+                    boxShadow: page === p.id ? "0 4px 12px rgba(124,58,237,0.3)" : "none",
+                    transform: page === p.id ? "scale(1.05)" : "scale(1)",
+                  }}>
+                  <span style={{marginLeft:"4px",fontSize:"13px"}}>{p.icon}</span>
+                  {p.label}
                 </button>
               ))}
-              <div className="border-t border-gray-100 pt-2 flex items-center justify-between px-4">
-                <span className="text-sm font-bold">{user.name} ({user.role})</span>
-                <button onClick={() => setUser(null)} className="text-xs text-red-500 font-bold px-3 py-1.5 rounded-lg bg-red-50">خروج</button>
+              {extraPages.length > 9 && (
+                <div className="relative">
+                  <button onClick={() => setShowExtra(!showExtra)}
+                    style={{
+                      padding: "5px 14px",
+                      borderRadius: "999px",
+                      fontSize: "12px",
+                      fontWeight: "700",
+                      fontFamily: "'Cairo', sans-serif",
+                      background: showExtra || extraPages.slice(9).some(p=>p.id===page)
+                        ? "linear-gradient(135deg,#7c3aed,#6d28d9)" : "#faf5ff",
+                      color: showExtra || extraPages.slice(9).some(p=>p.id===page) ? "#fff" : "#7c3aed",
+                      border: "1.5px solid #e9d5ff",
+                    }}>
+                    ✨ المزيد {showExtra ? "▴" : "▾"}
+                  </button>
+                  {showExtra && (
+                    <div className="absolute top-full right-0 mt-2 bg-white rounded-2xl shadow-xl border border-gray-100 py-2 z-50 min-w-48">
+                      {extraPages.slice(9).map(p => (
+                        <button key={p.id} onClick={() => { navigate(p.id); setShowExtra(false); }}
+                          className={`w-full text-right px-4 py-2.5 text-sm font-bold hover:bg-purple-50 transition-all flex items-center gap-2 ${page === p.id ? "text-purple-700 bg-purple-50" : "text-gray-700"}`}
+                          style={{fontFamily:"'Cairo', sans-serif"}}>
+                          <span>{p.icon}</span>{p.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* ── موبايل ── */}
+          {menuOpen && (
+            <div className="lg:hidden py-3 space-y-1">
+              <div className="grid grid-cols-2 gap-2 mb-3">
+                {pages.map(p => (
+                  <button key={p.id} onClick={() => { navigate(p.id); setMenuOpen(false); }}
+                    style={{
+                      padding:"10px 14px", borderRadius:"999px", fontSize:"13px", fontWeight:"800",
+                      fontFamily:"'Cairo',sans-serif", textAlign:"right",
+                      background: page===p.id ? "linear-gradient(135deg,#0d9488,#0f766e)" : "#f1f5f9",
+                      color: page===p.id ? "#fff" : "#475569",
+                      border: page===p.id ? "none" : "1.5px solid #e2e8f0",
+                      boxShadow: page===p.id ? "0 4px 12px rgba(13,148,136,0.3)" : "none",
+                    }}>
+                    <span style={{marginLeft:"5px"}}>{p.icon}</span>{p.label}
+                  </button>
+                ))}
+              </div>
+              <div className="text-xs text-purple-500 font-black px-2 mb-1">✨ صفحات إضافية</div>
+              <div className="grid grid-cols-2 gap-2">
+                {extraPages.map(p => (
+                  <button key={p.id} onClick={() => { navigate(p.id); setMenuOpen(false); }}
+                    style={{
+                      padding:"8px 12px", borderRadius:"999px", fontSize:"12px", fontWeight:"700",
+                      fontFamily:"'Cairo',sans-serif", textAlign:"right",
+                      background: page===p.id ? "linear-gradient(135deg,#7c3aed,#6d28d9)" : "#faf5ff",
+                      color: page===p.id ? "#fff" : "#7c3aed",
+                      border: "1.5px solid #e9d5ff",
+                    }}>
+                    <span style={{marginLeft:"4px"}}>{p.icon}</span>{p.label}
+                  </button>
+                ))}
+              </div>
+              <div className="border-t border-gray-100 pt-3 flex items-center justify-between px-2">
+                <span className="text-sm font-black text-gray-700">{user.name} — {user.role}</span>
+                <button onClick={() => setUser(null)} className="text-xs text-red-500 font-black px-3 py-2 rounded-full bg-red-50 border border-red-100">🚪 خروج</button>
               </div>
             </div>
           )}
