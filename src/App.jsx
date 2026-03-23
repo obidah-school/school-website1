@@ -446,13 +446,20 @@ function readFileAsync(file, mode = "base64") {
 let _xlsxLoaded = false;
 function loadXLSX() {
   return new Promise((res) => {
-    if (window.XLSX || _xlsxLoaded) return res();
-    loadXLSX().then(() => { _xlsxLoaded = true; res(); });
+    if (window.XLSX) { _xlsxLoaded = true; return res(window.XLSX); }
+    if (_xlsxLoaded && window.XLSX) return res(window.XLSX);
+    const s = document.createElement("script");
+    s.src = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
+    s.onload = () => { _xlsxLoaded = true; res(window.XLSX); };
+    document.head.appendChild(s);
   });
 }
 // فتح نافذة طباعة
 function printWindow(html) {
-  printWindow(html);
+  const w = window.open("", "_blank");
+  if (!w) return;
+  w.document.write(html);
+  w.document.close();
 }
 
 function PublicAnnouncementsPage({ announcements, siteFont, onLogin, onTeacherPortal, onParentPortal, onStudentRaffle }) {
@@ -3586,6 +3593,7 @@ function TeacherPortal({ classList, setClassList, saveClass, siteFont, onBack, a
         مدرسة عبيدة بن الحارث المتوسطة — بوابة المعلم © ١٤٤٧ هـ
       </footer>
     </div>
+    </>
   );
 }
 // ===== ثوابت التقييم الأسبوعي =====
@@ -7735,7 +7743,7 @@ function gaGradeLabel(p){ if(p>=90) return{l:"ممتاز",c:"#10b981",bg:"#dcfce
 function GradeAnalysisPage() {
   const [stage,   setStage]   = useState("متوسط");
   const [sem,     setSem]     = useState("الكل");
-  const [tab,     setTab]     = useState("students");
+  const [tab,     setTab]     = useState("excel");
   const [students,setStudents]= useState([]);
   const [showForm,setShowForm]= useState(false);
   const [editId,  setEditId]  = useState(null);
@@ -7743,6 +7751,62 @@ function GradeAnalysisPage() {
 
   const subjMap  = GA_SUBJECTS[stage] || {};
   const subjNames= Object.keys(subjMap);
+
+  const [xlsxMsg, setXlsxMsg] = useState("");
+  const [xlsxLoading, setXlsxLoading] = useState(false);
+  const xlsxRef = useRef(null);
+
+  const handleXlsxImport = async (file) => {
+    if (!file) return;
+    setXlsxLoading(true); setXlsxMsg("");
+    try {
+      const XLSX = await loadXLSX();
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf);
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { header:1 });
+      if (rows.length < 2) { setXlsxMsg("⚠️ الملف لا يحتوي على بيانات كافية"); setXlsxLoading(false); return; }
+      
+      const hdrs = (rows[0]||[]).map(h=>String(h||"").trim());
+      const nameIdx = hdrs.findIndex(h=>h.includes("اسم")||h.toLowerCase().includes("name"));
+      const semIdx  = hdrs.findIndex(h=>h.includes("فصل")||h.includes("semester")||h.toLowerCase().includes("sem"));
+      
+      if (nameIdx<0) { setXlsxMsg("⚠️ لم يُعثر على عمود 'اسم الطالب'. تأكد من وجود رأس عمود يحتوي على كلمة 'اسم'"); setXlsxLoading(false); return; }
+      
+      const subjNames_local = Object.keys(GA_SUBJECTS[stage]||{});
+      const subjIndices = {};
+      subjNames_local.forEach(subj => {
+        const cwIdx = hdrs.findIndex(h => h.includes(subj.substring(0,4)) && (h.includes("أعمال")||h.includes("سنة")||h.includes("cw")||!h.includes("نهائي")));
+        const feIdx = hdrs.findIndex(h => h.includes(subj.substring(0,4)) && (h.includes("نهائي")||h.includes("fe")||h.includes("اختبار")));
+        const totalIdx = hdrs.findIndex(h => h.includes(subj.substring(0,4)) && (h.includes("مجموع")||h.includes("total")||h.includes("درجة")));
+        subjIndices[subj] = { cwIdx, feIdx, totalIdx };
+      });
+      
+      const newStudents = rows.slice(1).filter(r=>r[nameIdx]).map(r => {
+        const grades = {};
+        const m_subj = GA_SUBJECTS[stage]||{};
+        subjNames_local.forEach(subj => {
+          const m = GA_MODELS[m_subj[subj]]||GA_MODELS["4"];
+          const idx = subjIndices[subj];
+          const total = idx.totalIdx>=0 ? Number(r[idx.totalIdx])||0 : null;
+          if (total !== null) {
+            const feRatio = m.fe>0 ? m.fe/100 : 0;
+            grades[subj] = { cw: Math.round(total*(1-feRatio)), fe: Math.round(total*feRatio) };
+          } else {
+            const cw = idx.cwIdx>=0 ? Math.min(Number(r[idx.cwIdx])||0, m.cw) : 0;
+            const fe = idx.feIdx>=0 ? Math.min(Number(r[idx.feIdx])||0, m.fe) : 0;
+            grades[subj] = { cw, fe };
+          }
+        });
+        return { id:Date.now()+Math.random()*1e5, name:String(r[nameIdx]).trim(), sem:semIdx>=0?String(r[semIdx]||"الفصل الأول"):"الفصل الأول", stage, grades };
+      });
+      
+      setStudents(p=>[...p.filter(s=>s.stage!==stage), ...newStudents]);
+      setXlsxMsg(`✅ تم استيراد ${newStudents.length} طالب من الفصل بنجاح!`);
+      setTimeout(()=>setTab("dashboard"),1500);
+    } catch(e) { setXlsxMsg("❌ خطأ في قراءة الملف: "+e.message); }
+    setXlsxLoading(false);
+  };
 
   const getModel = (sub) => GA_MODELS[subjMap[sub]] || GA_MODELS["4"];
   const subTotal = (sc) => sc ? Math.min((sc.cw||0)+(sc.fe||0),100) : 0;
@@ -7854,7 +7918,7 @@ function GradeAnalysisPage() {
     printWindow(`<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8"><title>تقرير تحليل الدرجات</title><link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;600;700;900&display=swap" rel="stylesheet"><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Tajawal';direction:rtl;color:#1e293b;background:#fff;padding:20px}.hd{background:linear-gradient(135deg,#0f172a,#6366f1);color:white;padding:20px;border-radius:12px;margin-bottom:20px}.hd h1{font-size:18px;font-weight:900}.kpi{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}.kc{background:#f8fafc;border-radius:10px;padding:12px;text-align:center}.kv{font-size:22px;font-weight:900}.kl{font-size:11px;color:#64748b}h3{font-size:14px;font-weight:800;margin:16px 0 8px;color:#1e3a5f;border-right:3px solid #6366f1;padding-right:8px}table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:16px}th{background:#0f172a;color:#e2e8f0;padding:8px;text-align:right;font-size:11px}td{padding:7px 8px;border-bottom:1px solid #f0f4f8}.footer{text-align:center;margin-top:16px;font-size:10px;color:#94a3b8;border-top:1px solid #e2e8f0;padding-top:10px}@media print{@page{size:A4;margin:1.5cm}body{padding:0}}</style></head><body><div class="hd"><h1>📊 تقرير تحليل الدرجات — دليل وزارة التعليم 2025</h1><p style="opacity:.8;font-size:12px;margin-top:4px">المرحلة: ${stage} | الفصل: ${sem} | ${r.total} طالب | ${new Date().toLocaleDateString("ar-SA")}</p></div><div class="kpi"><div class="kc"><div class="kv" style="color:#6366f1">${r.oa}%</div><div class="kl">المعدل العام</div></div><div class="kc"><div class="kv" style="color:#10b981">${r.passRate}%</div><div class="kl">نسبة النجاح</div></div><div class="kc"><div class="kv" style="color:#10b981">${r.passed}</div><div class="kl">ناجح</div></div><div class="kc"><div class="kv" style="color:#ef4444">${r.failed}</div><div class="kl">دور ثانٍ</div></div></div><h3>تحليل المواد حسب نماذج التقويم</h3><table><thead><tr><th>المادة</th><th>النموذج</th><th>النوع</th><th>المتوسط</th><th>أعلى</th><th>أدنى</th><th>نجاح</th><th>التقدير</th></tr></thead><tbody>${subRows}</tbody></table><h3>بيانات الطلاب</h3><table><thead><tr><th>#</th><th>الاسم</th><th>الفصل</th>${subjNames.map(s=>`<th>${s.substring(0,8)}</th>`).join("")}<th>المعدل</th><th>التقدير</th></tr></thead><tbody>${rows}</tbody></table><div style="background:#f0f9ff;border-radius:10px;padding:14px;margin-bottom:16px"><h3 style="margin-top:0">💡 التوصيات</h3><div style="font-size:12px;line-height:2">• المادة الأضعف: <strong>${r.worst}</strong> بمتوسط ${r.ss[r.worst]?.avg}% — تحتاج دعماً إضافياً<br>${r.failed>0?`• يوجد <strong>${r.failed}</strong> طالب يحتاج اختبار الدور الثاني — يحتفظ بـ40 ويُختبر من 60`:"• جميع الطلاب ناجحون 🎉"}<br>• نسبة النجاح ${r.passRate}% ${r.passRate>=90?"ممتازة 🎉":r.passRate>=70?"جيدة":"تحتاج تحسيناً"}</div></div><div class="footer">مدرسة عبيدة بن الحارث المتوسطة — نظام تحليل الدرجات © ١٤٤٧ هـ</div><script>window.onload=()=>window.print()</script></body></html>`);
   };
 
-  const TABS=[{id:"dashboard",l:"📊 لوحة القيادة"},{id:"students",l:"👨‍🎓 بيانات الطلاب"},{id:"models",l:"⚖️ نماذج التقويم"},{id:"analysis",l:"📈 التحليل الشامل"},{id:"ranking",l:"🏆 ترتيب الأوائل"},{id:"comparison",l:"🔄 مقارنة الفصلين"},{id:"report",l:"📋 التقرير"}];
+  const TABS=[{id:"excel",l:"📤 استيراد إكسل"},{id:"dashboard",l:"📊 لوحة القيادة"},{id:"students",l:"👨‍🎓 بيانات الطلاب"},{id:"models",l:"⚖️ نماذج التقويم"},{id:"analysis",l:"📈 التحليل الشامل"},{id:"ranking",l:"🏆 ترتيب الأوائل"},{id:"comparison",l:"🔄 مقارنة الفصلين"},{id:"report",l:"📋 التقرير"}];
 
   return (
     <div dir="rtl" className="space-y-4">
@@ -7894,6 +7958,101 @@ function GradeAnalysisPage() {
       </div>
 
       {/* ══ لوحة القيادة ══ */}
+      {/* ══ استيراد إكسل ══ */}
+      {tab==="excel" && (
+        <div className="space-y-4">
+          {/* إرشادات */}
+          <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 space-y-4">
+            <h3 className="font-black text-gray-800 text-sm">📤 استيراد درجات الفصل من ملف Excel</h3>
+            <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 space-y-2 text-xs text-blue-800 leading-relaxed">
+              <div className="font-black mb-2">📋 كيف يجب أن يكون ملف الإكسل:</div>
+              <div>• <strong>الصف الأول:</strong> رؤوس الأعمدة (اسم الطالب، الفصل، درجات المواد)</div>
+              <div>• عمود <strong>اسم الطالب</strong> أو <strong>Name</strong> — يحتوي أسماء الطلاب</div>
+              <div>• أعمدة المواد — يمكن أن تكون درجة إجمالية أو (أعمال سنة + اختبار نهائي)</div>
+              <div>• النظام يتعرف على المواد تلقائياً إذا ذُكر اسمها في رأس العمود</div>
+            </div>
+            
+            {/* نموذج الملف */}
+            <div className="overflow-x-auto">
+              <div className="text-xs font-black text-gray-500 mb-2">مثال لشكل الملف المطلوب:</div>
+              <table className="text-xs border-collapse min-w-full">
+                <thead><tr className="bg-teal-600 text-white">
+                  <th className="border border-teal-500 px-3 py-2">اسم الطالب</th>
+                  <th className="border border-teal-500 px-3 py-2">الفصل</th>
+                  {Object.keys(GA_SUBJECTS[stage]||{}).slice(0,4).map(s=>(
+                    <th key={s} className="border border-teal-500 px-3 py-2">{s.substring(0,6)} إجمالي</th>
+                  ))}
+                </tr></thead>
+                <tbody>
+                  {["أحمد محمد","فاطمة علي","خالد سعد"].map((n,i)=>(
+                    <tr key={i} className={i%2===0?"bg-white":"bg-gray-50"}>
+                      <td className="border border-gray-200 px-3 py-1.5">{n}</td>
+                      <td className="border border-gray-200 px-3 py-1.5">الفصل الأول</td>
+                      {Object.keys(GA_SUBJECTS[stage]||{}).slice(0,4).map(s=>(
+                        <td key={s} className="border border-gray-200 px-3 py-1.5 text-center">{70+Math.floor(Math.random()*30)}</td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* رفع الملف */}
+            <div className="border-2 border-dashed border-indigo-300 rounded-2xl p-8 text-center bg-indigo-50 hover:bg-indigo-100 transition-all cursor-pointer"
+              onClick={()=>xlsxRef.current?.click()}>
+              <div className="text-4xl mb-2">📁</div>
+              <div className="font-black text-indigo-700 mb-1">اضغط لرفع ملف Excel</div>
+              <div className="text-xs text-indigo-500">.xlsx أو .xls</div>
+              <input ref={xlsxRef} type="file" accept=".xlsx,.xls" className="hidden"
+                onChange={e=>handleXlsxImport(e.target.files?.[0])}/>
+            </div>
+
+            {xlsxLoading && (
+              <div className="flex items-center justify-center gap-3 py-4">
+                <div className="animate-spin text-2xl">⏳</div>
+                <span className="font-bold text-gray-600">جاري معالجة الملف...</span>
+              </div>
+            )}
+            {xlsxMsg && (
+              <div className={"rounded-2xl p-4 text-sm font-bold text-center "+(xlsxMsg.startsWith("✅")?"bg-green-50 text-green-700 border border-green-200":"bg-red-50 text-red-700 border border-red-200")}>
+                {xlsxMsg}
+              </div>
+            )}
+          </div>
+
+          {/* مواد المرحلة */}
+          <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+            <h3 className="font-black text-gray-800 mb-3 text-sm">📚 مواد {stage} التي سيتم تحليلها ({Object.keys(GA_SUBJECTS[stage]||{}).length} مادة)</h3>
+            <div className="grid grid-cols-2 gap-2">
+              {Object.entries(GA_SUBJECTS[stage]||{}).map(([subj,mid])=>{
+                const m = GA_MODELS[mid];
+                return (
+                  <div key={subj} className="flex items-center justify-between bg-gray-50 rounded-xl px-3 py-2">
+                    <span className="text-xs font-bold text-gray-700">{subj}</span>
+                    <div className="flex items-center gap-1">
+                      <span className="text-xs px-2 py-0.5 rounded-full font-bold" style={{background:m.type==="ختامي"?"#fef3c7":"#dcfce7",color:m.type==="ختامي"?"#b45309":"#166534"}}>{m.name}</span>
+                      <span className="text-xs text-gray-400">{m.cw}+{m.fe}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* أو بيانات تجريبية */}
+          <div className="flex gap-3">
+            <button onClick={loadDemo} className="flex-1 py-3 rounded-2xl bg-amber-500 hover:bg-amber-600 text-white font-black text-sm">
+              🔄 تحميل بيانات تجريبية كاملة
+            </button>
+            {students.filter(s=>s.stage===stage).length>0 && (
+              <button onClick={()=>setTab("dashboard")} className="flex-1 py-3 rounded-2xl font-black text-sm text-white" style={{background:"linear-gradient(135deg,#0f172a,#6366f1)"}}>
+                📊 عرض التحليل ({students.filter(s=>s.stage===stage).length} طالب)
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {tab==="dashboard" && (
         <div className="space-y-4">
           {!analytics ? (
@@ -8315,6 +8474,597 @@ function GradeAnalysisPage() {
   );
 }
 
+
+
+// ===== الاختبار الجماعي الموزع على أيام =====
+function DailyQuizPage({ classList }) {
+  const [tab, setTab] = useState("create");
+  const [plans, setPlans] = useState([]);
+  const [activePlan, setActivePlan] = useState(null);
+  const [form, setForm] = useState({ title:"", subject:"", days:8, questions:[] });
+  const [newQ, setNewQ] = useState({ text:"", options:["","","",""], answer:0 });
+  const [dayIdx, setDayIdx] = useState(0);
+  const [studentName, setStudentName] = useState("");
+  const [answers, setAnswers] = useState({});
+  const [submitted, setSubmitted] = useState(false);
+  const [revealed, setRevealed] = useState(false);
+  const [results, setResults] = useState([]);
+
+  useEffect(() => {
+    DB.get("school-daily-quiz-plans",[]).then(d=>setPlans(Array.isArray(d)?d:[]));
+    DB.get("school-daily-quiz-results",[]).then(d=>setResults(Array.isArray(d)?d:[]));
+  },[]);
+
+  const savePlans = p => { setPlans(p); DB.set("school-daily-quiz-plans",p); };
+  const saveResults = r => { setResults(r); DB.set("school-daily-quiz-results",r); };
+
+  const addQ = () => {
+    if (!newQ.text.trim() || newQ.options.some(o=>!o.trim())) { alert("أكمل السؤال والخيارات الأربعة"); return; }
+    setForm(f=>({...f, questions:[...f.questions,{...newQ,id:Date.now()}]}));
+    setNewQ({text:"",options:["","","",""],answer:0});
+  };
+
+  const createPlan = () => {
+    if (!form.title.trim()||form.questions.length<1) { alert("أدخل العنوان وسؤالاً واحداً على الأقل"); return; }
+    const qPerDay = Math.ceil(form.questions.length/form.days);
+    const days = Array.from({length:form.days},(_,i)=>({
+      day:i+1,
+      questions: form.questions.slice(i*qPerDay,(i+1)*qPerDay),
+    })).filter(d=>d.questions.length>0);
+    const plan = {id:Date.now(), title:form.title, subject:form.subject, days, createdAt:new Date().toLocaleDateString("ar-SA")};
+    savePlans([plan,...plans]);
+    setForm({title:"",subject:"",days:8,questions:[]});
+    setTab("run");
+    setActivePlan(plan);
+  };
+
+  const submitAnswer = () => {
+    if (!studentName.trim()) { alert("أدخل اسمك"); return; }
+    const todayQs = activePlan?.days[dayIdx]?.questions||[];
+    const score = todayQs.filter((q,qi)=>answers[qi]===q.answer).length;
+    const entry = {id:Date.now(),planId:activePlan.id,planTitle:activePlan.title,day:dayIdx+1,studentName,score,total:todayQs.length,date:new Date().toLocaleDateString("ar-SA")};
+    saveResults([entry,...results]);
+    setSubmitted(true);
+  };
+
+  const todayQs = activePlan?.days[dayIdx]?.questions||[];
+  const dayResults = results.filter(r=>r.planId===activePlan?.id&&r.day===dayIdx+1);
+
+  return (
+    <div dir="rtl" className="space-y-4">
+      <div className="rounded-3xl overflow-hidden shadow-xl" style={{background:"linear-gradient(135deg,#7c3aed,#2563eb)"}}>
+        <div className="p-6 text-white">
+          <h2 className="text-2xl font-black mb-1">🎯 الاختبار الجماعي اليومي</h2>
+          <p className="opacity-80 text-sm">توزيع المعايير على أيام — الإجابة مخفية حتى يجاوب الجميع</p>
+        </div>
+      </div>
+      <div className="flex gap-1 bg-white rounded-2xl p-1.5 shadow-sm overflow-x-auto">
+        {[{id:"create",l:"➕ إنشاء خطة"},{id:"run",l:"▶️ تشغيل اختبار"},{id:"results",l:"📊 النتائج"}].map(t=>(
+          <button key={t.id} onClick={()=>setTab(t.id)}
+            className={"flex-shrink-0 px-4 py-2 rounded-xl text-xs font-black transition-all "+(tab===t.id?"bg-purple-600 text-white shadow":"text-gray-500 hover:bg-gray-50")}>
+            {t.l}
+          </button>
+        ))}
+      </div>
+
+      {/* إنشاء خطة */}
+      {tab==="create" && (
+        <div className="space-y-4">
+          <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 space-y-3">
+            <h3 className="font-black text-gray-800 text-sm">📋 بيانات الخطة</h3>
+            <div className="grid grid-cols-2 gap-3">
+              <div><label className="text-xs font-bold text-gray-500 block mb-1">عنوان الخطة</label>
+                <input value={form.title} onChange={e=>setForm(f=>({...f,title:e.target.value}))} placeholder="مثال: اختبار الوحدة الأولى" className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 text-sm focus:border-purple-400 focus:outline-none" style={{fontFamily:"inherit"}}/></div>
+              <div><label className="text-xs font-bold text-gray-500 block mb-1">المادة</label>
+                <input value={form.subject} onChange={e=>setForm(f=>({...f,subject:e.target.value}))} placeholder="رياضيات، علوم..." className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 text-sm focus:border-purple-400 focus:outline-none" style={{fontFamily:"inherit"}}/></div>
+            </div>
+            <div><label className="text-xs font-bold text-gray-500 block mb-1">عدد الأيام: {form.days}</label>
+              <input type="range" min="1" max="30" value={form.days} onChange={e=>setForm(f=>({...f,days:Number(e.target.value)}))} className="w-full"/></div>
+          </div>
+          <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 space-y-3">
+            <h3 className="font-black text-gray-800 text-sm">❓ إضافة أسئلة ({form.questions.length} سؤال)</h3>
+            <textarea value={newQ.text} onChange={e=>setNewQ(p=>({...p,text:e.target.value}))} placeholder="نص السؤال..." rows={2}
+              className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 text-sm focus:border-purple-400 focus:outline-none resize-none" style={{fontFamily:"inherit"}}/>
+            <div className="grid grid-cols-2 gap-2">
+              {newQ.options.map((op,i)=>(
+                <div key={i} className="flex items-center gap-2">
+                  <input type="radio" name="ans" checked={newQ.answer===i} onChange={()=>setNewQ(p=>({...p,answer:i}))} className="accent-green-500"/>
+                  <input value={op} onChange={e=>setNewQ(p=>({...p,options:p.options.map((o,j)=>j===i?e.target.value:o)}))}
+                    placeholder={`خيار ${i+1}${i===newQ.answer?" ✓ (الصحيح)":""}`}
+                    className="flex-1 px-2 py-1.5 rounded-lg border border-gray-200 text-xs focus:outline-none focus:border-green-400" style={{fontFamily:"inherit"}}/>
+                </div>
+              ))}
+            </div>
+            <div className="text-xs text-gray-400">حدد الدائرة بجانب الإجابة الصحيحة ✓</div>
+            <button onClick={addQ} className="w-full py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-black text-sm">+ إضافة السؤال</button>
+            {form.questions.length>0 && (
+              <div className="space-y-1 max-h-40 overflow-y-auto">
+                {form.questions.map((q,i)=>(
+                  <div key={q.id} className="flex items-center justify-between bg-purple-50 rounded-xl px-3 py-2">
+                    <span className="text-xs font-bold text-purple-800 truncate">{i+1}. {q.text}</span>
+                    <button onClick={()=>setForm(f=>({...f,questions:f.questions.filter(x=>x.id!==q.id)}))} className="text-red-400 text-xs px-2">✕</button>
+                  </div>
+                ))}
+              </div>
+            )}
+            {form.questions.length>0 && (
+              <div className="bg-blue-50 rounded-xl p-3 text-xs text-blue-700 font-bold">
+                📅 {form.questions.length} سؤال ÷ {form.days} أيام = {Math.ceil(form.questions.length/form.days)} سؤال/يوم تقريباً
+              </div>
+            )}
+          </div>
+          <button onClick={createPlan} disabled={!form.title||form.questions.length===0}
+            className="w-full py-3 rounded-2xl text-white font-black text-base disabled:opacity-40"
+            style={{background:"linear-gradient(135deg,#7c3aed,#2563eb)"}}>
+            ✅ إنشاء الخطة وتوزيعها
+          </button>
+        </div>
+      )}
+
+      {/* تشغيل الاختبار */}
+      {tab==="run" && (
+        <div className="space-y-4">
+          <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+            <label className="text-xs font-bold text-gray-500 block mb-1">اختر الخطة</label>
+            <select value={activePlan?.id||""} onChange={e=>{const p=plans.find(x=>x.id===Number(e.target.value));setActivePlan(p);setDayIdx(0);setSubmitted(false);setRevealed(false);setAnswers({});}}
+              className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 text-sm font-bold focus:outline-none" style={{fontFamily:"inherit"}}>
+              <option value="">— اختر خطة —</option>
+              {plans.map(p=><option key={p.id} value={p.id}>{p.title} | {p.subject}</option>)}
+            </select>
+          </div>
+          {activePlan && (
+            <>
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {activePlan.days.map((d,i)=>(
+                  <button key={i} onClick={()=>{setDayIdx(i);setSubmitted(false);setRevealed(false);setAnswers({});}}
+                    className={"flex-shrink-0 px-4 py-2 rounded-xl text-xs font-black transition-all border-2 "+
+                      (dayIdx===i?"bg-purple-600 text-white border-purple-600":"bg-white text-gray-600 border-gray-200 hover:border-purple-300")}>
+                    يوم {d.day}
+                    <div className="text-xs opacity-70">{d.questions.length} سؤال</div>
+                  </button>
+                ))}
+              </div>
+              <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-black text-gray-800">اليوم {activePlan.days[dayIdx]?.day} — {activePlan.subject}</h3>
+                  <span className="text-xs bg-purple-100 text-purple-700 px-3 py-1 rounded-full font-bold">{todayQs.length} سؤال</span>
+                </div>
+                {!submitted ? (
+                  <div className="space-y-4">
+                    <input value={studentName} onChange={e=>setStudentName(e.target.value)} placeholder="اسم الطالب" className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 text-sm focus:border-purple-400 focus:outline-none" style={{fontFamily:"inherit"}}/>
+                    {todayQs.map((q,qi)=>(
+                      <div key={q.id} className="bg-gray-50 rounded-xl p-4">
+                        <div className="font-bold text-gray-800 text-sm mb-3">{qi+1}. {q.text}</div>
+                        <div className="grid grid-cols-1 gap-2">
+                          {q.options.map((op,oi)=>(
+                            <button key={oi} onClick={()=>setAnswers(p=>({...p,[qi]:oi}))}
+                              className={"w-full text-right px-4 py-2.5 rounded-xl border-2 text-sm font-bold transition-all "+
+                                (answers[qi]===oi?"border-purple-500 bg-purple-50 text-purple-800":"border-gray-200 bg-white text-gray-700 hover:border-purple-300")}>
+                              {["أ","ب","ج","د"][oi]}. {op}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                    <button onClick={submitAnswer} disabled={Object.keys(answers).length<todayQs.length}
+                      className="w-full py-3 rounded-2xl text-white font-black disabled:opacity-40"
+                      style={{background:"linear-gradient(135deg,#7c3aed,#2563eb)"}}>
+                      ✅ تسليم الإجابات
+                    </button>
+                  </div>
+                ) : (
+                  <div className="text-center py-6">
+                    <div className="text-4xl mb-2">⏳</div>
+                    <div className="font-black text-gray-700 mb-1">تم التسليم!</div>
+                    <div className="text-sm text-gray-400 mb-4">انتظر حتى يجاوب بقية الطلاب</div>
+                    <div className="text-xs text-gray-400 mb-3">{dayResults.length} طالب سلّم حتى الآن</div>
+                    {!revealed ? (
+                      <button onClick={()=>setRevealed(true)} className="px-6 py-2.5 rounded-xl bg-green-600 text-white font-black text-sm hover:bg-green-700">
+                        🎯 كشف الإجابات الصحيحة
+                      </button>
+                    ) : (
+                      <div className="space-y-3 text-right">
+                        {todayQs.map((q,qi)=>(
+                          <div key={q.id} className="bg-gray-50 rounded-xl p-4">
+                            <div className="font-bold text-sm mb-2">{qi+1}. {q.text}</div>
+                            {q.options.map((op,oi)=>(
+                              <div key={oi} className={"flex items-center gap-2 px-3 py-2 rounded-xl mb-1 text-sm "+(oi===q.answer?"bg-green-100 text-green-800 font-black":answers[qi]===oi&&oi!==q.answer?"bg-red-100 text-red-700":"text-gray-500")}>
+                                {oi===q.answer?"✅":answers[qi]===oi?"❌":"○"} {["أ","ب","ج","د"][oi]}. {op}
+                              </div>
+                            ))}
+                          </div>
+                        ))}
+                        <div className="bg-purple-50 rounded-xl p-4 text-center">
+                          <div className="text-2xl font-black text-purple-700">{todayQs.filter((q,qi)=>answers[qi]===q.answer).length}/{todayQs.length}</div>
+                          <div className="text-xs text-purple-500 font-bold">نتيجتك</div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+          {plans.length===0 && <div className="bg-white rounded-2xl p-12 text-center shadow-sm border"><div className="text-4xl mb-2">📋</div><div className="font-black text-gray-400">أنشئ خطة أولاً من تبويب "إنشاء خطة"</div></div>}
+        </div>
+      )}
+
+      {/* النتائج */}
+      {tab==="results" && (
+        <div className="space-y-4">
+          {plans.map(plan=>{
+            const planRes=results.filter(r=>r.planId===plan.id);
+            if(!planRes.length) return null;
+            return (
+              <div key={plan.id} className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100">
+                <div className="px-5 py-3 border-b font-black text-gray-800 text-sm flex items-center justify-between">
+                  <span>📊 {plan.title}</span><span className="text-xs text-gray-400">{plan.subject}</span>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50"><tr>
+                      <th className="px-4 py-2 text-right text-xs font-black text-gray-500">الطالب</th>
+                      <th className="px-3 py-2 text-center text-xs font-black text-purple-600">اليوم</th>
+                      <th className="px-3 py-2 text-center text-xs font-black text-green-600">النتيجة</th>
+                      <th className="px-3 py-2 text-center text-xs font-black text-gray-400">التاريخ</th>
+                    </tr></thead>
+                    <tbody>
+                      {planRes.map((r,i)=>{
+                        const pct=Math.round(r.score/r.total*100);
+                        const col=pct>=80?"text-green-600":pct>=60?"text-amber-600":"text-red-600";
+                        return <tr key={r.id} className={i%2===0?"":"bg-gray-50"}>
+                          <td className="px-4 py-2 font-bold text-gray-800">{r.studentName}</td>
+                          <td className="px-3 py-2 text-center text-xs text-purple-600 font-bold">يوم {r.day}</td>
+                          <td className={"px-3 py-2 text-center font-black "+col}>{r.score}/{r.total} ({pct}%)</td>
+                          <td className="px-3 py-2 text-center text-xs text-gray-400">{r.date}</td>
+                        </tr>;
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            );
+          })}
+          {results.length===0 && <div className="bg-white rounded-2xl p-12 text-center shadow-sm border"><div className="text-4xl mb-2">📊</div><div className="font-black text-gray-400">لا توجد نتائج بعد</div></div>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ===== مساعد المعلم الذكي =====
+function AITeacherPage() {
+  const CLAUDE_API_KEY = import.meta.env.VITE_CLAUDE_API_KEY || "";
+  const [tab, setTab] = useState("questions"); // questions | summary | essay
+  const [inputText, setInputText] = useState("");
+  const [subject, setSubject] = useState("");
+  const [grade, setGrade] = useState("");
+  const [numQ, setNumQ] = useState(10);
+  const [level, setLevel] = useState("متوسط");
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState("");
+  const [error, setError] = useState("");
+  const [essayText, setEssayText] = useState("");
+  const [essayLang, setEssayLang] = useState("عربي");
+
+  const callClaude = async (prompt) => {
+    if (!CLAUDE_API_KEY) {
+      setError("⚠️ يجب إضافة VITE_CLAUDE_API_KEY في إعدادات Vercel");
+      return null;
+    }
+    try {
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method:"POST",
+        headers:{"Content-Type":"application/json","x-api-key":CLAUDE_API_KEY,"anthropic-version":"2023-06-01"},
+        body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:2000,messages:[{role:"user",content:prompt}]})
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error.message);
+      return data.content?.[0]?.text || "";
+    } catch(e) { setError("خطأ في الاتصال: "+e.message); return null; }
+  };
+
+  const generateQuestions = async () => {
+    if (!inputText.trim()) { alert("أدخل نص المنهج أو الموضوع"); return; }
+    setLoading(true); setResult(""); setError("");
+    const prompt = `أنت معلم خبير في التعليم السعودي. بناءً على النص التالي، أنشئ ${numQ} سؤالاً اختيارياً (MCQ) باللغة العربية لطلاب ${grade} في مادة ${subject} بمستوى ${level}.
+
+النص:
+${inputText}
+
+الصيغة المطلوبة لكل سؤال:
+س[رقم]: [نص السؤال]
+أ) [خيار]
+ب) [خيار]  
+ج) [خيار]
+د) [خيار]
+✅ الإجابة: [الحرف الصحيح]
+
+ابدأ مباشرة بالأسئلة.`;
+    const text = await callClaude(prompt);
+    if (text) setResult(text);
+    setLoading(false);
+  };
+
+  const generateSummary = async () => {
+    if (!inputText.trim()) { alert("أدخل نص المنهج"); return; }
+    setLoading(true); setResult(""); setError("");
+    const prompt = `لخّص النص التالي لطلاب ${grade} في مادة ${subject} بأسلوب واضح ومنظم باللغة العربية.
+اجعل الملخص يشمل:
+1. أهم المفاهيم والتعريفات
+2. النقاط الرئيسية مرقمة
+3. خلاصة في جملتين
+
+النص:
+${inputText}`;
+    const text = await callClaude(prompt);
+    if (text) setResult(text);
+    setLoading(false);
+  };
+
+  const correctEssay = async () => {
+    if (!essayText.trim()) { alert("أدخل نص المقالة"); return; }
+    setLoading(true); setResult(""); setError("");
+    const prompt = `أنت مصحح لغوي خبير. قيّم المقالة التالية المكتوبة باللغة ${essayLang} وقدّم:
+
+1. **الدرجة الإجمالية** (من 100)
+2. **نقاط القوة** (3-4 نقاط)
+3. **الأخطاء اللغوية والنحوية** مع التصحيح
+4. **ملاحظات على الأسلوب والتنظيم**
+5. **توصيات للتحسين**
+
+المقالة:
+${essayText}
+
+قدّم التقييم باللغة العربية بصيغة واضحة ومنظمة.`;
+    const text = await callClaude(prompt);
+    if (text) setResult(text);
+    setLoading(false);
+  };
+
+  const copyResult = () => { navigator.clipboard.writeText(result); };
+  const printResult = () => {
+    printWindow(`<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8"><style>body{font-family:'Cairo',sans-serif;padding:20px;direction:rtl;line-height:2}h1{color:#7c3aed}pre{white-space:pre-wrap;font-family:inherit}</style></head><body><h1>🤖 مساعد المعلم الذكي</h1><pre>${result}</pre><script>window.onload=()=>window.print()</script></body></html>`);
+  };
+
+  return (
+    <div dir="rtl" className="space-y-4">
+      <div className="rounded-3xl overflow-hidden shadow-xl" style={{background:"linear-gradient(135deg,#7c3aed,#ec4899)"}}>
+        <div className="p-6 text-white">
+          <h2 className="text-2xl font-black mb-1">🤖 مساعد المعلم الذكي</h2>
+          <p className="opacity-80 text-sm">مدعوم بـ Claude AI — أسئلة، ملخصات، وتصحيح مقالات</p>
+        </div>
+      </div>
+
+      {!CLAUDE_API_KEY && (
+        <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-4">
+          <div className="font-black text-amber-800 mb-1">⚠️ يلزم إعداد مفتاح API</div>
+          <div className="text-xs text-amber-700 leading-relaxed">أضف متغير <strong>VITE_CLAUDE_API_KEY</strong> في إعدادات Vercel ← Environment Variables</div>
+        </div>
+      )}
+
+      <div className="flex gap-1 bg-white rounded-2xl p-1.5 shadow-sm overflow-x-auto">
+        {[{id:"questions",l:"❓ توليد أسئلة"},{id:"summary",l:"📝 ملخص تلقائي"},{id:"essay",l:"✏️ تصحيح مقالة"}].map(t=>(
+          <button key={t.id} onClick={()=>{setTab(t.id);setResult("");setError("");}}
+            className={"flex-shrink-0 px-4 py-2 rounded-xl text-xs font-black transition-all "+(tab===t.id?"bg-purple-600 text-white shadow":"text-gray-500 hover:bg-gray-50")}>
+            {t.l}
+          </button>
+        ))}
+      </div>
+
+      {(tab==="questions"||tab==="summary") && (
+        <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 space-y-3">
+          <div className="grid grid-cols-3 gap-3">
+            <div><label className="text-xs font-bold text-gray-500 block mb-1">المادة</label>
+              <input value={subject} onChange={e=>setSubject(e.target.value)} placeholder="رياضيات..." className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 text-sm focus:border-purple-400 focus:outline-none" style={{fontFamily:"inherit"}}/></div>
+            <div><label className="text-xs font-bold text-gray-500 block mb-1">الصف</label>
+              <input value={grade} onChange={e=>setGrade(e.target.value)} placeholder="الأول متوسط" className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 text-sm focus:border-purple-400 focus:outline-none" style={{fontFamily:"inherit"}}/></div>
+            {tab==="questions" && (
+              <div><label className="text-xs font-bold text-gray-500 block mb-1">عدد الأسئلة: {numQ}</label>
+                <input type="range" min="3" max="30" value={numQ} onChange={e=>setNumQ(Number(e.target.value))} className="w-full mt-2"/></div>
+            )}
+          </div>
+          {tab==="questions" && (
+            <div><label className="text-xs font-bold text-gray-500 block mb-1">المستوى</label>
+              <div className="flex gap-2">
+                {["سهل","متوسط","صعب"].map(l=>(
+                  <button key={l} onClick={()=>setLevel(l)}
+                    className={"px-4 py-1.5 rounded-xl text-xs font-black border-2 transition-all "+(level===l?"border-purple-500 bg-purple-600 text-white":"border-gray-200 text-gray-600 hover:border-purple-300")}>
+                    {l}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          <div>
+            <label className="text-xs font-bold text-gray-500 block mb-1">📄 نص المنهج أو الموضوع</label>
+            <textarea value={inputText} onChange={e=>setInputText(e.target.value)} rows={6}
+              placeholder="الصق نص المنهج هنا، أو اكتب الموضوع الذي تريد إنشاء أسئلة أو ملخص عنه..."
+              className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 text-sm focus:border-purple-400 focus:outline-none resize-none" style={{fontFamily:"inherit"}}/>
+          </div>
+          <button onClick={tab==="questions"?generateQuestions:generateSummary} disabled={loading||!inputText.trim()}
+            className="w-full py-3 rounded-2xl text-white font-black disabled:opacity-40"
+            style={{background:"linear-gradient(135deg,#7c3aed,#ec4899)"}}>
+            {loading?"⏳ جاري المعالجة...":tab==="questions"?"🎯 توليد الأسئلة":"📝 إنشاء الملخص"}
+          </button>
+        </div>
+      )}
+
+      {tab==="essay" && (
+        <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 space-y-3">
+          <div className="flex gap-2">
+            {["عربي","إنجليزي"].map(l=>(
+              <button key={l} onClick={()=>setEssayLang(l)}
+                className={"px-4 py-2 rounded-xl text-sm font-black border-2 transition-all "+(essayLang===l?"border-purple-500 bg-purple-600 text-white":"border-gray-200 text-gray-600")}>
+                {l==="عربي"?"🔤 عربي":"🔠 إنجليزي"}
+              </button>
+            ))}
+          </div>
+          <div>
+            <label className="text-xs font-bold text-gray-500 block mb-1">✏️ نص المقالة / الكتابة</label>
+            <textarea value={essayText} onChange={e=>setEssayText(e.target.value)} rows={8}
+              placeholder="الصق كتابة الطالب هنا للتصحيح والتقييم..."
+              className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 text-sm focus:border-purple-400 focus:outline-none resize-none" style={{fontFamily:"inherit"}} dir={essayLang==="إنجليزي"?"ltr":"rtl"}/>
+          </div>
+          <button onClick={correctEssay} disabled={loading||!essayText.trim()}
+            className="w-full py-3 rounded-2xl text-white font-black disabled:opacity-40"
+            style={{background:"linear-gradient(135deg,#7c3aed,#ec4899)"}}>
+            {loading?"⏳ جاري التصحيح...":"🔍 تصحيح وتقييم المقالة"}
+          </button>
+        </div>
+      )}
+
+      {error && <div className="bg-red-50 border border-red-200 rounded-2xl p-4 text-sm text-red-700 font-bold">{error}</div>}
+
+      {result && (
+        <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100">
+          <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+            <h3 className="font-black text-gray-800 text-sm">✨ النتيجة</h3>
+            <div className="flex gap-2">
+              <button onClick={copyResult} className="text-xs bg-gray-100 text-gray-600 px-3 py-1.5 rounded-lg font-bold hover:bg-gray-200">📋 نسخ</button>
+              <button onClick={printResult} className="text-xs bg-purple-100 text-purple-700 px-3 py-1.5 rounded-lg font-bold hover:bg-purple-200">🖨️ طباعة</button>
+            </div>
+          </div>
+          <div className="p-5">
+            <pre className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap" style={{fontFamily:"inherit"}}>{result}</pre>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ===== نظام التوصية بالدروس =====
+function LessonRecommendPage({ classList }) {
+  const [selectedClass, setSelectedClass] = useState("");
+  const [selectedStudent, setSelectedStudent] = useState(null);
+
+  const SUBJECT_RESOURCES = {
+    "رياضيات": [{title:"خان أكاديمي — رياضيات",url:"https://ar.khanacademy.org/math",icon:"📐"},{title:"يوتيوب — شرح رياضيات",url:"https://www.youtube.com/results?search_query=شرح+رياضيات+متوسط",icon:"▶️"}],
+    "علوم":    [{title:"خان أكاديمي — علوم",url:"https://ar.khanacademy.org/science",icon:"🔬"},{title:"يوتيوب — شرح علوم",url:"https://www.youtube.com/results?search_query=شرح+علوم+متوسط",icon:"▶️"}],
+    "إنجليزي": [{title:"Duolingo — إنجليزي",url:"https://www.duolingo.com",icon:"🔠"},{title:"BBC Learning English",url:"https://www.bbc.co.uk/learningenglish",icon:"🌐"}],
+    "لغتي":   [{title:"يوتيوب — لغة عربية",url:"https://www.youtube.com/results?search_query=شرح+لغة+عربية+متوسط",icon:"📖"},{title:"مدرسة.كوم",url:"https://madrasa.com",icon:"🏫"}],
+    "دراسات إسلامية": [{title:"يوتيوب — تربية إسلامية",url:"https://www.youtube.com/results?search_query=شرح+تربية+إسلامية",icon:"🌙"},{title:"إسلام ويب",url:"https://islamweb.net",icon:"📿"}],
+  };
+
+  const cls = classList.find(c=>c.id===selectedClass);
+  const student = cls?.students?.find(s=>s.id===selectedStudent);
+  const evals = student?.evals||[];
+
+  const weakSubjects = (() => {
+    const subjScores = {};
+    evals.forEach(ev => {
+      if (!ev.subject) return;
+      if (!subjScores[ev.subject]) subjScores[ev.subject]=[];
+      const lvMap={excel:5,vgood:4,good:3,accept:2,weak:1};
+      subjScores[ev.subject].push(lvMap[ev.level]||0);
+    });
+    return Object.entries(subjScores).map(([subj,scores])=>({
+      subj, avg:scores.reduce((a,b)=>a+b,0)/scores.length, count:scores.length
+    })).filter(x=>x.avg<3).sort((a,b)=>a.avg-b.avg);
+  })();
+
+  const levelLabel = avg => avg>=4?"ممتاز":avg>=3?"جيد":avg>=2?"مقبول":"يحتاج دعم";
+  const levelColor = avg => avg>=4?"#22c55e":avg>=3?"#f59e0b":avg>=2?"#fb923c":"#ef4444";
+
+  return (
+    <div dir="rtl" className="space-y-4">
+      <div className="rounded-3xl overflow-hidden shadow-xl" style={{background:"linear-gradient(135deg,#0891b2,#7c3aed)"}}>
+        <div className="p-6 text-white">
+          <h2 className="text-2xl font-black mb-1">💡 التوصية بالدروس</h2>
+          <p className="opacity-80 text-sm">تحليل نقاط ضعف الطالب واقتراح مصادر تعليمية مناسبة</p>
+        </div>
+      </div>
+      <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 space-y-3">
+        <div>
+          <label className="text-xs font-bold text-gray-500 block mb-1">الفصل</label>
+          <select value={selectedClass} onChange={e=>{setSelectedClass(e.target.value);setSelectedStudent(null);}}
+            className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 text-sm font-bold focus:outline-none" style={{fontFamily:"inherit"}}>
+            <option value="">— اختر الفصل —</option>
+            {classList.map(c=><option key={c.id} value={c.id}>{c.name||`${c.level}/${c.section}`}</option>)}
+          </select>
+        </div>
+        {cls && (
+          <div>
+            <label className="text-xs font-bold text-gray-500 block mb-1">الطالب</label>
+            <select value={selectedStudent||""} onChange={e=>setSelectedStudent(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 text-sm font-bold focus:outline-none" style={{fontFamily:"inherit"}}>
+              <option value="">— اختر الطالب —</option>
+              {(cls.students||[]).filter(s=>s.name).map(s=><option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+          </div>
+        )}
+      </div>
+
+      {student && (
+        <div className="space-y-4">
+          {weakSubjects.length===0 ? (
+            <div className="bg-green-50 border border-green-200 rounded-2xl p-6 text-center">
+              <div className="text-3xl mb-2">🌟</div>
+              <div className="font-black text-green-700">أداء الطالب ممتاز في جميع المواد</div>
+              <div className="text-xs text-green-600 mt-1">لا توجد مواد تحتاج دعماً إضافياً</div>
+            </div>
+          ) : (
+            <>
+              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
+                <div className="font-black text-amber-800 mb-3 text-sm">⚠️ مواد تحتاج متابعة — {student.name}</div>
+                <div className="space-y-2">
+                  {weakSubjects.map(w=>(
+                    <div key={w.subj} className="flex items-center justify-between bg-white rounded-xl px-4 py-3">
+                      <span className="font-bold text-gray-800 text-sm">{w.subj}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-gray-400">{w.count} تقييم</span>
+                        <span className="text-xs font-black px-2 py-1 rounded-full text-white" style={{background:levelColor(w.avg)}}>
+                          {levelLabel(w.avg)}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="space-y-3">
+                {weakSubjects.map(w=>{
+                  const resources = SUBJECT_RESOURCES[w.subj]||[{title:"بحث في يوتيوب",url:`https://www.youtube.com/results?search_query=شرح+${w.subj}`,icon:"▶️"}];
+                  return (
+                    <div key={w.subj} className="bg-white rounded-2xl p-5 shadow-sm border border-blue-100">
+                      <div className="font-black text-blue-800 mb-3 text-sm">📚 توصيات لمادة {w.subj}</div>
+                      <div className="space-y-2">
+                        {resources.map((r,i)=>(
+                          <a key={i} href={r.url} target="_blank" rel="noopener noreferrer"
+                            className="flex items-center gap-3 bg-blue-50 hover:bg-blue-100 rounded-xl px-4 py-3 transition-all group">
+                            <span className="text-xl">{r.icon}</span>
+                            <div className="flex-1">
+                              <div className="font-bold text-blue-800 text-sm group-hover:underline">{r.title}</div>
+                              <div className="text-xs text-blue-500">{r.url.substring(0,40)}...</div>
+                            </div>
+                            <span className="text-blue-400 group-hover:text-blue-600">←</span>
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
+          {evals.length===0 && (
+            <div className="bg-gray-50 rounded-2xl p-6 text-center border">
+              <div className="text-3xl mb-2">📋</div>
+              <div className="font-black text-gray-500">لا توجد تقييمات لهذا الطالب بعد</div>
+              <div className="text-xs text-gray-400 mt-1">أضف تقييمات بالمواد من صفحة تقييم الطلاب</div>
+            </div>
+          )}
+        </div>
+      )}
+      {!student && !cls && (
+        <div className="bg-white rounded-2xl p-12 text-center shadow-sm border">
+          <div className="text-4xl mb-3">💡</div>
+          <div className="font-black text-gray-600">اختر فصلاً وطالباً لعرض التوصيات</div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function SettingsPage({ teachers, setTeachers, saveTeachers, week, setWeek, saveWeek, users, siteFont, setSiteFont, saveSiteFont, weekArchive, archiveCurrentWeek }) {
   const [newT, setNewT] = useState("");
@@ -11078,7 +11828,7 @@ export default function SchoolWebsite() {
       const hash = window.location.hash.replace("#","") || "home";
       if (hash.startsWith("ann-")) { setDirectAnnId(hash.replace("ann-","")); return; }
       setDirectAnnId(null);
-      if (["home","attendance","announcements","activities","settings","students","messages","surveys","sms","report","gradeanalysis","monthlyreport","teacherprofile","absencestats","attendancereport","student-absence","strategies","calendar","gallery","certificates","poll","raffle","broadcast","groupdivider","quiz","classtimer","luckywheel","exitticket","timetable","classvisits","honorboard","tasks"].includes(hash)) setPage(hash);
+      if (["home","attendance","announcements","activities","settings","students","messages","surveys","sms","report","gradeanalysis","monthlyreport","teacherprofile","absencestats","attendancereport","student-absence","strategies","calendar","gallery","certificates","poll","raffle","broadcast","groupdivider","quiz","classtimer","luckywheel","exitticket","timetable","classvisits","honorboard","tasks","dailyquiz","aiteacher","lessonrecommend"].includes(hash)) setPage(hash);
     };
     window.addEventListener("hashchange", h); h();
     return () => window.removeEventListener("hashchange", h);
@@ -11217,9 +11967,57 @@ export default function SchoolWebsite() {
     { id: "monthlyreport",    label: "التقرير الشهري/الفصلي",  icon: "📋" },
     { id: "absencestats",  label: "إحصائيات الغياب",   icon: "📊" },
     { id: "attendancereport", label: "تحليل الحضور والانصراف", icon: "🗂️" },
+    { id: "dailyquiz",     label: "الاختبار اليومي",     icon: "🎯" },
+    { id: "aiteacher",     label: "مساعد المعلم الذكي",  icon: "🤖" },
+    { id: "lessonrecommend",label: "التوصية بالدروس",    icon: "💡" },
   ];
 
   return (
+    <>
+    <style>{`
+      @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap');
+      .nav-pill-main {
+        display: inline-flex; align-items: center; gap: 5px;
+        padding: 8px 20px; border-radius: 999px;
+        font-size: 13px; font-weight: 800;
+        font-family: 'Cairo', sans-serif;
+        transition: all 0.2s ease; cursor: pointer; border: none;
+        white-space: nowrap;
+      }
+      .nav-pill-main.active {
+        background: linear-gradient(135deg,#0d9488,#0f766e);
+        color: #fff; box-shadow: 0 4px 14px rgba(13,148,136,0.4);
+        transform: scale(1.04);
+      }
+      .nav-pill-main:not(.active) {
+        background: #f1f5f9; color: #475569;
+        border: 1.5px solid #e2e8f0;
+      }
+      .nav-pill-main:not(.active):hover {
+        background: #e0fdf4; color: #0d9488; border-color: #99f6e4;
+      }
+      .nav-pill-extra {
+        display: inline-flex; align-items: center; gap: 4px;
+        padding: 6px 14px; border-radius: 999px;
+        font-size: 12px; font-weight: 700;
+        font-family: 'Cairo', sans-serif;
+        transition: all 0.2s ease; cursor: pointer; border: none;
+        white-space: nowrap;
+      }
+      .nav-pill-extra.active {
+        background: linear-gradient(135deg,#7c3aed,#6d28d9);
+        color: #fff; box-shadow: 0 4px 14px rgba(124,58,237,0.35);
+        transform: scale(1.04);
+      }
+      .nav-pill-extra:not(.active) {
+        background: #faf5ff; color: #7c3aed;
+        border: 1.5px solid #e9d5ff;
+      }
+      .nav-pill-extra:not(.active):hover {
+        background: #ede9fe; border-color: #c4b5fd;
+      }
+      .nav-pill-icon { font-size: 16px; }
+    `}</style>
     <div dir="rtl" className="min-h-screen relative overflow-x-hidden" style={{ fontFamily: siteFont, background: "linear-gradient(160deg, #f0fdfa 0%, #ecfdf5 25%, #f5f5f4 60%, #fefce8 100%)" }}>
 
       {/* ── رذاذ الزوايا المتحرك ── */}
@@ -11380,23 +12178,8 @@ export default function SchoolWebsite() {
             <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
               {pages.map(p => (
                 <button key={p.id} onClick={() => { navigate(p.id); setShowExtra(false); }}
-                  className="flex-shrink-0 transition-all"
-                  style={{
-                    padding: "7px 18px",
-                    borderRadius: "999px",
-                    fontSize: "13px",
-                    fontWeight: "800",
-                    fontFamily: "'Cairo', sans-serif",
-                    letterSpacing: "-0.2px",
-                    background: page === p.id
-                      ? "linear-gradient(135deg,#0d9488,#0f766e)"
-                      : "#f1f5f9",
-                    color: page === p.id ? "#fff" : "#475569",
-                    border: page === p.id ? "none" : "1.5px solid #e2e8f0",
-                    boxShadow: page === p.id ? "0 4px 12px rgba(13,148,136,0.35)" : "none",
-                    transform: page === p.id ? "scale(1.05)" : "scale(1)",
-                  }}>
-                  <span style={{marginLeft:"5px",fontSize:"15px"}}>{p.icon}</span>
+                  className={`nav-pill-main ${page === p.id ? "active" : ""}`}>
+                  <span className="nav-pill-icon">{p.icon}</span>
                   {p.label}
                 </button>
               ))}
@@ -11405,39 +12188,15 @@ export default function SchoolWebsite() {
             <div className="flex items-center gap-1.5 flex-wrap">
               {extraPages.slice(0,9).map(p => (
                 <button key={p.id} onClick={() => { navigate(p.id); setShowExtra(false); }}
-                  className="flex-shrink-0 transition-all"
-                  style={{
-                    padding: "5px 14px",
-                    borderRadius: "999px",
-                    fontSize: "12px",
-                    fontWeight: "700",
-                    fontFamily: "'Cairo', sans-serif",
-                    background: page === p.id
-                      ? "linear-gradient(135deg,#7c3aed,#6d28d9)"
-                      : "#faf5ff",
-                    color: page === p.id ? "#fff" : "#7c3aed",
-                    border: page === p.id ? "none" : "1.5px solid #e9d5ff",
-                    boxShadow: page === p.id ? "0 4px 12px rgba(124,58,237,0.3)" : "none",
-                    transform: page === p.id ? "scale(1.05)" : "scale(1)",
-                  }}>
-                  <span style={{marginLeft:"4px",fontSize:"13px"}}>{p.icon}</span>
+                  className={`nav-pill-extra ${page === p.id ? "active" : ""}`}>
+                  <span className="nav-pill-icon">{p.icon}</span>
                   {p.label}
                 </button>
               ))}
               {extraPages.length > 9 && (
                 <div className="relative">
                   <button onClick={() => setShowExtra(!showExtra)}
-                    style={{
-                      padding: "5px 14px",
-                      borderRadius: "999px",
-                      fontSize: "12px",
-                      fontWeight: "700",
-                      fontFamily: "'Cairo', sans-serif",
-                      background: showExtra || extraPages.slice(9).some(p=>p.id===page)
-                        ? "linear-gradient(135deg,#7c3aed,#6d28d9)" : "#faf5ff",
-                      color: showExtra || extraPages.slice(9).some(p=>p.id===page) ? "#fff" : "#7c3aed",
-                      border: "1.5px solid #e9d5ff",
-                    }}>
+                    className={`nav-pill-extra ${showExtra || extraPages.slice(9).some(p=>p.id===page) ? "active" : ""}`}>
                     ✨ المزيد {showExtra ? "▴" : "▾"}
                   </button>
                   {showExtra && (
@@ -11529,6 +12288,9 @@ export default function SchoolWebsite() {
         {page === "gradeanalysis" && <GradeAnalysisPage />}
         {page === "teacherprofile" && <TeacherProfilePage teachers={teachers} attendance={attendance} week={week} weekArchive={weekArchive} classList={classList} />}
         {page === "attendancereport" && <AttendanceAnalysisPage />}
+        {page === "dailyquiz"      && <DailyQuizPage classList={classList} />}
+        {page === "aiteacher"      && <AITeacherPage />}
+        {page === "lessonrecommend"&& <LessonRecommendPage classList={classList} />}
         {page === "settings"      && <SettingsPage teachers={teachers} setTeachers={setTeachers} saveTeachers={saveTeachers} week={week} setWeek={setWeek} saveWeek={saveWeek} users={users} siteFont={siteFont} setSiteFont={setSiteFont} saveSiteFont={saveSiteFont} weekArchive={weekArchive} archiveCurrentWeek={archiveCurrentWeek} />}
       </main>
       </div>{/* end relative z-10 */}
@@ -11538,6 +12300,7 @@ export default function SchoolWebsite() {
         <p className="relative text-gray-400 mt-1">© ١٤٤٧ هـ — جميع الحقوق محفوظة</p>
       </footer>
     </div>
+    </>
   );
 }
 
