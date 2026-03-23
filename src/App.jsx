@@ -1969,24 +1969,24 @@ function ParentPortal({ classList, setClassList, saveClass, messages, setMessage
                           <div className="text-xs text-gray-400">{lastEval.day} {lastEval.dateH}</div>
                           <span className="px-4 py-2 rounded-full font-black text-sm" style={{ background: lastLv.bg, color: lastLv.c }}>{lastLv.label}</span>
                         </div>
-                        {/* درجات المواد */}
-                        {lastEval.subjectGrades && Object.keys(lastEval.subjectGrades).some(k=>lastEval.subjectGrades[k]) && (
+                        {/* ملخص المواد — آخر مستوى لكل مادة */}
+                        {evals.some(e=>e.subject) && (
                           <div className="mb-3">
-                            <div className="text-xs font-black text-gray-500 mb-2">📚 درجات المواد</div>
-                            <div className="flex flex-wrap gap-1.5">
+                            <div className="text-xs font-black text-gray-500 mb-2">📊 آخر مستوى لكل مادة</div>
+                            <div className="grid grid-cols-3 gap-1.5">
                               {SUBJECTS.map(subj => {
-                                const gr = lastEval.subjectGrades[subj.key];
-                                if (!gr) return null;
-                                const grObj = SUBJECT_GRADES.find(g=>g.value===gr) || SUBJECT_GRADES[0];
+                                const last = [...evals].reverse().find(e=>e.subject===subj.key);
+                                if (!last) return null;
+                                const lv = LMAP[last.level];
                                 return (
-                                  <div key={subj.key} className="flex items-center gap-1 rounded-xl px-2.5 py-1.5 text-xs font-black"
-                                    style={{background:subj.bg,color:subj.color}}>
-                                    <span>{subj.icon}</span>
-                                    <span>{subj.label}</span>
-                                    <span className="rounded-full px-2 py-0.5 text-white font-black text-xs"
-                                      style={{background:grObj.bg,color:grObj.color}}>
-                                      {grObj.label}
-                                    </span>
+                                  <div key={subj.key} className="rounded-xl overflow-hidden border" style={{borderColor:subj.color+"44"}}>
+                                    <div className="flex items-center gap-1 px-2 py-1" style={{background:subj.bg}}>
+                                      <span className="text-xs">{subj.icon}</span>
+                                      <span className="text-xs font-black truncate" style={{color:subj.color}}>{subj.label}</span>
+                                    </div>
+                                    <div className="text-center font-black text-xs py-1.5" style={{background:lv?.bg||"#f5f5f5",color:lv?.c||"#333"}}>
+                                      {lv?.label||"—"}
+                                    </div>
                                   </div>
                                 );
                               })}
@@ -3668,9 +3668,9 @@ function newEval() {
     id: Date.now() + Math.random() * 1000 | 0,
     dateH: "",
     day: "الأحد",
+    subject: "",
     level: "",
     categories: {},
-    subjectGrades: {},
   };
 }
 
@@ -3744,6 +3744,7 @@ ${siteUrl}
   };
 
   const saveEval = () => {
+    if (!draft.subject) { alert("اختر المادة الدراسية أولاً"); return; }
     if (!draft.level) { alert("اختر المستوى أولاً"); return; }
     const updated = { ...student, evals: [...evals, { ...draft, id: Date.now() }] };
     onUpdate(updated);
@@ -3777,14 +3778,13 @@ ${siteUrl}
               {lastLevel.label}
             </span>
           )}
-          {/* مؤشرات المواد */}
-          {lastEval?.subjectGrades && (() => {
-            const hasGrades = Object.values(lastEval.subjectGrades).some(Boolean);
-            if (!hasGrades) return null;
-            const count = Object.values(lastEval.subjectGrades).filter(Boolean).length;
+          {/* مؤشر المواد — عدد المواد المقيّمة */}
+          {(() => {
+            const subjSet = new Set(evals.filter(e=>e.subject).map(e=>e.subject));
+            if (subjSet.size === 0) return null;
             return (
               <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full font-bold">
-                📚 {count} مادة
+                📚 {subjSet.size} مادة
               </span>
             );
           })()}
@@ -3837,6 +3837,34 @@ ${siteUrl}
               </button>
             )}
           </div>
+          {/* ملخص مستوى كل مادة */}
+          {evals.some(e=>e.subject) && (
+            <div className="px-4 pt-3 pb-2">
+              <div className="text-xs font-black text-gray-500 mb-2">📊 آخر مستوى لكل مادة</div>
+              <div className="grid grid-cols-3 gap-1.5">
+                {SUBJECTS.map(subj => {
+                  const subjEvals = [...evals].reverse().filter(e=>e.subject===subj.key);
+                  const last = subjEvals[0];
+                  if (!last) return null;
+                  const lv = EVAL_LEVELS.find(l=>l.value===last.level) || EVAL_LEVELS[0];
+                  return (
+                    <div key={subj.key} className="rounded-xl overflow-hidden border"
+                      style={{borderColor:subj.color+"44"}}>
+                      <div className="flex items-center gap-1 px-2 py-1" style={{background:subj.bg}}>
+                        <span className="text-xs">{subj.icon}</span>
+                        <span className="text-xs font-black truncate" style={{color:subj.color}}>{subj.label}</span>
+                      </div>
+                      <div className="px-2 py-1 text-center font-black text-xs" style={{background:lv.bg||"#f5f5f5",color:lv.color||"#333"}}>
+                        {lv.label || "—"}
+                      </div>
+                      <div className="text-center text-xs text-gray-400 pb-1">{subjEvals.length} تقييم</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* قائمة التقييمات السابقة */}
           {evals.length > 0 && (
             <div className="px-4 pt-3 space-y-3">
@@ -3846,35 +3874,21 @@ ${siteUrl}
                   <div key={ev.id} className="rounded-xl border border-gray-100 overflow-hidden">
                     {/* رأس التقييم */}
                     <div className="flex items-center justify-between px-3 py-2" style={{ background: lv.bg || "#f5f5f5" }}>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {ev.subject && (() => {
+                          const subj = SUBJECTS.find(s=>s.key===ev.subject);
+                          return subj ? (
+                            <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-black"
+                              style={{background:subj.bg, color:subj.color, border:`1px solid ${subj.color}44`}}>
+                              {subj.icon} {subj.label}
+                            </span>
+                          ) : null;
+                        })()}
                         <span className="font-black text-sm" style={{ color: lv.color }}>{lv.label}</span>
                         {ev.dateH && <span className="text-xs opacity-70" style={{ color: lv.color }}>📅 {ev.day} {ev.dateH}</span>}
                       </div>
                       <button onClick={() => deleteEval(ev.id)} className="text-xs opacity-50 hover:opacity-100 px-2 py-0.5 rounded-lg hover:bg-red-100 hover:text-red-600 transition-all">🗑️</button>
                     </div>
-                    {/* درجات المواد */}
-                    {ev.subjectGrades && Object.keys(ev.subjectGrades).some(k=>ev.subjectGrades[k]) && (
-                      <div className="px-3 py-2 border-t border-gray-50">
-                        <div className="text-xs font-black text-gray-500 mb-1.5">📚 درجات المواد</div>
-                        <div className="flex flex-wrap gap-1.5">
-                          {SUBJECTS.map(subj => {
-                            const gr = ev.subjectGrades[subj.key];
-                            if (!gr) return null;
-                            const grObj = SUBJECT_GRADES.find(g=>g.value===gr) || SUBJECT_GRADES[0];
-                            return (
-                              <div key={subj.key} className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-black"
-                                style={{background:subj.bg, color:subj.color, border:`1px solid ${subj.color}33`}}>
-                                <span>{subj.icon}</span>
-                                <span>{subj.label}</span>
-                                <span className="rounded-full px-1.5 py-0.5 font-black text-white" style={{background:grObj.bg,color:grObj.color,border:`1px solid ${grObj.bg}`}}>
-                                  {grObj.label}
-                                </span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
                     {/* ملاحظات الفئات */}
                     {EVAL_CATEGORIES.map(cat => {
                       const catData = ev.categories?.[cat.key];
@@ -3902,6 +3916,23 @@ ${siteUrl}
             <div className="m-4 bg-blue-50 rounded-2xl p-4 border-2 border-blue-200">
               <div className="font-black text-blue-800 mb-3 text-sm">➕ تقييم أسبوعي جديد</div>
 
+              {/* اختيار المادة */}
+              <div className="mb-3">
+                <label className={cx.label}>📚 المادة الدراسية *</label>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {SUBJECTS.map(subj => (
+                    <button key={subj.key} onClick={() => setDraft(p => ({ ...p, subject: subj.key }))}
+                      className={"flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-black border-2 transition-all " +
+                        (draft.subject === subj.key ? "border-current shadow-sm" : "border-gray-200 bg-white hover:border-gray-300")}
+                      style={draft.subject === subj.key ? {background:subj.bg, color:subj.color, borderColor:subj.color} : {color:"#6b7280"}}>
+                      <span className="text-sm">{subj.icon}</span>
+                      <span className="truncate">{subj.label}</span>
+                    </button>
+                  ))}
+                </div>
+                {!draft.subject && <div className="text-xs text-red-500 font-bold mt-1">اختر المادة أولاً</div>}
+              </div>
+
               {/* التاريخ واليوم والمستوى */}
               <div className="grid grid-cols-3 gap-2 mb-3">
                 <div>
@@ -3924,39 +3955,6 @@ ${siteUrl}
                     style={draft.level ? { background: EVAL_LEVELS.find(l=>l.value===draft.level)?.bg, color: EVAL_LEVELS.find(l=>l.value===draft.level)?.color } : {}}>
                     {EVAL_LEVELS.map(l => <option key={l.value} value={l.value}>{l.label}</option>)}
                   </select>
-                </div>
-              </div>
-
-              {/* ===== درجات المواد ===== */}
-              <div className="mb-3">
-                <div className="font-black text-blue-800 text-xs mb-2">📚 درجات المواد (اختياري)</div>
-                <div className="grid grid-cols-3 gap-1.5">
-                  {SUBJECTS.map(subj => {
-                    const grade = draft.subjectGrades?.[subj.key] || "";
-                    const gradeObj = SUBJECT_GRADES.find(g=>g.value===grade) || SUBJECT_GRADES[0];
-                    return (
-                      <div key={subj.key} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-                        <div className="flex items-center gap-1.5 px-2 py-1.5 border-b border-gray-100"
-                          style={{background: subj.bg}}>
-                          <span className="text-sm">{subj.icon}</span>
-                          <span className="text-xs font-black truncate" style={{color:subj.color}}>{subj.label}</span>
-                        </div>
-                        <select
-                          value={grade}
-                          onChange={e => setDraft(p => ({ ...p, subjectGrades: { ...p.subjectGrades, [subj.key]: e.target.value }}))}
-                          className="w-full px-1.5 py-1.5 text-xs font-bold focus:outline-none bg-white text-center border-0"
-                          style={{
-                            color: gradeObj.color,
-                            background: grade ? gradeObj.bg : "#fff",
-                            fontFamily: "inherit"
-                          }}>
-                          {SUBJECT_GRADES.map(g => (
-                            <option key={g.value} value={g.value}>{g.label}</option>
-                          ))}
-                        </select>
-                      </div>
-                    );
-                  })}
                 </div>
               </div>
 
@@ -7745,6 +7743,617 @@ function TeacherProfilePage({ teachers, attendance, week, weekArchive, classList
 }
 
 
+// ===== صفحة تحليل درجات الطلاب — وزارة التعليم 2025 =====
+const GA_MODELS = {
+  "1":{ name:"نموذج 1", type:"تكويني",  cw:100, fe:0,  round2:"يحتفظ بـ40 ويختبر من 60 (15 شفهي + 45 تحريري)", parts:{"المهام الأدائية والمشاركة":40,"تقويمات شفهية وتحريرية":60} },
+  "2":{ name:"نموذج 2", type:"ختامي",   cw:60,  fe:40, round2:"يحتفظ بـ40 ويختبر من 60 اختبار تحريري",        parts:{"المهام الأدائية والمشاركة":40,"تقويمات تحريرية":20,"اختبار نهاية الفترة":40} },
+  "3":{ name:"نموذج 3", type:"ختامي",   cw:60,  fe:40, round2:"يحتفظ بـ40 ويختبر من 60 (30 شفهي + 30 تحريري)",parts:{"المهام الأدائية والمشاركة":40,"تقويمات شفهية وتحريرية":20,"اختبار نهاية الفترة":40} },
+  "4":{ name:"نموذج 4", type:"تكويني",  cw:100, fe:0,  round2:"يحتفظ بـ40 ويختبر من 60 درجة",                parts:{"المهام الأدائية والمشاركة":40,"تقويمات تحريرية":60} },
+  "5":{ name:"نموذج 5", type:"تكويني",  cw:100, fe:0,  round2:"يحتفظ بـ40 ويختبر من 60 (شفهي وتطبيقات عملية)",parts:{"المهام الأدائية والمشاركة":40,"تقويمات وأدوات متنوعة":60} },
+  "6":{ name:"نموذج 6", type:"تكويني",  cw:100, fe:0,  round2:"يحتفظ بـ40 ويختبر من 60 (35 تطبيقات + 25 تحريري)",parts:{"المهام الأدائية والمشاركة":40,"تقويمات وتطبيقات عملية":60} },
+  "7":{ name:"نموذج 7", type:"ختامي",   cw:60,  fe:40, round2:"يحتفظ بـ40 ويختبر من 60 (20 تطبيقات + 40 تحريري)",parts:{"المهام الأدائية والمشاركة":40,"تقويمات وتطبيقات عملية":20,"اختبار نهاية الفترة":40} },
+};
+const GA_SUBJECTS = {
+  "ابتدائي":{"القرآن الكريم والدراسات الإسلامية":"1","اللغة العربية":"3","الرياضيات":"2","العلوم":"2","اللغة الإنجليزية":"3","الدراسات الاجتماعية":"4","المهارات الرقمية":"6","التربية الفنية":"5","التربية البدنية والدفاع عن النفس":"5","المهارات الحياتية والأسرية":"5"},
+  "متوسط":{"القرآن الكريم والدراسات الإسلامية":"1","اللغة العربية":"3","الرياضيات":"2","العلوم":"2","اللغة الإنجليزية":"3","الدراسات الاجتماعية":"4","المهارات الرقمية":"6","التفكير الناقد":"4","التربية الفنية":"5","التربية البدنية والدفاع عن النفس":"5","المهارات الحياتية والأسرية":"5"},
+  "ثانوي":{"القرآن الكريم وتفسيره":"1","الكفايات اللغوية":"3","اللغة الإنجليزية":"3","الرياضيات":"2","الفيزياء":"7","الكيمياء":"7","الأحياء":"7","الدراسات الاجتماعية":"4","التقنية الرقمية":"6","التفكير الناقد":"4","التربية الصحية والبدنية":"5","المهارات الحياتية":"4"},
+};
+const GA_RULES = [
+  "يُنفذ التقويم التكويني باستمرار بعد كل وحدة دراسية في جميع المواد",
+  "يتم إجراء اختبارات تحريرية قصيرة من (20) درجة مرتين على الأقل خلال الفترة الدراسية",
+  "المواد المُقوَّمة ختامياً: الرياضيات والعربية + الإنجليزية والعلوم (باقي الصفوف)",
+  "تُطبق النسبة الشرطية (20%) من درجة الاختبار التحريري في المواد المُقوَّمة ختامياً",
+  "عند إخفاق الطالب يحتفظ بـ (40) درجة ويُختبر الدور الثاني من (60) درجة",
+  "لا يُمنح الطالب درجة كاملة في المشاركة في المقرر الذي غاب فيه بدون عذر",
+  "لا يُعاد للطالب المتغيب بدون عذر عن الاختبارات القصيرة",
+];
+const GA_CC = ["#2dd4bf","#f472b6","#818cf8","#fb923c","#34d399","#f87171","#a78bfa","#fbbf24","#38bdf8","#e879f9","#84cc16","#06b6d4"];
+function gaGradeLabel(p){ if(p>=90) return{l:"ممتاز",c:"#10b981",bg:"#dcfce7"}; if(p>=80) return{l:"جيد جداً",c:"#3b82f6",bg:"#dbeafe"}; if(p>=70) return{l:"جيد",c:"#f59e0b",bg:"#fef3c7"}; if(p>=60) return{l:"مقبول",c:"#f97316",bg:"#ffedd5"}; if(p>=50) return{l:"ضعيف",c:"#ef4444",bg:"#fee2e2"}; return{l:"راسب",c:"#991b1b",bg:"#fee2e2"}; }
+
+function GradeAnalysisPage() {
+  const [stage,   setStage]   = useState("متوسط");
+  const [sem,     setSem]     = useState("الكل");
+  const [tab,     setTab]     = useState("dashboard");
+  const [students,setStudents]= useState([]);
+  const [showForm,setShowForm]= useState(false);
+  const [editId,  setEditId]  = useState(null);
+  const [form,    setForm]    = useState({name:"",sem:"الفصل الأول",grades:{}});
+
+  const subjMap  = GA_SUBJECTS[stage] || {};
+  const subjNames= Object.keys(subjMap);
+
+  const getModel = (sub) => GA_MODELS[subjMap[sub]] || GA_MODELS["4"];
+  const subTotal = (sc) => sc ? Math.min((sc.cw||0)+(sc.fe||0),100) : 0;
+  const stuAvg   = (s)  => { const sc=subjNames.map(n=>subTotal(s.grades?.[n])); return sc.length ? Math.round(sc.reduce((a,b)=>a+b,0)/sc.length*10)/10 : 0; };
+  const filtered = students.filter(s=>s.stage===stage&&(sem==="الكل"||s.sem===sem));
+
+  const analytics = React.useMemo(()=>{
+    if (!filtered.length) return null;
+    const ss = {};
+    subjNames.forEach(sub=>{ ss[sub]={scores:[],pass:0,fail:0}; });
+    const ranked = filtered.map(s=>{
+      let total=0; let cnt=0;
+      subjNames.forEach(sub=>{
+        const v=subTotal(s.grades?.[sub]);
+        ss[sub].scores.push(v);
+        v>=50?ss[sub].pass++:ss[sub].fail++;
+        total+=v; cnt++;
+      });
+      const avg=cnt?Math.round(total/cnt*10)/10:0;
+      return{...s,avg,total};
+    }).sort((a,b)=>b.avg-a.avg);
+    subjNames.forEach(sub=>{
+      const sc=ss[sub].scores;
+      if(!sc.length) return;
+      const m=sc.reduce((a,b)=>a+b,0)/sc.length;
+      ss[sub].avg=Math.round(m*10)/10;
+      ss[sub].max=Math.max(...sc);
+      ss[sub].min=Math.min(...sc);
+      ss[sub].sd =Math.round(Math.sqrt(sc.reduce((a,b)=>a+Math.pow(b-m,2),0)/sc.length)*10)/10;
+      ss[sub].pr =Math.round(ss[sub].pass/sc.length*100);
+    });
+    const avgs=ranked.map(s=>s.avg);
+    const oa=Math.round(avgs.reduce((a,b)=>a+b,0)/avgs.length*10)/10;
+    const passed=avgs.filter(a=>a>=50).length;
+    const grades={};
+    avgs.forEach(a=>{ const g=gaGradeLabel(a).l; grades[g]=(grades[g]||0)+1; });
+    const best=subjNames.length?subjNames.reduce((a,b)=>(ss[a]?.avg||0)>(ss[b]?.avg||0)?a:b,""):"-";
+    const worst=subjNames.length?subjNames.reduce((a,b)=>(ss[a]?.avg||100)<(ss[b]?.avg||100)?a:b,""):"-";
+    return{ranked,ss,oa,mx:Math.max(...avgs),mn:Math.min(...avgs),passed,failed:avgs.length-passed,passRate:Math.round(passed/avgs.length*100),total:avgs.length,grades,best,worst};
+  },[filtered.length, stage, sem, JSON.stringify(students)]);
+
+  // رسم الأعمدة المبسط بدون Chart.js
+  const BarChart = ({data,max=100,colors})=>(
+    <div className="flex items-end gap-1 h-40 overflow-x-auto pb-1">
+      {data.map((d,i)=>{
+        const h=max>0?Math.round(d.value/max*100):0;
+        return(
+          <div key={i} className="flex flex-col items-center flex-shrink-0" style={{minWidth:28}}>
+            <div className="text-xs font-black mb-1" style={{color:colors?colors[i%colors.length]:GA_CC[i%GA_CC.length],fontSize:9}}>{d.value}</div>
+            <div className="rounded-t-lg w-full transition-all" style={{height:h+"%",minHeight:2,background:colors?colors[i%colors.length]:GA_CC[i%GA_CC.length],width:24}}/>
+            <div className="text-center mt-1 text-gray-400" style={{fontSize:8,maxWidth:28,lineHeight:1.1,wordBreak:"break-word"}}>{d.label}</div>
+          </div>
+        );
+      })}
+    </div>
+  );
+
+  const RadarChart = ({data})=>{
+    const n=data.length; if(n<3) return null;
+    const cx=100,cy=100,r=75;
+    const pts=data.map((d,i)=>{
+      const a=(i/n)*2*Math.PI-Math.PI/2;
+      const v=d.value/100*r;
+      return{x:cx+Math.cos(a)*v,y:cy+Math.sin(a)*v,lx:cx+Math.cos(a)*(r+18),ly:cy+Math.sin(a)*(r+18),label:d.label,value:d.value};
+    });
+    const axes=data.map((_,i)=>{ const a=(i/n)*2*Math.PI-Math.PI/2; return{x1:cx,y1:cy,x2:cx+Math.cos(a)*r,y2:cy+Math.sin(a)*r}; });
+    const poly=pts.map(p=>`${p.x},${p.y}`).join(" ");
+    const rings=[25,50,75,100].map(pct=>data.map((_,i)=>{ const a=(i/n)*2*Math.PI-Math.PI/2,rv=pct/100*r; return`${cx+Math.cos(a)*rv},${cy+Math.sin(a)*rv}`; }).join(" "));
+    return(
+      <svg viewBox="0 0 200 200" className="w-full" style={{maxHeight:220}}>
+        {rings.map((p,i)=><polygon key={i} points={p} fill="none" stroke="#e5e7eb" strokeWidth="0.5"/>)}
+        {axes.map((a,i)=><line key={i} x1={a.x1} y1={a.y1} x2={a.x2} y2={a.y2} stroke="#e5e7eb" strokeWidth="0.5"/>)}
+        <polygon points={poly} fill="#6366f125" stroke="#6366f1" strokeWidth="1.5"/>
+        {pts.map((p,i)=><circle key={i} cx={p.x} cy={p.y} r="3" fill="#6366f1"/>)}
+        {pts.map((p,i)=><text key={i} x={p.lx} y={p.ly} textAnchor="middle" dominantBaseline="middle" fontSize="6" fill="#64748b">{p.label.substring(0,6)}</text>)}
+      </svg>
+    );
+  };
+
+  const loadDemo = ()=>{
+    const names=["أحمد محمد","فاطمة علي","خالد سعد","نورة أحمد","عبدالله يوسف","مريم خالد","سلطان فهد","ريم سعود","يزيد عمر","ليلى حسن","عمر إبراهيم","سارة ناصر","فيصل عبدالرحمن","هند سالم","راكان ماجد"];
+    const news=[];
+    ["الفصل الأول","الفصل الثاني"].forEach(s=>{
+      names.forEach(nm=>{
+        const grades={};
+        subjNames.forEach(sub=>{ const m=getModel(sub); grades[sub]={cw:Math.round(m.cw*(0.4+Math.random()*0.6)),fe:m.fe>0?Math.round(m.fe*(0.3+Math.random()*0.7)):0}; });
+        news.push({id:Date.now()+Math.random()*1e5,name:nm,sem:s,stage,grades});
+      });
+    });
+    setStudents(p=>[...p.filter(s=>s.stage!==stage),...news]);
+    setTab("dashboard");
+  };
+
+  const saveStudent = ()=>{
+    if(!form.name.trim()){alert("أدخل اسم الطالب");return;}
+    if(editId){ setStudents(p=>p.map(s=>s.id===editId?{...s,...form,stage}:s)); setEditId(null); }
+    else { setStudents(p=>[...p,{id:Date.now(),stage,...form}]); }
+    setForm({name:"",sem:"الفصل الأول",grades:{}}); setShowForm(false);
+  };
+
+  const printReport = ()=>{
+    if(!analytics) return;
+    const r=analytics;
+    const rows=r.ranked.map((s,i)=>{
+      const g=gaGradeLabel(s.avg);
+      return `<tr style="background:${i%2===0?"#fff":"#f9fafb"}"><td style="font-weight:700;color:#64748b">${i+1}</td><td style="font-weight:700">${s.name}</td><td>${s.sem}</td>${subjNames.map(sub=>`<td style="text-align:center;font-weight:600">${subTotal(s.grades?.[sub])}</td>`).join("")}<td style="font-weight:800;color:#6366f1">${s.avg}%</td><td><span style="background:${g.bg};color:${g.c};padding:2px 8px;border-radius:12px;font-weight:700;font-size:11px">${g.l}</span></td></tr>`;
+    }).join("");
+    const subRows=subjNames.map((sub,i)=>{ const s=r.ss[sub]; const m=getModel(sub); const g=gaGradeLabel(s.avg); return `<tr style="background:${i%2===0?"#fff":"#f9fafb"}"><td style="font-weight:700">${sub}</td><td><span style="background:#ede9fe;color:#6d28d9;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700">${m.name}</span></td><td style="text-align:center;color:${m.type==="ختامي"?"#f59e0b":"#10b981"};font-weight:700">${m.type}</td><td style="text-align:center;font-weight:700;color:#3b82f6">${s.avg}%</td><td style="text-align:center;color:#10b981;font-weight:600">${s.max}</td><td style="text-align:center;color:#ef4444;font-weight:600">${s.min}</td><td style="text-align:center">${s.pr}%</td><td><span style="background:${g.bg};color:${g.c};padding:2px 8px;border-radius:12px;font-weight:700;font-size:11px">${g.l}</span></td></tr>`; }).join("");
+    printWindow(`<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8"><title>تقرير تحليل الدرجات</title><link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;600;700;900&display=swap" rel="stylesheet"><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Tajawal';direction:rtl;color:#1e293b;background:#fff;padding:20px}.hd{background:linear-gradient(135deg,#0f172a,#6366f1);color:white;padding:20px;border-radius:12px;margin-bottom:20px}.hd h1{font-size:18px;font-weight:900}.kpi{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}.kc{background:#f8fafc;border-radius:10px;padding:12px;text-align:center}.kv{font-size:22px;font-weight:900}.kl{font-size:11px;color:#64748b}h3{font-size:14px;font-weight:800;margin:16px 0 8px;color:#1e3a5f;border-right:3px solid #6366f1;padding-right:8px}table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:16px}th{background:#0f172a;color:#e2e8f0;padding:8px;text-align:right;font-size:11px}td{padding:7px 8px;border-bottom:1px solid #f0f4f8}.footer{text-align:center;margin-top:16px;font-size:10px;color:#94a3b8;border-top:1px solid #e2e8f0;padding-top:10px}@media print{@page{size:A4;margin:1.5cm}body{padding:0}}</style></head><body><div class="hd"><h1>📊 تقرير تحليل الدرجات — دليل وزارة التعليم 2025</h1><p style="opacity:.8;font-size:12px;margin-top:4px">المرحلة: ${stage} | الفصل: ${sem} | ${r.total} طالب | ${new Date().toLocaleDateString("ar-SA")}</p></div><div class="kpi"><div class="kc"><div class="kv" style="color:#6366f1">${r.oa}%</div><div class="kl">المعدل العام</div></div><div class="kc"><div class="kv" style="color:#10b981">${r.passRate}%</div><div class="kl">نسبة النجاح</div></div><div class="kc"><div class="kv" style="color:#10b981">${r.passed}</div><div class="kl">ناجح</div></div><div class="kc"><div class="kv" style="color:#ef4444">${r.failed}</div><div class="kl">دور ثانٍ</div></div></div><h3>تحليل المواد حسب نماذج التقويم</h3><table><thead><tr><th>المادة</th><th>النموذج</th><th>النوع</th><th>المتوسط</th><th>أعلى</th><th>أدنى</th><th>نجاح</th><th>التقدير</th></tr></thead><tbody>${subRows}</tbody></table><h3>بيانات الطلاب</h3><table><thead><tr><th>#</th><th>الاسم</th><th>الفصل</th>${subjNames.map(s=>`<th>${s.substring(0,8)}</th>`).join("")}<th>المعدل</th><th>التقدير</th></tr></thead><tbody>${rows}</tbody></table><div style="background:#f0f9ff;border-radius:10px;padding:14px;margin-bottom:16px"><h3 style="margin-top:0">💡 التوصيات</h3><div style="font-size:12px;line-height:2">• المادة الأضعف: <strong>${r.worst}</strong> بمتوسط ${r.ss[r.worst]?.avg}% — تحتاج دعماً إضافياً<br>${r.failed>0?`• يوجد <strong>${r.failed}</strong> طالب يحتاج اختبار الدور الثاني — يحتفظ بـ40 ويُختبر من 60`:"• جميع الطلاب ناجحون 🎉"}<br>• نسبة النجاح ${r.passRate}% ${r.passRate>=90?"ممتازة 🎉":r.passRate>=70?"جيدة":"تحتاج تحسيناً"}</div></div><div class="footer">مدرسة عبيدة بن الحارث المتوسطة — نظام تحليل الدرجات © ١٤٤٧ هـ</div><script>window.onload=()=>window.print()</script></body></html>`);
+  };
+
+  const TABS=[{id:"dashboard",l:"📊 لوحة القيادة"},{id:"students",l:"👨‍🎓 بيانات الطلاب"},{id:"models",l:"⚖️ نماذج التقويم"},{id:"analysis",l:"📈 التحليل الشامل"},{id:"ranking",l:"🏆 ترتيب الأوائل"},{id:"comparison",l:"🔄 مقارنة الفصلين"},{id:"report",l:"📋 التقرير"}];
+
+  return (
+    <div dir="rtl" className="space-y-4">
+      {/* رأس الصفحة */}
+      <div className="rounded-3xl overflow-hidden shadow-xl" style={{background:"linear-gradient(135deg,#0f172a 0%,#1e3a5f 50%,#6366f1 100%)"}}>
+        <div className="p-6 text-white">
+          <h2 className="text-2xl font-black mb-1">📊 تحليل درجات الطلاب</h2>
+          <p className="opacity-80 text-sm">دليل توزيع الدرجات — وزارة التعليم السعودية ١٤٤٧ هـ</p>
+        </div>
+      </div>
+
+      {/* فلاتر */}
+      <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex flex-wrap gap-3 items-end">
+        <div><label className={cx.label}>المرحلة</label>
+          <select value={stage} onChange={e=>{setStage(e.target.value);setTab("dashboard");setStudents(p=>p.filter(s=>s.stage!==e.target.value));}} className={cx.input} style={{fontFamily:"inherit"}}>
+            {["ابتدائي","متوسط","ثانوي"].map(s=><option key={s} value={s}>{s}</option>)}
+          </select></div>
+        <div><label className={cx.label}>الفصل</label>
+          <select value={sem} onChange={e=>setSem(e.target.value)} className={cx.input} style={{fontFamily:"inherit"}}>
+            {["الفصل الأول","الفصل الثاني","الكل"].map(s=><option key={s} value={s}>{s}</option>)}
+          </select></div>
+        <div className="flex gap-2 mr-auto">
+          <button onClick={loadDemo} className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-black">🔄 بيانات تجريبية</button>
+          <button onClick={printReport} disabled={!analytics} className="px-4 py-2 rounded-xl text-white text-xs font-black disabled:opacity-40" style={{background:"linear-gradient(135deg,#0f172a,#6366f1)"}}>🖨️ طباعة التقرير</button>
+        </div>
+      </div>
+
+      {/* تبويبات */}
+      <div className="flex gap-1 bg-white rounded-2xl p-1.5 shadow-sm overflow-x-auto">
+        {TABS.map(t=>(
+          <button key={t.id} onClick={()=>setTab(t.id)}
+            className={"flex-shrink-0 px-3 py-2 rounded-xl text-xs font-black transition-all "+
+              (tab===t.id?"bg-indigo-600 text-white shadow":"text-gray-500 hover:bg-gray-50")}>
+            {t.l}
+          </button>
+        ))}
+      </div>
+
+      {/* ══ لوحة القيادة ══ */}
+      {tab==="dashboard" && (
+        <div className="space-y-4">
+          {!analytics ? (
+            <div className="bg-white rounded-2xl p-12 text-center shadow-sm border">
+              <div className="text-5xl mb-3">📊</div>
+              <div className="font-black text-gray-600 mb-2">لا توجد بيانات بعد</div>
+              <div className="text-sm text-gray-400">اضغط "بيانات تجريبية" لتجربة النظام أو أضف طلاباً يدوياً</div>
+              <button onClick={loadDemo} className="mt-4 px-6 py-2.5 rounded-xl bg-indigo-600 text-white font-black text-sm hover:bg-indigo-700">🔄 تحميل بيانات تجريبية</button>
+            </div>
+          ) : (
+            <>
+              {/* KPI */}
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {[
+                  {l:"عدد الطلاب",v:analytics.total,c:"#6366f1",bg:"#ede9fe"},
+                  {l:"المعدل العام",v:analytics.oa+"%",c:gaGradeLabel(analytics.oa).c,bg:gaGradeLabel(analytics.oa).bg,sub:gaGradeLabel(analytics.oa).l},
+                  {l:"نسبة النجاح",v:analytics.passRate+"%",c:"#10b981",bg:"#dcfce7",sub:analytics.passed+" ناجح"},
+                  {l:"دور ثانٍ",v:analytics.failed,c:analytics.failed>0?"#ef4444":"#10b981",bg:analytics.failed>0?"#fee2e2":"#dcfce7",sub:analytics.failed>0?"يحتاج متابعة":"ممتاز"},
+                ].map(k=>(
+                  <div key={k.l} className="rounded-2xl p-4 text-center" style={{background:k.bg}}>
+                    <div className="text-3xl font-black" style={{color:k.c}}>{k.v}</div>
+                    <div className="text-xs font-bold mt-1" style={{color:k.c,opacity:.8}}>{k.l}</div>
+                    {k.sub && <div className="text-xs mt-0.5" style={{color:k.c,opacity:.6}}>{k.sub}</div>}
+                  </div>
+                ))}
+              </div>
+
+              {/* رسم أعمدة + رادار */}
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+                  <h3 className="font-black text-gray-800 mb-3 text-sm">📊 متوسط الدرجات حسب المادة</h3>
+                  <BarChart data={subjNames.map(s=>({label:s.substring(0,6),value:analytics.ss[s]?.avg||0}))} max={100}/>
+                </div>
+                <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+                  <h3 className="font-black text-gray-800 mb-3 text-sm">🌐 مخطط الرادار</h3>
+                  <RadarChart data={subjNames.map(s=>({label:s,value:analytics.ss[s]?.avg||0}))}/>
+                </div>
+              </div>
+
+              {/* توزيع التقديرات */}
+              <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+                <h3 className="font-black text-gray-800 mb-4 text-sm">🎯 توزيع التقديرات</h3>
+                <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+                  {[{l:"ممتاز",min:90},{l:"جيد جداً",min:80,max:90},{l:"جيد",min:70,max:80},{l:"مقبول",min:60,max:70},{l:"ضعيف",min:50,max:60},{l:"راسب",max:50}].map(gr=>{
+                    const count=analytics.ranked.filter(s=>gr.max?(s.avg>=(gr.min||0)&&s.avg<gr.max):(s.avg>=gr.min)).length;
+                    const g=gaGradeLabel(gr.min||0);
+                    return(
+                      <div key={gr.l} className="rounded-xl p-3 text-center" style={{background:g.bg}}>
+                        <div className="text-2xl font-black" style={{color:g.c}}>{count}</div>
+                        <div className="text-xs font-bold mt-0.5" style={{color:g.c}}>{gr.l}</div>
+                        <div className="text-xs mt-0.5" style={{color:g.c,opacity:.6}}>{Math.round(count/analytics.total*100)}%</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ══ بيانات الطلاب ══ */}
+      {tab==="students" && (
+        <div className="space-y-4">
+          <div className="flex gap-2 flex-wrap">
+            <button onClick={()=>{setForm({name:"",sem:"الفصل الأول",grades:{}});setEditId(null);setShowForm(true);}} className="px-4 py-2 rounded-xl bg-indigo-600 text-white font-black text-sm hover:bg-indigo-700">➕ إضافة طالب</button>
+            <button onClick={loadDemo} className="px-4 py-2 rounded-xl bg-amber-500 text-white font-black text-sm hover:bg-amber-600">🔄 بيانات تجريبية</button>
+            {filtered.length>0 && <button onClick={()=>{if(confirm("حذف جميع الطلاب؟")) setStudents(p=>p.filter(s=>!(s.stage===stage&&(sem==="الكل"||s.sem===sem))));}} className="px-4 py-2 rounded-xl bg-red-100 text-red-600 font-black text-sm hover:bg-red-200">🗑️ مسح</button>}
+          </div>
+
+          {showForm && (
+            <div className="bg-indigo-50 border-2 border-indigo-200 rounded-2xl p-5 space-y-4">
+              <div className="font-black text-indigo-800 text-sm">{editId?"✏️ تعديل":"➕ إضافة طالب"}</div>
+              <div className="grid grid-cols-2 gap-3">
+                <div><label className={cx.label}>اسم الطالب *</label>
+                  <input value={form.name} onChange={e=>setForm(p=>({...p,name:e.target.value}))} placeholder="أدخل الاسم" className={cx.input} style={{fontFamily:"inherit"}}/></div>
+                <div><label className={cx.label}>الفصل</label>
+                  <select value={form.sem} onChange={e=>setForm(p=>({...p,sem:e.target.value}))} className={cx.input} style={{fontFamily:"inherit"}}>
+                    <option>الفصل الأول</option><option>الفصل الثاني</option></select></div>
+              </div>
+              <div>
+                <div className="text-xs font-black text-gray-600 mb-2">📚 درجات المواد</div>
+                <div className="grid gap-2" style={{gridTemplateColumns:"repeat(auto-fill,minmax(240px,1fr))"}}>
+                  {subjNames.map(sub=>{
+                    const m=getModel(sub);
+                    const total=Math.min((form.grades[sub]?.cw||0)+(form.grades[sub]?.fe||0),100);
+                    const tg=total>0?gaGradeLabel(total):null;
+                    return(
+                      <div key={sub} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                        <div className="flex items-center justify-between px-3 py-2 border-b border-gray-100" style={{background:"#f8fafc"}}>
+                          <span className="text-xs font-black text-gray-800">{sub}</span>
+                          <div className="flex items-center gap-1">
+                            <span className="text-xs px-1.5 py-0.5 rounded-full font-bold" style={{background:m.type==="ختامي"?"#fef3c7":"#dcfce7",color:m.type==="ختامي"?"#b45309":"#166534"}}>{m.name}</span>
+                            {tg && <span className="text-xs px-1.5 py-0.5 rounded-full font-black" style={{background:tg.bg,color:tg.c}}>{total}</span>}
+                          </div>
+                        </div>
+                        <div className="flex gap-2 p-2">
+                          <div className="flex-1">
+                            <label className="text-xs text-gray-400 block mb-0.5">أعمال السنة (/{m.cw})</label>
+                            <input type="number" min="0" max={m.cw} value={form.grades[sub]?.cw??""} onChange={e=>setForm(p=>({...p,grades:{...p.grades,[sub]:{...(p.grades[sub]||{}),cw:Math.min(Number(e.target.value),m.cw)}}}))}
+                              className="w-full px-2 py-1.5 rounded-lg border border-gray-200 text-sm text-center focus:outline-none focus:border-indigo-400" style={{fontFamily:"inherit"}}/>
+                          </div>
+                          {m.fe>0 && (
+                            <div className="flex-1">
+                              <label className="text-xs text-gray-400 block mb-0.5">اختبار نهائي (/{m.fe})</label>
+                              <input type="number" min="0" max={m.fe} value={form.grades[sub]?.fe??""} onChange={e=>setForm(p=>({...p,grades:{...p.grades,[sub]:{...(p.grades[sub]||{}),fe:Math.min(Number(e.target.value),m.fe)}}}))}
+                                className="w-full px-2 py-1.5 rounded-lg border border-gray-200 text-sm text-center focus:outline-none focus:border-indigo-400" style={{fontFamily:"inherit"}}/>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <button onClick={saveStudent} className="flex-1 py-2.5 rounded-xl bg-indigo-600 text-white font-black hover:bg-indigo-700">{editId?"💾 حفظ":"✅ إضافة"}</button>
+                <button onClick={()=>{setShowForm(false);setEditId(null);}} className="px-4 py-2.5 rounded-xl bg-gray-100 text-gray-600 font-bold">إلغاء</button>
+              </div>
+            </div>
+          )}
+
+          {filtered.length>0 ? (
+            <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100">
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead style={{background:"#0f172a"}}>
+                    <tr>
+                      <th className="px-3 py-3 text-right text-gray-300 font-bold">#</th>
+                      <th className="px-3 py-3 text-right text-gray-300 font-bold whitespace-nowrap">الاسم</th>
+                      <th className="px-2 py-3 text-center text-gray-300 font-bold">الفصل</th>
+                      {subjNames.map(s=><th key={s} className="px-2 py-3 text-center text-gray-300 font-bold whitespace-nowrap">{s.substring(0,6)}</th>)}
+                      <th className="px-3 py-3 text-center text-gray-300 font-bold">المعدل</th>
+                      <th className="px-3 py-3 text-center text-gray-300 font-bold">التقدير</th>
+                      <th className="px-2 py-3"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filtered.map((s,i)=>{
+                      const avg=stuAvg(s); const g=gaGradeLabel(avg);
+                      return(
+                        <tr key={s.id} className={i%2===0?"":"bg-gray-50"}>
+                          <td className="px-3 py-2.5 text-gray-400 font-bold">{i+1}</td>
+                          <td className="px-3 py-2.5 font-bold text-gray-800 whitespace-nowrap">{s.name}</td>
+                          <td className="px-2 py-2.5 text-center text-gray-400">{s.sem.replace("الفصل","ف")}</td>
+                          {subjNames.map(sub=>{ const t=subTotal(s.grades?.[sub]); const sg=t>0?gaGradeLabel(t):null;
+                            return <td key={sub} className="px-2 py-2.5 text-center font-bold" style={{color:sg?sg.c:"#9ca3af"}}>{t||"—"}</td>; })}
+                          <td className="px-3 py-2.5 text-center font-black" style={{color:"#6366f1"}}>{avg}%</td>
+                          <td className="px-3 py-2.5 text-center"><span className="px-2 py-0.5 rounded-full font-black" style={{background:g.bg,color:g.c,fontSize:10}}>{g.l}</span></td>
+                          <td className="px-2 py-2.5">
+                            <div className="flex gap-1">
+                              <button onClick={()=>{setForm({name:s.name,sem:s.sem,grades:{...s.grades}});setEditId(s.id);setShowForm(true);}} className="bg-blue-50 text-blue-600 px-1.5 py-1 rounded-lg hover:bg-blue-100 text-xs">✏️</button>
+                              <button onClick={()=>{if(confirm("حذف؟")) setStudents(p=>p.filter(x=>x.id!==s.id));}} className="bg-red-50 text-red-500 px-1.5 py-1 rounded-lg hover:bg-red-100 text-xs">🗑️</button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-white rounded-2xl p-12 text-center shadow-sm border"><div className="text-4xl mb-2">👨‍🎓</div><div className="font-black text-gray-400">لا توجد بيانات — أضف طلاباً أو اضغط "بيانات تجريبية"</div></div>
+          )}
+        </div>
+      )}
+
+      {/* ══ نماذج التقويم ══ */}
+      {tab==="models" && (
+        <div className="space-y-4">
+          <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100">
+            <div className="px-5 py-3 border-b font-black text-gray-800 text-sm">⚖️ المواد ونماذجها — {stage}</div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-3 text-right text-xs font-black text-gray-500">المادة</th>
+                    <th className="px-3 py-3 text-center text-xs font-black text-indigo-600">النموذج</th>
+                    <th className="px-3 py-3 text-center text-xs font-black text-gray-500">النوع</th>
+                    <th className="px-3 py-3 text-center text-xs font-black text-blue-600">أعمال السنة</th>
+                    <th className="px-3 py-3 text-center text-xs font-black text-amber-600">اختبار نهائي</th>
+                    <th className="px-4 py-3 text-right text-xs font-black text-gray-500">الدور الثاني</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {subjNames.map((sub,i)=>{
+                    const m=getModel(sub);
+                    return(
+                      <tr key={sub} className={i%2===0?"":"bg-gray-50"}>
+                        <td className="px-4 py-3 font-bold text-gray-800 text-sm">{sub}</td>
+                        <td className="px-3 py-3 text-center"><span className="text-xs px-2 py-1 rounded-full font-bold bg-indigo-100 text-indigo-700">{m.name}</span></td>
+                        <td className="px-3 py-3 text-center"><span className="text-xs px-2 py-1 rounded-full font-bold" style={{background:m.type==="ختامي"?"#fef3c7":"#dcfce7",color:m.type==="ختامي"?"#b45309":"#166534"}}>{m.type}</span></td>
+                        <td className="px-3 py-3 text-center font-black text-blue-700">{m.cw}</td>
+                        <td className="px-3 py-3 text-center font-black" style={{color:m.fe>0?"#d97706":"#9ca3af"}}>{m.fe||"—"}</td>
+                        <td className="px-4 py-3 text-xs text-gray-500">{m.round2}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+            <h3 className="font-black text-gray-800 mb-3 text-sm">📘 القواعد العامة</h3>
+            <div className="space-y-2">
+              {GA_RULES.map((r,i)=>(
+                <div key={i} className="flex items-start gap-3 bg-indigo-50 rounded-xl px-4 py-3 border-r-4 border-indigo-500">
+                  <span className="text-xs font-black text-indigo-600 flex-shrink-0">{i+1}.</span>
+                  <span className="text-xs text-gray-700 leading-relaxed">{r}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100">
+            <div className="px-5 py-3 border-b font-black text-gray-800 text-sm">📊 جدول التقديرات</div>
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50"><tr><th className="px-4 py-3 text-right text-xs font-black text-gray-500">التقدير</th><th className="px-4 py-3 text-center text-xs font-black text-gray-500">النسبة</th></tr></thead>
+              <tbody>
+                {[{l:"ممتاز",r:"90-100%"},{l:"جيد جداً",r:"80-89%"},{l:"جيد",r:"70-79%"},{l:"مقبول",r:"60-69%"},{l:"ضعيف",r:"50-59%"},{l:"راسب",r:"أقل من 50%"}].map((g,i)=>{
+                  const gl=gaGradeLabel(g.l==="ممتاز"?90:g.l==="جيد جداً"?80:g.l==="جيد"?70:g.l==="مقبول"?60:g.l==="ضعيف"?50:0);
+                  return <tr key={g.l} className={i%2===0?"":"bg-gray-50"}><td className="px-4 py-3"><span className="text-xs font-black px-3 py-1 rounded-full" style={{background:gl.bg,color:gl.c}}>{g.l}</span></td><td className="px-4 py-3 text-center font-bold text-gray-700">{g.r}</td></tr>;
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ══ التحليل الشامل ══ */}
+      {tab==="analysis" && !analytics && (
+        <div className="bg-white rounded-2xl p-12 text-center shadow-sm border"><div className="text-4xl mb-2">📈</div><div className="font-black text-gray-400">أضف بيانات طلاب أولاً</div></div>
+      )}
+      {tab==="analysis" && analytics && (
+        <div className="space-y-4">
+          <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+            <h3 className="font-black text-gray-800 mb-4 text-sm">📊 تحليل المواد</h3>
+            <div className="space-y-3">
+              {subjNames.map((sub,i)=>{
+                const s=analytics.ss[sub]; const g=gaGradeLabel(s.avg); const m=getModel(sub);
+                return(
+                  <div key={sub}>
+                    <div className="flex items-center justify-between mb-1 flex-wrap gap-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-black text-gray-700">{sub}</span>
+                        <span className="text-xs px-1.5 py-0.5 rounded-full font-bold" style={{background:m.type==="ختامي"?"#fef3c7":"#dcfce7",color:m.type==="ختامي"?"#b45309":"#166534"}}>{m.name}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs">
+                        <span className="text-gray-400">↑{s.max} ↓{s.min} σ{s.sd}</span>
+                        <span className="font-black px-2 py-0.5 rounded-full" style={{background:g.bg,color:g.c}}>{s.avg}%</span>
+                        <span className="text-gray-400">نجاح {s.pr}%</span>
+                      </div>
+                    </div>
+                    <div className="h-3 rounded-full" style={{background:"#f3f4f6"}}>
+                      <div className="h-full rounded-full" style={{width:s.avg+"%",background:GA_CC[i%GA_CC.length]}}/>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {[{l:"المعدل العام",v:analytics.oa+"%",c:"#6366f1"},{l:"أعلى معدل",v:analytics.mx+"%",c:"#10b981"},{l:"أدنى معدل",v:analytics.mn+"%",c:"#ef4444"},{l:"أقوى مادة",v:analytics.best.substring(0,8),c:"#0ea5e9"},{l:"أضعف مادة",v:analytics.worst.substring(0,8),c:"#f97316"},{l:"ناجح",v:analytics.passed,c:"#10b981"},{l:"دور ثانٍ",v:analytics.failed,c:"#ef4444"},{l:"إجمالي",v:analytics.total,c:"#7c3aed"}].map(k=>(
+              <div key={k.l} className="bg-white rounded-2xl p-3 shadow-sm border border-gray-100 text-center">
+                <div className="text-xs font-bold text-gray-400 mb-1">{k.l}</div>
+                <div className="font-black text-lg" style={{color:k.c}}>{k.v}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ══ ترتيب الأوائل ══ */}
+      {tab==="ranking" && (
+        <div className="space-y-4">
+          {!analytics ? (
+            <div className="bg-white rounded-2xl p-12 text-center shadow-sm border"><div className="text-4xl mb-2">🏆</div><div className="font-black text-gray-400">أضف بيانات أولاً</div></div>
+          ) : (
+            <>
+              {analytics.ranked.length>=3 && (
+                <div className="flex justify-center items-end gap-4 py-4">
+                  {[1,0,2].map(pos=>{
+                    const s=analytics.ranked[pos];
+                    const medals=["🥇","🥈","🥉"];
+                    const colors=["#f59e0b","#6366f1","#f97316"];
+                    return(
+                      <div key={pos} className="text-center" style={{transform:pos===0?"scale(1.08)":"scale(1)"}}>
+                        <div className="text-3xl mb-1">{medals[pos]}</div>
+                        <div className="bg-white rounded-2xl shadow-lg px-4 py-3 border-2 min-w-24" style={{borderColor:colors[pos]}}>
+                          <div className="font-black text-gray-800 text-sm">{s.name.split(" ")[0]}</div>
+                          <div className="text-xl font-black mt-1" style={{color:colors[pos]}}>{s.avg}%</div>
+                          <div className="text-xs text-gray-400">{s.sem.replace("الفصل","ف")}</div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead style={{background:"#0f172a"}}><tr>
+                      <th className="px-3 py-3 text-right text-xs text-gray-300 font-bold">الترتيب</th>
+                      <th className="px-3 py-3 text-right text-xs text-gray-300 font-bold">الاسم</th>
+                      <th className="px-3 py-3 text-center text-xs text-gray-300 font-bold">المعدل</th>
+                      <th className="px-3 py-3 text-center text-xs text-gray-300 font-bold">الفصل</th>
+                      <th className="px-3 py-3 text-center text-xs text-gray-300 font-bold">التقدير</th>
+                    </tr></thead>
+                    <tbody>
+                      {analytics.ranked.map((s,i)=>{
+                        const g=gaGradeLabel(s.avg);
+                        return(
+                          <tr key={s.id} style={{background:i===0?"#fef3c7":i===1?"#ede9fe":i===2?"#ffedd5":i%2===0?"#fff":"#f8fafc"}}>
+                            <td className="px-3 py-3 font-black text-lg">{i<3?["🥇","🥈","🥉"][i]:i+1}</td>
+                            <td className="px-3 py-3 font-bold text-gray-800">{s.name}</td>
+                            <td className="px-3 py-3 text-center font-black" style={{color:"#6366f1"}}>{s.avg}%</td>
+                            <td className="px-3 py-3 text-center text-xs text-gray-400">{s.sem.replace("الفصل","ف")}</td>
+                            <td className="px-3 py-3 text-center"><span className="text-xs font-black px-2 py-1 rounded-full" style={{background:g.bg,color:g.c}}>{g.l}</span></td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ══ مقارنة الفصلين ══ */}
+      {tab==="comparison" && (
+        <div className="space-y-4">
+          {(() => {
+            const semData = {};
+            ["الفصل الأول","الفصل الثاني"].forEach(s=>{
+              const ss=students.filter(x=>x.stage===stage&&x.sem===s);
+              if(!ss.length) return;
+              const avgs=ss.map(x=>stuAvg(x));
+              const subAvgs={};
+              subjNames.forEach(sub=>{ const scores=ss.map(x=>subTotal(x.grades?.[sub])); subAvgs[sub]=scores.length?Math.round(scores.reduce((a,b)=>a+b,0)/scores.length*10)/10:0; });
+              semData[s]={overall:Math.round(avgs.reduce((a,b)=>a+b,0)/avgs.length*10)/10,subAvgs};
+            });
+            const sems=Object.keys(semData);
+            if(!sems.length) return <div className="bg-white rounded-2xl p-12 text-center shadow-sm border"><div className="text-4xl mb-2">🔄</div><div className="font-black text-gray-400">أضف بيانات الفصلين أولاً</div></div>;
+            return(
+              <>
+                {sems.length>=2 && (
+                  <div className="grid grid-cols-2 gap-3">
+                    {sems.map(s=>{
+                      const d=semData[s]; const g=gaGradeLabel(d.overall);
+                      return <div key={s} className="rounded-2xl p-4 text-center" style={{background:g.bg}}><div className="text-xs font-bold mb-1" style={{color:g.c}}>{s}</div><div className="text-3xl font-black" style={{color:g.c}}>{d.overall}%</div><div className="text-xs font-bold" style={{color:g.c}}>{g.l}</div></div>;
+                    })}
+                  </div>
+                )}
+                <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+                  <h3 className="font-black text-gray-800 mb-4 text-sm">📊 مقارنة المواد بين الفصلين</h3>
+                  <div className="space-y-3">
+                    {subjNames.map((sub,i)=>(
+                      <div key={sub}>
+                        <div className="text-xs font-black text-gray-700 mb-1">{sub}</div>
+                        <div className="space-y-1">
+                          {sems.map((s,si)=>{
+                            const v=semData[s]?.subAvgs[sub]||0;
+                            return(
+                              <div key={s} className="flex items-center gap-2">
+                                <span className="text-xs text-gray-400 w-16 flex-shrink-0">{s.replace("الفصل ","ف")}</span>
+                                <div className="flex-1 h-2.5 rounded-full bg-gray-100">
+                                  <div className="h-full rounded-full" style={{width:v+"%",background:si===0?"#6366f1":"#0ea5e9"}}/>
+                                </div>
+                                <span className="text-xs font-black w-10 text-right" style={{color:si===0?"#6366f1":"#0ea5e9"}}>{v}%</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
+            );
+          })()}
+        </div>
+      )}
+
+      {/* ══ التقرير ══ */}
+      {tab==="report" && (
+        <div className="space-y-4">
+          {!analytics ? (
+            <div className="bg-white rounded-2xl p-12 text-center shadow-sm border"><div className="text-4xl mb-2">📋</div><div className="font-black text-gray-400">أضف بيانات أولاً</div></div>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                {[{l:"المعدل العام",v:analytics.oa+"%",c:"#6366f1",bg:"#ede9fe"},{l:"نسبة النجاح",v:analytics.passRate+"%",c:"#10b981",bg:"#dcfce7"},{l:"دور ثانٍ",v:analytics.failed,c:"#ef4444",bg:"#fee2e2"},{l:"أفضل مادة",v:analytics.best.substring(0,10),c:"#0ea5e9",bg:"#e0f2fe"},{l:"أضعف مادة",v:analytics.worst.substring(0,10),c:"#f97316",bg:"#ffedd5"},{l:"إجمالي الطلاب",v:analytics.total,c:"#7c3aed",bg:"#f5f3ff"}].map(k=>(
+                  <div key={k.l} className="rounded-2xl p-4" style={{background:k.bg}}>
+                    <div className="text-xs font-bold opacity-60" style={{color:k.c}}>{k.l}</div>
+                    <div className="text-xl font-black mt-1" style={{color:k.c}}>{k.v}</div>
+                  </div>
+                ))}
+              </div>
+              <div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-5">
+                <h3 className="font-black text-indigo-800 mb-3 text-sm">💡 التوصيات</h3>
+                <div className="space-y-2 text-sm text-indigo-800">
+                  {analytics.failed>0 && <div className="flex gap-2"><span>🔄</span><span>يوجد <strong>{analytics.failed}</strong> طالب يحتاج اختبار الدور الثاني — يحتفظ بـ 40 درجة ويُختبر من 60</span></div>}
+                  <div className="flex gap-2"><span>📉</span><span>المادة الأضعف: <strong>{analytics.worst}</strong> ({analytics.ss[analytics.worst]?.avg}%) — تحتاج دعماً إضافياً</span></div>
+                  <div className="flex gap-2"><span>📈</span><span>نسبة النجاح {analytics.passRate}% {analytics.passRate>=90?"ممتازة 🎉":analytics.passRate>=70?"جيدة":"تحتاج تحسيناً"}</span></div>
+                  <div className="flex gap-2"><span>🏆</span><span>أفضل مادة: <strong>{analytics.best}</strong> ({analytics.ss[analytics.best]?.avg}%)</span></div>
+                </div>
+              </div>
+              <button onClick={printReport} className="w-full py-4 rounded-2xl text-white font-black text-base shadow-xl hover:shadow-2xl transition-all flex items-center justify-center gap-3" style={{background:"linear-gradient(135deg,#0f172a,#6366f1)"}}>
+                🖨️ طباعة التقرير الكامل / حفظ PDF
+                <span className="text-sm opacity-70 font-normal">يشمل جميع الطلاب والمواد والتوصيات</span>
+              </button>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+
 function SettingsPage({ teachers, setTeachers, saveTeachers, week, setWeek, saveWeek, users, siteFont, setSiteFont, saveSiteFont, weekArchive, archiveCurrentWeek }) {
   const [newT, setNewT] = useState("");
   const [editWeek, setEditWeek] = useState(false);
@@ -10644,6 +11253,7 @@ export default function SchoolWebsite() {
     { id: "absencestats",  label: "إحصائيات الغياب",   icon: "📊" },
     { id: "attendancereport", label: "تحليل الحضور والانصراف", icon: "🗂️" },
     { id: "monthlyreport",    label: "التقرير الشهري/الفصلي",  icon: "📋" },
+    { id: "gradeanalysis",    label: "تحليل درجات الطلاب",     icon: "📊" },
     { id: "teacherprofile",   label: "ملف المعلم",             icon: "👨‍🏫" },
   ];
 
@@ -10872,6 +11482,7 @@ export default function SchoolWebsite() {
         {page === "tasks"         && <TasksPage teachers={teachers} />}
         {page === "absencestats"  && <AbsenceStatsPage teachers={teachers} attendance={attendance} week={week} weekArchive={weekArchive} />}
         {page === "monthlyreport" && <MonthlyReportPage teachers={teachers} attendance={attendance} week={week} weekArchive={weekArchive} classList={classList} announcements={announcements} activities={activities} />}
+        {page === "gradeanalysis" && <GradeAnalysisPage />}
         {page === "teacherprofile" && <TeacherProfilePage teachers={teachers} attendance={attendance} week={week} weekArchive={weekArchive} classList={classList} />}
         {page === "attendancereport" && <AttendanceAnalysisPage />}
         {page === "settings"      && <SettingsPage teachers={teachers} setTeachers={setTeachers} saveTeachers={saveTeachers} week={week} setWeek={setWeek} saveWeek={saveWeek} users={users} siteFont={siteFont} setSiteFont={setSiteFont} saveSiteFont={saveSiteFont} weekArchive={weekArchive} archiveCurrentWeek={archiveCurrentWeek} />}
