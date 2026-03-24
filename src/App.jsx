@@ -327,6 +327,7 @@ const SchoolLogo = ({ size = 'md', animate = true }) => {
           <span style={textStyle(bfs + 1)}>تعليم ✦ تميّز ✦ انتماء</span>
         </div>
       </div>
+    </ErrorBoundary>
     </>
   );
 };
