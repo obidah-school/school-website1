@@ -6814,324 +6814,287 @@ const RichField = ({ label, value, onChange, placeholder, rows }) => {
 };
 
 function ProgramReportPage() {
-  const emptyReport = {
-    // الترويسة
-    schoolName: "مدرسة عبيدة بن الحارث المتوسطة",
-    region: "الإدارة العامة للتعليم بالمنطقة",
-    // بيانات التقرير
-    reportTitle: "",
-    executor: "",
-    participants: "",
-    location: "",
-    duration: "",
-    date: "",
-    beneficiaries: "",
-    field: "",
-    objectives: "",
-    steps: "",
-    // التوقيعات
-    activityLeaderName: "",
-    principalName: "",
-    // الشواهد
-    witnesses: [null, null, null, null],
-  };
+  const [region,      setRegion]      = useState("");
+  const [office,      setOffice]      = useState("مكتب التعليم");
+  const [progName,    setProgName]    = useState("");
+  const [executor,    setExecutor]    = useState("");
+  const [location,    setLocation]    = useState("");
+  const [targetGroup, setTargetGroup] = useState("");
+  const [objectives,  setObjectives]  = useState(["","","","",""]);
+  const [benefCount,  setBenefCount]  = useState("");
+  const [dateDay,     setDateDay]     = useState("");
+  const [dateMonth,   setDateMonth]   = useState("");
+  const [dateYear,    setDateYear]    = useState("1447");
+  const [witnesses,   setWitnesses]   = useState([null,null,null,null,null]);
+  const [saved,       setSaved]       = useState(false);
 
-  const [report, setReport] = useState(() => {
-    try { const s = localStorage.getItem("prog_report"); return s ? JSON.parse(s) : emptyReport; } catch { return emptyReport; }
-  });
-  const [saved, setSaved] = useState(false);
-  const witnessRefs = [useRef(), useRef(), useRef(), useRef()];
-
-  const upd = (field, val) => setReport(p => ({ ...p, [field]: val }));
-
-  useEffect(() => {
+  React.useEffect(() => {
     try {
-      const toSave = { ...report, witnesses: report.witnesses.map(w => w ? w.dataUrl || null : null) };
-      localStorage.setItem("prog_report", JSON.stringify(toSave));
-    } catch {}
-    setSaved(true);
-    const t = setTimeout(() => setSaved(false), 1500);
+      const s = localStorage.getItem("prog_report_v2");
+      if (s) {
+        const d = JSON.parse(s);
+        if (d.region      !== undefined) setRegion(d.region);
+        if (d.office      !== undefined) setOffice(d.office);
+        if (d.progName    !== undefined) setProgName(d.progName);
+        if (d.executor    !== undefined) setExecutor(d.executor);
+        if (d.location    !== undefined) setLocation(d.location);
+        if (d.targetGroup !== undefined) setTargetGroup(d.targetGroup);
+        if (d.objectives  !== undefined) setObjectives(d.objectives);
+        if (d.benefCount  !== undefined) setBenefCount(d.benefCount);
+        if (d.dateDay     !== undefined) setDateDay(d.dateDay);
+        if (d.dateMonth   !== undefined) setDateMonth(d.dateMonth);
+        if (d.dateYear    !== undefined) setDateYear(d.dateYear);
+        if (d.witnesses   !== undefined) setWitnesses(d.witnesses);
+      }
+    } catch(e) {}
+  }, []);
+
+  React.useEffect(() => {
+    const t = setTimeout(() => {
+      try {
+        localStorage.setItem("prog_report_v2", JSON.stringify({
+          region, office, progName, executor, location, targetGroup,
+          objectives, benefCount, dateDay, dateMonth, dateYear, witnesses
+        }));
+      } catch(e) {}
+    }, 800);
     return () => clearTimeout(t);
-  }, [report]);
+  }, [region, office, progName, executor, location, targetGroup, objectives, benefCount, dateDay, dateMonth, dateYear, witnesses]);
 
-  const handleWitness = (idx, file) => {
+  const dateStr = dateDay && dateMonth
+    ? `${String(dateDay).padStart(2,"0")} / ${dateMonth} / ${dateYear} هـ`
+    : `_____ / _____ / ${dateYear} هـ`;
+
+  const handlePaste = (idx, e) => {
+    const items = e.clipboardData && e.clipboardData.items;
+    if (!items) return;
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.startsWith("image/")) {
+        const file = items[i].getAsFile();
+        const reader = new FileReader();
+        reader.onload = ev => {
+          setWitnesses(ws => ws.map((w, j) => j === idx ? ev.target.result : w));
+        };
+        reader.readAsDataURL(file);
+        e.preventDefault();
+        break;
+      }
+    }
+  };
+
+  const handleFile = (idx, file) => {
     if (!file) return;
-    readFileAsync(file, "dataurl").then(dataUrl => { const witnesses = [...report.witnesses]; witnesses[idx] = { dataUrl, name: file.name }; setReport(p => ({ ...p, witnesses })); });
-
-      const witnesses = [...report.witnesses];
-      witnesses[idx] = { dataUrl: e.target.result, name: file.name };
-      setReport(p => ({ ...p, witnesses }));
-    };
+    const reader = new FileReader();
+    reader.onload = ev => setWitnesses(ws => ws.map((w,j) => j===idx ? ev.target.result : w));
+    reader.readAsDataURL(file);
   };
 
-  const removeWitness = (idx) => {
-    const witnesses = [...report.witnesses];
-    witnesses[idx] = null;
-    setReport(p => ({ ...p, witnesses }));
-  };
-
-  const downloadWitness = (w) => {
-    const a = document.createElement("a");
-    a.href = w.dataUrl;
-    a.download = w.name || "شاهد.jpg";
-    a.click();
-  };
+  const removeWitness = idx => setWitnesses(ws => ws.map((w,j) => j===idx ? null : w));
 
   const printReport = () => {
-    const witnessesHtml = report.witnesses.map((w, i) =>
-      w ? `<div class="witness-item"><img src="${w.dataUrl}" style="max-width:100%;max-height:220px;border-radius:8px;object-fit:contain;" /><div class="witness-label">شاهد ${i+1}</div></div>`
-        : `<div class="witness-item empty"><div class="empty-box">شاهد ${i+1}</div></div>`
+    const activeWit = witnesses.filter(w=>w);
+    const witGrid = activeWit.map((w,i) =>
+      `<div class="wb"><img src="${w}" /><div class="wn">شاهد ${i+1}</div></div>`
     ).join("");
 
-    printWindow(`<!DOCTYPE html>
-<html dir="rtl" lang="ar">
-<head>
-<meta charset="UTF-8">
-<title>${report.reportTitle || "تقرير برنامج"}</title>
+    printWindow(`<!DOCTYPE html><html dir="rtl" lang="ar">
+<head><meta charset="UTF-8">
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
 <style>
-  * { margin:0; padding:0; box-sizing:border-box; }
-  body { font-family:'Cairo',sans-serif; background:#fff; color:#1e293b; direction:rtl; font-size:13px; }
-  .page { max-width:800px; margin:0 auto; padding:0; }
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Cairo',sans-serif;direction:rtl;background:#fff;color:#111;font-size:12px}
+.page{width:210mm;margin:0 auto;padding:8mm 10mm}
+.hdr{display:flex;align-items:center;justify-content:space-between;border-bottom:2.5px solid #1a5276;padding-bottom:6px;margin-bottom:6px}
+.hdr-r{text-align:right;font-size:12px;font-weight:700;color:#1a5276;line-height:1.8}
+.hdr-l{text-align:left;font-size:11px;font-weight:700;color:#555}
+.logo{width:52px}
+.school-bar{background:#1a5276;color:#fff;text-align:center;padding:5px 10px;font-size:15px;font-weight:900;margin:5px 0}
+.prog-bar{text-align:center;padding:4px;font-size:12px;font-weight:700;color:#1a5276;border-bottom:1.5px solid #1a5276;margin-bottom:4px}
+.prog-val{text-align:center;padding:6px;font-size:14px;font-weight:900;min-height:28px;margin-bottom:8px;background:#eaf4fb;border-radius:4px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:7px}
+.fb{border:1.5px solid #1a5276;border-radius:4px;overflow:hidden}
+.fl{background:#1a5276;color:#fff;font-size:10px;font-weight:700;padding:3px 8px;text-align:center}
+.fv{padding:5px 8px;min-height:24px;font-size:11px;white-space:pre-wrap}
+.obj .fv{min-height:70px}
+.ws-title{background:#1a5276;color:#fff;text-align:center;padding:4px;font-size:12px;font-weight:900;margin:8px 0 5px}
+.wg{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.wb{border:1.5px solid #1a5276;border-radius:3px;overflow:hidden;text-align:center}
+.wb img{width:100%;max-height:150px;object-fit:contain;display:block}
+.wn{font-size:9px;color:#1a5276;font-weight:700;padding:1px}
+.ft{margin-top:10px;display:flex;justify-content:flex-end;font-size:11px;font-weight:700;border-top:1.5px solid #1a5276;padding-top:6px}
+@media print{@page{size:A4;margin:8mm 10mm}body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+</style></head><body><div class="page">
 
-  /* الترويسة */
-  .header { background:linear-gradient(135deg,#0d3b6e,#0d9488); color:white; padding:16px 24px; display:flex; align-items:center; justify-content:space-between; gap:0; }
-  .header-right { text-align:right; flex:1; }
-  .header-right .ministry { font-size:15px; font-weight:900; }
-  .header-right .region { font-size:12px; opacity:.82; margin-top:4px; }
-  .header-center { display:flex; align-items:center; justify-content:center; padding:0 20px; }
-  .logo-img { height:75px; width:auto; }
-  .divider-line { width:1.5px; height:65px; background:rgba(255,255,255,0.3); border-radius:2px; margin:0 16px; }
-  .header-left { text-align:left; flex:1; }
-  .header-left .school-name { font-size:14px; font-weight:900; }
-  .header-left .report-label { font-size:11px; opacity:.75; margin-top:4px; }
-  .header-left .report-title-inline { font-size:12px; font-weight:700; opacity:.9; margin-top:2px; border-bottom:1px solid rgba(255,255,255,0.4); padding-bottom:2px; }
-
-  /* عنوان التقرير */
-  .report-title-bar { background:#1e3a5f; color:white; text-align:center; padding:12px; font-size:17px; font-weight:900; }
-
-  /* الجدول */
-  .table-section { padding:0 16px; margin-top:12px; }
-  .row-2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px; }
-  .row-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:10px; }
-  .field-box { border:1.5px solid #0d9488; border-radius:8px; padding:8px 12px; }
-  .field-label { font-size:10px; color:#0d9488; font-weight:700; margin-bottom:4px; }
-  .field-value { font-size:12px; font-weight:600; min-height:20px; white-space:pre-wrap; }
-
-  .row-big { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px; }
-  .field-box-big { border:1.5px solid #0d9488; border-radius:8px; padding:10px 12px; min-height:100px; }
-
-  /* الشواهد */
-  .witnesses-title { text-align:center; color:#0d9488; font-weight:900; font-size:14px; margin:16px 0 10px; border-top:2px solid #0d9488; padding-top:10px; }
-  .witnesses-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; padding:0 16px; margin-bottom:16px; }
-  .witness-item { border:1.5px solid #0d9488; border-radius:8px; padding:8px; text-align:center; min-height:160px; display:flex; flex-direction:column; align-items:center; justify-content:center; }
-  .witness-label { font-size:11px; color:#0d9488; font-weight:700; margin-top:6px; }
-  .empty-box { color:#ccc; font-size:12px; }
-
-  /* التوقيعات */
-  .signatures { display:grid; grid-template-columns:1fr 1fr; gap:20px; padding:10px 24px 16px; }
-  .sig-box { text-align:center; border-top:1.5px dashed #0d9488; padding-top:8px; }
-  .sig-title { font-size:11px; color:#64748b; }
-  .sig-name { font-size:13px; font-weight:700; margin-top:4px; }
-
-  /* الفوتر */
-  .footer { background:#0f2540; color:rgba(255,255,255,.6); text-align:center; padding:8px; font-size:10px; }
-
-  @media print { @page { size:A4; margin:0; } body { -webkit-print-color-adjust:exact; print-color-adjust:exact; } }
-</style>
-</head>
-<body>
-<div class="page">
-  <div class="header">
-    <div class="header-right">
-      <div class="ministry">وزارة التعليم</div>
-      <div class="region">الإدارة العامة للتعليم بمحافظة جدة</div>
-    </div>
-    <div class="header-center">
-      <div class="divider-line"></div>
-      <img src="${LOGO_URL}" class="logo-img" alt="شعار وزارة التعليم" />
-      <div class="divider-line"></div>
-    </div>
-    <div class="header-left">
-      <div class="school-name">مدرسة عبيدة بن الحارث المتوسطة</div>
-      <div class="report-label">تقرير برنامج:</div>
-      <div class="report-title-inline">${report.reportTitle || "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"}</div>
-    </div>
-  </div>
-
-  <div class="report-title-bar">${report.reportTitle || "تقرير برنامج"}</div>
-
-  <div class="table-section">
-    <div class="row-2">
-      <div class="field-box"><div class="field-label">المنفذ/ون:</div><div class="field-value">${report.executor}</div></div>
-      <div class="field-box"><div class="field-label">المشارك/ون:</div><div class="field-value">${report.participants}</div></div>
-    </div>
-    <div class="row-3">
-      <div class="field-box"><div class="field-label">مكان التنفيذ:</div><div class="field-value">${report.location}</div></div>
-      <div class="field-box"><div class="field-label">مدة التنفيذ:</div><div class="field-value">${report.duration}</div></div>
-      <div class="field-box"><div class="field-label">تاريخ التنفيذ:</div><div class="field-value">${report.date}</div></div>
-    </div>
-    <div class="row-2">
-      <div class="field-box"><div class="field-label">المستفيدون / العدد:</div><div class="field-value">${report.beneficiaries}</div></div>
-      <div class="field-box"><div class="field-label">المجال:</div><div class="field-value">${report.field}</div></div>
-    </div>
-    <div class="row-big">
-      <div class="field-box-big"><div class="field-label">الأهداف:</div><div class="field-value">${report.objectives}</div></div>
-      <div class="field-box-big"><div class="field-label">خطوات التنفيذ / الوصف:</div><div class="field-value">${report.steps}</div></div>
-    </div>
-  </div>
-
-  <div class="witnesses-title">— الشواهد —</div>
-  <div class="witnesses-grid">${witnessesHtml}</div>
-
-  <div class="signatures">
-    <div class="sig-box"><div class="sig-title">رائد النشاط</div><div class="sig-name">${report.activityLeaderName || "الاسم"}</div></div>
-    <div class="sig-box"><div class="sig-title">مدير المدرسة</div><div class="sig-name">${report.principalName || "الاسم"}</div></div>
-  </div>
-
-  <div class="footer">مدرسة عبيدة بن الحارث المتوسطة — بوابة الإدارة المدرسية الإلكترونية</div>
+<div class="hdr">
+  <div class="hdr-r">الإدارة العامة للتعليم${region ? "<br>بمحافظة " + region : ""}<br>${office}</div>
+  <img src="${LOGO_URL}" class="logo" alt="شعار" />
+  <div class="hdr-l">وزارة التعليم<br>Ministry of Education</div>
 </div>
-<script>window.onload=()=>{ window.print(); }</script>
-</body></html>`);
 
-  // حقل نص بسيط أو محرر غني
-  const Field = ({ label, field, placeholder, multiline }) => (
-    <div>
-      {multiline
-        ? <RichField label={label} value={report[field] || ''} onChange={val => upd(field, val)} placeholder={placeholder} />
-        : <>
-            <label className="text-xs font-bold text-teal-700 mb-1 block">{label}</label>
-            <input value={report[field] || ''} onChange={e => upd(field, e.target.value)}
-              className="w-full border-2 border-gray-200 focus:border-teal-400 rounded-xl px-3 py-2 text-sm focus:outline-none"
-              placeholder={placeholder} />
-          </>
-      }
-    </div>
-  );
+<div class="school-bar">مدرسة عبيدة بن الحارث المتوسطة</div>
+<div class="prog-bar">اسم البرنامج</div>
+<div class="prog-val">${progName || "&nbsp;"}</div>
+
+<div class="g2">
+  <div class="fb"><div class="fl">المنفـذ</div><div class="fv">${executor || "&nbsp;"}</div></div>
+  <div class="fb"><div class="fl">مكان التنفيذ</div><div class="fv">${location || "&nbsp;"}</div></div>
+</div>
+<div class="g2">
+  <div class="fb obj"><div class="fl">الأهداف</div>
+    <div class="fv">${objectives.filter(o=>o.trim()).map((o,i)=>i+1+". "+o).join("\n") || "&nbsp;"}</div>
+  </div>
+  <div>
+    <div class="fb" style="margin-bottom:6px"><div class="fl">المستهدفون</div><div class="fv">${targetGroup || "&nbsp;"}</div></div>
+    <div class="fb" style="margin-bottom:6px"><div class="fl">عدد المستفيدين</div><div class="fv">${benefCount || "&nbsp;"}</div></div>
+    <div class="fb"><div class="fl">تاريخ التنفيذ</div><div class="fv">${dateStr}</div></div>
+  </div>
+</div>
+
+${activeWit.length > 0 ? `<div class="ws-title">الشـواهـد</div><div class="wg">${witGrid}</div>` : ""}
+
+<div class="ft">توقيع المعلم: ____________________</div>
+</div><script>window.onload=()=>window.print()</script></body></html>`);
+  };
+
+  const ic = "w-full px-3 py-2 rounded-xl border-2 border-gray-200 focus:border-blue-400 focus:outline-none text-sm";
+  const st = { fontFamily:"inherit" };
 
   return (
-    <div className="space-y-5 max-w-4xl mx-auto">
-      {/* ===== ترويسة ===== */}
-      <div className="bg-gradient-to-l from-teal-700 to-blue-900 rounded-2xl overflow-hidden text-white shadow-xl">
-        {/* صف 1: وزارة / شعار / مدرسة */}
-        <div className="flex items-stretch" style={{minHeight:"85px"}}>
-          {/* يمين */}
-          <div className="flex-1 flex flex-col justify-center text-right px-5 py-3">
-            <div className="font-black text-base">وزارة التعليم</div>
-            <div className="text-xs opacity-80 mt-1">الإدارة العامة للتعليم بمحافظة جدة</div>
-          </div>
-          {/* وسط */}
-          <div className="flex items-center justify-center px-5 gap-3">
-            <div style={{width:"1.5px",height:"60px",background:"rgba(255,255,255,0.3)",borderRadius:"2px"}}></div>
-            <img src={LOGO_URL} alt="شعار" className="h-16 w-auto" style={{filter:"brightness(0) invert(1)"}} />
-            <div style={{width:"1.5px",height:"60px",background:"rgba(255,255,255,0.3)",borderRadius:"2px"}}></div>
-          </div>
-          {/* يسار */}
-          <div className="flex-1 flex flex-col justify-center text-left px-5 py-3">
-            <div className="font-black text-sm">مدرسة عبيدة بن الحارث المتوسطة</div>
-            <div className="text-xs opacity-70 mt-1">المتوسطة — جدة</div>
-          </div>
-        </div>
-        {/* صف 2: تقرير برنامج + حقل العنوان */}
-        <div className="bg-black bg-opacity-30 flex items-center gap-3 px-6 py-3">
-          <span className="font-black text-base whitespace-nowrap">📋 تقرير برنامج:</span>
-          <input
-            value={report.reportTitle || ""}
-            onChange={e => upd("reportTitle", e.target.value)}
-            className="flex-1 bg-transparent border-b-2 border-white border-opacity-50 text-white placeholder-white placeholder-opacity-40 focus:outline-none focus:border-opacity-90 font-bold text-sm py-0.5"
-            placeholder="اكتب عنوان / اسم البرنامج هنا..."
-            dir="rtl"
-          />
-          {/* أزرار */}
-          <div className="flex gap-2 mr-auto">
-            {saved && <span className="bg-green-500 text-white text-xs font-bold px-3 py-1.5 rounded-xl">✅ حُفظ</span>}
-            <button onClick={printReport} className="bg-white text-teal-700 font-black px-4 py-1.5 rounded-xl text-sm hover:bg-teal-50 flex items-center gap-1.5">🖨️ طباعة</button>
-            <button onClick={() => { setReport(emptyReport); }} className="bg-white bg-opacity-20 text-white font-bold px-3 py-1.5 rounded-xl text-sm hover:bg-opacity-30">🗑️ مسح</button>
+    <div dir="rtl" className="space-y-4 max-w-3xl mx-auto">
+
+      <div className="rounded-3xl overflow-hidden shadow-xl" style={{background:"linear-gradient(135deg,#0f2d55,#1a6696)"}}>
+        <div className="p-5 text-white flex items-center gap-4">
+          <img src={LOGO_URL} alt="وزارة التعليم" className="h-14 w-auto" style={{filter:"brightness(0) invert(1) opacity(.85)"}} />
+          <div>
+            <h2 className="text-xl font-black">📋 تقرير تنفيذ برنامج</h2>
+            <p className="text-blue-200 text-sm">النموذج الرسمي — وزارة التعليم</p>
           </div>
         </div>
       </div>
 
-      {/* ===== الترويسة ===== */}
-      <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
-        <h3 className={cx.head3}>
-          <span className="bg-teal-100 text-teal-700 px-3 py-1 rounded-lg text-sm">الترويسة</span>
-        </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Field label="اسم المدرسة" field="schoolName" placeholder="مدرسة عبيدة بن الحارث المتوسطة" />
-          <Field label="الإدارة / المنطقة" field="region" placeholder="الإدارة العامة للتعليم بالمنطقة" />
+      <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 space-y-3">
+        <h3 className="font-black text-blue-800 text-sm mb-1">🏛️ بيانات الجهة</h3>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-xs font-bold text-gray-500 block mb-1">الإدارة العامة للتعليم — بمحافظة / منطقة</label>
+            <input value={region} onChange={e=>setRegion(e.target.value)}
+              placeholder="اختياري: جدة، الرياض، المدينة..."
+              className={ic} style={st} />
+          </div>
+          <div>
+            <label className="text-xs font-bold text-gray-500 block mb-1">مكتب / إدارة التعليم</label>
+            <input value={office} onChange={e=>setOffice(e.target.value)}
+              className={ic} style={st} />
+          </div>
         </div>
       </div>
 
-      {/* ===== عنوان التقرير ===== */}
-      <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
-        <h3 className={cx.head3}>
-          <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-lg text-sm">عنوان التقرير</span>
-        </h3>
-        <input value={report.reportTitle} onChange={e => upd("reportTitle", e.target.value)}
-          className="w-full border-2 border-blue-200 focus:border-blue-500 rounded-xl px-4 py-3 text-base font-bold focus:outline-none text-center"
-          placeholder="مثال: تقرير الاحتفاء باليوم الوطني ٩٥" />
+      <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 space-y-3">
+        <h3 className="font-black text-blue-800 text-sm mb-1">📝 بيانات البرنامج</h3>
+        <div>
+          <label className="text-xs font-bold text-gray-500 block mb-1">اسم البرنامج</label>
+          <input value={progName} onChange={e=>setProgName(e.target.value)}
+            placeholder="اسم البرنامج..." className={ic} style={st} />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-xs font-bold text-gray-500 block mb-1">المنفذ</label>
+            <input value={executor} onChange={e=>setExecutor(e.target.value)}
+              placeholder="المعلم / ..." className={ic} style={st} />
+          </div>
+          <div>
+            <label className="text-xs font-bold text-gray-500 block mb-1">مكان التنفيذ</label>
+            <input value={location} onChange={e=>setLocation(e.target.value)}
+              placeholder="الفصول الدراسية / ..." className={ic} style={st} />
+          </div>
+          <div>
+            <label className="text-xs font-bold text-gray-500 block mb-1">المستهدفون</label>
+            <input value={targetGroup} onChange={e=>setTargetGroup(e.target.value)}
+              placeholder="الطلاب / المعلمون / ..." className={ic} style={st} />
+          </div>
+          <div>
+            <label className="text-xs font-bold text-gray-500 block mb-1">عدد المستفيدين</label>
+            <input value={benefCount} onChange={e=>setBenefCount(e.target.value)}
+              placeholder="أكثر من 70 طالب / ..." className={ic} style={st} />
+          </div>
+        </div>
+        <div>
+          <label className="text-xs font-bold text-gray-500 block mb-1">تاريخ التنفيذ (هجري)</label>
+          <div className="flex gap-2 items-center">
+            <select value={dateDay} onChange={e=>setDateDay(e.target.value)}
+              className="flex-1 px-2 py-2 rounded-xl border-2 border-gray-200 text-sm font-bold text-center focus:outline-none" style={st}>
+              <option value="">يوم</option>
+              {Array.from({length:30},(_,i)=>i+1).map(d=><option key={d} value={d}>{String(d).padStart(2,"0")}</option>)}
+            </select>
+            <span className="font-bold text-gray-400">/</span>
+            <select value={dateMonth} onChange={e=>setDateMonth(e.target.value)}
+              className="flex-1 px-2 py-2 rounded-xl border-2 border-gray-200 text-sm font-bold focus:outline-none" style={st}>
+              <option value="">الشهر</option>
+              {HIJRI_M.map((m,i)=><option key={i} value={m}>{m}</option>)}
+            </select>
+            <span className="font-bold text-gray-400">/</span>
+            <select value={dateYear} onChange={e=>setDateYear(e.target.value)}
+              className="flex-1 px-2 py-2 rounded-xl border-2 border-gray-200 text-sm font-bold text-center focus:outline-none" style={st}>
+              {[1445,1446,1447,1448,1449].map(y=><option key={y} value={y}>{y}</option>)}
+            </select>
+            <span className="text-sm font-bold text-gray-500">هـ</span>
+          </div>
+        </div>
       </div>
 
-      {/* ===== بيانات التنفيذ ===== */}
-      <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
-        <h3 className={cx.head3}>
-          <span className="bg-teal-100 text-teal-700 px-3 py-1 rounded-lg text-sm">بيانات التنفيذ</span>
-        </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-          <Field label="المنفذ/ون" field="executor" placeholder="جميع منسوبي المدرسة" />
-          <Field label="المشارك/ون" field="participants" placeholder="أولياء الأمور" />
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
-          <Field label="مكان التنفيذ" field="location" placeholder="فناء المدرسة" />
-          <Field label="مدة التنفيذ" field="duration" placeholder="يوم واحد" />
-          <Field label="تاريخ التنفيذ" field="date" placeholder="١/٤/١٤٤٧ هـ" />
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Field label="المستفيدون / العدد" field="beneficiaries" placeholder="منسوبو المدرسة / أولياء الأمور" />
-          <Field label="المجال" field="field" placeholder="المواطنة" />
+      <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+        <h3 className="font-black text-blue-800 text-sm mb-3">🎯 الأهداف</h3>
+        <div className="space-y-2">
+          {objectives.map((obj,i)=>(
+            <div key={i} className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black text-white flex-shrink-0"
+                style={{background:"#1a6696"}}>{i+1}</div>
+              <input value={obj} onChange={e=>setObjectives(ob=>ob.map((x,j)=>j===i?e.target.value:x))}
+                placeholder={`الهدف ${i+1}...`} className={ic} style={st} />
+              {objectives.length > 3 &&
+                <button onClick={()=>setObjectives(ob=>ob.filter((_,j)=>j!==i))} className="text-red-400 px-1 text-sm">✕</button>}
+            </div>
+          ))}
+          <button onClick={()=>setObjectives(ob=>[...ob,""])}
+            className="text-xs font-black text-blue-700 hover:underline mt-1">+ إضافة هدف</button>
         </div>
       </div>
 
-      {/* ===== الأهداف والخطوات ===== */}
-      <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
-        <h3 className={cx.head3}>
-          <span className="bg-amber-100 text-amber-700 px-3 py-1 rounded-lg text-sm">الأهداف والتنفيذ</span>
-        </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Field label="الأهداف" field="objectives" placeholder="١. تعزيز الهوية الوطنية&#10;٢. تنمية الانتماء&#10;٣. ..." multiline />
-          <Field label="خطوات التنفيذ / الوصف" field="steps" placeholder="١. إذاعة صباحية متنوعة&#10;٢. مسابقات&#10;٣. ..." multiline />
-        </div>
-      </div>
-
-      {/* ===== الشواهد ===== */}
-      <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
-        <h3 className={cx.head3}>
-          <span className="bg-purple-100 text-purple-700 px-3 py-1 rounded-lg text-sm">الشواهد (صور)</span>
-          <span className="text-xs text-gray-400 font-normal">أرفق حتى 4 صور كشواهد للنشاط</span>
-        </h3>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          {report.witnesses.map((w, i) => (
-            <div key={i} className="relative">
-              <div className="text-xs font-bold text-teal-700 mb-1 text-center">شاهد {i + 1}</div>
+      <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+        <h3 className="font-black text-blue-800 text-sm mb-1">📸 الشواهد</h3>
+        <p className="text-xs text-blue-400 mb-3 bg-blue-50 rounded-xl px-3 py-2">
+          💡 انقر على أي مربع ← ثم اضغط <strong>Ctrl+V</strong> للصق الصورة مباشرة من الحافظة، أو اضغط لاختيار ملف
+        </p>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          {witnesses.map((w, idx) => (
+            <div key={idx} className="relative">
               {w ? (
-                <div className="relative group rounded-xl overflow-hidden border-2 border-teal-300" style={{ aspectRatio:"4/3" }}>
-                  <img src={w.dataUrl} alt={`شاهد ${i+1}`} className="w-full h-full object-cover" />
-                  <div className="absolute inset-0 bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-all flex flex-col items-center justify-center gap-2">
-                    <button onClick={() => downloadWitness(w)}
-                      className="bg-white text-teal-700 font-bold text-xs px-3 py-1.5 rounded-lg w-20">⬇️ تحميل</button>
-                    <button onClick={() => removeWitness(i)}
-                      className="bg-red-500 text-white font-bold text-xs px-3 py-1.5 rounded-lg w-20">🗑️ حذف</button>
+                <div className="relative rounded-2xl overflow-hidden border-2 border-blue-400 group">
+                  <img src={w} alt={`شاهد ${idx+1}`} className="w-full object-cover" style={{maxHeight:160}} />
+                  <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all flex items-center justify-center">
+                    <button onClick={()=>removeWitness(idx)}
+                      className="opacity-0 group-hover:opacity-100 bg-red-500 text-white text-xs font-black px-3 py-1.5 rounded-xl transition-opacity">
+                      🗑️ حذف
+                    </button>
+                  </div>
+                  <div className="absolute bottom-0 left-0 right-0 text-center text-xs font-black text-white py-0.5"
+                    style={{background:"rgba(26,102,150,0.85)"}}>
+                    شاهد {idx+1}
                   </div>
                 </div>
               ) : (
-                <label className="cursor-pointer block">
-                  <div className="border-2 border-dashed border-gray-300 hover:border-teal-400 rounded-xl flex flex-col items-center justify-center text-gray-400 hover:text-teal-500 transition-all bg-gray-50 hover:bg-teal-50"
-                    style={{ aspectRatio:"4/3" }}>
-                    <span className="text-3xl mb-1">📷</span>
-                    <span className="text-xs font-bold">إرفاق صورة</span>
-                  </div>
+                <label
+                  tabIndex={0}
+                  onPaste={e => handlePaste(idx, e)}
+                  className="flex flex-col items-center justify-center gap-1.5 rounded-2xl border-2 border-dashed border-blue-300 bg-blue-50 cursor-pointer hover:bg-blue-100 hover:border-blue-500 transition-all focus:border-blue-500 focus:bg-blue-100 focus:outline-none"
+                  style={{minHeight:130, padding:"16px 8px"}}>
+                  <span className="text-3xl">📷</span>
+                  <span className="text-xs font-black text-blue-700 text-center">شاهد {idx+1}</span>
+                  <span className="text-xs text-blue-400 text-center leading-relaxed">
+                    Ctrl+V للصق<br/>أو اضغط لاختيار ملف
+                  </span>
                   <input type="file" accept="image/*" className="hidden"
-                    onChange={e => { if(e.target.files[0]) handleWitness(i, e.target.files[0]); e.target.value=""; }} />
+                    onChange={e=>{ if(e.target.files[0]) handleFile(idx, e.target.files[0]); e.target.value=""; }} />
                 </label>
               )}
             </div>
@@ -7139,43 +7102,34 @@ function ProgramReportPage() {
         </div>
       </div>
 
-      {/* ===== التوقيعات ===== */}
-      <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
-        <h3 className={cx.head3}>
-          <span className="bg-gray-100 text-gray-700 px-3 py-1 rounded-lg text-sm">التوقيعات</span>
-        </h3>
-        <div className="grid grid-cols-2 gap-6">
-          <div className="text-center">
-            <label className="text-xs font-bold text-gray-500 block mb-1">رائد النشاط</label>
-            <input value={report.activityLeaderName} onChange={e => upd("activityLeaderName", e.target.value)}
-              className="w-full border-b-2 border-dashed border-teal-400 text-center py-2 text-sm font-bold focus:outline-none bg-transparent"
-              placeholder="الاسم" />
-          </div>
-          <div className="text-center">
-            <label className="text-xs font-bold text-gray-500 block mb-1">مدير المدرسة</label>
-            <input value={report.principalName} onChange={e => upd("principalName", e.target.value)}
-              className="w-full border-b-2 border-dashed border-teal-400 text-center py-2 text-sm font-bold focus:outline-none bg-transparent"
-              placeholder="الاسم" />
-          </div>
-        </div>
-      </div>
-
-      {/* Preview bar */}
-      <div className="bg-teal-50 border border-teal-200 rounded-2xl px-5 py-4 flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <p className="text-sm font-black text-teal-700">✅ البيانات تُحفظ تلقائياً في المتصفح</p>
-          <p className="text-xs text-teal-500 mt-0.5">اضغط "طباعة / PDF" للحصول على نسخة جاهزة للطباعة أو الحفظ كـ PDF</p>
-        </div>
+      <div className="flex gap-3">
+        <button onClick={()=>{setSaved(true);setTimeout(()=>setSaved(false),2000);}}
+          className="flex-1 py-4 rounded-2xl text-white font-black text-sm shadow-lg transition-all"
+          style={{background:"linear-gradient(135deg,#1a6696,#0f2d55)"}}>
+          {saved ? "✅ تم الحفظ" : "💾 حفظ التقرير"}
+        </button>
         <button onClick={printReport}
-          className="bg-teal-600 hover:bg-teal-700 text-white font-black px-6 py-2.5 rounded-xl text-sm flex items-center gap-2">
-          🖨️ طباعة / حفظ PDF
+          className="flex-1 py-4 rounded-2xl text-white font-black text-sm shadow-lg"
+          style={{background:"linear-gradient(135deg,#155724,#28a745)"}}>
+          🖨️ طباعة / PDF
+        </button>
+        <button onClick={()=>{
+          if(window.confirm("تصفير جميع البيانات؟")) {
+            setRegion(""); setOffice("مكتب التعليم"); setProgName(""); setExecutor("");
+            setLocation(""); setTargetGroup(""); setObjectives(["","","","",""]);
+            setBenefCount(""); setDateDay(""); setDateMonth(""); setDateYear("1447");
+            setWitnesses([null,null,null,null,null]);
+            try { localStorage.removeItem("prog_report_v2"); } catch(e) {}
+          }}}
+          className="px-5 py-4 rounded-2xl text-gray-400 font-black text-sm border-2 border-gray-200 hover:border-red-300 hover:text-red-500 transition-all">
+          🗑️
         </button>
       </div>
     </div>
   );
 }
 
-// ===== التقرير الشهري والفصلي =====
+
 function MonthlyReportPage({ teachers, attendance, week, weekArchive, classList, announcements, activities }) {
   const [reportType, setReportType] = useState("monthly"); // monthly | semester
   const [selectedMonth, setSelectedMonth] = useState(10);
