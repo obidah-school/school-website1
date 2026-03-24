@@ -9825,11 +9825,13 @@ function OfficialFormsPage({ teachers, attendance, week }) {
     let body = "";
 
     if (formType === "warning") {
+      const currentMins = calcLateMins();
+      const lateDurStr = currentMins ? `بمقدار ( ${fmtMins(currentMins)} )` : "";
       const warnType = formData.type === "تأخر" ?
-        `تأخركم من بداية العمل ، وحضوركم الساعة ( ${timeFromStr} )` :
+        `تأخركم من بداية العمل ، وحضوركم الساعة ( ${timeFromStr} ) ${lateDurStr}` :
         formData.type === "مغادرة" ?
-        `عدم تواجدكم أثناء العمل من الساعة ( ${timeFromStr} ) إلى الساعة ( ${timeToStr} )` :
-        `انصرافكم مبكراً قبل نهاية العمل من الساعة ( ${timeFromStr} )`;
+        `عدم تواجدكم أثناء العمل من الساعة ( ${timeFromStr} ) إلى الساعة ( ${timeToStr} ) ${lateDurStr}` :
+        `انصرافكم مبكراً قبل نهاية العمل من الساعة ( ${timeFromStr} ) ${lateDurStr}`;
 
       body = `
         <div style="display:flex;justify-content:space-between;margin-bottom:10px">
