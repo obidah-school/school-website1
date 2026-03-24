@@ -11555,11 +11555,11 @@ function CommitteeMeetingPage({ teachers }) {
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
 <style>
   * { margin:0; padding:0; box-sizing:border-box; }
-  body { font-family:'Cairo',sans-serif; direction:rtl; background:#fff; color:#1a1a1a; font-size:12px; }
-  .page { width:210mm; margin:0 auto; padding:10mm 12mm; }
+  body { font-family:'Cairo',sans-serif; direction:rtl; background:#fff; color:#1a1a1a; font-size:11px; }
+  .page { width:210mm; margin:0 auto; padding:6mm 10mm; }
 
   /* الرأس */
-  .header { display:flex; align-items:center; justify-content:space-between; border-bottom:3px solid ${COM_GREEN}; padding-bottom:8px; margin-bottom:12px; }
+  .header { display:flex; align-items:center; justify-content:space-between; border-bottom:3px solid ${COM_GREEN}; padding-bottom:5px; margin-bottom:8px; }
   .header-center { text-align:center; }
   .header-center h1 { font-size:15px; font-weight:900; color:${COM_GREEN}; }
   .header-center h2 { font-size:13px; font-weight:700; color:#333; margin-top:2px; }
@@ -11569,19 +11569,19 @@ function CommitteeMeetingPage({ teachers }) {
   .logo-text { font-size:11px; color:${COM_GREEN}; font-weight:700; text-align:center; line-height:1.4; }
 
   /* عنوان الاجتماع */
-  .meeting-title { display:flex; justify-content:space-between; align-items:center; margin:10px 0 8px; }
+  .meeting-title { display:flex; justify-content:space-between; align-items:center; margin:6px 0 5px; }
   .meeting-title .type-label { font-size:16px; font-weight:900; color:${COM_GREEN}; }
   .meeting-title .num-box { font-size:14px; font-weight:700; border:1.5px solid #333; padding:3px 20px; border-radius:4px; }
 
   /* الجدول الرئيسي */
   table { width:100%; border-collapse:collapse; margin-bottom:10px; }
-  th { background:${COM_GREEN}; color:#fff; padding:5px 8px; font-size:11px; font-weight:700; text-align:center; border:1px solid ${COM_GREEN}; }
-  td { padding:5px 8px; border:1px solid #aaa; font-size:11px; text-align:center; vertical-align:middle; }
+  th { background:${COM_GREEN}; color:#fff; padding:4px 6px; font-size:10px; font-weight:700; text-align:center; border:1px solid ${COM_GREEN}; }
+  td { padding:4px 6px; border:1px solid #aaa; font-size:10px; text-align:center; vertical-align:middle; }
   td.right { text-align:right; }
   tr:nth-child(even) td { background:#f9f9f9; }
 
   /* قسم الأعمال */
-  .section-title { font-size:13px; font-weight:900; color:${COM_GREEN}; margin:10px 0 6px; border-right:4px solid ${COM_GREEN}; padding-right:8px; }
+  .section-title { font-size:12px; font-weight:900; color:${COM_GREEN}; margin:6px 0 4px; border-right:4px solid ${COM_GREEN}; padding-right:8px; }
   .agenda-table td.num { background:${COM_GREEN}; color:#fff; width:30px; text-align:center; font-weight:700; }
   .agenda-table td.text { text-align:right; min-height:20px; }
 
@@ -11589,7 +11589,7 @@ function CommitteeMeetingPage({ teachers }) {
   .rec-th { background:${COM_GREEN}; color:#fff; font-size:10px; font-weight:700; }
 
   /* قرار اللجنة */
-  .decision-box { border:1.5px solid ${COM_GREEN}; border-radius:6px; padding:10px 14px; margin:10px 0; }
+  .decision-box { border:1.5px solid ${COM_GREEN}; border-radius:6px; padding:6px 10px; margin:6px 0; }
   .decision-box .dt { font-weight:900; color:${COM_GREEN}; margin-bottom:5px; font-size:12px; }
   .decision-box .dc { font-size:11px; line-height:1.9; min-height:40px; }
 
@@ -11603,8 +11603,10 @@ function CommitteeMeetingPage({ teachers }) {
   .footer-right { font-weight:900; font-size:13px; color:${COM_GREEN}; }
 
   @media print {
-    @page { size: A4; margin: 10mm 12mm; }
+    @page { size: A4; margin: 8mm 10mm; }
     body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .page { width: 100% !important; padding: 0 !important; }
+    table { page-break-inside: avoid; }
   }
 </style>
 </head>
