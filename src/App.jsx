@@ -7386,13 +7386,18 @@ function MonthlyReportPage({ teachers, attendance, week, weekArchive, classList,
 function TeacherProfilePage({ teachers, attendance, week, weekArchive, classList }) {
   const [selectedTeacher, setSelectedTeacher] = useState(teachers[0] || "");
   const [tab, setTab] = useState("profile"); // profile | leaves | performance
-  const [leaves, setLeaves] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("teacher-leaves")||"{}"); } catch(e){ return {}; }
-  });
+  const [leaves, setLeaves] = useState({});
   const [showLeaveForm, setShowLeaveForm] = useState(false);
   const [leaveForm, setLeaveForm] = useState({ type:"اضطراري", dateH:"", dateM:"", reason:"", days:1, status:"بانتظار الموافقة" });
 
-  const saveLeaves = (v) => { localStorage.setItem("teacher-leaves", JSON.stringify(v)); setLeaves(v); };
+  // - تحميل إجازات المعلمين من Firebase -
+  React.useEffect(() => {
+    DB.get("school-teacher-leaves", {}).then(data => {
+      if (data && typeof data === "object") setLeaves(data);
+    });
+  }, []);
+
+  const saveLeaves = (v) => { setLeaves(v); DB.set("school-teacher-leaves", v); };
 
   const addLeave = () => {
     if (!leaveForm.dateH.trim()) { alert("أدخل التاريخ"); return; }
@@ -7721,6 +7726,31 @@ function GradeAnalysisPage() {
 
   const [xlsxMsg, setXlsxMsg] = useState("");
   const [xlsxLoading, setXlsxLoading] = useState(false);
+
+  // - تحميل الدرجات من Firebase عند فتح الصفحة -
+  React.useEffect(() => {
+    DB.get("school-grade-analysis", {}).then(data => {
+      if (data && typeof data === "object") {
+        const key = stage + "-" + sem;
+        if (data[key] && Array.isArray(data[key])) {
+          setStudents(data[key]);
+        }
+      }
+      setGaLoaded(true);
+    });
+  }, [stage, sem]);
+
+  // - حفظ تلقائي عند تغيير الدرجات -
+  React.useEffect(() => {
+    if (!gaLoaded || students.length === 0) return;
+    const t = setTimeout(async () => {
+      const existing = await DB.get("school-grade-analysis", {});
+      const key = stage + "-" + sem;
+      const updated = { ...existing, [key]: students };
+      DB.set("school-grade-analysis", updated);
+    }, 1500);
+    return () => clearTimeout(t);
+  }, [students, gaLoaded, stage, sem]);
   const xlsxRef = useRef(null);
 
   const handleXlsxImport = async (file) => {
