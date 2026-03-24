@@ -724,6 +724,9 @@ function HomePage({ teachers, announcements, activities, navigate, attendance, w
             {unreadMsgs>0 && <div className="flex items-center gap-2 bg-blue-50 rounded-xl px-3 py-2 cursor-pointer" onClick={()=>navigate("messages")}><span className="text-blue-500">✉️</span><span className="text-xs font-bold text-blue-700">{unreadMsgs} رسالة غير مقروءة</span></div>}
             {unreadNotes>0&& <div className="flex items-center gap-2 bg-amber-50 rounded-xl px-3 py-2 cursor-pointer" onClick={()=>navigate("messages")}><span>📨</span><span className="text-xs font-bold text-amber-700">{unreadNotes} ملاحظة بلا رد</span></div>}
             {todayAbsent===0&&todayLate===0&&unreadMsgs===0&&unreadNotes===0 && <div className="text-center py-3"><div className="text-2xl mb-1">🎉</div><div className="text-xs text-gray-400 font-bold">لا توجد تنبيهات</div></div>}
+            <div className="flex items-center gap-2 bg-red-50 rounded-xl px-3 py-2 cursor-pointer" onClick={()=>navigate("earlywarning")}>
+              <span className="text-red-500">🚨</span><span className="text-xs font-bold text-red-700">مراقبة الطلاب المعرضين للتعثر</span>
+            </div>
           </div>
         </div>
         <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
@@ -823,14 +826,14 @@ function HomePage({ teachers, announcements, activities, navigate, attendance, w
       {/* ── روابط سريعة ── */}
       <div className="grid grid-cols-4 gap-3 sm:grid-cols-8">
         {[
-          {id:"attendance",    icon:"📋", label:"الحضور",     color:"#0d9488"},
-          {id:"students",      icon:"👨‍🎓", label:"التقييمات",  color:"#7c3aed"},
-          {id:"messages",      icon:"✉️",  label:"الرسائل",    color:"#2563eb"},
-          {id:"announcements", icon:"📢",  label:"الإعلانات",  color:"#d97706"},
-          {id:"absencestats",  icon:"📊",  label:"الغياب",     color:"#dc2626"},
-          {id:"gradeanalysis", icon:"📊",  label:"الدرجات",    color:"#6366f1"},
-          {id:"monthlyreport", icon:"📋",  label:"التقارير",   color:"#0d9488"},
-          {id:"settings",      icon:"⚙️",  label:"الإعدادات",  color:"#64748b"},
+          {id:"attendance",    icon:"📋", label:"الحضور",        color:"#0d9488"},
+          {id:"students",      icon:"👨‍🎓", label:"التقييمات",     color:"#7c3aed"},
+          {id:"messages",      icon:"✉️",  label:"الرسائل",       color:"#2563eb"},
+          {id:"earlywarning",  icon:"🚨",  label:"الإنذار المبكر",color:"#dc2626"},
+          {id:"gradeanalysis", icon:"📊",  label:"تحليل الدرجات", color:"#6366f1"},
+          {id:"portfolio",     icon:"📁",  label:"ملف الطالب",    color:"#7c3aed"},
+          {id:"meetings",      icon:"📅",  label:"الاجتماعات",    color:"#0891b2"},
+          {id:"settings",      icon:"⚙️",  label:"الإعدادات",     color:"#64748b"},
         ].map(p=>(
           <button key={p.id} onClick={()=>navigate(p.id)}
             className="bg-white rounded-2xl p-3 flex flex-col items-center gap-1.5 hover:shadow-md transition-all border border-gray-100 hover:scale-105">
@@ -10700,6 +10703,1379 @@ function OfficialFormsPage({ teachers, attendance, week }) {
   );
 }
 
+
+// ══════════════════════════════════════════════════════
+// صفحة ملف الطالب الشامل
+// ══════════════════════════════════════════════════════
+function StudentPortfolioPage({ classList, weekArchive, attendance, week, teachers }) {
+  const [selClass,   setSelClass]   = useState("");
+  const [selStudent, setSelStudent] = useState("");
+  const [tab,        setTab]        = useState("overview");
+
+  const cls  = classList.find(c=>c.id===selClass);
+  const stu  = cls?.students?.find(s=>s.id===selStudent);
+
+  // حضور الطالب
+  const absCount = stu ? (() => {
+    let abs = 0;
+    teachers.forEach((_,ti)=>{
+      week.days.forEach((_,di)=>{
+        if ((attendance[ti]?.[di]?.status||"حاضر")==="غائب") abs++;
+      });
+    });
+    return abs;
+  })() : 0;
+
+  // تقييمات المادة
+  const evals = stu?.evals || [];
+  const subjEvals = {};
+  evals.forEach(ev=>{
+    if (!ev.subject) return;
+    if (!subjEvals[ev.subject]) subjEvals[ev.subject]=[];
+    subjEvals[ev.subject].push(ev);
+  });
+
+  const lvLabel = l => ({excel:"ممتاز",vgood:"جيد جداً",good:"جيد",accept:"مقبول",weak:"ضعيف"}[l]||l);
+  const lvColor = l => ({excel:"#10b981",vgood:"#3b82f6",good:"#f59e0b",accept:"#f97316",weak:"#ef4444"}[l]||"#6b7280");
+
+  return (
+    <div dir="rtl" className="space-y-4">
+      <div className="rounded-3xl overflow-hidden shadow-xl" style={{background:"linear-gradient(135deg,#0f172a,#7c3aed)"}}>
+        <div className="p-6 text-white">
+          <h2 className="text-2xl font-black mb-1">📁 ملف الطالب الشامل</h2>
+          <p className="opacity-80 text-sm">سجل متكامل — الأداء الأكاديمي والحضور والتقييمات</p>
+        </div>
+      </div>
+
+      {/* اختيار الطالب */}
+      <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex gap-3 flex-wrap">
+        <div className="flex-1">
+          <label className="text-xs font-bold text-gray-500 block mb-1">الفصل</label>
+          <select value={selClass} onChange={e=>{setSelClass(e.target.value);setSelStudent("");}}
+            className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 text-sm font-bold focus:outline-none" style={{fontFamily:"inherit"}}>
+            <option value="">— اختر الفصل —</option>
+            {classList.map(c=><option key={c.id} value={c.id}>{c.name||`${c.level}/${c.section}`}</option>)}
+          </select>
+        </div>
+        {cls && (
+          <div className="flex-1">
+            <label className="text-xs font-bold text-gray-500 block mb-1">الطالب</label>
+            <select value={selStudent} onChange={e=>setSelStudent(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 text-sm font-bold focus:outline-none" style={{fontFamily:"inherit"}}>
+              <option value="">— اختر الطالب —</option>
+              {(cls.students||[]).filter(s=>s.name).map(s=><option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+          </div>
+        )}
+      </div>
+
+      {stu && (
+        <>
+          {/* بطاقة الطالب */}
+          <div className="rounded-2xl overflow-hidden shadow-sm border border-gray-100">
+            <div className="p-5 text-white flex items-center gap-4" style={{background:"linear-gradient(135deg,#0f172a,#7c3aed)"}}>
+              <div className="w-16 h-16 rounded-2xl bg-white bg-opacity-20 flex items-center justify-center text-3xl flex-shrink-0">👨‍🎓</div>
+              <div>
+                <h3 className="text-xl font-black">{stu.name}</h3>
+                <p className="opacity-70 text-sm">{cls?.level} / شعبة {cls?.section} — {cls?.teacher}</p>
+                {stu.nationalId && <p className="opacity-60 text-xs mt-0.5">الهوية: {stu.nationalId}</p>}
+              </div>
+            </div>
+            <div className="grid grid-cols-3 divide-x divide-x-reverse bg-white">
+              {[
+                {l:"مواد مقيّمة",v:Object.keys(subjEvals).length,c:"#6366f1"},
+                {l:"أيام الغياب",v:absCount,c:absCount>3?"#ef4444":"#10b981"},
+                {l:"المرحلة",v:cls?.level||"—",c:"#0ea5e9"},
+              ].map(k=>(
+                <div key={k.l} className="p-4 text-center">
+                  <div className="text-2xl font-black" style={{color:k.c}}>{k.v}</div>
+                  <div className="text-xs text-gray-400 font-bold mt-1">{k.l}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* تبويبات */}
+          <div className="flex gap-1 bg-white rounded-2xl p-1.5 shadow-sm overflow-x-auto">
+            {[{id:"overview",l:"📊 نظرة عامة"},{id:"subjects",l:"📚 المواد"},{id:"attendance",l:"📋 الحضور"},{id:"plan",l:"💡 خطة التطوير"}].map(t=>(
+              <button key={t.id} onClick={()=>setTab(t.id)}
+                className={"flex-shrink-0 px-4 py-2 rounded-xl text-xs font-black transition-all "+(tab===t.id?"bg-purple-600 text-white shadow":"text-gray-500 hover:bg-gray-50")}>
+                {t.l}
+              </button>
+            ))}
+          </div>
+
+          {/* نظرة عامة */}
+          {tab==="overview" && (
+            <div className="space-y-3">
+              {Object.keys(subjEvals).length===0 ? (
+                <div className="bg-white rounded-2xl p-8 text-center shadow-sm border">
+                  <div className="text-3xl mb-2">📚</div>
+                  <div className="font-black text-gray-400">لا توجد تقييمات بعد لهذا الطالب</div>
+                </div>
+              ) : (
+                <div className="grid gap-3">
+                  {Object.entries(subjEvals).map(([subj,evs])=>{
+                    const last = evs[evs.length-1];
+                    const color = lvColor(last?.level);
+                    return (
+                      <div key={subj} className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex items-center gap-4">
+                        <div className="flex-1">
+                          <div className="font-black text-gray-800 text-sm">{subj}</div>
+                          <div className="text-xs text-gray-400 mt-0.5">{evs.length} تقييم</div>
+                        </div>
+                        <span className="font-black px-3 py-1.5 rounded-xl text-sm" style={{background:color+"18",color}}>{lvLabel(last?.level)}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* تفاصيل المواد */}
+          {tab==="subjects" && (
+            <div className="space-y-3">
+              {Object.entries(subjEvals).map(([subj,evs])=>(
+                <div key={subj} className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+                  <h4 className="font-black text-gray-800 mb-3 text-sm">{subj}</h4>
+                  <div className="space-y-2">
+                    {evs.map((ev,i)=>{
+                      const c=lvColor(ev.level);
+                      return (
+                        <div key={i} className="flex items-center justify-between bg-gray-50 rounded-xl px-3 py-2">
+                          <span className="text-xs text-gray-500">{ev.dateH||ev.day||"—"}</span>
+                          <span className="text-xs font-black px-2 py-0.5 rounded-full" style={{background:c+"18",color:c}}>{lvLabel(ev.level)}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* الحضور */}
+          {tab==="attendance" && (
+            <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+              <h4 className="font-black text-gray-800 mb-4 text-sm">📋 سجل الحضور الأسبوعي</h4>
+              <div className="grid grid-cols-5 gap-2">
+                {(week.days||[]).map((day,di)=>{
+                  const ti = teachers.indexOf(cls?.teacher||"");
+                  const status = ti>=0?(attendance[ti]?.[di]?.status||"حاضر"):"—";
+                  const col = status==="حاضر"?"#10b981":status==="غائب"?"#ef4444":"#f59e0b";
+                  return (
+                    <div key={di} className="rounded-xl p-3 text-center border" style={{borderColor:col+"44",background:col+"11"}}>
+                      <div className="text-xs font-black" style={{color:col}}>{day.name}</div>
+                      <div className="text-xs mt-1" style={{color:col}}>{status}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* خطة التطوير */}
+          {tab==="plan" && (
+            <StudentImprovementPlan student={stu} subjEvals={subjEvals} lvLabel={lvLabel} lvColor={lvColor}/>
+          )}
+        </>
+      )}
+      {!stu && !cls && (
+        <div className="bg-white rounded-2xl p-12 text-center shadow-sm border">
+          <div className="text-4xl mb-3">📁</div>
+          <div className="font-black text-gray-600">اختر فصلاً وطالباً لعرض ملفه الشامل</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// مكوّن خطة التحسين الفردية
+function StudentImprovementPlan({ student, subjEvals, lvLabel, lvColor }) {
+  const [saved, setSaved]   = useState(false);
+  const [notes, setNotes]   = useState("");
+  const [goals, setGoals]   = useState([{text:"",done:false}]);
+
+  const weakSubjects = Object.entries(subjEvals).filter(([,evs])=>{
+    const last = evs[evs.length-1];
+    return ["weak","accept"].includes(last?.level);
+  });
+
+  const addGoal = () => setGoals(g=>[...g,{text:"",done:false}]);
+  const saveP   = () => { setSaved(true); setTimeout(()=>setSaved(false),2500); };
+  const printP  = () => {
+    printWindow(`<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8">
+    <title>خطة تطوير — ${student.name}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>body{font-family:'Cairo';direction:rtl;padding:24px;color:#1e293b}
+    h1{font-size:18px;font-weight:900;color:#6366f1;border-bottom:3px solid #6366f1;padding-bottom:8px;margin-bottom:16px}
+    h3{font-size:14px;font-weight:800;color:#1e3a5f;margin:16px 0 8px}
+    .badge{background:#fee2e2;color:#dc2626;padding:2px 10px;border-radius:20px;font-weight:700;font-size:12px}
+    .goal{padding:8px 12px;border:1px solid #e2e8f0;border-radius:8px;margin:4px 0;font-size:13px}
+    .notes{background:#f8fafc;border-radius:8px;padding:12px;font-size:13px;line-height:2}
+    @media print{@page{margin:1.5cm}}</style></head><body>
+    <h1>📋 خطة تطوير الطالب</h1>
+    <p><strong>الاسم:</strong> ${student.name}</p>
+    <p><strong>رقم الهوية:</strong> ${student.nationalId||"—"}</p>
+    <p><strong>التاريخ:</strong> ${new Date().toLocaleDateString("ar-SA")}</p>
+    ${weakSubjects.length>0?`<h3>المواد التي تحتاج دعماً:</h3>${weakSubjects.map(([s,evs])=>`<span class="badge">${s}: ${lvLabel(evs[evs.length-1].level)}</span> `).join("")}`:""}
+    <h3>الأهداف:</h3>${goals.filter(g=>g.text).map(g=>`<div class="goal">${g.text}</div>`).join("")}
+    ${notes?`<h3>ملاحظات المعلم:</h3><div class="notes">${notes}</div>`:""}
+    <script>window.onload=()=>window.print()</script></body></html>`);
+  };
+
+  return (
+    <div className="space-y-4">
+      {weakSubjects.length>0 && (
+        <div className="bg-red-50 border border-red-200 rounded-2xl p-4">
+          <h4 className="font-black text-red-700 mb-2 text-sm">⚠️ مواد تحتاج دعماً</h4>
+          <div className="flex flex-wrap gap-2">
+            {weakSubjects.map(([s,evs])=>{
+              const c=lvColor(evs[evs.length-1]?.level);
+              return <span key={s} className="px-3 py-1.5 rounded-xl font-black text-xs" style={{background:c+"18",color:c}}>{s}: {lvLabel(evs[evs.length-1].level)}</span>;
+            })}
+          </div>
+        </div>
+      )}
+      <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 space-y-3">
+        <h4 className="font-black text-gray-800 text-sm">🎯 أهداف خطة التطوير</h4>
+        {goals.map((g,i)=>(
+          <div key={i} className="flex items-center gap-2">
+            <input type="checkbox" checked={g.done} onChange={e=>setGoals(gs=>gs.map((x,j)=>j===i?{...x,done:e.target.checked}:x))} className="w-4 h-4 accent-green-500"/>
+            <input value={g.text} onChange={e=>setGoals(gs=>gs.map((x,j)=>j===i?{...x,text:e.target.value}:x))}
+              placeholder={`هدف ${i+1}...`} className="flex-1 px-3 py-2 rounded-xl border-2 border-gray-200 text-sm focus:outline-none focus:border-purple-400" style={{fontFamily:"inherit"}}/>
+            {goals.length>1&&<button onClick={()=>setGoals(gs=>gs.filter((_,j)=>j!==i))} className="text-red-400 px-2">✕</button>}
+          </div>
+        ))}
+        <button onClick={addGoal} className="text-xs text-purple-600 font-black hover:underline">+ إضافة هدف</button>
+      </div>
+      <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+        <h4 className="font-black text-gray-800 text-sm mb-2">📝 ملاحظات المعلم</h4>
+        <textarea value={notes} onChange={e=>setNotes(e.target.value)} rows={4}
+          placeholder="أكتب ملاحظاتك وتوصياتك للطالب وولي أمره..."
+          className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 text-sm focus:outline-none focus:border-purple-400 resize-none" style={{fontFamily:"inherit"}}/>
+      </div>
+      {saved && <div className="bg-green-50 border border-green-200 rounded-2xl p-3 text-center font-black text-green-700 text-sm">✅ تم حفظ الخطة</div>}
+      <div className="flex gap-3">
+        <button onClick={saveP} className="flex-1 py-3 rounded-2xl font-black text-white text-sm" style={{background:"linear-gradient(135deg,#6366f1,#7c3aed)"}}>💾 حفظ الخطة</button>
+        <button onClick={printP} className="flex-1 py-3 rounded-2xl font-black text-white text-sm" style={{background:"linear-gradient(135deg,#0f172a,#1e3a5f)"}}>🖨️ طباعة وإرسال لولي الأمر</button>
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+// صفحة تنبيه الطلاب المعرضين للرسوب
+// ══════════════════════════════════════════════════════════════
+function EarlyWarningPage({ classList }) {
+  const [threshold, setThreshold] = useState(60);
+  const [selectedClass, setSelectedClass] = useState("all");
+
+  const allStudents = classList.flatMap(cls=>
+    (cls.students||[]).filter(s=>s.name).map(s=>({...s,cls}))
+  );
+
+  const filtered = selectedClass==="all"?allStudents:allStudents.filter(s=>s.cls.id===selectedClass);
+
+  const atRisk = filtered.map(s=>{
+    const evals = s.evals||[];
+    const subjects = {};
+    evals.forEach(ev=>{
+      if(!ev.subject) return;
+      const scores = {excel:5,vgood:4,good:3,accept:2,weak:1};
+      if(!subjects[ev.subject]) subjects[ev.subject]=[];
+      subjects[ev.subject].push(scores[ev.level]||0);
+    });
+    const subjectAvgs = Object.entries(subjects).map(([sub,sc])=>({
+      sub, avg:sc.reduce((a,b)=>a+b,0)/sc.length*20
+    }));
+    const overall = subjectAvgs.length?subjectAvgs.reduce((a,b)=>a+b.avg,0)/subjectAvgs.length:0;
+    const weakSubjects = subjectAvgs.filter(x=>x.avg<threshold);
+    return {...s, overall:Math.round(overall), subjectAvgs, weakSubjects};
+  }).filter(s=>s.weakSubjects.length>0).sort((a,b)=>a.overall-b.overall);
+
+  const riskLevel = pct => pct<40?"critical":pct<threshold?"high":"medium";
+  const riskColor = l => ({critical:"#dc2626",high:"#ea580c",medium:"#f59e0b"}[l]);
+  const riskBg    = l => ({critical:"#fee2e2",high:"#ffedd5",medium:"#fef3c7"}[l]);
+  const riskLabel = l => ({critical:"خطر شديد",high:"معرض للرسوب",medium:"يحتاج متابعة"}[l]);
+
+  return (
+    <div dir="rtl" className="space-y-4">
+      <div className="rounded-3xl overflow-hidden shadow-xl" style={{background:"linear-gradient(135deg,#dc2626,#b91c1c)"}}>
+        <div className="p-6 text-white">
+          <h2 className="text-2xl font-black mb-1">🚨 نظام الإنذار المبكر</h2>
+          <p className="opacity-80 text-sm">رصد الطلاب المعرضين للتعثر قبل فوات الأوان</p>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex flex-wrap gap-3 items-end">
+        <div>
+          <label className="text-xs font-bold text-gray-500 block mb-1">الفصل</label>
+          <select value={selectedClass} onChange={e=>setSelectedClass(e.target.value)}
+            className="px-3 py-2 rounded-xl border-2 border-gray-200 text-sm font-bold focus:outline-none" style={{fontFamily:"inherit"}}>
+            <option value="all">كل الفصول</option>
+            {classList.map(c=><option key={c.id} value={c.id}>{c.name||`${c.level}/${c.section}`}</option>)}
+          </select>
+        </div>
+        <div className="flex-1">
+          <label className="text-xs font-bold text-gray-500 block mb-1">حد التنبيه: {threshold}%</label>
+          <input type="range" min="40" max="75" value={threshold} onChange={e=>setThreshold(Number(e.target.value))} className="w-full"/>
+        </div>
+        <div className="text-center bg-red-50 rounded-xl px-4 py-2">
+          <div className="text-2xl font-black text-red-600">{atRisk.length}</div>
+          <div className="text-xs text-red-400 font-bold">طالب معرض للخطر</div>
+        </div>
+      </div>
+
+      {atRisk.length===0 ? (
+        <div className="bg-green-50 border border-green-200 rounded-2xl p-12 text-center">
+          <div className="text-4xl mb-3">🌟</div>
+          <div className="font-black text-green-700 text-lg">ممتاز! لا يوجد طلاب معرضون للخطر</div>
+          <div className="text-sm text-green-600 mt-1">جميع الطلاب فوق حد {threshold}%</div>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {atRisk.map(s=>{
+            const level = riskLevel(s.overall);
+            const col   = riskColor(level);
+            const bg    = riskBg(level);
+            return (
+              <div key={s.id} className="bg-white rounded-2xl overflow-hidden shadow-sm border-2" style={{borderColor:col+"44"}}>
+                <div className="flex items-center justify-between px-5 py-3" style={{background:bg}}>
+                  <div>
+                    <div className="font-black text-sm" style={{color:col}}>{s.name}</div>
+                    <div className="text-xs mt-0.5" style={{color:col,opacity:.7}}>{s.cls.name||`${s.cls.level}/${s.cls.section}`}</div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="text-center">
+                      <div className="text-2xl font-black" style={{color:col}}>{s.overall}%</div>
+                      <div className="text-xs font-bold" style={{color:col,opacity:.7}}>المتوسط</div>
+                    </div>
+                    <span className="px-3 py-1.5 rounded-xl font-black text-xs text-white" style={{background:col}}>
+                      {riskLabel(level)}
+                    </span>
+                  </div>
+                </div>
+                <div className="px-5 py-3">
+                  <div className="text-xs font-bold text-gray-500 mb-2">مواد تحتاج تدخل:</div>
+                  <div className="flex flex-wrap gap-2">
+                    {s.weakSubjects.map(w=>(
+                      <span key={w.sub} className="px-2 py-1 rounded-lg text-xs font-black" style={{background:"#fee2e2",color:"#dc2626"}}>
+                        {w.sub}: {Math.round(w.avg)}%
+                      </span>
+                    ))}
+                  </div>
+                  {/* شريط تقدم */}
+                  <div className="mt-3 h-2.5 rounded-full overflow-hidden" style={{background:"#f3f4f6"}}>
+                    <div className="h-full rounded-full" style={{width:s.overall+"%",background:col}}/>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+// صفحة الاجتماعات وحجز المواعيد
+// ══════════════════════════════════════════════════════════════
+function MeetingsPage({ teachers }) {
+  const [meetings, setMeetings] = useState([]);
+  const [form,     setForm]     = useState({title:"",teacher:"",date:"",dateH:"",time:"",type:"حضوري",notes:""});
+  const [showForm, setShowForm] = useState(false);
+  const [filter,   setFilter]   = useState("all");
+
+  useEffect(()=>{
+    DB.get("school-meetings",[]).then(d=>setMeetings(Array.isArray(d)?d:[]));
+  },[]);
+
+  const saveMeetings = m => { setMeetings(m); DB.set("school-meetings",m); };
+
+  const addMeeting = () => {
+    if (!form.title.trim()||!form.teacher||!form.dateH) { alert("أكمل البيانات المطلوبة"); return; }
+    saveMeetings([{id:Date.now(),...form,status:"مجدول",createdAt:new Date().toLocaleDateString("ar-SA")},...meetings]);
+    setForm({title:"",teacher:"",date:"",dateH:"",time:"",type:"حضوري",notes:""});
+    setShowForm(false);
+  };
+
+  const updateStatus = (id,status) => saveMeetings(meetings.map(m=>m.id===id?{...m,status}:m));
+  const deleteMeeting = id => { if(confirm("حذف الاجتماع؟")) saveMeetings(meetings.filter(m=>m.id!==id)); };
+
+  const filtered = filter==="all"?meetings:meetings.filter(m=>m.status===filter);
+
+  const statusColors = {
+    "مجدول":{bg:"#dbeafe",c:"#1d4ed8"},
+    "منجز": {bg:"#dcfce7",c:"#166534"},
+    "مؤجل": {bg:"#fef3c7",c:"#854d0e"},
+    "ملغي": {bg:"#fee2e2",c:"#991b1b"},
+  };
+
+  const HIJRI_MONTHS_M = ["محرم","صفر","ربيع الأول","ربيع الثاني","جمادى الأولى","جمادى الآخرة","رجب","شعبان","رمضان","شوال","ذو القعدة","ذو الحجة"];
+
+  return (
+    <div dir="rtl" className="space-y-4">
+      <div className="rounded-3xl overflow-hidden shadow-xl" style={{background:"linear-gradient(135deg,#0f172a,#0891b2)"}}>
+        <div className="p-6 text-white">
+          <h2 className="text-2xl font-black mb-1">📅 الاجتماعات والمواعيد</h2>
+          <p className="opacity-80 text-sm">جدولة اجتماعات أولياء الأمور والمعلمين</p>
+        </div>
+      </div>
+
+      <div className="flex gap-2 flex-wrap">
+        <button onClick={()=>setShowForm(!showForm)} className="px-4 py-2 rounded-xl font-black text-sm text-white" style={{background:"linear-gradient(135deg,#0891b2,#0284c7)"}}>
+          ➕ إضافة اجتماع
+        </button>
+        {["all","مجدول","منجز","مؤجل"].map(f=>(
+          <button key={f} onClick={()=>setFilter(f)}
+            className={"px-4 py-2 rounded-xl font-black text-xs transition-all "+(filter===f?"bg-blue-600 text-white":"bg-white text-gray-600 border border-gray-200")}>
+            {f==="all"?"الكل":f}
+          </button>
+        ))}
+        <div className="mr-auto text-xs text-gray-400 flex items-center">{filtered.length} اجتماع</div>
+      </div>
+
+      {showForm && (
+        <div className="bg-cyan-50 border-2 border-cyan-200 rounded-2xl p-5 space-y-3">
+          <div className="font-black text-cyan-800 text-sm">➕ اجتماع جديد</div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="col-span-2">
+              <label className="text-xs font-bold text-gray-500 block mb-1">عنوان الاجتماع *</label>
+              <input value={form.title} onChange={e=>setForm(p=>({...p,title:e.target.value}))} placeholder="مثال: اجتماع أولياء الأمور الفصل الأول" className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 text-sm focus:outline-none" style={{fontFamily:"inherit"}}/>
+            </div>
+            <div>
+              <label className="text-xs font-bold text-gray-500 block mb-1">المعلم المسؤول *</label>
+              <select value={form.teacher} onChange={e=>setForm(p=>({...p,teacher:e.target.value}))} className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 text-sm focus:outline-none" style={{fontFamily:"inherit"}}>
+                <option value="">— اختر —</option>
+                <option value="مدير المدرسة">مدير المدرسة</option>
+                {teachers.map(t=><option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-bold text-gray-500 block mb-1">نوع الاجتماع</label>
+              <select value={form.type} onChange={e=>setForm(p=>({...p,type:e.target.value}))} className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 text-sm focus:outline-none" style={{fontFamily:"inherit"}}>
+                {["حضوري","عن بُعد (زووم)","هاتفي","مزدوج"].map(t=><option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-bold text-gray-500 block mb-1">التاريخ الهجري *</label>
+              <div className="flex gap-1">
+                <select value={form.dateDay||""} onChange={e=>setForm(p=>({...p,dateDay:e.target.value}))} className="flex-1 px-2 py-2 rounded-xl border-2 border-gray-200 text-xs focus:outline-none text-center" style={{fontFamily:"inherit"}}>
+                  <option value="">يوم</option>
+                  {Array.from({length:30},(_,i)=>i+1).map(d=><option key={d} value={d}>{String(d).padStart(2,"0")}</option>)}
+                </select>
+                <select value={form.dateMonth||""} onChange={e=>setForm(p=>({...p,dateMonth:e.target.value}))} className="flex-1 px-2 py-2 rounded-xl border-2 border-gray-200 text-xs focus:outline-none" style={{fontFamily:"inherit"}}>
+                  <option value="">شهر</option>
+                  {HIJRI_MONTHS_M.map((m,i)=><option key={i} value={m}>{m}</option>)}
+                </select>
+                <select value={form.dateYear||"1447"} onChange={e=>setForm(p=>({...p,dateYear:e.target.value}))} className="flex-1 px-2 py-2 rounded-xl border-2 border-gray-200 text-xs focus:outline-none text-center" style={{fontFamily:"inherit"}}>
+                  {[1447,1448,1449].map(y=><option key={y} value={y}>{y}</option>)}
+                </select>
+              </div>
+            </div>
+            <div>
+              <label className="text-xs font-bold text-gray-500 block mb-1">الوقت</label>
+              <div className="flex gap-1">
+                <select value={form.timeH||""} onChange={e=>setForm(p=>({...p,timeH:e.target.value}))} className="flex-1 px-2 py-2 rounded-xl border-2 border-gray-200 text-xs focus:outline-none text-center" style={{fontFamily:"inherit"}}>
+                  <option value="">س</option>
+                  {Array.from({length:12},(_,i)=>i+1).map(h=><option key={h} value={h}>{String(h).padStart(2,"0")}</option>)}
+                </select>
+                <select value={form.timeM||"00"} onChange={e=>setForm(p=>({...p,timeM:e.target.value}))} className="flex-1 px-2 py-2 rounded-xl border-2 border-gray-200 text-xs focus:outline-none text-center" style={{fontFamily:"inherit"}}>
+                  {["00","15","30","45"].map(m=><option key={m} value={m}>{m}</option>)}
+                </select>
+                <select value={form.timeP||"ص"} onChange={e=>setForm(p=>({...p,timeP:e.target.value}))} className="flex-1 px-2 py-2 rounded-xl border-2 border-gray-200 text-xs focus:outline-none text-center" style={{fontFamily:"inherit"}}>
+                  <option>ص</option><option>م</option>
+                </select>
+              </div>
+            </div>
+            <div className="col-span-2">
+              <label className="text-xs font-bold text-gray-500 block mb-1">ملاحظات</label>
+              <textarea value={form.notes} onChange={e=>setForm(p=>({...p,notes:e.target.value}))} rows={2} placeholder="أجندة الاجتماع أو ملاحظات..." className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 text-sm focus:outline-none resize-none" style={{fontFamily:"inherit"}}/>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button onClick={addMeeting} className="flex-1 py-2.5 rounded-xl bg-cyan-600 text-white font-black hover:bg-cyan-700">✅ إضافة</button>
+            <button onClick={()=>setShowForm(false)} className="px-4 py-2.5 rounded-xl bg-gray-100 text-gray-600 font-bold">إلغاء</button>
+          </div>
+        </div>
+      )}
+
+      {filtered.length===0 ? (
+        <div className="bg-white rounded-2xl p-12 text-center shadow-sm border"><div className="text-4xl mb-2">📅</div><div className="font-black text-gray-400">لا توجد اجتماعات</div></div>
+      ) : (
+        <div className="space-y-3">
+          {filtered.map(m=>{
+            const sc=statusColors[m.status]||{bg:"#f3f4f6",c:"#374151"};
+            const timeStr=m.timeH?`${String(m.timeH).padStart(2,"0")}:${m.timeM||"00"} ${m.timeP||""}`:""
+            const dateStr=m.dateDay?`${m.dateDay}/${m.dateMonth||""}/${m.dateYear||"1447"} هـ`:m.dateH||"—";
+            return (
+              <div key={m.id} className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100">
+                <div className="flex items-center justify-between px-5 py-3">
+                  <div className="flex-1">
+                    <div className="font-black text-gray-800 text-sm">{m.title}</div>
+                    <div className="flex items-center gap-3 mt-1 text-xs text-gray-400">
+                      <span>👤 {m.teacher}</span>
+                      <span>📅 {dateStr}</span>
+                      {timeStr&&<span>⏰ {timeStr}</span>}
+                      <span className="px-2 py-0.5 rounded-full font-bold" style={{background:"#f3f4f6",color:"#374151"}}>{m.type}</span>
+                    </div>
+                    {m.notes&&<div className="text-xs text-gray-400 mt-1 truncate">{m.notes}</div>}
+                  </div>
+                  <div className="flex items-center gap-2 mr-3">
+                    <span className="px-2 py-1 rounded-lg font-black text-xs" style={{background:sc.bg,color:sc.c}}>{m.status}</span>
+                    <div className="flex gap-1">
+                      {m.status==="مجدول"&&<>
+                        <button onClick={()=>updateStatus(m.id,"منجز")} className="text-xs bg-green-50 text-green-600 px-2 py-1 rounded-lg hover:bg-green-100 font-bold">✅</button>
+                        <button onClick={()=>updateStatus(m.id,"مؤجل")} className="text-xs bg-amber-50 text-amber-600 px-2 py-1 rounded-lg hover:bg-amber-100 font-bold">⏸</button>
+                      </>}
+                      <button onClick={()=>deleteMeeting(m.id)} className="text-xs bg-red-50 text-red-400 px-2 py-1 rounded-lg hover:bg-red-100">🗑️</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+// خريطة حرارية للنشاط المدرسي
+// ══════════════════════════════════════════════════════════════
+function HeatmapPage({ teachers, attendance, week, weekArchive, announcements, activities }) {
+  const dayNames = ["الأحد","الاثنين","الثلاثاء","الأربعاء","الخميس"];
+
+  // حساب نسبة الحضور لكل يوم في الأرشيف
+  const archiveStats = weekArchive.map(entry=>{
+    const dayRates = (entry.week?.days||[]).map((_,di)=>{
+      const present=teachers.filter((_,ti)=>(entry.attendance?.[ti]?.[di]?.status||"حاضر")==="حاضر").length;
+      return teachers.length>0?Math.round(present/teachers.length*100):0;
+    });
+    return {week:entry.week,rates:dayRates,date:entry.archivedAt};
+  });
+
+  // الأسبوع الحالي
+  const currentRates = dayNames.map((_,di)=>{
+    const present=teachers.filter((_,ti)=>(attendance[ti]?.[di]?.status||"حاضر")==="حاضر").length;
+    return teachers.length>0?Math.round(present/teachers.length*100):0;
+  });
+
+  const heatColor = v => v>=95?"#16a34a":v>=85?"#65a30d":v>=75?"#ca8a04":v>=60?"#ea580c":"#dc2626";
+  const heatBg    = v => v>=95?"#dcfce7":v>=85?"#ecfccb":v>=75?"#fef3c7":v>=60?"#ffedd5":"#fee2e2";
+
+  // إحصائيات الإعلانات والأنشطة بالأشهر
+  const announcementsPerMonth = {};
+  announcements.forEach(a=>{
+    const month = a.date?.substring(3,10)||"غير محدد";
+    announcementsPerMonth[month]=(announcementsPerMonth[month]||0)+1;
+  });
+
+  return (
+    <div dir="rtl" className="space-y-5">
+      <div className="rounded-3xl overflow-hidden shadow-xl" style={{background:"linear-gradient(135deg,#0f172a,#1e3a5f)"}}>
+        <div className="p-6 text-white">
+          <h2 className="text-2xl font-black mb-1">🗺️ خريطة نشاط المدرسة</h2>
+          <p className="opacity-80 text-sm">رؤية بصرية شاملة للأيام والأسابيع والنشاط المدرسي</p>
+        </div>
+      </div>
+
+      {/* الأسبوع الحالي */}
+      <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+        <h3 className="font-black text-gray-800 mb-4 text-sm">📅 الأسبوع الحالي — نسبة الحضور اليومية</h3>
+        <div className="grid grid-cols-5 gap-3">
+          {dayNames.map((day,di)=>{
+            const rate=currentRates[di];
+            return (
+              <div key={day} className="rounded-2xl p-4 text-center" style={{background:heatBg(rate)}}>
+                <div className="text-xs font-black mb-2" style={{color:heatColor(rate)}}>{day}</div>
+                <div className="text-2xl font-black" style={{color:heatColor(rate)}}>{rate}%</div>
+                <div className="text-xs mt-1" style={{color:heatColor(rate),opacity:.7}}>
+                  {rate>=95?"ممتاز":rate>=85?"جيد":rate>=75?"مقبول":"يحتاج متابعة"}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* أرشيف الأسابيع كخريطة حرارية */}
+      {archiveStats.length>0 && (
+        <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 overflow-x-auto">
+          <h3 className="font-black text-gray-800 mb-4 text-sm">📊 خريطة الحضور — الأسابيع المؤرشفة</h3>
+          <table className="min-w-full text-xs">
+            <thead>
+              <tr>
+                <th className="px-3 py-2 text-right text-gray-500 font-bold">الأسبوع</th>
+                {dayNames.map(d=><th key={d} className="px-3 py-2 text-center text-gray-500 font-bold">{d}</th>)}
+                <th className="px-3 py-2 text-center text-gray-500 font-bold">المتوسط</th>
+              </tr>
+            </thead>
+            <tbody>
+              {archiveStats.map((w,wi)=>{
+                const avg=w.rates.length?Math.round(w.rates.reduce((a,b)=>a+b,0)/w.rates.length):0;
+                return (
+                  <tr key={wi}>
+                    <td className="px-3 py-2 text-gray-500 text-xs whitespace-nowrap">{w.date}</td>
+                    {w.rates.map((rate,di)=>(
+                      <td key={di} className="px-1 py-1">
+                        <div className="w-12 h-8 rounded-lg flex items-center justify-center text-xs font-black mx-auto"
+                          style={{background:heatBg(rate),color:heatColor(rate)}}>
+                          {rate}%
+                        </div>
+                      </td>
+                    ))}
+                    <td className="px-3 py-2 text-center">
+                      <span className="font-black text-xs px-2 py-1 rounded-full" style={{background:heatBg(avg),color:heatColor(avg)}}>{avg}%</span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* أيام الأسبوع الأكثر غياباً */}
+      <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+        <h3 className="font-black text-gray-800 mb-4 text-sm">📉 تحليل أيام الغياب</h3>
+        {archiveStats.length>0 ? (
+          <div className="space-y-3">
+            {dayNames.map((day,di)=>{
+              const rates=archiveStats.map(w=>w.rates[di]||0);
+              const avg=rates.length?Math.round(rates.reduce((a,b)=>a+b,0)/rates.length):0;
+              const absPct=100-avg;
+              return (
+                <div key={day}>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-bold text-gray-700">{day}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-gray-400">حضور {avg}%</span>
+                      <span className="text-xs font-black px-2 py-0.5 rounded-full" style={{background:heatBg(avg),color:heatColor(avg)}}>
+                        غياب {absPct}%
+                      </span>
+                    </div>
+                  </div>
+                  <div className="h-3 rounded-full overflow-hidden" style={{background:"#f3f4f6"}}>
+                    <div className="h-full rounded-full" style={{width:avg+"%",background:heatColor(avg)}}/>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="text-center py-6 text-gray-400 text-sm">أرشف أسبوعاً واحداً على الأقل لرؤية التحليل</div>
+        )}
+      </div>
+
+      {/* نشاط الإعلانات */}
+      <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+        <h3 className="font-black text-gray-800 mb-4 text-sm">📢 نشاط الإعلانات والأنشطة</h3>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="rounded-2xl p-4 text-center bg-blue-50 border border-blue-100">
+            <div className="text-3xl font-black text-blue-700">{announcements.length}</div>
+            <div className="text-xs text-blue-500 font-bold mt-1">إجمالي الإعلانات</div>
+          </div>
+          <div className="rounded-2xl p-4 text-center bg-purple-50 border border-purple-100">
+            <div className="text-3xl font-black text-purple-700">{activities.length}</div>
+            <div className="text-xs text-purple-500 font-bold mt-1">إجمالي الأنشطة</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+// ══════════════════════════════════════════════════════════════
+// صفحة اجتماعات اللجان والفرق — الدليل التنظيمي والإجرائي
+// ══════════════════════════════════════════════════════════════
+const SCHOOL_COMMITTEES = [
+  { id:"monthly",      label:"الاجتماع الشهري",              type:"شهري",    members:[
+    {name:"",role:"مدير المدرسة",        job:"رئيساً"},
+    {name:"",role:"وكيل الشؤون التعليمية",job:"عضو"},
+    {name:"",role:"وكيل شؤون الطلاب",   job:"عضو"},
+    {name:"",role:"وكيل الشؤون المدرسية",job:"عضو"},
+    {name:"",role:"الموجه الطلابي",      job:"عضو"},
+    {name:"",role:"رائد النشاط",         job:"عضو"},
+    {name:"",role:"معلم",                job:"عضو"},
+    {name:"",role:"معلم",                job:"عضو"},
+    {name:"",role:"معلم",                job:"عضو"},
+    {name:"",role:"مساعد إداري",         job:"مقرراً للجنة"},
+  ]},
+  { id:"safety",       label:"لجنة الأمن والسلامة",          type:"دوري",    members:[
+    {name:"",role:"مدير المدرسة",        job:"رئيساً"},
+    {name:"",role:"وكيل الشؤون المدرسية",job:"عضو"},
+    {name:"",role:"المشرف على السلامة",  job:"عضو"},
+    {name:"",role:"رائد النشاط",         job:"عضو"},
+    {name:"",role:"معلم",                job:"عضو"},
+    {name:"",role:"مساعد إداري",         job:"مقرراً"},
+  ]},
+  { id:"discipline",   label:"لجنة الانضباط المدرسي",        type:"دوري",    members:[
+    {name:"",role:"مدير المدرسة",        job:"رئيساً"},
+    {name:"",role:"وكيل شؤون الطلاب",   job:"عضو"},
+    {name:"",role:"الموجه الطلابي",      job:"عضو"},
+    {name:"",role:"رائد النشاط",         job:"عضو"},
+    {name:"",role:"معلم",                job:"عضو"},
+    {name:"",role:"مساعد إداري",         job:"مقرراً"},
+  ]},
+  { id:"exams",        label:"لجنة الاختبارات",               type:"فصلي",   members:[
+    {name:"",role:"مدير المدرسة",        job:"رئيساً"},
+    {name:"",role:"وكيل الشؤون التعليمية",job:"عضو"},
+    {name:"",role:"وكيل شؤون الطلاب",   job:"عضو"},
+    {name:"",role:"معلم",                job:"عضو"},
+    {name:"",role:"معلم",                job:"عضو"},
+    {name:"",role:"مساعد إداري",         job:"مقرراً"},
+  ]},
+  { id:"activity",     label:"لجنة النشاط الطلابي",           type:"دوري",   members:[
+    {name:"",role:"مدير المدرسة",        job:"رئيساً"},
+    {name:"",role:"وكيل شؤون الطلاب",   job:"عضو"},
+    {name:"",role:"رائد النشاط",         job:"عضو"},
+    {name:"",role:"الموجه الطلابي",      job:"عضو"},
+    {name:"",role:"معلم",                job:"عضو"},
+    {name:"",role:"مساعد إداري",         job:"مقرراً"},
+  ]},
+  { id:"dev",          label:"لجنة التخطيط والتطوير",         type:"فصلي",   members:[
+    {name:"",role:"مدير المدرسة",        job:"رئيساً"},
+    {name:"",role:"وكيل الشؤون التعليمية",job:"عضو"},
+    {name:"",role:"وكيل الشؤون المدرسية",job:"عضو"},
+    {name:"",role:"معلم",                job:"عضو"},
+    {name:"",role:"معلم",                job:"عضو"},
+    {name:"",role:"مساعد إداري",         job:"مقرراً"},
+  ]},
+  { id:"health",       label:"لجنة الصحة المدرسية",           type:"فصلي",   members:[
+    {name:"",role:"مدير المدرسة",        job:"رئيساً"},
+    {name:"",role:"وكيل شؤون الطلاب",   job:"عضو"},
+    {name:"",role:"مشرف الصحة",         job:"عضو"},
+    {name:"",role:"معلم",                job:"عضو"},
+    {name:"",role:"مساعد إداري",         job:"مقرراً"},
+  ]},
+  { id:"community",    label:"لجنة الشراكة المجتمعية",        type:"فصلي",   members:[
+    {name:"",role:"مدير المدرسة",        job:"رئيساً"},
+    {name:"",role:"وكيل الشؤون المدرسية",job:"عضو"},
+    {name:"",role:"رائد النشاط",         job:"عضو"},
+    {name:"",role:"معلم",                job:"عضو"},
+    {name:"",role:"مساعد إداري",         job:"مقرراً"},
+  ]},
+  { id:"eval",         label:"لجنة المتابعة والتقويم",        type:"فصلي",   members:[
+    {name:"",role:"مدير المدرسة",        job:"رئيساً"},
+    {name:"",role:"وكيل الشؤون التعليمية",job:"عضو"},
+    {name:"",role:"وكيل شؤون الطلاب",   job:"عضو"},
+    {name:"",role:"معلم",                job:"عضو"},
+    {name:"",role:"مساعد إداري",         job:"مقرراً"},
+  ]},
+  { id:"env",          label:"لجنة البيئة المدرسية",          type:"فصلي",   members:[
+    {name:"",role:"مدير المدرسة",        job:"رئيساً"},
+    {name:"",role:"وكيل الشؤون المدرسية",job:"عضو"},
+    {name:"",role:"رائد النشاط",         job:"عضو"},
+    {name:"",role:"معلم",                job:"عضو"},
+    {name:"",role:"مساعد إداري",         job:"مقرراً"},
+  ]},
+];
+
+const HIJRI_M = ["محرم","صفر","ربيع الأول","ربيع الثاني","جمادى الأولى","جمادى الآخرة","رجب","شعبان","رمضان","شوال","ذو القعدة","ذو الحجة"];
+const DAYS_AR = ["الأحد","الاثنين","الثلاثاء","الأربعاء","الخميس","الجمعة","السبت"];
+const PERIODS  = ["الحصة الأولى","الحصة الثانية","الحصة الثالثة","الحصة الرابعة","الحصة الخامسة","الحصة السادسة","ما بعد الدوام","فترة الإشراف"];
+const COM_GREEN = "#4a7c59";
+const COM_LIGHT = "#d8f3dc";
+
+function CommitteeMeetingPage({ teachers }) {
+  const [selectedCom, setSelectedCom] = useState("monthly");
+  const [meetingNum,  setMeetingNum]  = useState("1");
+  const [dateDay,     setDateDay]     = useState("");
+  const [dateMonth,   setDateMonth]   = useState("");
+  const [dateYear,    setDateYear]    = useState("1447");
+  const [dayName,     setDayName]     = useState("الأحد");
+  const [period,      setPeriod]      = useState("الحصة الثالثة");
+  const [location,    setLocation]    = useState("إدارة المدرسة");
+  const [agenda,      setAgenda]      = useState(["","","","",""]);
+  const [members,     setMembers]     = useState([]);
+  const [recommendations, setRecs]   = useState([{text:"",jt:"",ms:"",jf:""},{text:"",jt:"",ms:"",jf:""},{text:"",jt:"",ms:"",jf:""},{text:"",jt:"",ms:"",jf:""},{text:"",jt:"",ms:"",jf:""}]);
+  const [decision,    setDecision]    = useState("");
+  const [endTime,     setEndTime]     = useState("");
+  const [attendees,   setAttendees]   = useState("");
+  const [targetGroup, setTargetGroup] = useState("أعضاء اللجنة");
+  const [workTeam,    setWorkTeam]    = useState("الهيئة التعليمية");
+  const [tab,         setTab]         = useState("form"); // form | preview | history
+  const [saved,       setSaved]       = useState(false);
+  const [history,     setHistory]     = useState([]);
+  const [accounts,    setAccounts]    = useState([]);
+
+  useEffect(()=>{
+    DB.get("school-teacher-accounts",[]).then(d=>setAccounts(Array.isArray(d)?d:[]));
+    DB.get("school-committee-history",[]).then(d=>setHistory(Array.isArray(d)?d:[]));
+  },[]);
+
+  // عند اختيار اللجنة — تحميل أعضائها الافتراضيين
+  useEffect(()=>{
+    const com = SCHOOL_COMMITTEES.find(c=>c.id===selectedCom);
+    if (com) {
+      setMembers(com.members.map(m=>({...m})));
+    }
+  },[selectedCom]);
+
+  const com = SCHOOL_COMMITTEES.find(c=>c.id===selectedCom);
+  const dateStr = dateDay&&dateMonth ? `${String(dateDay).padStart(2,"0")} / ${dateMonth} / ${dateYear} هـ` : `_____ / _____ / ${dateYear} هـ`;
+
+  const updateMember = (i,field,val) => setMembers(ms=>ms.map((m,j)=>j===i?{...m,[field]:val}:m));
+  const addMember    = ()=>setMembers(ms=>[...ms,{name:"",role:"معلم",job:"عضو"}]);
+  const removeMember = i=>setMembers(ms=>ms.filter((_,j)=>j!==i));
+  const updateRec    = (i,field,val)=>setRecs(rs=>rs.map((r,j)=>j===i?{...r,[field]:val}:r));
+  const addRec       = ()=>setRecs(rs=>[...rs,{text:"",jt:"",ms:"",jf:""}]);
+
+  const saveMeeting = ()=>{
+    const entry = {
+      id:Date.now(), committee:selectedCom, comLabel:com?.label,
+      meetingNum, dateStr, dayName, period, location,
+      agenda:agenda.filter(a=>a.trim()),
+      members:[...members], recommendations:[...recommendations],
+      decision, attendees, targetGroup, workTeam,
+      savedAt:new Date().toLocaleDateString("ar-SA"),
+    };
+    const updated=[entry,...history];
+    setHistory(updated);
+    DB.set("school-committee-history",updated);
+    setSaved(true);
+    setTimeout(()=>setSaved(false),3000);
+  };
+
+  const printMeeting = ()=>{
+    const activeMembers = members.filter(m=>m.name||m.role);
+    const activeRecs    = recommendations.filter(r=>r.text);
+    const activeAgenda  = agenda.filter(a=>a.trim());
+
+    printWindow(`<!DOCTYPE html><html dir="rtl" lang="ar">
+<head>
+<meta charset="utf-8">
+<title>محضر اجتماع — ${com?.label}</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Cairo',sans-serif; direction:rtl; background:#fff; color:#1a1a1a; font-size:12px; }
+  .page { width:210mm; margin:0 auto; padding:10mm 12mm; }
+
+  /* الرأس */
+  .header { display:flex; align-items:center; justify-content:space-between; border-bottom:3px solid ${COM_GREEN}; padding-bottom:8px; margin-bottom:12px; }
+  .header-center { text-align:center; }
+  .header-center h1 { font-size:15px; font-weight:900; color:${COM_GREEN}; }
+  .header-center h2 { font-size:13px; font-weight:700; color:#333; margin-top:2px; }
+  .header-center h3 { font-size:12px; color:#555; margin-top:2px; }
+  .logo-box { width:70px; text-align:center; }
+  .logo-box img { width:60px; }
+  .logo-text { font-size:11px; color:${COM_GREEN}; font-weight:700; text-align:center; line-height:1.4; }
+
+  /* عنوان الاجتماع */
+  .meeting-title { display:flex; justify-content:space-between; align-items:center; margin:10px 0 8px; }
+  .meeting-title .type-label { font-size:16px; font-weight:900; color:${COM_GREEN}; }
+  .meeting-title .num-box { font-size:14px; font-weight:700; border:1.5px solid #333; padding:3px 20px; border-radius:4px; }
+
+  /* الجدول الرئيسي */
+  table { width:100%; border-collapse:collapse; margin-bottom:10px; }
+  th { background:${COM_GREEN}; color:#fff; padding:5px 8px; font-size:11px; font-weight:700; text-align:center; border:1px solid ${COM_GREEN}; }
+  td { padding:5px 8px; border:1px solid #aaa; font-size:11px; text-align:center; vertical-align:middle; }
+  td.right { text-align:right; }
+  tr:nth-child(even) td { background:#f9f9f9; }
+
+  /* قسم الأعمال */
+  .section-title { font-size:13px; font-weight:900; color:${COM_GREEN}; margin:10px 0 6px; border-right:4px solid ${COM_GREEN}; padding-right:8px; }
+  .agenda-table td.num { background:${COM_GREEN}; color:#fff; width:30px; text-align:center; font-weight:700; }
+  .agenda-table td.text { text-align:right; min-height:20px; }
+
+  /* التوصيات */
+  .rec-th { background:${COM_GREEN}; color:#fff; font-size:10px; font-weight:700; }
+
+  /* قرار اللجنة */
+  .decision-box { border:1.5px solid ${COM_GREEN}; border-radius:6px; padding:10px 14px; margin:10px 0; }
+  .decision-box .dt { font-weight:900; color:${COM_GREEN}; margin-bottom:5px; font-size:12px; }
+  .decision-box .dc { font-size:11px; line-height:1.9; min-height:40px; }
+
+  /* التوقيعات */
+  .sig-th { background:${COM_GREEN}; color:#fff; font-weight:700; font-size:11px; }
+  .sig-td { min-height:24px; }
+
+  /* التذييل */
+  .footer { display:flex; justify-content:space-between; align-items:center; margin-top:12px; padding-top:8px; border-top:2px solid ${COM_GREEN}; font-size:11px; }
+  .footer-left { font-weight:700; color:#333; }
+  .footer-right { font-weight:900; font-size:13px; color:${COM_GREEN}; }
+
+  @media print {
+    @page { size: A4; margin: 10mm 12mm; }
+    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- الرأس -->
+  <div class="header">
+    <div class="logo-text">الإدارة العامة للتعليم<br>بمحافظة جدة<br>مدرسة عبيدة بن الحارث المتوسطة</div>
+    <div class="header-center">
+      <h1>وزارة التعليم</h1>
+      <h2>Ministry of Education</h2>
+    </div>
+    <div class="logo-text" style="text-align:left;font-size:10px;color:#555">
+      ⠿⠿⠿⠿<br>⠿⠿⠿⠿<br>⠿⠿⠿⠿
+    </div>
+  </div>
+
+  <!-- عنوان الاجتماع -->
+  <div class="meeting-title">
+    <div><span style="font-size:13px;font-weight:700;">●  الاجتماع: </span><span class="type-label">${com?.label}</span></div>
+    <div class="num-box">رقم ( ${meetingNum} )</div>
+  </div>
+
+  <!-- بيانات الاجتماع -->
+  <table>
+    <tr>
+      <th>مقر الاجتماع</th>
+      <th>إدارة المدرسة</th>
+      <th>موعد الاجتماع</th>
+      <th>${period}</th>
+      <th>الفئة المستهدفة</th>
+      <th>فريق العمل</th>
+      <th>الحاضـــرون</th>
+    </tr>
+    <tr>
+      <td>${location}</td>
+      <td>${dayName} ${dateStr}</td>
+      <td colspan="2"></td>
+      <td>${targetGroup}</td>
+      <td>${workTeam}</td>
+      <td>${attendees||activeMembers.length}</td>
+    </tr>
+  </table>
+
+  <!-- جدول الأعمال -->
+  <div class="section-title">جـــدول أعمـــال الاجتمـــاع :</div>
+  <table class="agenda-table">
+    ${activeAgenda.length>0
+      ? activeAgenda.map((a,i)=>`<tr><td class="num">${i+1}</td><td class="right">${a}</td></tr>`).join("")
+      : Array(5).fill(0).map((_,i)=>`<tr><td class="num">${i+1}</td><td class="right">&nbsp;</td></tr>`).join("")
+    }
+  </table>
+
+  <!-- وقت الاجتماع -->
+  <p style="font-size:11px;margin:6px 0;text-align:right;">إنه في تمام الساعة ( ${endTime||"&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"} ) يوم / ${dayName} الموافق ${dateStr} &nbsp; تمت مناقشة الأعمال وعليه تمت التوصيات بالآتي:</p>
+
+  <!-- التوصيات -->
+  <table>
+    <tr>
+      <th style="width:30px">م</th>
+      <th>التوصيـــــة</th>
+      <th style="width:18%">الجهة المكلفة بالتنفيذ</th>
+      <th style="width:14%">مـسنـدة التنفيذ</th>
+      <th style="width:18%">الجهة التابعة للتنفيذ</th>
+    </tr>
+    ${recommendations.map((r,i)=>`
+    <tr>
+      <td style="background:${COM_GREEN};color:#fff;font-weight:700;">${i+1}</td>
+      <td class="right" style="min-height:22px">${r.text||"&nbsp;"}</td>
+      <td>${r.jt||"&nbsp;"}</td>
+      <td>${r.ms||"&nbsp;"}</td>
+      <td>${r.jf||"&nbsp;"}</td>
+    </tr>`).join("")}
+  </table>
+
+  <!-- قرار اللجنة -->
+  <div class="decision-box">
+    <div class="dt">قرار اللجنة الإدارية:</div>
+    <div class="dc">${decision||"&nbsp;"}</div>
+  </div>
+
+  <!-- التوقيعات -->
+  <table>
+    <tr>
+      <th class="sig-th">الاسم</th>
+      <th class="sig-th">الوصف الوظيفي</th>
+      <th class="sig-th">العمل المكلف به</th>
+      <th class="sig-th">التوقيع</th>
+    </tr>
+    ${activeMembers.map(m=>`
+    <tr>
+      <td class="sig-td right">${m.name||"&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"}</td>
+      <td>${m.role}</td>
+      <td>${m.job}</td>
+      <td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</td>
+    </tr>`).join("")}
+  </table>
+
+  <!-- التذييل -->
+  <div class="footer">
+    <div class="footer-left">وانتهى الاجتماع في تمام الساعة (${endTime||"........"}) بالشكر لجميع الحاضرين</div>
+    <div class="footer-right">يعتمد / مدير المدرسة</div>
+  </div>
+
+</div>
+<script>window.onload=()=>window.print()</script>
+</body></html>`);
+  };
+
+  return (
+    <div dir="rtl" className="space-y-4">
+      {/* رأس الصفحة */}
+      <div className="rounded-3xl overflow-hidden shadow-xl" style={{background:`linear-gradient(135deg,#1a3a2a,${COM_GREEN})`}}>
+        <div className="p-6 text-white">
+          <h2 className="text-2xl font-black mb-1">📋 اجتماعات اللجان والفرق</h2>
+          <p className="opacity-80 text-sm">وفق الدليل التنظيمي والإجرائي — وزارة التعليم</p>
+        </div>
+      </div>
+
+      {/* تبويبات */}
+      <div className="flex gap-1 bg-white rounded-2xl p-1.5 shadow-sm overflow-x-auto">
+        {[{id:"form",l:"📝 إنشاء محضر"},{id:"preview",l:"👁️ معاينة"},{id:"history",l:`📚 السجل (${history.length})`}].map(t=>(
+          <button key={t.id} onClick={()=>setTab(t.id)}
+            className={"flex-shrink-0 px-4 py-2 rounded-xl text-xs font-black transition-all "+(tab===t.id?"text-white shadow":"text-gray-500 hover:bg-gray-50")}
+            style={tab===t.id?{background:`linear-gradient(135deg,${COM_GREEN},#2d6a4f)`}:{}}>
+            {t.l}
+          </button>
+        ))}
+      </div>
+
+      {/* ══════════ نموذج الإدخال ══════════ */}
+      {tab==="form" && (
+        <div className="space-y-4">
+
+          {/* اختيار اللجنة */}
+          <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+            <h3 className="font-black text-sm mb-3" style={{color:COM_GREEN}}>🏛️ اختيار اللجنة</h3>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              {SCHOOL_COMMITTEES.map(c=>(
+                <button key={c.id} onClick={()=>setSelectedCom(c.id)}
+                  className="p-3 rounded-2xl border-2 text-right transition-all"
+                  style={{borderColor:selectedCom===c.id?COM_GREEN:"#e5e7eb",background:selectedCom===c.id?COM_LIGHT:"#fff"}}>
+                  <div className="font-black text-xs" style={{color:selectedCom===c.id?COM_GREEN:"#374151"}}>{c.label}</div>
+                  <div className="text-xs mt-0.5" style={{color:"#6b7280"}}>{c.type} — {c.members.length} أعضاء</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* بيانات الاجتماع */}
+          <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 space-y-4">
+            <h3 className="font-black text-sm" style={{color:COM_GREEN}}>📅 بيانات الاجتماع</h3>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              <div>
+                <label className="text-xs font-bold text-gray-500 block mb-1">رقم الاجتماع</label>
+                <input value={meetingNum} onChange={e=>setMeetingNum(e.target.value)} type="number" min="1" max="50"
+                  className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 text-sm font-bold text-center focus:outline-none"
+                  style={{fontFamily:"inherit",borderColor:COM_GREEN+"55"}}/>
+              </div>
+              <div>
+                <label className="text-xs font-bold text-gray-500 block mb-1">يوم الاجتماع</label>
+                <select value={dayName} onChange={e=>setDayName(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 text-sm font-bold focus:outline-none" style={{fontFamily:"inherit"}}>
+                  {DAYS_AR.map(d=><option key={d} value={d}>{d}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-bold text-gray-500 block mb-1">الحصة / الوقت</label>
+                <select value={period} onChange={e=>setPeriod(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 text-sm font-bold focus:outline-none" style={{fontFamily:"inherit"}}>
+                  {PERIODS.map(p=><option key={p} value={p}>{p}</option>)}
+                </select>
+              </div>
+              {/* منتقي التاريخ الهجري */}
+              <div className="col-span-2 sm:col-span-3">
+                <label className="text-xs font-bold text-gray-500 block mb-1">التاريخ الهجري</label>
+                <div className="flex gap-2 items-center">
+                  <select value={dateDay} onChange={e=>setDateDay(e.target.value)}
+                    className="flex-1 px-2 py-2 rounded-xl border-2 border-gray-200 text-sm font-bold text-center focus:outline-none" style={{fontFamily:"inherit"}}>
+                    <option value="">يوم</option>
+                    {Array.from({length:30},(_,i)=>i+1).map(d=><option key={d} value={d}>{String(d).padStart(2,"0")}</option>)}
+                  </select>
+                  <span className="font-bold text-gray-400">/</span>
+                  <select value={dateMonth} onChange={e=>setDateMonth(e.target.value)}
+                    className="flex-1 px-2 py-2 rounded-xl border-2 border-gray-200 text-sm font-bold focus:outline-none" style={{fontFamily:"inherit"}}>
+                    <option value="">الشهر</option>
+                    {HIJRI_M.map((m,i)=><option key={i} value={m}>{m}</option>)}
+                  </select>
+                  <span className="font-bold text-gray-400">/</span>
+                  <select value={dateYear} onChange={e=>setDateYear(e.target.value)}
+                    className="flex-1 px-2 py-2 rounded-xl border-2 border-gray-200 text-sm font-bold text-center focus:outline-none" style={{fontFamily:"inherit"}}>
+                    {[1446,1447,1448,1449].map(y=><option key={y} value={y}>{y}</option>)}
+                  </select>
+                  <span className="text-sm font-bold text-gray-500">هـ</span>
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-bold text-gray-500 block mb-1">مقر الاجتماع</label>
+                <select value={location} onChange={e=>setLocation(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 text-sm font-bold focus:outline-none" style={{fontFamily:"inherit"}}>
+                  {["إدارة المدرسة","غرفة الاجتماعات","المكتبة","قاعة النشاط","الفصل الدراسي"].map(l=><option key={l} value={l}>{l}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-bold text-gray-500 block mb-1">الفئة المستهدفة</label>
+                <input value={targetGroup} onChange={e=>setTargetGroup(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 text-sm focus:outline-none" style={{fontFamily:"inherit"}}/>
+              </div>
+              <div>
+                <label className="text-xs font-bold text-gray-500 block mb-1">وقت انتهاء الاجتماع</label>
+                <input value={endTime} onChange={e=>setEndTime(e.target.value)} placeholder="مثال: 10:30 ص"
+                  className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 text-sm focus:outline-none" style={{fontFamily:"inherit"}}/>
+              </div>
+            </div>
+          </div>
+
+          {/* جدول الأعمال */}
+          <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 space-y-3">
+            <h3 className="font-black text-sm" style={{color:COM_GREEN}}>📋 جدول أعمال الاجتماع</h3>
+            {agenda.map((a,i)=>(
+              <div key={i} className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black text-white flex-shrink-0" style={{background:COM_GREEN}}>{i+1}</div>
+                <input value={a} onChange={e=>setAgenda(ag=>ag.map((x,j)=>j===i?e.target.value:x))}
+                  placeholder={`البند ${i+1}...`}
+                  className="flex-1 px-3 py-2 rounded-xl border-2 border-gray-200 text-sm focus:outline-none"
+                  style={{fontFamily:"inherit",borderColor:a?COM_GREEN+"44":"#e5e7eb"}}/>
+                {agenda.length>3&&<button onClick={()=>setAgenda(ag=>ag.filter((_,j)=>j!==i))} className="text-red-400 px-2 text-sm">✕</button>}
+              </div>
+            ))}
+            <button onClick={()=>setAgenda(ag=>[...ag,""])} className="text-xs font-black hover:underline" style={{color:COM_GREEN}}>+ إضافة بند</button>
+          </div>
+
+          {/* التوصيات */}
+          <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 space-y-3">
+            <h3 className="font-black text-sm" style={{color:COM_GREEN}}>✅ التوصيات</h3>
+            {recommendations.map((r,i)=>(
+              <div key={i} className="border border-gray-200 rounded-2xl p-3 space-y-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-lg flex items-center justify-center text-xs font-black text-white flex-shrink-0" style={{background:COM_GREEN}}>{i+1}</div>
+                  <input value={r.text} onChange={e=>updateRec(i,"text",e.target.value)} placeholder="نص التوصية..."
+                    className="flex-1 px-3 py-1.5 rounded-xl border-2 border-gray-200 text-sm focus:outline-none" style={{fontFamily:"inherit"}}/>
+                </div>
+                <div className="grid grid-cols-3 gap-2 mr-8">
+                  <input value={r.jt} onChange={e=>updateRec(i,"jt",e.target.value)} placeholder="الجهة المكلفة"
+                    className="px-2 py-1.5 rounded-lg border border-gray-200 text-xs focus:outline-none" style={{fontFamily:"inherit"}}/>
+                  <input value={r.ms} onChange={e=>updateRec(i,"ms",e.target.value)} placeholder="مسند التنفيذ"
+                    className="px-2 py-1.5 rounded-lg border border-gray-200 text-xs focus:outline-none" style={{fontFamily:"inherit"}}/>
+                  <input value={r.jf} onChange={e=>updateRec(i,"jf",e.target.value)} placeholder="الجهة التابعة"
+                    className="px-2 py-1.5 rounded-lg border border-gray-200 text-xs focus:outline-none" style={{fontFamily:"inherit"}}/>
+                </div>
+              </div>
+            ))}
+            <button onClick={addRec} className="text-xs font-black hover:underline" style={{color:COM_GREEN}}>+ إضافة توصية</button>
+          </div>
+
+          {/* قرار اللجنة */}
+          <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+            <h3 className="font-black text-sm mb-3" style={{color:COM_GREEN}}>⚖️ قرار اللجنة الإدارية</h3>
+            <textarea value={decision} onChange={e=>setDecision(e.target.value)} rows={3}
+              placeholder="قرار اللجنة..."
+              className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 text-sm focus:outline-none resize-none" style={{fontFamily:"inherit"}}/>
+          </div>
+
+          {/* الأعضاء */}
+          <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+            <h3 className="font-black text-sm mb-3" style={{color:COM_GREEN}}>👥 أعضاء {com?.label}</h3>
+            <div className="space-y-2 mb-3">
+              {members.map((m,i)=>(
+                <div key={i} className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-lg flex items-center justify-center text-xs font-black text-white flex-shrink-0" style={{background:COM_GREEN}}>{i+1}</div>
+                  {/* اسم العضو — من الحسابات أو يدوي */}
+                  <select value={m.name} onChange={e=>updateMember(i,"name",e.target.value)}
+                    className="flex-1 px-2 py-1.5 rounded-xl border-2 border-gray-200 text-xs font-bold focus:outline-none" style={{fontFamily:"inherit"}}>
+                    <option value="">— اختر أو أدخل الاسم —</option>
+                    {teachers.map(t=><option key={t} value={t}>{t}</option>)}
+                    {accounts.filter(a=>!teachers.includes(a.name)).map(a=><option key={a.id} value={a.name}>{a.name}</option>)}
+                  </select>
+                  <input value={m.name} onChange={e=>updateMember(i,"name",e.target.value)}
+                    placeholder="أو اكتب الاسم" className="w-28 px-2 py-1.5 rounded-xl border-2 border-gray-200 text-xs focus:outline-none" style={{fontFamily:"inherit"}}/>
+                  <input value={m.role} onChange={e=>updateMember(i,"role",e.target.value)}
+                    className="w-32 px-2 py-1.5 rounded-lg border border-gray-200 text-xs focus:outline-none" style={{fontFamily:"inherit"}}/>
+                  <select value={m.job} onChange={e=>updateMember(i,"job",e.target.value)}
+                    className="w-28 px-2 py-1.5 rounded-lg border border-gray-200 text-xs focus:outline-none" style={{fontFamily:"inherit"}}>
+                    {["رئيساً","عضو","مقرراً","مقرراً للجنة","مشرفاً"].map(j=><option key={j} value={j}>{j}</option>)}
+                  </select>
+                  <button onClick={()=>removeMember(i)} className="text-red-400 text-sm px-1 hover:text-red-600">✕</button>
+                </div>
+              ))}
+            </div>
+            <button onClick={addMember} className="text-xs font-black hover:underline" style={{color:COM_GREEN}}>+ إضافة عضو</button>
+          </div>
+
+          {saved && <div className="bg-green-50 border border-green-200 rounded-2xl p-3 text-center font-black text-green-700 text-sm">✅ تم حفظ المحضر في السجل</div>}
+
+          <div className="flex gap-3">
+            <button onClick={saveMeeting}
+              className="flex-1 py-4 rounded-2xl text-white font-black text-sm shadow-lg"
+              style={{background:`linear-gradient(135deg,${COM_GREEN},#2d6a4f)`}}>
+              💾 حفظ المحضر
+            </button>
+            <button onClick={printMeeting}
+              className="flex-1 py-4 rounded-2xl text-white font-black text-sm shadow-lg"
+              style={{background:"linear-gradient(135deg,#0f172a,#1e3a5f)"}}>
+              🖨️ طباعة المحضر الرسمي
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ══════════ معاينة المحضر ══════════ */}
+      {tab==="preview" && (
+        <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100">
+          {/* كليشة المعاينة */}
+          <div className="p-4 border-b-4" style={{borderColor:COM_GREEN}}>
+            <div className="flex items-start justify-between">
+              <div className="text-xs leading-relaxed" style={{color:COM_GREEN}}>
+                <div className="font-black">الإدارة العامة للتعليم</div>
+                <div className="font-bold">بمحافظة جدة</div>
+                <div className="font-bold">مدرسة عبيدة بن الحارث المتوسطة</div>
+              </div>
+              <div className="text-center">
+                <div className="font-black text-sm" style={{color:COM_GREEN}}>وزارة التعليم</div>
+                <div className="text-xs text-gray-400">Ministry of Education</div>
+              </div>
+            </div>
+          </div>
+          {/* عنوان */}
+          <div className="flex justify-between items-center px-5 py-3 border-b">
+            <div className="text-base font-black" style={{color:COM_GREEN}}>● الاجتماع: {com?.label}</div>
+            <div className="border-2 px-4 py-1 rounded font-black text-sm" style={{borderColor:COM_GREEN}}>رقم ( {meetingNum} )</div>
+          </div>
+          {/* جدول بيانات */}
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs" style={{borderCollapse:"collapse"}}>
+              <thead>
+                <tr style={{background:COM_GREEN}}>
+                  {["مقر الاجتماع","إدارة المدرسة","موعد الاجتماع",period,"الفئة المستهدفة","فريق العمل","الحاضـرون"].map(h=>(
+                    <th key={h} className="px-3 py-2 text-white font-bold text-center border" style={{borderColor:COM_GREEN+"88"}}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td className="px-3 py-2 text-center border border-gray-300 font-bold">{location}</td>
+                  <td className="px-3 py-2 text-center border border-gray-300">{dayName} {dateStr}</td>
+                  <td colSpan={2} className="px-3 py-2 border border-gray-300"/>
+                  <td className="px-3 py-2 text-center border border-gray-300">{targetGroup}</td>
+                  <td className="px-3 py-2 text-center border border-gray-300">{workTeam}</td>
+                  <td className="px-3 py-2 text-center border border-gray-300 font-black">{members.filter(m=>m.name).length}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          {/* أعمال */}
+          <div className="px-5 py-3">
+            <div className="font-black text-sm mb-2 border-r-4 pr-2" style={{color:COM_GREEN,borderColor:COM_GREEN}}>جـدول أعمال الاجتماع:</div>
+            <table className="w-full text-xs" style={{borderCollapse:"collapse"}}>
+              {agenda.filter(a=>a.trim()).map((a,i)=>(
+                <tr key={i}>
+                  <td className="w-8 text-center font-black text-white py-1.5 px-2" style={{background:COM_GREEN}}>{i+1}</td>
+                  <td className="border border-gray-300 px-3 py-1.5">{a}</td>
+                </tr>
+              ))}
+            </table>
+          </div>
+          {/* توصيات */}
+          <div className="px-5 pb-3">
+            <div className="font-black text-sm mb-2 border-r-4 pr-2" style={{color:COM_GREEN,borderColor:COM_GREEN}}>التوصيات:</div>
+            <table className="w-full text-xs" style={{borderCollapse:"collapse"}}>
+              <thead>
+                <tr style={{background:COM_GREEN}}>
+                  {["م","التوصية","الجهة المكلفة","مسند التنفيذ","الجهة التابعة"].map(h=>(
+                    <th key={h} className="px-2 py-1.5 text-white font-bold text-center border" style={{borderColor:COM_GREEN+"88"}}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {recommendations.map((r,i)=>(
+                  <tr key={i}>
+                    <td className="w-8 text-center font-black text-white py-1.5" style={{background:COM_GREEN}}>{i+1}</td>
+                    <td className="border border-gray-300 px-3 py-1.5 text-right">{r.text||<span className="text-gray-300">—</span>}</td>
+                    <td className="border border-gray-300 px-2 py-1.5 text-center text-gray-500">{r.jt||"—"}</td>
+                    <td className="border border-gray-300 px-2 py-1.5 text-center text-gray-500">{r.ms||"—"}</td>
+                    <td className="border border-gray-300 px-2 py-1.5 text-center text-gray-500">{r.jf||"—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {/* قرار */}
+          {decision&&<div className="mx-5 mb-3 border-2 rounded-xl p-3 text-sm" style={{borderColor:COM_GREEN}}>
+            <div className="font-black text-xs mb-1" style={{color:COM_GREEN}}>قرار اللجنة الإدارية:</div>
+            <div className="text-gray-700 text-xs leading-relaxed">{decision}</div>
+          </div>}
+          {/* التوقيعات */}
+          <div className="px-5 pb-3">
+            <table className="w-full text-xs" style={{borderCollapse:"collapse"}}>
+              <thead>
+                <tr style={{background:COM_GREEN}}>
+                  {["الاسم","الوصف الوظيفي","العمل المكلف به","التوقيع"].map(h=>(
+                    <th key={h} className="px-3 py-2 text-white font-bold border" style={{borderColor:COM_GREEN+"88"}}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {members.map((m,i)=>(
+                  <tr key={i} className={i%2===0?"":"bg-gray-50"}>
+                    <td className="border border-gray-300 px-3 py-2 font-bold">{m.name||<span className="text-gray-300">—</span>}</td>
+                    <td className="border border-gray-300 px-3 py-2 text-center">{m.role}</td>
+                    <td className="border border-gray-300 px-3 py-2 text-center">{m.job}</td>
+                    <td className="border border-gray-300 px-8 py-2"/>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {/* تذييل */}
+          <div className="flex justify-between items-center px-5 py-3 border-t-2 text-xs" style={{borderColor:COM_GREEN}}>
+            <div className="text-gray-600">وانتهى الاجتماع في تمام الساعة ({endTime||"........"}) بالشكر لجميع الحاضرين</div>
+            <div className="font-black text-sm" style={{color:COM_GREEN}}>يعتمد / مدير المدرسة</div>
+          </div>
+          {/* زر الطباعة */}
+          <div className="p-4">
+            <button onClick={printMeeting} className="w-full py-3 rounded-2xl text-white font-black text-sm"
+              style={{background:`linear-gradient(135deg,${COM_GREEN},#2d6a4f)`}}>
+              🖨️ طباعة المحضر الرسمي بالألوان
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ══════════ السجل ══════════ */}
+      {tab==="history" && (
+        <div className="space-y-3">
+          {history.length===0 ? (
+            <div className="bg-white rounded-2xl p-12 text-center shadow-sm border"><div className="text-4xl mb-2">📚</div><div className="font-black text-gray-400">لا توجد محاضر مسجلة بعد</div></div>
+          ) : history.map(entry=>(
+            <div key={entry.id} className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100">
+              <div className="flex items-center justify-between px-5 py-3 border-b" style={{background:COM_LIGHT}}>
+                <div>
+                  <div className="font-black text-sm" style={{color:COM_GREEN}}>{entry.comLabel}</div>
+                  <div className="text-xs text-gray-500 mt-0.5">اجتماع رقم {entry.meetingNum} — {entry.dateStr}</div>
+                </div>
+                <div className="flex gap-2 items-center">
+                  <span className="text-xs text-gray-400">{entry.savedAt}</span>
+                  <button onClick={()=>{if(confirm("حذف المحضر؟")){const u=history.filter(h=>h.id!==entry.id);setHistory(u);DB.set("school-committee-history",u);}}} className="text-red-400 text-xs hover:text-red-600">🗑️</button>
+                </div>
+              </div>
+              <div className="px-5 py-3">
+                <div className="text-xs text-gray-500 mb-1 font-bold">أعمال الاجتماع:</div>
+                <div className="space-y-1">
+                  {(entry.agenda||[]).map((a,i)=><div key={i} className="text-xs text-gray-700">• {a}</div>)}
+                </div>
+                {entry.recommendations?.filter(r=>r.text).length>0&&(
+                  <div className="mt-2">
+                    <div className="text-xs font-bold text-gray-500 mb-1">التوصيات:</div>
+                    {entry.recommendations.filter(r=>r.text).map((r,i)=>(
+                      <div key={i} className="text-xs text-gray-600">✅ {r.text}</div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function SettingsPage({ teachers, setTeachers, saveTeachers, week, setWeek, saveWeek, users, siteFont, setSiteFont, saveSiteFont, weekArchive, archiveCurrentWeek }) {
   const [newT, setNewT] = useState("");
   const [editWeek, setEditWeek] = useState(false);
@@ -13462,7 +14838,7 @@ export default function SchoolWebsite() {
       const hash = window.location.hash.replace("#","") || "home";
       if (hash.startsWith("ann-")) { setDirectAnnId(hash.replace("ann-","")); return; }
       setDirectAnnId(null);
-      if (["home","attendance","announcements","activities","settings","students","messages","surveys","sms","report","gradeanalysis","monthlyreport","teacherprofile","absencestats","attendancereport","student-absence","strategies","calendar","gallery","certificates","poll","raffle","broadcast","groupdivider","quiz","classtimer","luckywheel","exitticket","timetable","classvisits","honorboard","tasks","dailyquiz","aiteacher","lessonrecommend","officialforms"].includes(hash)) setPage(hash);
+      if (["home","attendance","announcements","activities","settings","students","messages","surveys","sms","report","gradeanalysis","monthlyreport","teacherprofile","absencestats","attendancereport","student-absence","strategies","calendar","gallery","certificates","poll","raffle","broadcast","groupdivider","quiz","classtimer","luckywheel","exitticket","timetable","classvisits","honorboard","tasks","dailyquiz","aiteacher","lessonrecommend","officialforms","portfolio","earlywarning","meetings","heatmap","committeemeeting"].includes(hash)) setPage(hash);
     };
     window.addEventListener("hashchange", h); h();
     return () => window.removeEventListener("hashchange", h);
@@ -13602,6 +14978,11 @@ export default function SchoolWebsite() {
     { id: "absencestats",  label: "إحصائيات الغياب",   icon: "📊" },
     { id: "attendancereport", label: "تحليل الحضور والانصراف", icon: "🗂️" },
     { id: "officialforms",    label: "النماذج الرسمية",          icon: "📋" },
+    { id: "portfolio",        label: "ملف الطالب الشامل",       icon: "📁" },
+    { id: "earlywarning",     label: "الإنذار المبكر",           icon: "🚨" },
+    { id: "meetings",         label: "الاجتماعات والمواعيد",     icon: "📅" },
+    { id: "heatmap",          label: "خريطة النشاط المدرسي",    icon: "🗺️" },
+    { id: "committeemeeting",  label: "اجتماعات اللجان",           icon: "📋" },
     { id: "dailyquiz",     label: "الاختبار اليومي",     icon: "🎯" },
     { id: "aiteacher",     label: "مساعد المعلم الذكي",  icon: "🤖" },
     { id: "lessonrecommend",label: "التوصية بالدروس",    icon: "💡" },
@@ -13821,6 +15202,7 @@ export default function SchoolWebsite() {
             </div>
             {/* الصف الثاني: صفحات إضافية مباشرة */}
             <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-xs font-bold text-purple-300 opacity-60 flex-shrink-0">أدوات:</span>
               {extraPages.slice(0,9).map(p => (
                 <button key={p.id} onClick={() => { navigate(p.id); setShowExtra(false); }}
                   className={`nav-pill-extra ${page === p.id ? "active" : ""}`}>
@@ -13925,6 +15307,11 @@ export default function SchoolWebsite() {
         {page === "attendancereport" && <AttendanceAnalysisPage />}
         {page === "dailyquiz"      && <DailyQuizPage classList={classList} />}
         {page === "officialforms"  && <OfficialFormsPage teachers={teachers} attendance={attendance} week={week} />}
+        {page === "portfolio"      && <StudentPortfolioPage classList={classList} weekArchive={weekArchive} attendance={attendance} week={week} teachers={teachers} />}
+        {page === "earlywarning"   && <EarlyWarningPage classList={classList} />}
+        {page === "meetings"       && <MeetingsPage teachers={teachers} />}
+        {page === "heatmap"        && <HeatmapPage teachers={teachers} attendance={attendance} week={week} weekArchive={weekArchive} announcements={announcements} activities={activities} />}
+        {page === "committeemeeting" && <CommitteeMeetingPage teachers={teachers} />}
         {page === "aiteacher"      && <AITeacherPage />}
         {page === "lessonrecommend"&& <LessonRecommendPage classList={classList} />}
         {page === "settings"      && <SettingsPage teachers={teachers} setTeachers={setTeachers} saveTeachers={saveTeachers} week={week} setWeek={setWeek} saveWeek={saveWeek} users={users} siteFont={siteFont} setSiteFont={setSiteFont} saveSiteFont={saveSiteFont} weekArchive={weekArchive} archiveCurrentWeek={archiveCurrentWeek} />}
