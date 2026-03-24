@@ -7737,7 +7737,18 @@ const GA_RULES = [
   "لا يُعاد للطالب المتغيب بدون عذر عن الاختبارات القصيرة",
 ];
 const GA_CC = ["#2dd4bf","#f472b6","#818cf8","#fb923c","#34d399","#f87171","#a78bfa","#fbbf24","#38bdf8","#e879f9","#84cc16","#06b6d4"];
-function gaGradeLabel(p){ if(p>=90) return{l:"ممتاز",c:"#10b981",bg:"#dcfce7"}; if(p>=80) return{l:"جيد جداً",c:"#3b82f6",bg:"#dbeafe"}; if(p>=70) return{l:"جيد",c:"#f59e0b",bg:"#fef3c7"}; if(p>=60) return{l:"مقبول",c:"#f97316",bg:"#ffedd5"}; if(p>=50) return{l:"ضعيف",c:"#ef4444",bg:"#fee2e2"}; return{l:"راسب",c:"#991b1b",bg:"#fee2e2"}; }
+function gaGradeLabel(p){ 
+  if(p>=90) return{l:"ممتاز",    c:"#10b981",bg:"#dcfce7"};
+  if(p>=80) return{l:"جيد جداً", c:"#3b82f6",bg:"#dbeafe"};
+  if(p>=70) return{l:"جيد",      c:"#f59e0b",bg:"#fef3c7"};
+  if(p>=60) return{l:"مقبول",    c:"#f97316",bg:"#ffedd5"};
+  if(p>=50) return{l:"ضعيف",     c:"#ef4444",bg:"#fee2e2"};
+  return          {l:"دون المستوى",c:"#991b1b",bg:"#fce7f3"};
+}
+function gaGradeLabelFromStr(str){
+  const map={"ممتاز":{l:"ممتاز",c:"#10b981",bg:"#dcfce7"},"جيد جداً":{l:"جيد جداً",c:"#3b82f6",bg:"#dbeafe"},"جيد":{l:"جيد",c:"#f59e0b",bg:"#fef3c7"},"مقبول":{l:"مقبول",c:"#f97316",bg:"#ffedd5"},"ضعيف":{l:"ضعيف",c:"#ef4444",bg:"#fee2e2"}};
+  return map[str] || {l:str||"—",c:"#6b7280",bg:"#f3f4f6"};
+}
 
 function GradeAnalysisPage() {
   const [stage,   setStage]   = useState("متوسط");
@@ -7926,40 +7937,107 @@ function GradeAnalysisPage() {
   };
 
   const getModel = (sub) => GA_MODELS[subjMap[sub]] || GA_MODELS["4"];
-  const subTotal = (sc) => { if (!sc) return 0; if (sc.total !== undefined) return sc.total; return Math.min((sc.cw||0)+(sc.fe||0),100); };
-  const stuAvg   = (s)  => { if (s.gpa) return Math.round(parseFloat(s.gpa)*10)/10; const sc=subjNames.map(n=>subTotal(s.grades?.[n])); return sc.length ? Math.round(sc.reduce((a,b)=>a+b,0)/sc.length*10)/10 : 0; };
+  const subTotal = (sc) => { if (!sc) return 0; if (sc.total !== undefined && sc.total > 0) return Math.round(sc.total*100)/100; return Math.min((sc.cw||0)+(sc.fe||0),100); };
+  const stuAvg   = (s)  => { if (s.gpa && parseFloat(s.gpa)>0) return Math.round(parseFloat(s.gpa)*100)/100; const sc=subjNames.filter(n=>subTotal(s.grades?.[n])>0).map(n=>subTotal(s.grades?.[n])); return sc.length ? Math.round(sc.reduce((a,b)=>a+b,0)/sc.length*100)/100 : 0; };
   const filtered = students.filter(s=>s.stage===stage&&(sem==="الكل"||s.sem===sem));
+
+  // ألوان التقديرات الاحترافية
+  const GRADE_PALETTE = {
+    "ممتاز":     {bg:"#16a34a",light:"#dcfce7",text:"#14532d",border:"#22c55e"},
+    "جيد جداً":  {bg:"#2563eb",light:"#dbeafe",text:"#1e3a8a",border:"#3b82f6"},
+    "جيد":       {bg:"#d97706",light:"#fef3c7",text:"#78350f",border:"#f59e0b"},
+    "مقبول":     {bg:"#ea580c",light:"#ffedd5",text:"#7c2d12",border:"#f97316"},
+    "ضعيف":      {bg:"#dc2626",light:"#fee2e2",text:"#7f1d1d",border:"#ef4444"},
+    "دون المستوى":{bg:"#7c3aed",light:"#ede9fe",text:"#3b0764",border:"#8b5cf6"},
+  };
+  const GRADE_ORDER = ["ممتاز","جيد جداً","جيد","مقبول","ضعيف","دون المستوى"];
+
+  // رسم أعمدة احترافي
+  const GradeBarChart = ({data, height=160, showLabels=true}) => {
+    const max = Math.max(...data.map(d=>d.value), 1);
+    return (
+      <div style={{display:"flex",alignItems:"flex-end",gap:6,height,padding:"0 4px"}}>
+        {data.map((d,i)=>{
+          const p = GRADE_PALETTE[d.label]||{bg:"#6b7280",light:"#f3f4f6",text:"#374151"};
+          const h = Math.max(d.value/max*100, d.value>0?8:2);
+          return (
+            <div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
+              {showLabels && d.value>0 && <div style={{fontSize:10,fontWeight:700,color:p.bg}}>{d.value}</div>}
+              <div style={{width:"100%",borderRadius:"6px 6px 0 0",background:p.bg,height:h+"%",minHeight:d.value>0?4:1,transition:"height .5s ease",opacity:d.value>0?1:.25}}/>
+              <div style={{fontSize:9,color:p.text,textAlign:"center",fontWeight:600,maxWidth:40,lineHeight:1.1}}>
+                {d.label.substring(0,4)}
+              </div>
+              {d.pct!==undefined && <div style={{fontSize:9,color:"#6b7280"}}>{d.pct}%</div>}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
+  // رسم دائري تقدمي
+  const CircleProgress = ({value,max=100,color,size=80,label,sublabel}) => {
+    const r = (size/2)-8;
+    const circ = 2*Math.PI*r;
+    const dash = Math.min(value/max,1)*circ;
+    return (
+      <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
+        <div style={{position:"relative",width:size,height:size}}>
+          <svg width={size} height={size} style={{transform:"rotate(-90deg)"}}>
+            <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="#f3f4f6" strokeWidth={size/12}/>
+            <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={color} strokeWidth={size/12}
+              strokeDasharray={`${dash} ${circ}`} strokeLinecap="round"/>
+          </svg>
+          <div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}>
+            <span style={{fontSize:size/5,fontWeight:900,color,lineHeight:1}}>{value}</span>
+            {sublabel && <span style={{fontSize:8,color:"#6b7280",lineHeight:1}}>{sublabel}</span>}
+          </div>
+        </div>
+        {label && <div style={{fontSize:11,fontWeight:600,color:"#374151",textAlign:"center"}}>{label}</div>}
+      </div>
+    );
+  };
 
   const analytics = React.useMemo(()=>{
     if (!filtered.length) return null;
     const ss = {};
-    subjNames.forEach(sub=>{ ss[sub]={scores:[],pass:0,fail:0}; });
+    subjNames.forEach(sub=>{ ss[sub]={scores:[],gradeCount:{"ممتاز":0,"جيد جداً":0,"جيد":0,"مقبول":0,"ضعيف":0,"دون المستوى":0},pass:0,fail:0}; });
+    
     const ranked = filtered.map(s=>{
+      // استخدام GPA من الإكسل مباشرة
+      const avg = stuAvg(s);
       let total=0; let cnt=0;
       subjNames.forEach(sub=>{
-        const v=subTotal(s.grades?.[sub]);
-        ss[sub].scores.push(v);
-        v>=50?ss[sub].pass++:ss[sub].fail++;
-        total+=v; cnt++;
+        const sc = s.grades?.[sub];
+        const v  = subTotal(sc);
+        if(v>0){
+          ss[sub].scores.push(v);
+          total+=v; cnt++;
+          // استخدام تقدير الإكسل مباشرة
+          const grKey = sc?.gradeAr || gaGradeLabel(v).l;
+          if(grKey in ss[sub].gradeCount) ss[sub].gradeCount[grKey]++;
+          v>=60?ss[sub].pass++:ss[sub].fail++;
+        }
       });
-      const avg=cnt?Math.round(total/cnt*10)/10:0;
-      return{...s,avg,total};
+      return{...s,avg,total:Math.round(total*100)/100};
     }).sort((a,b)=>b.avg-a.avg);
+
     subjNames.forEach(sub=>{
       const sc=ss[sub].scores;
       if(!sc.length) return;
       const m=sc.reduce((a,b)=>a+b,0)/sc.length;
-      ss[sub].avg=Math.round(m*10)/10;
+      ss[sub].avg=Math.round(m*100)/100;
       ss[sub].max=Math.max(...sc);
       ss[sub].min=Math.min(...sc);
-      ss[sub].sd =Math.round(Math.sqrt(sc.reduce((a,b)=>a+Math.pow(b-m,2),0)/sc.length)*10)/10;
+      ss[sub].sd =Math.round(Math.sqrt(sc.reduce((a,b)=>a+Math.pow(b-m,2),0)/sc.length)*100)/100;
       ss[sub].pr =Math.round(ss[sub].pass/sc.length*100);
     });
+    
     const avgs=ranked.map(s=>s.avg);
-    const oa=Math.round(avgs.reduce((a,b)=>a+b,0)/avgs.length*10)/10;
-    const passed=avgs.filter(a=>a>=50).length;
+    const oa=Math.round(avgs.reduce((a,b)=>a+b,0)/avgs.length*100)/100;
+    const passed=avgs.filter(a=>a>=60).length;
     const grades={};
-    avgs.forEach(a=>{ const g=gaGradeLabel(a).l; grades[g]=(grades[g]||0)+1; });
+    ranked.forEach(s=>{ const g=(s.generalGrade||gaGradeLabel(s.avg).l); grades[g]=(grades[g]||0)+1; });
     const best=subjNames.length?subjNames.reduce((a,b)=>(ss[a]?.avg||0)>(ss[b]?.avg||0)?a:b,""):"-";
     const worst=subjNames.length?subjNames.reduce((a,b)=>(ss[a]?.avg||100)<(ss[b]?.avg||100)?a:b,""):"-";
     return{ranked,ss,oa,mx:Math.max(...avgs),mn:Math.min(...avgs),passed,failed:avgs.length-passed,passRate:Math.round(passed/avgs.length*100),total:avgs.length,grades,best,worst};
@@ -8027,12 +8105,86 @@ function GradeAnalysisPage() {
   const printReport = ()=>{
     if(!analytics) return;
     const r=analytics;
+    const COLORS={"ممتاز":"#16a34a","جيد جداً":"#2563eb","جيد":"#d97706","مقبول":"#ea580c","ضعيف":"#dc2626","دون المستوى":"#7c3aed"};
+    const BG={"ممتاز":"#dcfce7","جيد جداً":"#dbeafe","جيد":"#fef3c7","مقبول":"#ffedd5","ضعيف":"#fee2e2","دون المستوى":"#ede9fe"};
     const rows=r.ranked.map((s,i)=>{
       const g=gaGradeLabel(s.avg);
       return `<tr style="background:${i%2===0?"#fff":"#f9fafb"}"><td style="font-weight:700;color:#64748b">${i+1}</td><td style="font-weight:700">${s.name}</td><td>${s.sem}</td>${subjNames.map(sub=>`<td style="text-align:center;font-weight:600">${subTotal(s.grades?.[sub])}</td>`).join("")}<td style="font-weight:800;color:#6366f1">${s.avg}%</td><td><span style="background:${g.bg};color:${g.c};padding:2px 8px;border-radius:12px;font-weight:700;font-size:11px">${g.l}</span></td></tr>`;
     }).join("");
     const subRows=subjNames.map((sub,i)=>{ const s=r.ss[sub]; const m=getModel(sub); const g=gaGradeLabel(s.avg); return `<tr style="background:${i%2===0?"#fff":"#f9fafb"}"><td style="font-weight:700">${sub}</td><td><span style="background:#ede9fe;color:#6d28d9;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700">${m.name}</span></td><td style="text-align:center;color:${m.type==="ختامي"?"#f59e0b":"#10b981"};font-weight:700">${m.type}</td><td style="text-align:center;font-weight:700;color:#3b82f6">${s.avg}%</td><td style="text-align:center;color:#10b981;font-weight:600">${s.max}</td><td style="text-align:center;color:#ef4444;font-weight:600">${s.min}</td><td style="text-align:center">${s.pr}%</td><td><span style="background:${g.bg};color:${g.c};padding:2px 8px;border-radius:12px;font-weight:700;font-size:11px">${g.l}</span></td></tr>`; }).join("");
-    printWindow(`<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8"><title>تقرير تحليل الدرجات</title><link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;600;700;900&display=swap" rel="stylesheet"><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Tajawal';direction:rtl;color:#1e293b;background:#fff;padding:20px}.hd{background:linear-gradient(135deg,#0f172a,#6366f1);color:white;padding:20px;border-radius:12px;margin-bottom:20px}.hd h1{font-size:18px;font-weight:900}.kpi{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}.kc{background:#f8fafc;border-radius:10px;padding:12px;text-align:center}.kv{font-size:22px;font-weight:900}.kl{font-size:11px;color:#64748b}h3{font-size:14px;font-weight:800;margin:16px 0 8px;color:#1e3a5f;border-right:3px solid #6366f1;padding-right:8px}table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:16px}th{background:#0f172a;color:#e2e8f0;padding:8px;text-align:right;font-size:11px}td{padding:7px 8px;border-bottom:1px solid #f0f4f8}.footer{text-align:center;margin-top:16px;font-size:10px;color:#94a3b8;border-top:1px solid #e2e8f0;padding-top:10px}@media print{@page{size:A4;margin:1.5cm}body{padding:0}}</style></head><body><div class="hd"><h1>📊 تقرير تحليل الدرجات — دليل وزارة التعليم 2025</h1><p style="opacity:.8;font-size:12px;margin-top:4px">المرحلة: ${stage} | الفصل: ${sem} | ${r.total} طالب | ${new Date().toLocaleDateString("ar-SA")}</p></div><div class="kpi"><div class="kc"><div class="kv" style="color:#6366f1">${r.oa}%</div><div class="kl">المعدل العام</div></div><div class="kc"><div class="kv" style="color:#10b981">${r.passRate}%</div><div class="kl">نسبة النجاح</div></div><div class="kc"><div class="kv" style="color:#10b981">${r.passed}</div><div class="kl">ناجح</div></div><div class="kc"><div class="kv" style="color:#ef4444">${r.failed}</div><div class="kl">دور ثانٍ</div></div></div><h3>تحليل المواد حسب نماذج التقويم</h3><table><thead><tr><th>المادة</th><th>النموذج</th><th>النوع</th><th>المتوسط</th><th>أعلى</th><th>أدنى</th><th>نجاح</th><th>التقدير</th></tr></thead><tbody>${subRows}</tbody></table><h3>بيانات الطلاب</h3><table><thead><tr><th>#</th><th>الاسم</th><th>الفصل</th>${subjNames.map(s=>`<th>${s.substring(0,8)}</th>`).join("")}<th>المعدل</th><th>التقدير</th></tr></thead><tbody>${rows}</tbody></table><div style="background:#f0f9ff;border-radius:10px;padding:14px;margin-bottom:16px"><h3 style="margin-top:0">💡 التوصيات</h3><div style="font-size:12px;line-height:2">• المادة الأضعف: <strong>${r.worst}</strong> بمتوسط ${r.ss[r.worst]?.avg}% — تحتاج دعماً إضافياً<br>${r.failed>0?`• يوجد <strong>${r.failed}</strong> طالب يحتاج اختبار الدور الثاني — يحتفظ بـ40 ويُختبر من 60`:"• جميع الطلاب ناجحون 🎉"}<br>• نسبة النجاح ${r.passRate}% ${r.passRate>=90?"ممتازة 🎉":r.passRate>=70?"جيدة":"تحتاج تحسيناً"}</div></div><div class="footer">مدرسة عبيدة بن الحارث المتوسطة — نظام تحليل الدرجات © ١٤٤٧ هـ</div><script>window.onload=()=>window.print()</script></body></html>`);
+    printWindow(`<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8">
+    <title>تقرير تحليل الدرجات — ${stage} — ${sem}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
+    <style>
+      *{margin:0;padding:0;box-sizing:border-box}
+      body{font-family:'Cairo',sans-serif;direction:rtl;color:#1e293b;background:#fff;padding:20px;font-size:12px}
+      .hd{background:linear-gradient(135deg,#0f172a,#1e3a5f);color:white;padding:20px 24px;border-radius:14px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center}
+      .hd h1{font-size:18px;font-weight:900;margin-bottom:4px}.hd p{opacity:.7;font-size:12px}
+      .kpi{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:16px}
+      .kc{border-radius:12px;padding:12px;text-align:center;border:1px solid #e2e8f0}
+      .kv{font-size:20px;font-weight:900;margin-bottom:2px}.kl{font-size:10px;color:#64748b;font-weight:600}
+      h3{font-size:13px;font-weight:900;margin:16px 0 8px;color:#1e3a5f;border-right:4px solid #6366f1;padding-right:10px}
+      table{width:100%;border-collapse:collapse;margin-bottom:14px;font-size:11px}
+      th{background:#1e3a5f;color:#e2e8f0;padding:8px 6px;text-align:right;font-weight:700;font-size:10px}
+      td{padding:6px;border-bottom:1px solid #f0f4f8}
+      tr:nth-child(even){background:#f9fafb}
+      .badge{padding:2px 8px;border-radius:20px;font-weight:700;font-size:10px}
+      .medal-row-0{background:#fef9c3!important}.medal-row-1{background:#f0fdf4!important}.medal-row-2{background:#fff7ed!important}
+      .footer{text-align:center;margin-top:16px;font-size:10px;color:#94a3b8;border-top:1px solid #e2e8f0;padding-top:10px}
+      .rec-box{background:#eff6ff;border-radius:10px;padding:14px;margin-bottom:14px;border:1px solid #bfdbfe}
+      .rec-box h4{color:#1e40af;font-size:12px;font-weight:900;margin-bottom:8px}
+      .rec-box p{font-size:11px;line-height:2;color:#1e3a8a}
+      @media print{
+        @page{size:A4 landscape;margin:1cm}
+        body{padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+      }
+    </style></head><body>
+    <div class="hd">
+      <div>
+        <h1>📊 تقرير تحليل نتائج الطلاب</h1>
+        <p>مدرسة عبيدة بن الحارث المتوسطة — المرحلة: ${stage} | الفصل: ${sem} | ${r.total} طالب</p>
+        <p>تاريخ الطباعة: ${new Date().toLocaleDateString("ar-SA")} — دليل وزارة التعليم ١٤٤٧/١٤٤٨ هـ</p>
+      </div>
+    </div>
+    <div class="kpi">
+      <div class="kc" style="background:#ede9fe"><div class="kv" style="color:#6366f1">${r.oa}%</div><div class="kl">المعدل العام</div></div>
+      <div class="kc" style="background:#dcfce7"><div class="kv" style="color:#16a34a">${r.passRate}%</div><div class="kl">نسبة النجاح</div></div>
+      <div class="kc" style="background:#dcfce7"><div class="kv" style="color:#16a34a">${r.passed}</div><div class="kl">ناجح</div></div>
+      <div class="kc" style="background:#fee2e2"><div class="kv" style="color:#dc2626">${r.failed}</div><div class="kl">دور ثانٍ</div></div>
+      <div class="kc" style="background:#e0f2fe"><div class="kv" style="color:#0369a1">${r.total}</div><div class="kl">إجمالي الطلاب</div></div>
+    </div>
+    <h3>📚 تحليل المواد الدراسية</h3>
+    <table>
+      <thead><tr><th>المادة</th><th>النموذج</th><th>العدد</th>
+        <th style="color:#fca5a5">ضعيف</th><th style="color:#fca5a5">%</th>
+        <th style="color:#fdba74">مقبول</th><th style="color:#fdba74">%</th>
+        <th style="color:#fde047">جيد</th><th style="color:#fde047">%</th>
+        <th style="color:#93c5fd">جيد جداً</th><th style="color:#93c5fd">%</th>
+        <th style="color:#86efac">ممتاز</th><th style="color:#86efac">%</th>
+        <th style="color:#a5b4fc">المتوسط</th>
+      </tr></thead>
+      <tbody>${subRows}</tbody>
+    </table>
+    <h3>👨‍🎓 ترتيب الطلاب</h3>
+    <table>
+      <thead><tr><th>الترتيب</th><th>الاسم</th>
+        ${subjNames.map(s=>`<th style="font-size:9px">${s.substring(0,6)}</th>`).join("")}
+        <th style="color:#a5b4fc">المعدل</th><th>التقدير</th>
+        <th style="color:#86efac">ممتاز</th><th style="color:#93c5fd">جيد جداً</th>
+        <th style="color:#fde047">جيد</th><th style="color:#fdba74">مقبول</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div class="rec-box">
+      <h4>💡 التوصيات التربوية</h4>
+      <p>• المادة الأضعف: <strong>${r.worst}</strong> (${r.ss[r.worst]?.avg}%) — تحتاج خطة دعم وتقوية</p>
+      <p>${r.failed>0?`• يوجد <strong>${r.failed}</strong> طالب يحتاج اختبار الدور الثاني — يحتفظ بـ40 ويُختبر من 60`:"• جميع الطلاب ناجحون — نتيجة مشرفة 🎉"}</p>
+      <p>• نسبة النجاح ${r.passRate}% — ${r.passRate>=90?"ممتازة وتستحق التكريم 🎉":r.passRate>=70?"جيدة وتستحق التعزيز":"تحتاج خطة تحسين عاجلة"}</p>
+      <p>• أقوى مادة: <strong>${r.best}</strong> (${r.ss[r.best]?.avg}%) — نموذج يُحتذى به</p>
+    </div>
+    <div class="footer">مدرسة عبيدة بن الحارث المتوسطة — نظام تحليل الدرجات الإلكتروني © ١٤٤٧ هـ</div>
+    <script>window.onload=()=>window.print()</script>
+    </body></html>`);
   };
 
   const TABS=[
@@ -8042,8 +8194,9 @@ function GradeAnalysisPage() {
     {id:"classes",    l:"🏫 تحليل الفصول"},
     {id:"studata",    l:"📋 بيانات الطلاب"},
     {id:"ranking",    l:"🏆 ترتيب الأوائل"},
-    {id:"comparison", l:"🔄 مقارنة الفصلين"},
-    {id:"report",     l:"📄 التقرير"},
+    {id:"exam",       l:"📝 تحليل الاختبار"},
+    {id:"comparison", l:"🔄 مقارنة الفترات"},
+    {id:"report",     l:"📄 التقرير الكامل"},
   ];
 
   return (
@@ -8556,8 +8709,8 @@ function GradeAnalysisPage() {
         <div className="space-y-5">
           {!analytics ? (
             <div className="bg-white rounded-2xl p-12 text-center shadow-sm border">
-              <div className="text-4xl mb-2">📊</div>
-              <div className="font-black text-gray-400">استورد بيانات أولاً</div>
+              <div className="text-5xl mb-3">📊</div>
+              <div className="font-black text-gray-600 mb-2">استورد بيانات أولاً</div>
               <button onClick={()=>setTab("excel")} className="mt-3 px-5 py-2 rounded-xl bg-indigo-600 text-white font-black text-sm">📤 استيراد</button>
             </div>
           ) : (
@@ -8565,76 +8718,108 @@ function GradeAnalysisPage() {
               {/* بطاقات دائرية رئيسية */}
               <div className="grid grid-cols-3 gap-4">
                 {[
-                  {label:"العدد الكلي", value:analytics.total, suffix:"", color:"#10b981"},
-                  {label:"متوسط الدرجات", value:analytics.oa, suffix:"%", color:"#6366f1"},
-                  {label:"التقدير العام", value:gaGradeLabel(analytics.oa).l, suffix:"", color:gaGradeLabel(analytics.oa).c, isText:true},
+                  {label:"العدد الكلي",   value:analytics.total,   color:"#10b981", max:analytics.total, sub:"طالب"},
+                  {label:"متوسط الدرجات", value:analytics.oa,      color:"#6366f1", max:100,             sub:"%"},
+                  {label:"نسبة النجاح",   value:analytics.passRate,color:gaGradeLabel(analytics.oa).c, max:100, sub:"%"},
                 ].map(item=>(
-                  <div key={item.label} className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex flex-col items-center gap-3">
-                    <div className="relative" style={{width:110,height:110}}>
-                      <svg viewBox="0 0 110 110" width="110" height="110">
-                        <circle cx="55" cy="55" r="48" fill="none" stroke="#f3f4f6" strokeWidth="8"/>
-                        <circle cx="55" cy="55" r="48" fill="none" stroke={item.color} strokeWidth="8"
-                          strokeDasharray={`${item.isText?301:Math.min((item.value/100)*301,301)} 301`}
-                          strokeLinecap="round" transform="rotate(-90 55 55)"
-                          style={{transition:"stroke-dasharray 1s ease"}}/>
-                      </svg>
-                      <div className="absolute inset-0 flex items-center justify-center flex-col">
-                        <span className="font-black text-gray-800" style={{fontSize:item.isText?14:20}}>{item.value}{item.suffix}</span>
-                      </div>
-                    </div>
-                    <div className="text-sm font-black text-gray-500">{item.label}</div>
+                  <div key={item.label} className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex flex-col items-center gap-3">
+                    <CircleProgress value={item.value} max={item.max} color={item.color} size={100} sublabel={item.sub}/>
+                    <div className="text-sm font-black text-gray-600">{item.label}</div>
                   </div>
                 ))}
               </div>
 
-              {/* تحليل كل مادة */}
+              {/* توزيع التقديرات العام بياناً */}
+              <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+                <h3 className="font-black text-gray-800 mb-1 text-sm">📊 توزيع التقديرات العام</h3>
+                <p className="text-xs text-gray-400 mb-4">بناءً على المعدل العام لكل طالب — {analytics.total} طالب</p>
+                <GradeBarChart height={140} data={GRADE_ORDER.map(g=>{
+                  const c = analytics.grades[g]||0;
+                  return {label:g, value:c, pct:analytics.total?Math.round(c/analytics.total*100):0};
+                })}/>
+                {/* شريط تراكمي */}
+                <div className="mt-4 h-7 rounded-xl overflow-hidden flex" style={{direction:"ltr"}}>
+                  {GRADE_ORDER.map(g=>{
+                    const c=analytics.grades[g]||0;
+                    const pct=analytics.total?c/analytics.total*100:0;
+                    const p=GRADE_PALETTE[g];
+                    return pct>0?(
+                      <div key={g} title={`${g}: ${c} طالب (${Math.round(pct)}%)`}
+                        style={{width:pct+"%",background:p.bg,display:"flex",alignItems:"center",justifyContent:"center",transition:"width .5s"}}>
+                        {pct>8&&<span style={{color:"#fff",fontSize:11,fontWeight:700}}>{Math.round(pct)}%</span>}
+                      </div>
+                    ):null;
+                  })}
+                </div>
+                <div className="flex flex-wrap gap-3 mt-3 justify-center">
+                  {GRADE_ORDER.map(g=>{
+                    const c=analytics.grades[g]||0;
+                    if(!c) return null;
+                    const p=GRADE_PALETTE[g];
+                    return <span key={g} className="flex items-center gap-1 text-xs font-bold" style={{color:p.text}}>
+                      <span className="inline-block w-3 h-3 rounded" style={{background:p.bg}}/>
+                      {g}: {c} ({analytics.total?Math.round(c/analytics.total*100):0}%)
+                    </span>;
+                  })}
+                </div>
+              </div>
+
+              {/* تحليل تفصيلي لكل مادة */}
               {subjNames.map(sub=>{
-                const s=analytics.ss[sub]; if(!s) return null;
-                const g=gaGradeLabel(s.avg);
-                const counts={};
-                const labels=[{l:"ممتاز",min:90},{l:"جيد جداً",min:80,max:90},{l:"جيد",min:70,max:80},{l:"مقبول",min:60,max:70},{l:"ضعيف",min:50,max:60},{l:"دون المستوى",max:50}];
-                labels.forEach(gr=>{
-                  counts[gr.l]=filtered.filter(st=>{
-                    const v=subTotal(st.grades?.[sub]);
-                    return gr.max?(v>=(gr.min||0)&&v<gr.max):(v>=gr.min);
-                  }).length;
-                });
-                const passed=filtered.filter(st=>subTotal(st.grades?.[sub])>=60).length;
-                const failed=filtered.length-passed;
+                const s=analytics.ss[sub]; if(!s||!s.scores?.length) return null;
+                const counts=s.gradeCount||{};
+                const n=filtered.length;
+                const passed=Object.entries(counts).filter(([g])=>["ممتاز","جيد جداً","جيد","مقبول"].includes(g)).reduce((a,[,v])=>a+v,0);
+                const failed=n-passed;
                 return (
                   <div key={sub} className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-                    <h3 className="font-black text-blue-700 text-base mb-4 text-right">{sub}</h3>
-                    <div className="grid grid-cols-3 gap-3 mb-3">
-                      <div className="rounded-2xl p-3 text-center bg-gray-50 border border-gray-200">
-                        <div className="text-sm text-gray-500 font-bold mb-1">العدد الكلي</div>
-                        <div className="text-2xl font-black text-gray-800">{filtered.length}</div>
-                      </div>
-                      <div className="rounded-2xl p-3 text-center bg-green-50 border border-green-200">
-                        <div className="text-sm text-green-600 font-bold mb-1">الناجحون</div>
-                        <div className="text-2xl font-black text-green-700">{passed}</div>
-                        {Object.entries(counts).filter(([k,v])=>v>0&&["ممتاز","جيد جداً","جيد","مقبول"].includes(k)).map(([k,v])=>(
-                          <div key={k} className="text-xs text-green-600">{k}: {v}</div>
-                        ))}
-                      </div>
-                      <div className="rounded-2xl p-3 text-center bg-red-50 border border-red-200">
-                        <div className="text-sm text-red-500 font-bold mb-1">المتعثرون</div>
-                        <div className="text-2xl font-black text-red-600">{failed}</div>
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="font-black text-blue-700 text-base">{sub}</h3>
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs px-3 py-1 rounded-full font-bold"
+                          style={{background:gaGradeLabel(s.avg).bg,color:gaGradeLabel(s.avg).c}}>
+                          متوسط: {s.avg}%
+                        </span>
                       </div>
                     </div>
-                    <div className="grid grid-cols-3 gap-3">
-                      <div className="rounded-2xl p-3 text-center bg-green-50 border border-green-200">
+                    <div className="grid grid-cols-3 gap-3 mb-4">
+                      <div className="rounded-2xl p-3 text-center border border-gray-100 bg-gray-50">
+                        <div className="text-sm text-gray-500 font-bold mb-1">العدد الكلي</div>
+                        <div className="text-3xl font-black text-gray-800">{n}</div>
+                      </div>
+                      <div className="rounded-2xl p-3 text-center border border-green-200 bg-green-50">
+                        <div className="text-sm text-green-600 font-bold mb-1">الناجحون</div>
+                        <div className="text-3xl font-black text-green-700">{passed}</div>
+                        <div className="text-xs text-green-500 mt-1">
+                          {GRADE_ORDER.slice(0,4).map(g=>counts[g]>0?`${g}:${counts[g]}`:null).filter(Boolean).join(" | ")}
+                        </div>
+                      </div>
+                      <div className="rounded-2xl p-3 text-center border border-red-200 bg-red-50">
+                        <div className="text-sm text-red-500 font-bold mb-1">المتعثرون</div>
+                        <div className="text-3xl font-black text-red-600">{failed}</div>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-3 mb-4">
+                      <div className="rounded-2xl p-3 text-center border border-green-100 bg-green-50">
                         <div className="text-xs text-green-500 font-bold mb-1">متوسط الدرجات</div>
-                        <div className="text-xl font-black text-green-700">{s.avg}</div>
-                        <div className="text-xs text-green-500">{s.avg}%</div>
+                        <div className="text-2xl font-black text-green-700">{s.avg}</div>
+                        <div className="text-xs text-green-400">{s.avg}%</div>
                       </div>
-                      <div className="rounded-2xl p-3 text-center bg-green-50 border border-green-200">
+                      <div className="rounded-2xl p-3 text-center border border-green-100 bg-green-50">
                         <div className="text-xs text-green-500 font-bold mb-1">أعلى درجة</div>
-                        <div className="text-xl font-black text-green-700">{s.max}</div>
+                        <div className="text-2xl font-black text-green-700">{s.max}</div>
                       </div>
-                      <div className="rounded-2xl p-3 text-center bg-red-50 border border-red-200">
-                        <div className="text-xs text-red-500 font-bold mb-1">أقل درجة</div>
-                        <div className="text-xl font-black text-red-600">{s.min}</div>
+                      <div className="rounded-2xl p-3 text-center border border-red-100 bg-red-50">
+                        <div className="text-xs text-red-400 font-bold mb-1">أقل درجة</div>
+                        <div className="text-2xl font-black text-red-600">{s.min}</div>
                       </div>
+                    </div>
+                    {/* رسم أعمدة التقديرات */}
+                    <div className="border border-gray-100 rounded-xl p-3">
+                      <div className="text-xs font-bold text-gray-400 mb-2">توزيع التقديرات</div>
+                      <GradeBarChart height={100} data={GRADE_ORDER.map(g=>({
+                        label:g, value:counts[g]||0, pct:n?Math.round((counts[g]||0)/n*100):0
+                      }))}/>
                     </div>
                   </div>
                 );
@@ -8644,87 +8829,130 @@ function GradeAnalysisPage() {
         </div>
       )}
 
-      {/* ══ تحليل المواد الدراسية ══ */}
       {tab==="subjects" && (
         <div className="space-y-4">
           {!analytics ? (
             <div className="bg-white rounded-2xl p-12 text-center shadow-sm border"><div className="text-4xl mb-2">📚</div><div className="font-black text-gray-400">استورد بيانات أولاً</div></div>
           ) : (
-            <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead style={{background:"#1e3a5f"}}>
-                    <tr>
-                      <th className="px-3 py-3 text-right text-xs text-gray-200 font-bold">الرقم</th>
-                      <th className="px-3 py-3 text-right text-xs text-gray-200 font-bold">المادة</th>
-                      <th className="px-3 py-3 text-center text-xs text-gray-200 font-bold">العدد</th>
-                      <th className="px-3 py-3 text-center text-xs text-red-300 font-bold">ضعيف</th>
-                      <th className="px-3 py-3 text-center text-xs text-red-300 font-bold">%</th>
-                      <th className="px-3 py-3 text-center text-xs text-orange-300 font-bold">مقبول</th>
-                      <th className="px-3 py-3 text-center text-xs text-orange-300 font-bold">%</th>
-                      <th className="px-3 py-3 text-center text-xs text-yellow-300 font-bold">جيد</th>
-                      <th className="px-3 py-3 text-center text-xs text-yellow-300 font-bold">%</th>
-                      <th className="px-3 py-3 text-center text-xs text-blue-300 font-bold">جيد جداً</th>
-                      <th className="px-3 py-3 text-center text-xs text-blue-300 font-bold">%</th>
-                      <th className="px-3 py-3 text-center text-xs text-green-300 font-bold">ممتاز</th>
-                      <th className="px-3 py-3 text-center text-xs text-green-300 font-bold">%</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(() => {
-                      const totals={dha:0,maq:0,jay:0,jayjay:0,mum:0,total:0};
-                      return [...subjNames.map((sub,i)=>{
-                        const n=filtered.length;
-                        const dha=filtered.filter(s=>subTotal(s.grades?.[sub])>=50&&subTotal(s.grades?.[sub])<60).length;
-                        const maq=filtered.filter(s=>subTotal(s.grades?.[sub])>=60&&subTotal(s.grades?.[sub])<70).length;
-                        const jay=filtered.filter(s=>subTotal(s.grades?.[sub])>=70&&subTotal(s.grades?.[sub])<80).length;
-                        const jayjay=filtered.filter(s=>subTotal(s.grades?.[sub])>=80&&subTotal(s.grades?.[sub])<90).length;
-                        const mum=filtered.filter(s=>subTotal(s.grades?.[sub])>=90).length;
-                        totals.dha+=dha; totals.maq+=maq; totals.jay+=jay; totals.jayjay+=jayjay; totals.mum+=mum; totals.total+=n;
-                        const pct=v=>n>0?(v/n*100).toFixed(1)+"%":"0.0%";
-                        return (
-                          <tr key={sub} className={i%2===0?"":"bg-gray-50"}>
-                            <td className="px-3 py-2.5 text-gray-400 font-bold text-center">{i+1}</td>
-                            <td className="px-3 py-2.5 font-bold text-gray-800" style={{maxWidth:120}}>{sub.substring(0,18)}{sub.length>18?"...":""}</td>
-                            <td className="px-3 py-2.5 text-center font-bold text-gray-700">{n}</td>
-                            <td className="px-3 py-2.5 text-center font-black text-red-600">{dha}</td>
-                            <td className="px-3 py-2.5 text-center text-red-400 text-xs">{pct(dha)}</td>
-                            <td className="px-3 py-2.5 text-center font-black text-orange-600">{maq}</td>
-                            <td className="px-3 py-2.5 text-center text-orange-400 text-xs">{pct(maq)}</td>
-                            <td className="px-3 py-2.5 text-center font-black text-yellow-600">{jay}</td>
-                            <td className="px-3 py-2.5 text-center text-yellow-500 text-xs">{pct(jay)}</td>
-                            <td className="px-3 py-2.5 text-center font-black text-blue-600">{jayjay}</td>
-                            <td className="px-3 py-2.5 text-center text-blue-400 text-xs">{pct(jayjay)}</td>
-                            <td className="px-3 py-2.5 text-center font-black text-green-600">{mum}</td>
-                            <td className="px-3 py-2.5 text-center text-green-400 text-xs">{pct(mum)}</td>
+            <>
+              <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead style={{background:"#1e3a5f"}}>
+                      <tr>
+                        <th className="px-3 py-3 text-right text-xs text-gray-200 font-bold sticky right-0" style={{background:"#1e3a5f"}}>م</th>
+                        <th className="px-3 py-3 text-right text-xs text-gray-200 font-bold sticky" style={{minWidth:120}}>المادة</th>
+                        <th className="px-3 py-3 text-center text-xs text-gray-300 font-bold">العدد</th>
+                        <th className="px-3 py-3 text-center text-xs font-bold" style={{color:"#ef4444"}}>ضعيف</th>
+                        <th className="px-3 py-3 text-center text-xs font-bold" style={{color:"#fed7aa"}}>%</th>
+                        <th className="px-3 py-3 text-center text-xs font-bold" style={{color:"#fb923c"}}>مقبول</th>
+                        <th className="px-3 py-3 text-center text-xs font-bold" style={{color:"#fde68a"}}>%</th>
+                        <th className="px-3 py-3 text-center text-xs font-bold" style={{color:"#fef08a"}}>جيد</th>
+                        <th className="px-3 py-3 text-center text-xs font-bold" style={{color:"#bfdbfe"}}>%</th>
+                        <th className="px-3 py-3 text-center text-xs font-bold" style={{color:"#93c5fd"}}>جيد جداً</th>
+                        <th className="px-3 py-3 text-center text-xs font-bold" style={{color:"#bfdbfe"}}>%</th>
+                        <th className="px-3 py-3 text-center text-xs font-bold" style={{color:"#86efac"}}>ممتاز</th>
+                        <th className="px-3 py-3 text-center text-xs font-bold" style={{color:"#bbf7d0"}}>%</th>
+                        <th className="px-3 py-3 text-center text-xs text-gray-300 font-bold">متوسط</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(()=>{
+                        const totals={n:0,dha:0,maq:0,jay:0,jj:0,mum:0,scores:[]};
+                        const rows = subjNames.map((sub,i)=>{
+                          const n=filtered.length;
+                          const gc=(analytics.ss[sub]?.gradeCount)||{};
+                          const dha=gc["ضعيف"]||0;
+                          const maq=gc["مقبول"]||0;
+                          const jay=gc["جيد"]||0;
+                          const jj =gc["جيد جداً"]||0;
+                          const mum=gc["ممتاز"]||0;
+                          const avg=analytics.ss[sub]?.avg||0;
+                          totals.n+=n; totals.dha+=dha; totals.maq+=maq; totals.jay+=jay; totals.jj+=jj; totals.mum+=mum;
+                          totals.scores.push(avg);
+                          const pct=v=>n>0?(v/n*100).toFixed(2)+"%":"0.00%";
+                          const g=gaGradeLabel(avg);
+                          return (
+                            <tr key={sub} className={i%2===0?"":"bg-gray-50"} style={{borderBottom:"1px solid #f3f4f6"}}>
+                              <td className="px-3 py-2.5 text-center text-gray-400 font-bold text-xs">{i+1}</td>
+                              <td className="px-3 py-2.5 font-bold text-gray-800 text-xs">{sub.length>18?sub.substring(0,16)+"...":sub}</td>
+                              <td className="px-3 py-2.5 text-center font-bold text-gray-700">{n}</td>
+                              <td className="px-3 py-2.5 text-center font-black text-red-600">{dha}</td>
+                              <td className="px-2 py-2.5 text-center text-red-400 text-xs">{pct(dha)}</td>
+                              <td className="px-3 py-2.5 text-center font-black text-orange-600">{maq}</td>
+                              <td className="px-2 py-2.5 text-center text-orange-400 text-xs">{pct(maq)}</td>
+                              <td className="px-3 py-2.5 text-center font-black text-yellow-600">{jay}</td>
+                              <td className="px-2 py-2.5 text-center text-yellow-500 text-xs">{pct(jay)}</td>
+                              <td className="px-3 py-2.5 text-center font-black text-blue-600">{jj}</td>
+                              <td className="px-2 py-2.5 text-center text-blue-400 text-xs">{pct(jj)}</td>
+                              <td className="px-3 py-2.5 text-center font-black text-green-600">{mum}</td>
+                              <td className="px-2 py-2.5 text-center text-green-500 text-xs">{pct(mum)}</td>
+                              <td className="px-3 py-2.5 text-center font-black text-xs px-2 py-1 rounded-full" style={{color:g.c}}>{avg}%</td>
+                            </tr>
+                          );
+                        });
+                        const tn=totals.n; const ts=totals.scores;
+                        const tavg=ts.length?Math.round(ts.reduce((a,b)=>a+b,0)/ts.length*100)/100:0;
+                        const pct=v=>tn>0?(v/tn*100).toFixed(2)+"%":"0.00%";
+                        rows.push(
+                          <tr key="total" style={{background:"#1e3a5f",color:"#fff",borderTop:"2px solid #6366f1"}}>
+                            <td colSpan={2} className="px-4 py-3 font-black text-right text-sm">الإجمالي</td>
+                            <td className="px-3 py-3 text-center font-black">{tn}</td>
+                            <td className="px-3 py-3 text-center font-black" style={{color:"#fca5a5"}}>{totals.dha}</td>
+                            <td className="px-2 py-3 text-center text-xs" style={{color:"#fca5a5"}}>{pct(totals.dha)}</td>
+                            <td className="px-3 py-3 text-center font-black" style={{color:"#fdba74"}}>{totals.maq}</td>
+                            <td className="px-2 py-3 text-center text-xs" style={{color:"#fdba74"}}>{pct(totals.maq)}</td>
+                            <td className="px-3 py-3 text-center font-black" style={{color:"#fde047"}}>{totals.jay}</td>
+                            <td className="px-2 py-3 text-center text-xs" style={{color:"#fde047"}}>{pct(totals.jay)}</td>
+                            <td className="px-3 py-3 text-center font-black" style={{color:"#93c5fd"}}>{totals.jj}</td>
+                            <td className="px-2 py-3 text-center text-xs" style={{color:"#93c5fd"}}>{pct(totals.jj)}</td>
+                            <td className="px-3 py-3 text-center font-black" style={{color:"#86efac"}}>{totals.mum}</td>
+                            <td className="px-2 py-3 text-center text-xs" style={{color:"#86efac"}}>{pct(totals.mum)}</td>
+                            <td className="px-3 py-3 text-center font-black" style={{color:"#a5b4fc"}}>{tavg}%</td>
                           </tr>
                         );
-                      }),
-                      <tr key="total" className="border-t-2 border-blue-200 bg-blue-50">
-                        <td colSpan={2} className="px-3 py-3 font-black text-blue-700 text-right">المجموع</td>
-                        <td className="px-3 py-3 text-center font-black text-blue-700">{totals.total}</td>
-                        <td className="px-3 py-3 text-center font-black text-red-600">{totals.dha}</td>
-                        <td className="px-3 py-3 text-center text-red-400 text-xs">{totals.total>0?(totals.dha/totals.total*100).toFixed(1)+"%":"0%"}</td>
-                        <td className="px-3 py-3 text-center font-black text-orange-600">{totals.maq}</td>
-                        <td className="px-3 py-3 text-center text-orange-400 text-xs">{totals.total>0?(totals.maq/totals.total*100).toFixed(1)+"%":"0%"}</td>
-                        <td className="px-3 py-3 text-center font-black text-yellow-600">{totals.jay}</td>
-                        <td className="px-3 py-3 text-center text-yellow-500 text-xs">{totals.total>0?(totals.jay/totals.total*100).toFixed(1)+"%":"0%"}</td>
-                        <td className="px-3 py-3 text-center font-black text-blue-600">{totals.jayjay}</td>
-                        <td className="px-3 py-3 text-center text-blue-400 text-xs">{totals.total>0?(totals.jayjay/totals.total*100).toFixed(1)+"%":"0%"}</td>
-                        <td className="px-3 py-3 text-center font-black text-green-600">{totals.mum}</td>
-                        <td className="px-3 py-3 text-center text-green-400 text-xs">{totals.total>0?(totals.mum/totals.total*100).toFixed(1)+"%":"0%"}</td>
-                      </tr>
-                      ];
-                    })()}
-                  </tbody>
-                </table>
+                        return rows;
+                      })()}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            </div>
+
+              {/* رسم بياني مخرجات المعلمين */}
+              <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+                <h3 className="font-black text-gray-800 mb-4 text-sm">📊 الرسم البياني — توزيع التقديرات لكل مادة</h3>
+                <div className="overflow-x-auto">
+                  <div style={{display:"flex",gap:16,minWidth:subjNames.length*90}}>
+                    {subjNames.map((sub,i)=>{
+                      const gc=(analytics.ss[sub]?.gradeCount)||{};
+                      const n=filtered.length;
+                      return (
+                        <div key={sub} style={{flex:"0 0 80px",textAlign:"center"}}>
+                          <div className="text-xs font-bold text-gray-600 mb-2 truncate" title={sub} style={{fontSize:9}}>
+                            {sub.substring(0,8)}
+                          </div>
+                          <GradeBarChart height={120} showLabels={false} data={GRADE_ORDER.slice(0,5).map(g=>({
+                            label:g, value:gc[g]||0, pct:n?Math.round((gc[g]||0)/n*100):0
+                          }))}/>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-3 mt-3 justify-center">
+                  {GRADE_ORDER.slice(0,5).map(g=>{
+                    const p=GRADE_PALETTE[g];
+                    return <span key={g} className="flex items-center gap-1 text-xs font-bold" style={{color:p.text}}>
+                      <span className="inline-block w-3 h-3 rounded" style={{background:p.bg}}/>{g}
+                    </span>;
+                  })}
+                </div>
+              </div>
+            </>
           )}
         </div>
       )}
 
-      {/* ══ تحليل الفصول الدراسية ══ */}
       {tab==="classes" && (
         <div className="space-y-4">
           {!analytics ? (
@@ -8806,32 +9034,53 @@ function GradeAnalysisPage() {
           ) : (
             <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100">
               <div className="overflow-x-auto">
-                <table className="w-full" style={{fontSize:12}}>
+                <table className="w-full" style={{fontSize:11}}>
                   <thead style={{background:"#1e3a5f",position:"sticky",top:0,zIndex:10}}>
                     <tr>
-                      <th className="px-3 py-3 text-right text-gray-200 font-bold whitespace-nowrap">الرقم</th>
-                      <th className="px-3 py-3 text-right text-gray-200 font-bold whitespace-nowrap">اسم الطالب/ة</th>
-                      {subjNames.map(s=><th key={s} className="px-2 py-3 text-center text-gray-200 font-bold" style={{minWidth:70}}>{s.substring(0,8)}{s.length>8?"...":""}</th>)}
-                      <th className="px-3 py-3 text-center text-green-300 font-bold">المعدل</th>
-                      <th className="px-3 py-3 text-center text-yellow-300 font-bold">التقدير</th>
+                      <th className="px-2 py-3 text-center text-gray-200 font-bold whitespace-nowrap">م</th>
+                      <th className="px-3 py-3 text-right text-gray-200 font-bold whitespace-nowrap" style={{minWidth:120}}>الاسم</th>
+                      <th className="px-2 py-3 text-center text-gray-300 font-bold whitespace-nowrap">الفصل</th>
+                      {subjNames.map(s=><th key={s} className="px-2 py-3 text-center text-gray-200 font-bold" style={{minWidth:50,writingMode:"vertical-rl",transform:"rotate(180deg)",height:60}}>{s.substring(0,8)}</th>)}
+                      <th className="px-2 py-3 text-center font-bold whitespace-nowrap" style={{color:"#86efac"}}>المعدل</th>
+                      <th className="px-2 py-3 text-center font-bold whitespace-nowrap" style={{color:"#86efac"}}>ممتاز</th>
+                      <th className="px-2 py-3 text-center font-bold whitespace-nowrap" style={{color:"#93c5fd"}}>جيد جداً</th>
+                      <th className="px-2 py-3 text-center font-bold whitespace-nowrap" style={{color:"#fde047"}}>جيد</th>
+                      <th className="px-2 py-3 text-center font-bold whitespace-nowrap" style={{color:"#fdba74"}}>مقبول</th>
+                      <th className="px-2 py-3 text-center font-bold whitespace-nowrap" style={{color:"#a5b4fc"}}>التقدير</th>
+                      <th className="px-2 py-3 text-center font-bold whitespace-nowrap" style={{color:"#fcd34d"}}>الترتيب</th>
                     </tr>
                   </thead>
                   <tbody>
                     {[...filtered].sort((a,b)=>stuAvg(b)-stuAvg(a)).map((s,i)=>{
                       const avg=stuAvg(s);
                       const g=gaGradeLabel(avg);
-                      const gradeColor=v=>v>=90?"#16a34a":v>=80?"#2563eb":v>=70?"#ca8a04":v>=60?"#ea580c":v>=50?"#dc2626":"#991b1b";
+                      const gc={};
+                      subjNames.forEach(sub=>{
+                        const gr=s.grades?.[sub]?.gradeAr||gaGradeLabel(subTotal(s.grades?.[sub])).l;
+                        gc[gr]=(gc[gr]||0)+1;
+                      });
+                      const rowBg=i===0?"#fef9c3":i===1?"#f0fdf4":i===2?"#fff7ed":i%2===0?"#fff":"#f9fafb";
                       return (
-                        <tr key={s.id} className={i%2===0?"":"bg-gray-50"} style={{borderBottom:"1px solid #f3f4f6"}}>
-                          <td className="px-3 py-2 text-center text-gray-400 font-bold">{i+1}</td>
-                          <td className="px-3 py-2 font-bold text-gray-800 whitespace-nowrap">{s.name}</td>
+                        <tr key={s.id} style={{background:rowBg,borderBottom:"1px solid #f3f4f6"}}>
+                          <td className="px-2 py-2 text-center text-gray-400 font-bold">{i+1}</td>
+                          <td className="px-3 py-2 font-bold text-gray-800 whitespace-nowrap text-xs">{s.name.length>20?s.name.substring(0,18)+"...":s.name}</td>
+                          <td className="px-2 py-2 text-center text-gray-400 text-xs">{s.sem.replace("الفصل","ف")}</td>
                           {subjNames.map(sub=>{
                             const v=subTotal(s.grades?.[sub]);
-                            return <td key={sub} className="px-2 py-2 text-center font-black" style={{color:v>0?gradeColor(v):"#9ca3af"}}>{v||"—"}</td>;
+                            const gr=s.grades?.[sub]?.gradeAr||"";
+                            const p=GRADE_PALETTE[gr]||{};
+                            return <td key={sub} className="px-2 py-2 text-center font-black" style={{color:p.bg||"#9ca3af",fontSize:11}}>{v||"—"}</td>;
                           })}
-                          <td className="px-3 py-2 text-center font-black" style={{color:"#6366f1"}}>{avg}%</td>
-                          <td className="px-3 py-2 text-center">
-                            <span className="px-2 py-0.5 rounded-full text-xs font-black" style={{background:g.bg,color:g.c}}>{s.generalGrade||g.l}</span>
+                          <td className="px-2 py-2 text-center font-black text-sm" style={{color:"#6366f1"}}>{Number(avg).toFixed(2)}%</td>
+                          <td className="px-2 py-2 text-center font-black text-green-600">{gc["ممتاز"]||0}</td>
+                          <td className="px-2 py-2 text-center font-black text-blue-600">{gc["جيد جداً"]||0}</td>
+                          <td className="px-2 py-2 text-center font-black text-yellow-600">{gc["جيد"]||0}</td>
+                          <td className="px-2 py-2 text-center font-black text-orange-600">{gc["مقبول"]||0}</td>
+                          <td className="px-2 py-2 text-center">
+                            <span className="px-2 py-0.5 rounded-full font-black text-xs" style={{background:g.bg,color:g.c}}>{s.generalGrade||g.l}</span>
+                          </td>
+                          <td className="px-2 py-2 text-center font-black">
+                            {i===0?"🥇":i===1?"🥈":i===2?"🥉":<span className="text-gray-600 text-xs font-bold">{i+1}</span>}
                           </td>
                         </tr>
                       );
@@ -8844,7 +9093,6 @@ function GradeAnalysisPage() {
         </div>
       )}
 
-      {/* ══ ترتيب الأوائل ══ */}
       {tab==="ranking" && (
         <div className="space-y-4">
           {!analytics ? (
@@ -8890,7 +9138,7 @@ function GradeAnalysisPage() {
                               {s.name}
                               {s.nationalId && <div className="text-xs text-gray-400">{s.nationalId}</div>}
                             </td>
-                            <td className="px-3 py-3 text-center font-black text-lg" style={{color:"#6366f1"}}>{s.avg}%</td>
+                            <td className="px-3 py-3 text-center font-black text-lg" style={{color:"#6366f1"}}>{Number(s.avg).toFixed(2)}%</td>
                             {subjNames.slice(0,5).map(sub=>{
                               const v=subTotal(s.grades?.[sub]);
                               const gc=gaGradeLabel(v);
@@ -8913,7 +9161,118 @@ function GradeAnalysisPage() {
         </div>
       )}
 
-      {/* ══ مقارنة الفصلين ══ */}
+      {/* ══ تحليل الاختبار ══ */}
+      {tab==="exam" && (
+        <div className="space-y-4">
+          {!analytics ? (
+            <div className="bg-white rounded-2xl p-12 text-center shadow-sm border"><div className="text-4xl mb-2">📝</div><div className="font-black text-gray-400">استورد بيانات أولاً</div></div>
+          ) : (
+            <>
+              <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100">
+                <div className="px-5 py-3 border-b" style={{background:"#1e3a5f"}}>
+                  <h3 className="font-black text-white text-sm">📝 متوسط درجات اختبار نهاية الفصل — المواد ذات الاختبار النهائي</h3>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead style={{background:"#f8fafc"}}>
+                      <tr>
+                        <th className="px-4 py-3 text-right text-xs font-black text-gray-500">م</th>
+                        <th className="px-4 py-3 text-right text-xs font-black text-gray-500">المادة</th>
+                        <th className="px-4 py-3 text-center text-xs font-black text-gray-500">الفصل</th>
+                        <th className="px-4 py-3 text-center text-xs font-black text-gray-500">عدد الطلاب</th>
+                        <th className="px-4 py-3 text-center text-xs font-black text-blue-600">مجموع الدرجات</th>
+                        <th className="px-4 py-3 text-center text-xs font-black text-green-600">متوسط الدرجات</th>
+                        <th className="px-4 py-3 text-center text-xs font-black text-gray-400">الدرجة العظمى</th>
+                        <th className="px-4 py-3 text-center text-xs font-black text-gray-400">أعلى</th>
+                        <th className="px-4 py-3 text-center text-xs font-black text-gray-400">أدنى</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(()=>{
+                        const examSubjs = subjNames.filter(sub=>{
+                          const m=getModel(sub);
+                          return m.fe>0 && filtered.some(s=>s.grades?.[sub]?.finalExam>0);
+                        });
+                        let totalSum=0, totalN=0;
+                        const rows = examSubjs.map((sub,i)=>{
+                          const m=getModel(sub);
+                          const scores=filtered.map(s=>s.grades?.[sub]?.finalExam||0).filter(v=>v>0);
+                          const n=filtered.length;
+                          const sum=scores.reduce((a,b)=>a+b,0);
+                          const avg=scores.length?Math.round(sum/scores.length*100)/100:0;
+                          const max2=scores.length?Math.max(...scores):0;
+                          const min2=scores.length?Math.min(...scores):0;
+                          totalSum+=sum; totalN+=n;
+                          const g=gaGradeLabel(avg/m.fe*100);
+                          return (
+                            <tr key={sub} className={i%2===0?"":"bg-gray-50"} style={{borderBottom:"1px solid #f3f4f6"}}>
+                              <td className="px-4 py-2.5 text-center text-gray-400 font-bold text-xs">{i+1}</td>
+                              <td className="px-4 py-2.5 font-bold text-gray-800">{sub}</td>
+                              <td className="px-4 py-2.5 text-center text-xs text-gray-500">{sem==="الكل"?"الكل":sem}</td>
+                              <td className="px-4 py-2.5 text-center font-bold text-gray-700">{n}</td>
+                              <td className="px-4 py-2.5 text-center font-black text-blue-600">{Math.round(sum*100)/100}</td>
+                              <td className="px-4 py-2.5 text-center">
+                                <span className="font-black px-2 py-0.5 rounded-full text-xs" style={{background:g.bg,color:g.c}}>{avg}</span>
+                              </td>
+                              <td className="px-4 py-2.5 text-center text-gray-500 font-bold">{m.fe}</td>
+                              <td className="px-4 py-2.5 text-center text-green-600 font-black">{max2}</td>
+                              <td className="px-4 py-2.5 text-center text-red-500 font-black">{min2}</td>
+                            </tr>
+                          );
+                        });
+                        if(examSubjs.length>0){
+                          rows.push(
+                            <tr key="total" style={{background:"#1e3a5f",color:"#fff"}}>
+                              <td colSpan={3} className="px-4 py-3 font-black text-right">الكل</td>
+                              <td className="px-4 py-3 text-center font-black">{totalN}</td>
+                              <td className="px-4 py-3 text-center font-black" style={{color:"#93c5fd"}}>{Math.round(totalSum*100)/100}</td>
+                              <td className="px-4 py-3 text-center font-black" style={{color:"#86efac"}}>{totalN?Math.round(totalSum/totalN*100)/100:0}</td>
+                              <td colSpan={3}/>
+                            </tr>
+                          );
+                        }
+                        return examSubjs.length===0
+                          ? <tr><td colSpan={9} className="px-4 py-8 text-center text-gray-400 font-bold">لا توجد مواد بها اختبار نهائي في البيانات المستوردة</td></tr>
+                          : rows;
+                      })()}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* رسم بياني — متوسط درجات الاختبار */}
+              {filtered.some(s=>subjNames.some(sub=>s.grades?.[sub]?.finalExam>0)) && (
+                <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+                  <h3 className="font-black text-gray-800 mb-4 text-sm">📊 مقارنة متوسط درجات الاختبار النهائي</h3>
+                  <div className="space-y-3">
+                    {subjNames.filter(sub=>getModel(sub).fe>0&&filtered.some(s=>s.grades?.[sub]?.finalExam>0)).map((sub,i)=>{
+                      const m=getModel(sub);
+                      const scores=filtered.map(s=>s.grades?.[sub]?.finalExam||0);
+                      const avg=Math.round(scores.reduce((a,b)=>a+b,0)/scores.length*100)/100;
+                      const pct=avg/m.fe*100;
+                      const g=gaGradeLabel(pct);
+                      return (
+                        <div key={sub}>
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-xs font-bold text-gray-700">{sub} <span className="text-gray-400">(من {m.fe})</span></span>
+                            <span className="font-black text-sm px-2 py-0.5 rounded-full" style={{background:g.bg,color:g.c}}>{avg}</span>
+                          </div>
+                          <div className="h-4 rounded-full overflow-hidden" style={{background:"#f3f4f6"}}>
+                            <div className="h-full rounded-full" style={{width:pct+"%",background:g.c,opacity:.8}}/>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ══ مقارنة الفترات ══ */}
+
       {tab==="comparison" && (
         <div className="space-y-5">
           {(() => {
@@ -8923,40 +9282,52 @@ function GradeAnalysisPage() {
               const ss=students.filter(x=>x.stage===stage&&x.sem===s);
               if(!ss.length) return;
               const avgs=ss.map(x=>stuAvg(x));
-              const oa=Math.round(avgs.reduce((a,b)=>a+b,0)/avgs.length*10)/10;
-              const subAvgs={};
+              const oa=Math.round(avgs.reduce((a,b)=>a+b,0)/avgs.length*100)/100;
+              const passed=avgs.filter(a=>a>=60).length;
+              const grades={};
+              ss.forEach(x=>{ const g=x.generalGrade||gaGradeLabel(stuAvg(x)).l; grades[g]=(grades[g]||0)+1; });
+              const subStats={};
               subjNames.forEach(sub=>{
-                const scores=ss.map(x=>subTotal(x.grades?.[sub]));
-                const avg=scores.reduce((a,b)=>a+b,0)/scores.length;
-                const finalAvg=ss.reduce((sum,st)=>sum+(st.grades?.[sub]?.finalExam||0),0)/ss.length;
-                const toolsAvg=ss.reduce((sum,st)=>sum+(st.grades?.[sub]?.evalTools||0),0)/ss.length;
-                subAvgs[sub]={avg:Math.round(avg*10)/10,finalAvg:Math.round(finalAvg*10)/10,toolsAvg:Math.round(toolsAvg*10)/10,count:ss.length};
+                const scores=ss.map(x=>subTotal(x.grades?.[sub])).filter(v=>v>0);
+                const avg=scores.length?Math.round(scores.reduce((a,b)=>a+b,0)/scores.length*100)/100:0;
+                const examScores=ss.map(x=>x.grades?.[sub]?.finalExam||0);
+                const examAvg=Math.round(examScores.reduce((a,b)=>a+b,0)/ss.length*100)/100;
+                const gc={};
+                ss.forEach(x=>{ const g=x.grades?.[sub]?.gradeAr||gaGradeLabel(subTotal(x.grades?.[sub])).l; gc[g]=(gc[g]||0)+1; });
+                subStats[sub]={avg,examAvg,gc,n:ss.length};
               });
-              semData[s]={overall:oa,subAvgs,count:ss.length,passRate:Math.round(avgs.filter(a=>a>=50).length/avgs.length*100)};
+              semData[s]={overall:oa,passed,failed:avgs.length-passed,passRate:Math.round(passed/avgs.length*100),count:ss.length,grades,subStats};
             });
             const avSems=Object.keys(semData);
             if(!avSems.length) return (
               <div className="bg-white rounded-2xl p-12 text-center shadow-sm border">
                 <div className="text-4xl mb-2">🔄</div>
-                <div className="font-black text-gray-400">أضف بيانات الفصلين للمقارنة</div>
-                <div className="text-xs text-gray-300 mt-1">استورد ملف الفصل الأول وملف الفصل الثاني</div>
+                <div className="font-black text-gray-500">أضف بيانات الفصلين للمقارنة</div>
+                <div className="text-xs text-gray-300 mt-1">استورد ملف الفصل الأول ثم ملف الفصل الثاني</div>
               </div>
             );
             const colors=["#6366f1","#0d9488"];
+            const lightColors=["#ede9fe","#d1fae5"];
             return (
               <>
                 {/* ملخص الفصلين */}
-                <div className="grid gap-3" style={{gridTemplateColumns:`repeat(${avSems.length},1fr)`}}>
+                <div className="grid gap-4" style={{gridTemplateColumns:`repeat(${avSems.length},1fr)`}}>
                   {avSems.map((s,i)=>{
                     const d=semData[s]; const g=gaGradeLabel(d.overall);
                     return (
-                      <div key={s} className="rounded-2xl p-5 text-center" style={{background:g.bg,border:`2px solid ${g.c}44`}}>
-                        <div className="text-sm font-black mb-2" style={{color:g.c}}>{s}</div>
-                        <div className="text-3xl font-black" style={{color:g.c}}>{d.overall}%</div>
-                        <div className="text-xs font-bold mt-1" style={{color:g.c,opacity:.7}}>{g.l}</div>
-                        <div className="flex justify-center gap-4 mt-2 text-xs" style={{color:g.c,opacity:.7}}>
-                          <span>{d.count} طالب</span>
-                          <span>نجاح {d.passRate}%</span>
+                      <div key={s} className="rounded-2xl p-5 border-2" style={{background:lightColors[i],borderColor:colors[i]+"44"}}>
+                        <div className="text-center mb-3">
+                          <div className="text-sm font-black mb-1" style={{color:colors[i]}}>{s}</div>
+                          <CircleProgress value={d.overall} max={100} color={colors[i]} size={90} sublabel="%"/>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2 text-center">
+                          <div><div className="text-lg font-black" style={{color:colors[i]}}>{d.count}</div><div className="text-xs text-gray-500">طالب</div></div>
+                          <div><div className="text-lg font-black text-green-600">{d.passRate}%</div><div className="text-xs text-gray-500">نجاح</div></div>
+                          <div><div className="text-lg font-black text-red-500">{d.failed}</div><div className="text-xs text-gray-500">دور ثانٍ</div></div>
+                        </div>
+                        {/* توزيع التقديرات */}
+                        <div className="mt-3">
+                          <GradeBarChart height={80} data={GRADE_ORDER.map(g=>({label:g,value:d.grades[g]||0}))}/>
                         </div>
                       </div>
                     );
@@ -8964,83 +9335,76 @@ function GradeAnalysisPage() {
                 </div>
 
                 {/* مقارنة مادة بمادة */}
-                <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-                  <h3 className="font-black text-gray-800 mb-4 text-sm">📊 مقارنة المواد بين الفصلين</h3>
-                  <div className="space-y-4">
-                    {subjNames.map(sub=>{
-                      const vals=avSems.map(s=>semData[s]?.subAvgs[sub]?.avg||0);
-                      const maxVal=Math.max(...vals,1);
-                      const diff=vals.length>=2?Math.round((vals[0]-vals[1])*10)/10:0;
-                      return (
-                        <div key={sub} className="border border-gray-100 rounded-xl p-3">
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="text-xs font-black text-gray-700">{sub}</span>
-                            {vals.length>=2 && <span className={"text-xs font-black px-2 py-0.5 rounded-full "+(diff>0?"bg-green-100 text-green-700":diff<0?"bg-red-100 text-red-700":"bg-gray-100 text-gray-500")}>
-                              {diff>0?"+":""}{diff}% {diff>0?"▲":diff<0?"▼":"="}
-                            </span>}
-                          </div>
-                          <div className="space-y-1.5">
-                            {avSems.map((s,i)=>{
-                              const val=semData[s]?.subAvgs[sub]?.avg||0;
-                              const g=gaGradeLabel(val);
-                              return (
-                                <div key={s} className="flex items-center gap-2">
-                                  <span className="text-xs text-gray-400 flex-shrink-0" style={{width:60,fontSize:10}}>{s.replace("الفصل","ف")}</span>
-                                  <div className="flex-1 h-5 rounded-lg overflow-hidden" style={{background:"#f3f4f6"}}>
-                                    <div className="h-full rounded-lg flex items-center justify-end pr-2"
-                                      style={{width:(val/maxVal*100)+"%",background:colors[i],opacity:.85}}>
-                                      <span className="text-white text-xs font-black">{val}%</span>
-                                    </div>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                          {/* مقارنة المكونات إذا وجدت */}
-                          {avSems.length>=2 && semData[avSems[0]]?.subAvgs[sub]?.finalAvg>0 && (
-                            <div className="grid grid-cols-2 gap-2 mt-2">
-                              <div className="bg-blue-50 rounded-lg p-2">
-                                <div className="text-xs text-blue-500 font-bold mb-1">اختبار نهائي</div>
-                                <div className="flex justify-between text-xs font-black text-blue-700">
-                                  {avSems.map(s=><span key={s}>{semData[s]?.subAvgs[sub]?.finalAvg||0}</span>)}
-                                </div>
-                              </div>
-                              <div className="bg-amber-50 rounded-lg p-2">
-                                <div className="text-xs text-amber-500 font-bold mb-1">أدوات تقييم</div>
-                                <div className="flex justify-between text-xs font-black text-amber-700">
-                                  {avSems.map(s=><span key={s}>{semData[s]?.subAvgs[sub]?.toolsAvg||0}</span>)}
-                                </div>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
+                <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100">
+                  <div className="px-5 py-3 border-b" style={{background:"#1e3a5f"}}>
+                    <h3 className="font-black text-white text-sm">📊 مقارنة المواد بين الفترتين</h3>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead style={{background:"#f8fafc"}}>
+                        <tr>
+                          <th className="px-4 py-3 text-right text-xs font-black text-gray-500">المادة</th>
+                          {avSems.map((s,i)=><th key={s} className="px-3 py-3 text-center text-xs font-black" style={{color:colors[i]}}>{s.replace("الفصل","ف")}</th>)}
+                          {avSems.length>=2 && <th className="px-3 py-3 text-center text-xs font-black text-gray-400">الفرق</th>}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {subjNames.map((sub,i)=>{
+                          const vals=avSems.map(s=>semData[s]?.subStats[sub]?.avg||0);
+                          const diff=vals.length>=2?Math.round((vals[0]-vals[1])*100)/100:0;
+                          const diffColor=diff>0?"#16a34a":diff<0?"#dc2626":"#6b7280";
+                          return (
+                            <tr key={sub} className={i%2===0?"":"bg-gray-50"} style={{borderBottom:"1px solid #f3f4f6"}}>
+                              <td className="px-4 py-3 font-bold text-gray-800 text-xs">{sub}</td>
+                              {vals.map((v,j)=>{
+                                const g=gaGradeLabel(v);
+                                return <td key={j} className="px-3 py-3 text-center">
+                                  <span className="font-black text-sm px-2 py-0.5 rounded-full" style={{background:g.bg,color:g.c}}>{v}%</span>
+                                </td>;
+                              })}
+                              {avSems.length>=2 && <td className="px-3 py-3 text-center font-black text-sm" style={{color:diffColor}}>
+                                {diff>0?"+":""}{diff}% {diff>0?"▲":diff<0?"▼":"="}
+                              </td>}
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
 
-                {/* منحنى التحصيل الدراسي */}
+                {/* رسم بياني المقارنة */}
                 <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-                  <h3 className="font-black text-gray-800 mb-4 text-sm">📈 توزيع المعدلات</h3>
-                  <div className="flex items-end gap-1 justify-center" style={{height:120}}>
-                    {[50,55,60,65,70,75,80,85,90,95,100].map((threshold,j)=>{
-                      return avSems.map((s,i)=>{
-                        const cnt=students.filter(x=>x.stage===stage&&x.sem===s).filter(x=>{const avg=stuAvg(x);return avg>=threshold&&avg<threshold+5;}).length;
-                        const maxCnt=Math.max(...[50,55,60,65,70,75,80,85,90,95,100].map(t=>students.filter(x=>x.stage===stage&&x.sem===s).filter(x=>{const avg=stuAvg(x);return avg>=t&&avg<t+5;}).length),1);
-                        const h=cnt>0?Math.round(cnt/maxCnt*100):2;
-                        return <div key={s+threshold} title={`${s}: ${cnt} طالب في ${threshold}-${threshold+5}%`}
-                          className="rounded-t-lg flex-1 transition-all" style={{height:h+"%",background:colors[i],opacity:.7+(i*0.15),maxWidth:20}}/>;
-                      });
-                    })}
+                  <h3 className="font-black text-gray-800 mb-4 text-sm">📈 الرسم البياني المقارن</h3>
+                  <div className="space-y-3">
+                    {subjNames.map(sub=>(
+                      <div key={sub}>
+                        <div className="text-xs font-bold text-gray-700 mb-1">{sub}</div>
+                        <div className="space-y-1">
+                          {avSems.map((s,i)=>{
+                            const v=semData[s]?.subStats[sub]?.avg||0;
+                            const g=gaGradeLabel(v);
+                            return (
+                              <div key={s} className="flex items-center gap-2">
+                                <span className="text-xs font-bold flex-shrink-0" style={{width:40,color:colors[i]}}>{s.replace("الفصل ","ف")}</span>
+                                <div className="flex-1 h-5 rounded-full overflow-hidden" style={{background:"#f3f4f6"}}>
+                                  <div className="h-full rounded-full flex items-center justify-end pr-2"
+                                    style={{width:v+"%",background:colors[i],opacity:.85}}>
+                                    {v>10&&<span className="text-white text-xs font-black">{v}%</span>}
+                                  </div>
+                                </div>
+                                <span className="text-xs font-black w-12 text-right" style={{color:g.c}}>{v}%</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                  <div className="flex justify-between text-xs text-gray-400 mt-1 px-1">
-                    <span>50%</span><span>65%</span><span>80%</span><span>95%</span>
-                  </div>
-                  <div className="flex gap-4 justify-center mt-2">
+                  <div className="flex gap-4 justify-center mt-3">
                     {avSems.map((s,i)=>(
-                      <span key={s} className="flex items-center gap-1 text-xs text-gray-500">
-                        <span className="inline-block w-3 h-3 rounded" style={{background:colors[i]}}/>
-                        {s.replace("الفصل","الفصل ")}
+                      <span key={s} className="flex items-center gap-1 text-xs font-bold" style={{color:colors[i]}}>
+                        <span className="inline-block w-4 h-3 rounded" style={{background:colors[i]}}/>{s}
                       </span>
                     ))}
                   </div>
@@ -9050,34 +9414,66 @@ function GradeAnalysisPage() {
           })()}
         </div>
       )}
-      {/* ══ التقرير ══ */}
+
+      {/* ══ التقرير الكامل ══ */}
       {tab==="report" && (
         <div className="space-y-4">
           {!analytics ? (
-            <div className="bg-white rounded-2xl p-12 text-center shadow-sm border"><div className="text-4xl mb-2">📋</div><div className="font-black text-gray-400">أضف بيانات أولاً</div></div>
+            <div className="bg-white rounded-2xl p-12 text-center shadow-sm border"><div className="text-4xl mb-2">📄</div><div className="font-black text-gray-400">استورد بيانات أولاً</div></div>
           ) : (
             <>
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                {[{l:"المعدل العام",v:analytics.oa+"%",c:"#6366f1",bg:"#ede9fe"},{l:"نسبة النجاح",v:analytics.passRate+"%",c:"#10b981",bg:"#dcfce7"},{l:"دور ثانٍ",v:analytics.failed,c:"#ef4444",bg:"#fee2e2"},{l:"أفضل مادة",v:analytics.best.substring(0,10),c:"#0ea5e9",bg:"#e0f2fe"},{l:"أضعف مادة",v:analytics.worst.substring(0,10),c:"#f97316",bg:"#ffedd5"},{l:"إجمالي الطلاب",v:analytics.total,c:"#7c3aed",bg:"#f5f3ff"}].map(k=>(
-                  <div key={k.l} className="rounded-2xl p-4" style={{background:k.bg}}>
-                    <div className="text-xs font-bold opacity-60" style={{color:k.c}}>{k.l}</div>
-                    <div className="text-xl font-black mt-1" style={{color:k.c}}>{k.v}</div>
-                  </div>
-                ))}
-              </div>
-              <div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-5">
-                <h3 className="font-black text-indigo-800 mb-3 text-sm">💡 التوصيات</h3>
-                <div className="space-y-2 text-sm text-indigo-800">
-                  {analytics.failed>0 && <div className="flex gap-2"><span>🔄</span><span>يوجد <strong>{analytics.failed}</strong> طالب يحتاج اختبار الدور الثاني — يحتفظ بـ 40 درجة ويُختبر من 60</span></div>}
-                  <div className="flex gap-2"><span>📉</span><span>المادة الأضعف: <strong>{analytics.worst}</strong> ({analytics.ss[analytics.worst]?.avg}%) — تحتاج دعماً إضافياً</span></div>
-                  <div className="flex gap-2"><span>📈</span><span>نسبة النجاح {analytics.passRate}% {analytics.passRate>=90?"ممتازة 🎉":analytics.passRate>=70?"جيدة":"تحتاج تحسيناً"}</span></div>
-                  <div className="flex gap-2"><span>🏆</span><span>أفضل مادة: <strong>{analytics.best}</strong> ({analytics.ss[analytics.best]?.avg}%)</span></div>
+              {/* ملخص إحصائي */}
+              <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-black text-gray-800 text-sm">📊 ملخص النتائج</h3>
+                  <div className="text-xs text-gray-400">{stage} — {sem} — {analytics.total} طالب</div>
+                </div>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  {[
+                    {l:"المعدل العام",v:analytics.oa+"%",c:"#6366f1",bg:"#ede9fe"},
+                    {l:"نسبة النجاح",v:analytics.passRate+"%",c:"#10b981",bg:"#dcfce7"},
+                    {l:"دور ثانٍ",v:analytics.failed,c:"#ef4444",bg:"#fee2e2"},
+                    {l:"أقوى مادة",v:(analytics.best||"").substring(0,8),c:"#0ea5e9",bg:"#e0f2fe"},
+                    {l:"أضعف مادة",v:(analytics.worst||"").substring(0,8),c:"#f97316",bg:"#ffedd5"},
+                    {l:"أعلى معدل",v:analytics.mx+"%",c:"#16a34a",bg:"#dcfce7"},
+                    {l:"أدنى معدل",v:analytics.mn+"%",c:"#dc2626",bg:"#fee2e2"},
+                    {l:"إجمالي الطلاب",v:analytics.total,c:"#7c3aed",bg:"#f5f3ff"},
+                  ].map(k=>(
+                    <div key={k.l} className="rounded-2xl p-3" style={{background:k.bg}}>
+                      <div className="text-xs font-bold opacity-60" style={{color:k.c}}>{k.l}</div>
+                      <div className="text-xl font-black mt-1" style={{color:k.c}}>{k.v}</div>
+                    </div>
+                  ))}
                 </div>
               </div>
-              <button onClick={printReport} className="w-full py-4 rounded-2xl text-white font-black text-base shadow-xl hover:shadow-2xl transition-all flex items-center justify-center gap-3" style={{background:"linear-gradient(135deg,#0f172a,#6366f1)"}}>
-                🖨️ طباعة التقرير الكامل / حفظ PDF
-                <span className="text-sm opacity-70 font-normal">يشمل جميع الطلاب والمواد والتوصيات</span>
-              </button>
+              {/* توصيات */}
+              <div className="rounded-2xl p-5 border-2 border-indigo-200 bg-indigo-50">
+                <h3 className="font-black text-indigo-800 mb-3 text-sm">💡 التوصيات التربوية</h3>
+                <div className="space-y-2 text-sm text-indigo-800">
+                  {analytics.failed>0 && <div className="flex gap-2"><span>🔄</span><span>يوجد <strong>{analytics.failed}</strong> طالب يحتاج اختبار الدور الثاني — يحتفظ بـ40 ويُختبر من 60</span></div>}
+                  <div className="flex gap-2"><span>📉</span><span>المادة الأضعف: <strong>{analytics.worst}</strong> ({analytics.ss[analytics.worst]?.avg}%) — تحتاج دعماً وخطة تحسين</span></div>
+                  <div className="flex gap-2"><span>📈</span><span>نسبة النجاح {analytics.passRate}% {analytics.passRate>=90?"ممتازة 🎉":analytics.passRate>=70?"جيدة وتستحق تعزيزها":"تحتاج خطة تحسين عاجلة"}</span></div>
+                  <div className="flex gap-2"><span>🏆</span><span>أفضل مادة: <strong>{analytics.best}</strong> ({analytics.ss[analytics.best]?.avg}%) — نموذج يُحتذى به</span></div>
+                </div>
+              </div>
+              {/* أزرار الطباعة */}
+              <div className="grid grid-cols-2 gap-3">
+                <button onClick={printReport}
+                  className="py-4 rounded-2xl text-white font-black text-sm shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2"
+                  style={{background:"linear-gradient(135deg,#1e3a5f,#6366f1)"}}>
+                  🖨️ طباعة التقرير الكامل
+                </button>
+                <button onClick={()=>{
+                  const sem1=students.filter(s=>s.stage===stage&&s.sem==="الفصل الأول");
+                  const sem2=students.filter(s=>s.stage===stage&&s.sem==="الفصل الثاني");
+                  if(!sem1.length||!sem2.length){alert("يلزم وجود بيانات الفصلين للمقارنة");return;}
+                  setTab("comparison");
+                }}
+                  className="py-4 rounded-2xl text-white font-black text-sm shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2"
+                  style={{background:"linear-gradient(135deg,#0d9488,#059669)"}}>
+                  🔄 مقارنة الفترتين
+                </button>
+              </div>
             </>
           )}
         </div>
