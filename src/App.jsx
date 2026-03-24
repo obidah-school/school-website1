@@ -6966,12 +6966,11 @@ function ProgramReportPage() {
 
   const handleWitness = (idx, file) => {
     if (!file) return;
-    readFileAsync(file, "dataurl").then(dataUrl => { const witnesses = [...report.witnesses]; witnesses[idx] = { dataUrl, name: file.name }; setReport(p => ({ ...p, witnesses })); });
-
+    readFileAsync(file, "dataurl").then(dataUrl => {
       const witnesses = [...report.witnesses];
-      witnesses[idx] = { dataUrl: e.target.result, name: file.name };
+      witnesses[idx] = { dataUrl, name: file.name };
       setReport(p => ({ ...p, witnesses }));
-    };
+    });
   };
 
   const removeWitness = (idx) => {
