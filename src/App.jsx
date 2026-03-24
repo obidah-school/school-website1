@@ -6331,7 +6331,7 @@ function SMSPage({ teachers, attendance, week, classList }) {
 function StudentAbsencePage() {
   const MADAR_URL = "https://app.mobile.net.sa";
   const FB_KEY    = "student-absence";
-  const PERIODS   = ["الأولى","الثانية","الثالثة","الرابعة","الخامسة","السادسة","السابعة"];
+  const PERIODS_T = ["الأولى","الثانية","الثالثة","الرابعة","الخامسة","السادسة","السابعة"];
   const STATUSES  = [
     { key:"حاضر",       label:"حاضر",        icon:"✅", color:"emerald" },
     { key:"غائب",       label:"غائب",         icon:"❌", color:"red"    },
@@ -6457,7 +6457,7 @@ function StudentAbsencePage() {
     else if (att.status === "تأخر صباحي")
       msg = `السلام عليكم ورحمة الله وبركاته\nنُفيدكم بأن ابنكم الطالب / ${stu.name}\nتأخّر عن الحضور الصباحي بتاريخ ${dateAr}\nنرجو الحرص على الالتزام بالحضور في وقته.\nمع تحيات إدارة مدرسة عبيدة بن الحارث المتوسطة`;
     else if (att.status === "تأخر حصص") {
-      const perNames = (att.periods||[]).sort((a,b)=>a-b).map(p => "الحصة " + PERIODS[p]).join("، ");
+      const perNames = (att.periods||[]).sort((a,b)=>a-b).map(p => "الحصة " + PERIODS_T[p]).join("، ");
       msg = `السلام عليكم ورحمة الله وبركاته\nنُفيدكم بأن ابنكم الطالب / ${stu.name}\nتأخّر عن ${perNames} بتاريخ ${dateAr}\nنرجو متابعة الأمر.\nمع تحيات إدارة مدرسة عبيدة بن الحارث المتوسطة`;
     }
     setModal({ stu, msg }); setCopied(false);
@@ -6475,7 +6475,7 @@ function StudentAbsencePage() {
     const rows = students.map((s,i) => {
       const att = getAtt(s.id);
       const perTxt = att.status === "تأخر حصص" && att.periods?.length
-        ? (att.periods||[]).sort((a,b)=>a-b).map(p=>PERIODS[p]).join("، ") : "—";
+        ? (att.periods||[]).sort((a,b)=>a-b).map(p=>PERIODS_T[p]).join("، ") : "—";
       const statusColor = { حاضر:"#059669", غائب:"#dc2626", "تأخر صباحي":"#d97706", "تأخر حصص":"#ea580c" }[att.status]||"#374151";
       return `<tr style="border-bottom:1px solid #e5e7eb; background:${i%2?"#f9fafb":"#fff"}">
         <td style="padding:8px 12px; text-align:center; color:#6b7280; font-size:12px">${i+1}</td>
@@ -6687,7 +6687,7 @@ function StudentAbsencePage() {
                       {/* حصص */}
                       <td className="px-3 py-3">
                         <div className="flex justify-center gap-1 flex-wrap">
-                          {PERIODS.map((p, pi) => {
+                          {PERIODS_T.map((p, pi) => {
                             const active   = att.status === "تأخر حصص";
                             const selected = active && (att.periods||[]).includes(pi);
                             return (
@@ -6705,7 +6705,7 @@ function StudentAbsencePage() {
                         </div>
                         {att.status === "تأخر حصص" && (att.periods||[]).length > 0 && (
                           <div className="text-center text-xs text-orange-600 font-bold mt-1.5">
-                            {(att.periods||[]).sort((a,b)=>a-b).map(p=>PERIODS[p]).join(" ، ")}
+                            {(att.periods||[]).sort((a,b)=>a-b).map(p=>PERIODS_T[p]).join(" ، ")}
                           </div>
                         )}
                       </td>
@@ -6790,7 +6790,7 @@ function StudentAbsencePage() {
                     <div>
                       <div className="text-xs text-gray-500 font-bold mb-1.5">اختر الحصص المتأخر عنها:</div>
                       <div className="flex flex-wrap gap-1.5">
-                        {PERIODS.map((p, pi) => (
+                        {PERIODS_T.map((p, pi) => (
                           <button key={pi} onClick={() => togglePeriod(stu.id, pi)}
                             className={`w-10 h-10 rounded-xl text-xs font-bold border transition-all ${(att.periods||[]).includes(pi) ? "bg-orange-500 text-white border-orange-500 shadow-md" : "bg-white text-gray-600 border-gray-300 hover:border-orange-400"}`}>
                             {pi+1}
@@ -6799,7 +6799,7 @@ function StudentAbsencePage() {
                       </div>
                       {(att.periods||[]).length > 0 && (
                         <div className="text-xs text-orange-600 font-bold mt-1.5">
-                          {(att.periods||[]).sort((a,b)=>a-b).map(p=>PERIODS[p]).join(" ، ")}
+                          {(att.periods||[]).sort((a,b)=>a-b).map(p=>PERIODS_T[p]).join(" ، ")}
                         </div>
                       )}
                     </div>
@@ -11589,7 +11589,7 @@ const SCHOOL_COMMITTEES = [
 
 const HIJRI_M = ["محرم","صفر","ربيع الأول","ربيع الثاني","جمادى الأولى","جمادى الآخرة","رجب","شعبان","رمضان","شوال","ذو القعدة","ذو الحجة"];
 const DAYS_AR = ["الأحد","الاثنين","الثلاثاء","الأربعاء","الخميس","الجمعة","السبت"];
-const PERIODS  = ["الحصة الأولى","الحصة الثانية","الحصة الثالثة","الحصة الرابعة","الحصة الخامسة","الحصة السادسة","ما بعد الدوام","فترة الإشراف"];
+const COM_PERIODS = ["الحصة الأولى","الحصة الثانية","الحصة الثالثة","الحصة الرابعة","الحصة الخامسة","الحصة السادسة","ما بعد الدوام","فترة الإشراف"];
 const COM_GREEN = "#4a7c59";
 const COM_LIGHT = "#d8f3dc";
 
@@ -11886,7 +11886,7 @@ function CommitteeMeetingPage({ teachers }) {
                 <label className="text-xs font-bold text-gray-500 block mb-1">الحصة / الوقت</label>
                 <select value={period} onChange={e=>setPeriod(e.target.value)}
                   className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 text-sm font-bold focus:outline-none" style={{fontFamily:"inherit"}}>
-                  {PERIODS.map(p=><option key={p} value={p}>{p}</option>)}
+                  {COM_PERIODS.map(p=><option key={p} value={p}>{p}</option>)}
                 </select>
               </div>
               {/* منتقي التاريخ الهجري */}
