@@ -9725,7 +9725,16 @@ function OfficialFormsPage({ teachers, attendance, week }) {
   const printForm = () => {
     const t = selectedTeacher || "___________";
     const nid = formData.nationalId || "___________";
-    const dateH = formData.dateH || "١٤ هـ  /  /";
+    // بناء التاريخ من القوائم المنسدلة
+    const _day   = formData.dateDay   ? String(formData.dateDay).padStart(2,"0") : "  ";
+    const _month = formData.dateMonth ? String(formData.dateMonth).padStart(2,"0") : "  ";
+    const _year  = formData.dateYear  || "١٤";
+    const _suf   = (formData.calType||"hijri")==="greg" ? "م" : "هـ";
+    const dateH  = `${_day} / ${_month} / ${_year} ${_suf}`;
+    // بناء الوقت من القوائم المنسدلة
+    const fmtTime = (h,m,p) => h&&m ? `${String(h).padStart(2,"0")}:${m} ${p||"ص"}` : "  :  ";
+    const timeFromStr = fmtTime(formData.timeFromH, formData.timeFromM, formData.timeFromP);
+    const timeToStr   = fmtTime(formData.timeToH,   formData.timeToM,   formData.timeToP);
     const spec = formData.spec || "___________";
     const rank = formData.rank || "___________";
     const jobNo = formData.jobNo || "___________";
@@ -9750,10 +9759,10 @@ function OfficialFormsPage({ teachers, attendance, week }) {
 
     if (formType === "warning") {
       const warnType = formData.type === "تأخر" ?
-        `تأخركم من بداية العمل ، وحضوركم الساعة ( ${formData.timeFrom||"    "} )` :
+        `تأخركم من بداية العمل ، وحضوركم الساعة ( ${timeFromStr} )` :
         formData.type === "مغادرة" ?
-        `عدم تواجدكم أثناء العمل من الساعة ( ${formData.timeFrom||"    "} ) إلى الساعة ( ${formData.timeTo||"    "} )` :
-        `انصرافكم مبكراً قبل نهاية العمل من الساعة ( ${formData.timeFrom||"    "} )`;
+        `عدم تواجدكم أثناء العمل من الساعة ( ${timeFromStr} ) إلى الساعة ( ${timeToStr} )` :
+        `انصرافكم مبكراً قبل نهاية العمل من الساعة ( ${timeFromStr} )`;
 
       body = `
         <div style="display:flex;justify-content:space-between;margin-bottom:10px">
@@ -10004,11 +10013,37 @@ function OfficialFormsPage({ teachers, attendance, week }) {
                 placeholder="مثال: معلم" className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 text-sm focus:outline-none"
                 style={{fontFamily:"inherit"}}/>
             </div>
-            <div>
-              <label className="text-xs font-bold text-gray-500 block mb-1">التاريخ الهجري</label>
-              <input value={formData.dateH} onChange={e=>setFormData(p=>({...p,dateH:e.target.value}))}
-                placeholder="١٤ هـ  /  /" className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 text-sm focus:outline-none"
-                style={{fontFamily:"inherit"}}/>
+            {/* منتقي التاريخ */}
+            <div className="col-span-2">
+              <label className="text-xs font-bold text-gray-500 block mb-1">التاريخ</label>
+              <div className="flex gap-2 items-center">
+                <select value={formData.calType||"hijri"} onChange={e=>setFormData(p=>({...p,calType:e.target.value,dateH:""}))}
+                  className="px-2 py-2 rounded-xl border-2 border-gray-200 text-xs font-bold focus:outline-none" style={{fontFamily:"inherit"}}>
+                  <option value="hijri">🌙 هجري</option>
+                  <option value="greg">☀️ ميلادي</option>
+                </select>
+                <select value={formData.dateDay||""} onChange={e=>setFormData(p=>({...p,dateDay:e.target.value}))}
+                  className="flex-1 px-2 py-2 rounded-xl border-2 border-gray-200 text-sm font-bold focus:outline-none text-center" style={{fontFamily:"inherit"}}>
+                  <option value="">يوم</option>
+                  {Array.from({length:30},(_,i)=>i+1).map(d=><option key={d} value={d}>{String(d).padStart(2,"0")}</option>)}
+                </select>
+                <span className="text-gray-400 font-bold">/</span>
+                <select value={formData.dateMonth||""} onChange={e=>setFormData(p=>({...p,dateMonth:e.target.value}))}
+                  className="flex-1 px-2 py-2 rounded-xl border-2 border-gray-200 text-sm font-bold focus:outline-none text-center" style={{fontFamily:"inherit"}}>
+                  <option value="">شهر</option>
+                  {(formData.calType==="greg"
+                    ?["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"]
+                    :["محرم","صفر","ربيع الأول","ربيع الثاني","جمادى الأولى","جمادى الآخرة","رجب","شعبان","رمضان","شوال","ذو القعدة","ذو الحجة"]
+                  ).map((m,i)=><option key={i} value={i+1}>{m}</option>)}
+                </select>
+                <span className="text-gray-400 font-bold">/</span>
+                <select value={formData.dateYear||""} onChange={e=>setFormData(p=>({...p,dateYear:e.target.value}))}
+                  className="flex-1 px-2 py-2 rounded-xl border-2 border-gray-200 text-sm font-bold focus:outline-none text-center" style={{fontFamily:"inherit"}}>
+                  <option value="">سنة</option>
+                  {Array.from({length:5},(_,i)=>(formData.calType==="greg"?2025:1447)+i).map(y=><option key={y} value={y}>{y}</option>)}
+                </select>
+                <span className="text-xs font-bold text-gray-400">{formData.calType==="greg"?"م":"هـ"}</span>
+              </div>
             </div>
 
             {(formType==="warning") && (
@@ -10023,17 +10058,47 @@ function OfficialFormsPage({ teachers, attendance, week }) {
                     <option>انصراف مبكر</option>
                   </select>
                 </div>
+                {/* منتقي الوقت — الساعة من */}
                 <div>
                   <label className="text-xs font-bold text-gray-500 block mb-1">الساعة من</label>
-                  <input value={formData.timeFrom} onChange={e=>setFormData(p=>({...p,timeFrom:e.target.value}))}
-                    placeholder="مثال: ٧:٣٠" className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 text-sm focus:outline-none"
-                    style={{fontFamily:"inherit"}}/>
+                  <div className="flex gap-1 items-center">
+                    <select value={formData.timeFromH||""} onChange={e=>setFormData(p=>({...p,timeFromH:e.target.value}))}
+                      className="flex-1 px-1 py-2 rounded-xl border-2 border-gray-200 text-sm font-bold text-center focus:outline-none" style={{fontFamily:"inherit"}}>
+                      <option value="">س</option>
+                      {Array.from({length:12},(_,i)=>i+1).map(h=><option key={h} value={h}>{String(h).padStart(2,"0")}</option>)}
+                    </select>
+                    <span className="font-black text-gray-400">:</span>
+                    <select value={formData.timeFromM||""} onChange={e=>setFormData(p=>({...p,timeFromM:e.target.value}))}
+                      className="flex-1 px-1 py-2 rounded-xl border-2 border-gray-200 text-sm font-bold text-center focus:outline-none" style={{fontFamily:"inherit"}}>
+                      <option value="">د</option>
+                      {["00","05","10","15","20","25","30","35","40","45","50","55"].map(m=><option key={m} value={m}>{m}</option>)}
+                    </select>
+                    <select value={formData.timeFromP||"ص"} onChange={e=>setFormData(p=>({...p,timeFromP:e.target.value}))}
+                      className="px-1 py-2 rounded-xl border-2 border-gray-200 text-xs font-bold text-center focus:outline-none" style={{fontFamily:"inherit"}}>
+                      <option>ص</option><option>م</option>
+                    </select>
+                  </div>
                 </div>
+                {/* منتقي الوقت — إلى الساعة */}
                 <div>
                   <label className="text-xs font-bold text-gray-500 block mb-1">إلى الساعة</label>
-                  <input value={formData.timeTo} onChange={e=>setFormData(p=>({...p,timeTo:e.target.value}))}
-                    placeholder="مثال: ٨:٠٠" className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 text-sm focus:outline-none"
-                    style={{fontFamily:"inherit"}}/>
+                  <div className="flex gap-1 items-center">
+                    <select value={formData.timeToH||""} onChange={e=>setFormData(p=>({...p,timeToH:e.target.value}))}
+                      className="flex-1 px-1 py-2 rounded-xl border-2 border-gray-200 text-sm font-bold text-center focus:outline-none" style={{fontFamily:"inherit"}}>
+                      <option value="">س</option>
+                      {Array.from({length:12},(_,i)=>i+1).map(h=><option key={h} value={h}>{String(h).padStart(2,"0")}</option>)}
+                    </select>
+                    <span className="font-black text-gray-400">:</span>
+                    <select value={formData.timeToM||""} onChange={e=>setFormData(p=>({...p,timeToM:e.target.value}))}
+                      className="flex-1 px-1 py-2 rounded-xl border-2 border-gray-200 text-sm font-bold text-center focus:outline-none" style={{fontFamily:"inherit"}}>
+                      <option value="">د</option>
+                      {["00","05","10","15","20","25","30","35","40","45","50","55"].map(m=><option key={m} value={m}>{m}</option>)}
+                    </select>
+                    <select value={formData.timeToP||"ص"} onChange={e=>setFormData(p=>({...p,timeToP:e.target.value}))}
+                      className="px-1 py-2 rounded-xl border-2 border-gray-200 text-xs font-bold text-center focus:outline-none" style={{fontFamily:"inherit"}}>
+                      <option>ص</option><option>م</option>
+                    </select>
+                  </div>
                 </div>
               </>
             )}
