@@ -11479,7 +11479,7 @@ const SCHOOL_COMMITTEES = [
 
 const HIJRI_M = ["محرم","صفر","ربيع الأول","ربيع الثاني","جمادى الأولى","جمادى الآخرة","رجب","شعبان","رمضان","شوال","ذو القعدة","ذو الحجة"];
 const DAYS_AR = ["الأحد","الاثنين","الثلاثاء","الأربعاء","الخميس","الجمعة","السبت"];
-const PERIODS  = ["الحصة الأولى","الحصة الثانية","الحصة الثالثة","الحصة الرابعة","الحصة الخامسة","الحصة السادسة","ما بعد الدوام","فترة الإشراف"];
+const PERIODS_COM  = ["الحصة الأولى","الحصة الثانية","الحصة الثالثة","الحصة الرابعة","الحصة الخامسة","الحصة السادسة","ما بعد الدوام","فترة الإشراف"];
 const COM_GREEN = "#4a7c59";
 const COM_LIGHT = "#d8f3dc";
 
@@ -11776,7 +11776,7 @@ function CommitteeMeetingPage({ teachers }) {
                 <label className="text-xs font-bold text-gray-500 block mb-1">الحصة / الوقت</label>
                 <select value={period} onChange={e=>setPeriod(e.target.value)}
                   className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 text-sm font-bold focus:outline-none" style={{fontFamily:"inherit"}}>
-                  {PERIODS.map(p=><option key={p} value={p}>{p}</option>)}
+                  {PERIODS_COM.map(p=><option key={p} value={p}>{p}</option>)}
                 </select>
               </div>
               {/* منتقي التاريخ الهجري */}
