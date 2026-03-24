@@ -313,6 +313,7 @@ const SchoolLogo = ({ size = 'md', animate = true }) => {
   });
 
   return (
+    <ErrorBoundary>
     <>
       <style>{kf}</style>
       <div style={{ display:'inline-flex', flexDirection:'column', alignItems:'center', gap: size==='xl' ? 14 : 10 }}>
@@ -15469,9 +15470,9 @@ function SchoolWebsite() {
       </footer>
     </div>
     </>
+    </ErrorBoundary>
   );
 }
 
-export default function App() {
-  return <ErrorBoundary><SchoolWebsite /></ErrorBoundary>;
-}
+SchoolWebsite.displayName = "SchoolWebsite";
+export default SchoolWebsite;
