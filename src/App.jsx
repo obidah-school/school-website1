@@ -2051,6 +2051,7 @@ function ParentPortal({ classList, setClassList, saveClass, messages, setMessage
 function StrategiesPage() {
   const [strategies, setStrategies] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [floatingPanels, setFloatingPanels] = useState([]); // النوافذ العائمة
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState({ title:"", category:"", description:"", pdfBase64:"", pdfName:"", bookBase64:"", bookName:"" });
   const [saving, setSaving] = useState(false);
@@ -14790,7 +14791,127 @@ function AttendanceAnalysisPage() {
   );
 }
 
-export default function SchoolWebsite() {
+export default // ===== نظام النوافذ العائمة =====
+
+// مكوّن النافذة العائمة الفردية
+function FloatingPanelWindow({ panel, onClose, onToggleMin, onMove, onBringFront, children }) {
+  const dragRef = useRef(null);
+  const isDragging = useRef(false);
+  const dragStart = useRef({ mx: 0, my: 0, px: 0, py: 0 });
+
+  const startDrag = (e) => {
+    if (e.target.closest("button, input, select, textarea, label")) return;
+    isDragging.current = true;
+    dragStart.current = { mx: e.clientX, my: e.clientY, px: panel.x, py: panel.y };
+    onBringFront(panel.id);
+    const move = (ev) => {
+      if (!isDragging.current) return;
+      const nx = dragStart.current.px + ev.clientX - dragStart.current.mx;
+      const ny = dragStart.current.py + ev.clientY - dragStart.current.my;
+      onMove(panel.id, Math.max(0, nx), Math.max(0, ny));
+    };
+    const up = () => { isDragging.current = false; window.removeEventListener("mousemove", move); window.removeEventListener("mouseup", up); };
+    window.addEventListener("mousemove", move);
+    window.addEventListener("mouseup", up);
+  };
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        left: panel.x,
+        top: panel.y,
+        zIndex: 9000,
+        width: panel.minimized ? "auto" : 480,
+        maxWidth: "95vw",
+        maxHeight: panel.minimized ? "auto" : "85vh",
+        borderRadius: 18,
+        boxShadow: "0 20px 60px rgba(0,0,0,.35)",
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
+        background: "#fff",
+        userSelect: "none",
+      }}
+      onClick={() => onBringFront(panel.id)}
+    >
+      {/* شريط العنوان */}
+      <div
+        onMouseDown={startDrag}
+        style={{
+          background: "linear-gradient(135deg,#0f172a,#1e3a5f)",
+          color: "#fff",
+          padding: "8px 12px",
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          cursor: "grab",
+          flexShrink: 0,
+          borderRadius: panel.minimized ? 18 : "18px 18px 0 0",
+        }}
+      >
+        <span style={{ fontSize: 18 }}>{panel.icon}</span>
+        <span style={{ flex: 1, fontFamily: "Cairo,sans-serif", fontWeight: 700, fontSize: 13 }}>{panel.label}</span>
+        <button
+          onClick={e => { e.stopPropagation(); onToggleMin(panel.id); }}
+          style={{ background: "rgba(255,255,255,.15)", border: "none", color: "#fff", borderRadius: 8, width: 26, height: 26, cursor: "pointer", fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center" }}
+        >{panel.minimized ? "⬆" : "⬇"}</button>
+        <button
+          onClick={e => { e.stopPropagation(); onClose(panel.id); }}
+          style={{ background: "rgba(239,68,68,.7)", border: "none", color: "#fff", borderRadius: 8, width: 26, height: 26, cursor: "pointer", fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center" }}
+        >✕</button>
+      </div>
+      {/* محتوى النافذة */}
+      {!panel.minimized && (
+        <div style={{ overflowY: "auto", flex: 1, padding: "12px", userSelect: "text", direction: "rtl" }}>
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// شريط الأدوات العائمة — يظهر دائماً في أسفل الشاشة
+function FloatBar({ openFloat, floatingPanels }) {
+  const tools = [
+    { id:"classtimer",   label:"مؤقت الحصة",     icon:"⏱️" },
+    { id:"luckywheel",   label:"عجلة الحظ",       icon:"🎡" },
+    { id:"exitticket",   label:"تذكرة الخروج",   icon:"🎫" },
+    { id:"groupdivider", label:"مقسم المجموعات", icon:"👥" },
+    { id:"raffle",       label:"السحب العشوائي",  icon:"🎯" },
+    { id:"quiz",         label:"اختبار سريع",     icon:"❓" },
+    { id:"poll",         label:"تصويت",           icon:"📊" },
+  ];
+  return (
+    <div style={{
+      position: "fixed", bottom: 12, left: "50%", transform: "translateX(-50%)",
+      zIndex: 8999, background: "rgba(15,23,42,.92)", borderRadius: 20,
+      padding: "6px 10px", display: "flex", gap: 6, alignItems: "center",
+      boxShadow: "0 8px 32px rgba(0,0,0,.4)", backdropFilter: "blur(10px)",
+    }}>
+      <span style={{ color: "rgba(255,255,255,.5)", fontSize: 11, fontFamily: "Cairo,sans-serif", paddingLeft: 4 }}>🧰</span>
+      {tools.map(t => {
+        const active = floatingPanels.some(p => p.id === t.id);
+        return (
+          <button key={t.id} onClick={() => openFloat(t.id, t.label, t.icon)}
+            title={t.label}
+            style={{
+              background: active ? "rgba(13,148,136,.7)" : "rgba(255,255,255,.1)",
+              border: active ? "1.5px solid #0d9488" : "1.5px solid rgba(255,255,255,.1)",
+              color: "#fff", borderRadius: 12, padding: "5px 10px",
+              cursor: "pointer", fontSize: 18, transition: "all .2s",
+              display: "flex", flexDirection: "column", alignItems: "center", gap: 1,
+            }}>
+            <span>{t.icon}</span>
+            <span style={{ fontSize: 9, fontFamily: "Cairo,sans-serif", opacity: .7 }}>{t.label}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function SchoolWebsite() {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
   const [parentPortal, setParentPortal] = useState(false);
@@ -14829,6 +14950,19 @@ export default function SchoolWebsite() {
   }, []);
 
   const navigate = (p) => { setPage(p); window.location.hash = p; setMenuOpen(false); };
+
+  // -- فتح نافذة عائمة --
+  const openFloat = (id, label, icon) => {
+    setFloatingPanels(prev => {
+      if (prev.find(p => p.id === id)) return prev; // لا تفتح نفس النافذة مرتين
+      const col = prev.length;
+      return [...prev, { id, label, icon, x: 80 + col * 30, y: 80 + col * 30, minimized: false }];
+    });
+  };
+  const closeFloat  = (id) => setFloatingPanels(prev => prev.filter(p => p.id !== id));
+  const toggleMin   = (id) => setFloatingPanels(prev => prev.map(p => p.id === id ? { ...p, minimized: !p.minimized } : p));
+  const movePanel   = (id, x, y) => setFloatingPanels(prev => prev.map(p => p.id === id ? { ...p, x, y } : p));
+  const bringFront  = (id) => setFloatingPanels(prev => { const p = prev.find(x => x.id === id); return p ? [...prev.filter(x => x.id !== id), p] : prev; });
 
   useEffect(() => {
     (async () => {
@@ -15307,6 +15441,30 @@ export default function SchoolWebsite() {
         <p className="relative text-gray-400 mt-1">© ١٤٤٧ هـ — جميع الحقوق محفوظة</p>
       </footer>
     </div>
+
+    {/* ===== شريط الادوات العائمة ===== */}
+    <FloatBar openFloat={openFloat} floatingPanels={floatingPanels} />
+
+    {/* ===== النوافذ العائمة ===== */}
+    {floatingPanels.map(panel => (
+      <FloatingPanelWindow
+        key={panel.id}
+        panel={panel}
+        onClose={closeFloat}
+        onToggleMin={toggleMin}
+        onMove={movePanel}
+        onBringFront={bringFront}
+      >
+        {panel.id === "classtimer"   && <ClassTimerPage />}
+        {panel.id === "luckywheel"   && <LuckyWheelPage />}
+        {panel.id === "exitticket"   && <ExitTicketPage />}
+        {panel.id === "groupdivider" && <GroupDividerPage teachers={teachers} classList={classList} />}
+        {panel.id === "raffle"       && <RafflePage classList={classList} />}
+        {panel.id === "quiz"         && <QuizPage classList={classList} />}
+        {panel.id === "poll"         && <PollPage />}
+      </FloatingPanelWindow>
+    ))}
+
     </>
   );
 }
