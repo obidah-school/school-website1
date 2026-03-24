@@ -9685,32 +9685,96 @@ const FORM_GREEN = "#2d6a4f";
 const FORM_LIGHT = "#d8f3dc";
 
 function OfficialFormsPage({ teachers, attendance, week }) {
-  const [accounts, setAccounts] = useState([]);
-  const [selectedTeacher, setSelectedTeacher] = useState("");
-  const [formType, setFormType] = useState("warning"); // warning | deduct_late | absence_investigate | absence_deduct
-  const [formData, setFormData] = useState({
-    date: "", dateH: "", timeFrom: "", timeTo: "", absFrom: "", absTo: "",
-    type: "تأخر", days: "", spec: "", rank: "", jobNo: "", jobTitle: "",
-    nationalId: "", reason: "", lateHours: "",
+  const [accounts,         setAccounts]        = useState([]);
+  const [selectedTeacher,  setSelectedTeacher]  = useState("");
+  const [formType,         setFormType]         = useState("warning");
+  const [formData,         setFormData]         = useState({
+    date:"", dateH:"", timeFrom:"", timeTo:"", absFrom:"", absTo:"",
+    type:"تأخر", days:"", spec:"", rank:"", jobNo:"", jobTitle:"",
+    nationalId:"", reason:"", lateHours:"",
+    calType:"hijri", dateDay:"", dateMonth:"", dateYear:"1447",
+    timeFromH:"", timeFromM:"00", timeFromP:"ص",
+    timeToH:"",   timeToM:"00", timeToP:"ص",
   });
+  const [lateRecords,  setLateRecords]  = useState({}); // { teacherName: [{date, mins, type, saved}] }
+  const [alertShown,   setAlertShown]   = useState(false);
+  const [savedBanner,  setSavedBanner]  = useState("");
 
   useEffect(() => {
     DB.get("school-teacher-accounts", []).then(d => setAccounts(Array.isArray(d)?d:[]));
+    DB.get("school-late-records", {}).then(d => setLateRecords(typeof d==="object"&&d?d:{}));
   }, []);
+
+  const saveLateRecords = (rec) => { setLateRecords(rec); DB.set("school-late-records", rec); };
+
+  // احتساب مدة التأخير من القوائم المنسدلة
+  const calcLateMins = () => {
+    const toMins = (h,m,p) => {
+      if (!h||!m) return null;
+      let hh = parseInt(h);
+      if (p==="م" && hh!==12) hh+=12;
+      if (p==="ص" && hh===12) hh=0;
+      return hh*60 + parseInt(m);
+    };
+    const from = toMins(formData.timeFromH, formData.timeFromM, formData.timeFromP);
+    const to   = toMins(formData.timeToH,   formData.timeToM,   formData.timeToP);
+    if (from===null || to===null) return null;
+    const diff = to - from;
+    return diff > 0 ? diff : null;
+  };
+
+  // إجمالي دقائق التأخر المتراكمة للمعلم
+  const totalLateMins = (name) => {
+    const recs = lateRecords[name] || [];
+    return recs.reduce((s,r) => s + (r.mins||0), 0);
+  };
+
+  // تنسيق الدقائق → ساعات ودقائق
+  const fmtMins = (mins) => {
+    if (!mins) return "٠ دقيقة";
+    const h = Math.floor(mins/60);
+    const m = mins%60;
+    return h>0 ? `${h} ساعة${m>0?" و "+m+" دقيقة":""}` : `${m} دقيقة`;
+  };
+
+  // حفظ التنبيه وإضافة التأخر للسجل
+  const saveWarningRecord = () => {
+    if (!selectedTeacher) return;
+    const mins = calcLateMins();
+    if (!mins) { alert("حدد وقت البداية والنهاية أولاً"); return; }
+    const dateLabel = `${formData.dateDay||"?"}/${formData.dateMonth||"?"}/${formData.dateYear||"1447"} ${(formData.calType||"hijri")==="greg"?"م":"هـ"}`;
+    const newRec = { id:Date.now(), date:dateLabel, mins, type:formData.type, savedAt:new Date().toLocaleDateString("ar-SA") };
+    const updated = { ...lateRecords, [selectedTeacher]: [...(lateRecords[selectedTeacher]||[]), newRec] };
+    saveLateRecords(updated);
+    const total = totalLateMins(selectedTeacher) + mins;
+    setSavedBanner(`✅ تم حفظ التنبيه — مجموع التأخر: ${fmtMins(total)}`);
+    setTimeout(()=>setSavedBanner(""),4000);
+    if (total >= 7*60 && !alertShown) {
+      setAlertShown(true);
+      setTimeout(()=>alert(`⚠️ تنبيه هام!
+
+المعلم ${selectedTeacher} تجاوز ٧ ساعات تأخر متراكمة (${fmtMins(total)}).
+
+يستوجب إصدار قرار الحسم وفق النظام.`), 300);
+    }
+  };
 
   // اختيار معلم — يملأ بياناته تلقائياً
   const handleSelectTeacher = (name) => {
     setSelectedTeacher(name);
+    setAlertShown(false);
     const acc = accounts.find(a => a.name === name) || {};
-    setFormData(p => ({ ...p, nationalId: acc.id || "" }));
-    // حساب أيام الغياب التلقائي
     const ti = teachers.indexOf(name);
     const absDays = ti >= 0 ? week.days.filter((_,di) => (attendance[ti]?.[di]?.status||"حاضر")==="غائب").length : 0;
-    const lateMins = ti >= 0 ? week.days.reduce((s,_,di) => {
-      const r = attendance[ti]?.[di]||{};
-      return s + (r.status==="متأخر" ? (parseInt(r.lateMinutes)||0) : 0);
-    }, 0) : 0;
-    setFormData(p => ({ ...p, days: absDays > 0 ? String(absDays) : "", lateHours: lateMins > 0 ? `${Math.floor(lateMins/60)} ساعة و ${lateMins%60} دقيقة` : "" }));
+    setFormData(p => ({ ...p, nationalId: acc.id || "", days: absDays > 0 ? String(absDays) : "" }));
+    // تنبيه تلقائي إذا تجاوز ٧ ساعات
+    const total = totalLateMins(name);
+    if (total >= 7*60) {
+      setTimeout(()=>alert(`⚠️ انتبه!
+
+مجموع تأخرات ${name} = ${fmtMins(total)}
+يستوجب إصدار قرار الحسم فوراً.`), 200);
+    }
   };
 
   const FORM_TYPES = [
@@ -9735,6 +9799,9 @@ function OfficialFormsPage({ teachers, attendance, week }) {
     const fmtTime = (h,m,p) => h&&m ? `${String(h).padStart(2,"0")}:${m} ${p||"ص"}` : "  :  ";
     const timeFromStr = fmtTime(formData.timeFromH, formData.timeFromM, formData.timeFromP);
     const timeToStr   = fmtTime(formData.timeToH,   formData.timeToM,   formData.timeToP);
+    // مجموع التأخر المتراكم
+    const totalMins = totalLateMins(selectedTeacher);
+    const totalLateStr = totalMins > 0 ? fmtMins(totalMins) : (formData.lateHours||"  ");
     const spec = formData.spec || "___________";
     const rank = formData.rank || "___________";
     const jobNo = formData.jobNo || "___________";
@@ -9818,7 +9885,7 @@ function OfficialFormsPage({ teachers, attendance, week }) {
           <tr><td style="${headerStyle};text-align:right" colspan="2">السجل المدني</td><td colspan="3">${nid}</td></tr>
         </table>
         ${tableHdr}
-        <p>إن مدير المدرسة ، وبناءً على صلاحياته ، وبناءً على المادة (٢١) من نظام الخدمة المدنية وبناءً على موافقة معالي الوزير على إعطاء بعض الصلاحيات لمديري المدارس بالقرار رقم ١/١١٣٩ وتاريخ ١٤٣١/٣/١٧هـ ، ولبلوغ ساعات التأخر عن العمل والخروج المبكر من العمل ( <u>${formData.lateHours||"    "}</u> ) ساعة ، وحيث إن عذره غير مقبول ، وبمقتضى النظام .</p>
+        <p>إن مدير المدرسة ، وبناءً على صلاحياته ، وبناءً على المادة (٢١) من نظام الخدمة المدنية وبناءً على موافقة معالي الوزير على إعطاء بعض الصلاحيات لمديري المدارس بالقرار رقم ١/١١٣٩ وتاريخ ١٤٣١/٣/١٧هـ ، ولبلوغ ساعات التأخر عن العمل والخروج المبكر من العمل ( <u>${totalLateStr}</u> ) ساعة ، وحيث إن عذره غير مقبول ، وبمقتضى النظام .</p>
         <p><b>يقرر ما يلي :</b></p>
         <p>(١) حسم مدة الغياب الموضحة بعاليه وعددها ( <u>${formData.days||"    "}</u> ) يوماً من راتبه .</p>
         <p>(٢) على إدارة شؤون الموظفين ( تنفيذ الأنظمة ) تنفيذ إجراء الحسم واستبعادها من خدماته وإرسال القرار للملف بالإدارة .</p>
@@ -10124,6 +10191,83 @@ function OfficialFormsPage({ teachers, attendance, week }) {
           </div>
         )}
 
+        {/* مدة التأخير المحتسبة تلقائياً */}
+        {selectedTeacher && formType==="warning" && (formData.timeFromH||formData.timeToH) && (()=>{
+          const mins = calcLateMins();
+          return mins ? (
+            <div className="rounded-2xl p-4 border-2 border-amber-300 bg-amber-50 flex items-center gap-3">
+              <span className="text-2xl">⏱️</span>
+              <div>
+                <div className="font-black text-amber-800 text-sm">مدة التأخير المحتسبة تلقائياً</div>
+                <div className="text-xl font-black text-amber-600">{fmtMins(mins)}</div>
+              </div>
+            </div>
+          ) : null;
+        })()}
+
+        {/* سجل التأخرات المتراكمة */}
+        {selectedTeacher && (()=>{
+          const recs = lateRecords[selectedTeacher]||[];
+          const total = totalLateMins(selectedTeacher);
+          const pct = Math.min(total/(7*60)*100,100);
+          const danger = total >= 7*60;
+          const warn   = total >= 5*60;
+          return (
+            <div className="rounded-2xl p-4 border-2 space-y-3"
+              style={{borderColor:danger?"#dc2626":warn?"#f59e0b":"#e5e7eb", background:danger?"#fef2f2":warn?"#fffbeb":"#f9fafb"}}>
+              <div className="flex items-center justify-between">
+                <div className="font-black text-sm" style={{color:danger?"#dc2626":warn?"#b45309":"#374151"}}>
+                  {danger?"🚨 تجاوز حد الحسم!":warn?"⚠️ اقترب من حد الحسم":"📊"} سجل التأخرات المتراكمة
+                </div>
+                <div className="font-black text-lg" style={{color:danger?"#dc2626":warn?"#b45309":"#6366f1"}}>
+                  {fmtMins(total)} / ٧ ساعات
+                </div>
+              </div>
+              {/* شريط تقدم */}
+              <div className="h-4 rounded-full overflow-hidden" style={{background:"#e5e7eb"}}>
+                <div className="h-full rounded-full transition-all"
+                  style={{width:pct+"%", background:danger?"#dc2626":warn?"#f59e0b":"#10b981"}}/>
+              </div>
+              <div className="flex justify-between text-xs text-gray-400">
+                <span>٠</span>
+                <span style={{color:"#f59e0b",fontWeight:"bold"}}>٥ ساعات</span>
+                <span style={{color:"#dc2626",fontWeight:"bold"}}>٧ ساعات (حسم)</span>
+              </div>
+              {recs.length>0 && (
+                <div className="space-y-1 max-h-40 overflow-y-auto">
+                  {recs.map((r,i)=>(
+                    <div key={r.id||i} className="flex items-center justify-between bg-white rounded-xl px-3 py-2 text-xs border border-gray-100">
+                      <span className="font-bold text-gray-700">{r.date}</span>
+                      <span className="font-bold text-gray-500">{r.type}</span>
+                      <span className="font-black text-amber-600">{fmtMins(r.mins)}</span>
+                      <button onClick={()=>{
+                        if(!confirm("حذف هذا السجل؟")) return;
+                        const updated={...lateRecords,[selectedTeacher]:recs.filter((_,j)=>j!==i)};
+                        saveLateRecords(updated);
+                      }} className="text-red-400 hover:text-red-600 px-1">✕</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {recs.length===0 && <div className="text-xs text-gray-400 text-center py-2">لا توجد تنبيهات مسجلة بعد</div>}
+              {danger && (
+                <button onClick={()=>setFormType("deduct_late")}
+                  className="w-full py-2.5 rounded-xl font-black text-white text-sm"
+                  style={{background:"#dc2626"}}>
+                  📋 إصدار قرار حسم ساعات التأخر
+                </button>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* شريط الحفظ */}
+        {savedBanner && (
+          <div className="rounded-2xl p-3 text-center font-black text-sm text-green-700 bg-green-50 border border-green-200">
+            {savedBanner}
+          </div>
+        )}
+
         {/* معاينة */}
         {selectedTeacher && (
           <div className="rounded-2xl p-4 border-2" style={{background:FORM_LIGHT, borderColor:FORM_GREEN+"44"}}>
@@ -10133,17 +10277,26 @@ function OfficialFormsPage({ teachers, attendance, week }) {
               <div><span className="text-gray-500">الهوية:</span> <strong>{formData.nationalId||"—"}</strong></div>
               <div><span className="text-gray-500">المدرسة:</span> <strong>{SCHOOL_NAME}</strong></div>
               {formData.days&&<div><span className="text-gray-500">الغياب:</span> <strong className="text-red-600">{formData.days} أيام</strong></div>}
-              {formData.lateHours&&<div><span className="text-gray-500">التأخر:</span> <strong className="text-amber-600">{formData.lateHours}</strong></div>}
+              {calcLateMins()&&<div><span className="text-gray-500">التأخر الحالي:</span> <strong className="text-amber-600">{fmtMins(calcLateMins())}</strong></div>}
+              {totalLateMins(selectedTeacher)>0&&<div className="col-span-2"><span className="text-gray-500">المتراكم:</span> <strong className="text-red-600">{fmtMins(totalLateMins(selectedTeacher))}</strong></div>}
             </div>
           </div>
         )}
 
-        <button onClick={printForm} disabled={!selectedTeacher}
-          className="w-full py-4 rounded-2xl text-white font-black text-base disabled:opacity-40 transition-all hover:shadow-xl flex items-center justify-center gap-3"
-          style={{background:`linear-gradient(135deg,${FORM_GREEN},#40916c)`}}>
-          🖨️ طباعة النموذج الرسمي
-          <span className="text-sm opacity-70 font-normal">— {currentForm?.label}</span>
-        </button>
+        <div className="flex gap-3">
+          {formType==="warning" && selectedTeacher && (
+            <button onClick={saveWarningRecord}
+              className="flex-1 py-4 rounded-2xl font-black text-base transition-all hover:shadow-xl flex items-center justify-center gap-2"
+              style={{background:"linear-gradient(135deg,#f59e0b,#d97706)",color:"#fff"}}>
+              💾 حفظ في السجل
+            </button>
+          )}
+          <button onClick={printForm} disabled={!selectedTeacher}
+            className="flex-1 py-4 rounded-2xl text-white font-black text-base disabled:opacity-40 transition-all hover:shadow-xl flex items-center justify-center gap-2"
+            style={{background:`linear-gradient(135deg,${FORM_GREEN},#40916c)`}}>
+            🖨️ طباعة النموذج
+          </button>
+        </div>
       </div>
     </div>
   );
