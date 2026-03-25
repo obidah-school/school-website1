@@ -2051,7 +2051,7 @@ function ParentPortal({ classList, setClassList, saveClass, messages, setMessage
 function StrategiesPage() {
   const [strategies, setStrategies] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [floatingPanels, setFloatingPanels] = useState([]); // النوافذ العائمة
+  const [floatingPanels, setFloatingPanels] = useState([]);
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState({ title:"", category:"", description:"", pdfBase64:"", pdfName:"", bookBase64:"", bookName:"" });
   const [saving, setSaving] = useState(false);
@@ -6834,18 +6834,18 @@ function ProgramReportPage() {
       const s = localStorage.getItem("prog_report_v2");
       if (s) {
         const d = JSON.parse(s);
-        if (d.region      !== undefined) setRegion(d.region);
-        if (d.office      !== undefined) setOffice(d.office);
-        if (d.progName    !== undefined) setProgName(d.progName);
-        if (d.executor    !== undefined) setExecutor(d.executor);
-        if (d.location    !== undefined) setLocation(d.location);
+        if (d.region !== undefined)      setRegion(d.region);
+        if (d.office !== undefined)      setOffice(d.office);
+        if (d.progName !== undefined)    setProgName(d.progName);
+        if (d.executor !== undefined)    setExecutor(d.executor);
+        if (d.location !== undefined)    setLocation(d.location);
         if (d.targetGroup !== undefined) setTargetGroup(d.targetGroup);
-        if (d.objectives  !== undefined) setObjectives(d.objectives);
-        if (d.benefCount  !== undefined) setBenefCount(d.benefCount);
-        if (d.dateDay     !== undefined) setDateDay(d.dateDay);
-        if (d.dateMonth   !== undefined) setDateMonth(d.dateMonth);
-        if (d.dateYear    !== undefined) setDateYear(d.dateYear);
-        if (d.witnesses   !== undefined) setWitnesses(d.witnesses);
+        if (d.objectives !== undefined)  setObjectives(d.objectives);
+        if (d.benefCount !== undefined)  setBenefCount(d.benefCount);
+        if (d.dateDay !== undefined)     setDateDay(d.dateDay);
+        if (d.dateMonth !== undefined)   setDateMonth(d.dateMonth);
+        if (d.dateYear !== undefined)    setDateYear(d.dateYear);
+        if (d.witnesses !== undefined)   setWitnesses(d.witnesses);
       }
     } catch(e) {}
   }, []);
@@ -6863,8 +6863,8 @@ function ProgramReportPage() {
   }, [region, office, progName, executor, location, targetGroup, objectives, benefCount, dateDay, dateMonth, dateYear, witnesses]);
 
   const dateStr = dateDay && dateMonth
-    ? `${String(dateDay).padStart(2,"0")} / ${dateMonth} / ${dateYear} هـ`
-    : `_____ / _____ / ${dateYear} هـ`;
+    ? String(dateDay).padStart(2,"0") + " / " + dateMonth + " / " + dateYear + " هـ"
+    : "_____ / _____ / " + dateYear + " هـ";
 
   const handlePaste = (idx, e) => {
     const items = e.clipboardData && e.clipboardData.items;
@@ -6873,9 +6873,7 @@ function ProgramReportPage() {
       if (items[i].type.startsWith("image/")) {
         const file = items[i].getAsFile();
         const reader = new FileReader();
-        reader.onload = ev => {
-          setWitnesses(ws => ws.map((w, j) => j === idx ? ev.target.result : w));
-        };
+        reader.onload = ev => { setWitnesses(ws => ws.map((w,j) => j===idx ? ev.target.result : w)); };
         reader.readAsDataURL(file);
         e.preventDefault();
         break;
@@ -6893,149 +6891,68 @@ function ProgramReportPage() {
   const removeWitness = idx => setWitnesses(ws => ws.map((w,j) => j===idx ? null : w));
 
   const printReport = () => {
-    const activeWit = witnesses.filter(w=>w);
+    const activeWit = witnesses.filter(w => w);
     const witGrid = activeWit.map((w,i) =>
-      `<div class="wb"><img src="${w}" /><div class="wn">شاهد ${i+1}</div></div>`
+      "<div class=\"wb\"><img src=\"" + w + "\" /><div class=\"wn\">شاهد " + (i+1) + "</div></div>"
     ).join("");
-
-    printWindow(`<!DOCTYPE html><html dir="rtl" lang="ar">
-<head><meta charset="UTF-8">
-<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'Cairo',sans-serif;direction:rtl;background:#fff;color:#111;font-size:12px}
-.page{width:210mm;margin:0 auto;padding:8mm 10mm}
-.hdr{display:flex;align-items:center;justify-content:space-between;border-bottom:2.5px solid #1a5276;padding-bottom:6px;margin-bottom:6px}
-.hdr-r{text-align:right;font-size:12px;font-weight:700;color:#1a5276;line-height:1.8}
-.hdr-l{text-align:left;font-size:11px;font-weight:700;color:#555}
-.logo{width:52px}
-.school-bar{background:#1a5276;color:#fff;text-align:center;padding:5px 10px;font-size:15px;font-weight:900;margin:5px 0}
-.prog-bar{text-align:center;padding:4px;font-size:12px;font-weight:700;color:#1a5276;border-bottom:1.5px solid #1a5276;margin-bottom:4px}
-.prog-val{text-align:center;padding:6px;font-size:14px;font-weight:900;min-height:28px;margin-bottom:8px;background:#eaf4fb;border-radius:4px}
-.g2{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:7px}
-.fb{border:1.5px solid #1a5276;border-radius:4px;overflow:hidden}
-.fl{background:#1a5276;color:#fff;font-size:10px;font-weight:700;padding:3px 8px;text-align:center}
-.fv{padding:5px 8px;min-height:24px;font-size:11px;white-space:pre-wrap}
-.obj .fv{min-height:70px}
-.ws-title{background:#1a5276;color:#fff;text-align:center;padding:4px;font-size:12px;font-weight:900;margin:8px 0 5px}
-.wg{display:grid;grid-template-columns:1fr 1fr;gap:7px}
-.wb{border:1.5px solid #1a5276;border-radius:3px;overflow:hidden;text-align:center}
-.wb img{width:100%;max-height:150px;object-fit:contain;display:block}
-.wn{font-size:9px;color:#1a5276;font-weight:700;padding:1px}
-.ft{margin-top:10px;display:flex;justify-content:flex-end;font-size:11px;font-weight:700;border-top:1.5px solid #1a5276;padding-top:6px}
-@media print{@page{size:A4;margin:8mm 10mm}body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
-</style></head><body><div class="page">
-
-<div class="hdr">
-  <div class="hdr-r">الإدارة العامة للتعليم${region ? "<br>بمحافظة " + region : ""}<br>${office}</div>
-  <img src="${LOGO_URL}" class="logo" alt="شعار" />
-  <div class="hdr-l">وزارة التعليم<br>Ministry of Education</div>
-</div>
-
-<div class="school-bar">مدرسة عبيدة بن الحارث المتوسطة</div>
-<div class="prog-bar">اسم البرنامج</div>
-<div class="prog-val">${progName || "&nbsp;"}</div>
-
-<div class="g2">
-  <div class="fb"><div class="fl">المنفـذ</div><div class="fv">${executor || "&nbsp;"}</div></div>
-  <div class="fb"><div class="fl">مكان التنفيذ</div><div class="fv">${location || "&nbsp;"}</div></div>
-</div>
-<div class="g2">
-  <div class="fb obj"><div class="fl">الأهداف</div>
-    <div class="fv">${objectives.filter(o=>o.trim()).map((o,i)=>i+1+". "+o).join("\n") || "&nbsp;"}</div>
-  </div>
-  <div>
-    <div class="fb" style="margin-bottom:6px"><div class="fl">المستهدفون</div><div class="fv">${targetGroup || "&nbsp;"}</div></div>
-    <div class="fb" style="margin-bottom:6px"><div class="fl">عدد المستفيدين</div><div class="fv">${benefCount || "&nbsp;"}</div></div>
-    <div class="fb"><div class="fl">تاريخ التنفيذ</div><div class="fv">${dateStr}</div></div>
-  </div>
-</div>
-
-${activeWit.length > 0 ? `<div class="ws-title">الشـواهـد</div><div class="wg">${witGrid}</div>` : ""}
-
-<div class="ft">توقيع المعلم: ____________________</div>
-</div><script>window.onload=()=>window.print()</script></body></html>`);
+    printWindow("<!DOCTYPE html><html dir=\"rtl\" lang=\"ar\">\n<head><meta charset=\"UTF-8\">\n<link href=\"https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap\" rel=\"stylesheet\">\n<style>\n*{margin:0;padding:0;box-sizing:border-box}\nbody{font-family:'Cairo',sans-serif;direction:rtl;background:#fff;color:#111;font-size:12px}\n.page{width:210mm;margin:0 auto;padding:8mm 10mm}\n.hdr{display:flex;align-items:center;justify-content:space-between;border-bottom:2.5px solid #1a5276;padding-bottom:6px;margin-bottom:6px}\n.hdr-r{text-align:right;font-size:12px;font-weight:700;color:#1a5276;line-height:1.8}\n.hdr-l{text-align:left;font-size:11px;font-weight:700;color:#555}\n.logo{width:52px}\n.school-bar{background:#1a5276;color:#fff;text-align:center;padding:5px 10px;font-size:15px;font-weight:900;margin:5px 0}\n.prog-bar{text-align:center;padding:4px;font-size:12px;font-weight:700;color:#1a5276;border-bottom:1.5px solid #1a5276;margin-bottom:4px}\n.prog-val{text-align:center;padding:6px;font-size:14px;font-weight:900;min-height:28px;margin-bottom:8px;background:#eaf4fb;border-radius:4px}\n.g2{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:7px}\n.fb{border:1.5px solid #1a5276;border-radius:4px;overflow:hidden}\n.fl{background:#1a5276;color:#fff;font-size:10px;font-weight:700;padding:3px 8px;text-align:center}\n.fv{padding:5px 8px;min-height:24px;font-size:11px;white-space:pre-wrap}\n.obj .fv{min-height:70px}\n.ws-title{background:#1a5276;color:#fff;text-align:center;padding:4px;font-size:12px;font-weight:900;margin:8px 0 5px}\n.wg{display:grid;grid-template-columns:1fr 1fr;gap:7px}\n.wb{border:1.5px solid #1a5276;border-radius:3px;overflow:hidden;text-align:center}\n.wb img{width:100%;max-height:150px;object-fit:contain;display:block}\n.wn{font-size:9px;color:#1a5276;font-weight:700;padding:1px}\n.ft{margin-top:10px;display:flex;justify-content:flex-end;font-size:11px;font-weight:700;border-top:1.5px solid #1a5276;padding-top:6px}\n@media print{@page{size:A4;margin:8mm 10mm}body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}\n</style></head><body><div class=\"page\">\n<div class=\"hdr\">\n  <div class=\"hdr-r\">الإدارة العامة للتعليم" + (region ? "<br>بمحافظة " + region : "") + "<br>" + office + "</div>\n  <img src=\"" + LOGO_URL + "\" class=\"logo\" alt=\"شعار\" />\n  <div class=\"hdr-l\">وزارة التعليم<br>Ministry of Education</div>\n</div>\n<div class=\"school-bar\">مدرسة عبيدة بن الحارث المتوسطة</div>\n<div class=\"prog-bar\">اسم البرنامج</div>\n<div class=\"prog-val\">" + (progName || "&nbsp;") + "</div>\n<div class=\"g2\">\n  <div class=\"fb\"><div class=\"fl\">المنفذ</div><div class=\"fv\">" + (executor || "&nbsp;") + "</div></div>\n  <div class=\"fb\"><div class=\"fl\">مكان التنفيذ</div><div class=\"fv\">" + (location || "&nbsp;") + "</div></div>\n</div>\n<div class=\"g2\">\n  <div class=\"fb obj\"><div class=\"fl\">الأهداف</div><div class=\"fv\">" + (objectives.filter(o=>o.trim()).map((o,i)=>(i+1)+". "+o).join("\n") || "&nbsp;") + "</div></div>\n  <div>\n    <div class=\"fb\" style=\"margin-bottom:6px\"><div class=\"fl\">المستهدفون</div><div class=\"fv\">" + (targetGroup || "&nbsp;") + "</div></div>\n    <div class=\"fb\" style=\"margin-bottom:6px\"><div class=\"fl\">عدد المستفيدين</div><div class=\"fv\">" + (benefCount || "&nbsp;") + "</div></div>\n    <div class=\"fb\"><div class=\"fl\">تاريخ التنفيذ</div><div class=\"fv\">" + dateStr + "</div></div>\n  </div>\n</div>\n" + (activeWit.length > 0 ? "<div class=\"ws-title\">الشواهد</div><div class=\"wg\">" + witGrid + "</div>" : "") + "\n<div class=\"ft\">توقيع المعلم: ____________________</div>\n</div><script>window.onload=()=>window.print()<\/script></body></html>");
   };
 
   const ic = "w-full px-3 py-2 rounded-xl border-2 border-gray-200 focus:border-blue-400 focus:outline-none text-sm";
-  const st = { fontFamily:"inherit" };
+  const st = { fontFamily: "inherit" };
 
   return (
     <div dir="rtl" className="space-y-4 max-w-3xl mx-auto">
-
       <div className="rounded-3xl overflow-hidden shadow-xl" style={{background:"linear-gradient(135deg,#0f2d55,#1a6696)"}}>
         <div className="p-5 text-white flex items-center gap-4">
           <img src={LOGO_URL} alt="وزارة التعليم" className="h-14 w-auto" style={{filter:"brightness(0) invert(1) opacity(.85)"}} />
           <div>
-            <h2 className="text-xl font-black">📋 تقرير تنفيذ برنامج</h2>
+            <h2 className="text-xl font-black">تقرير تنفيذ برنامج</h2>
             <p className="text-blue-200 text-sm">النموذج الرسمي — وزارة التعليم</p>
           </div>
         </div>
       </div>
 
       <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 space-y-3">
-        <h3 className="font-black text-blue-800 text-sm mb-1">🏛️ بيانات الجهة</h3>
+        <h3 className="font-black text-blue-800 text-sm mb-1">بيانات الجهة</h3>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="text-xs font-bold text-gray-500 block mb-1">الإدارة العامة للتعليم — بمحافظة / منطقة</label>
-            <input value={region} onChange={e=>setRegion(e.target.value)}
-              placeholder="اختياري: جدة، الرياض، المدينة..."
-              className={ic} style={st} />
+            <label className="text-xs font-bold text-gray-500 block mb-1">الإدارة العامة للتعليم — بمحافظة / منطقة (اختياري)</label>
+            <input value={region} onChange={e=>setRegion(e.target.value)} placeholder="اختياري: جدة، الرياض..." className={ic} style={st} />
           </div>
           <div>
             <label className="text-xs font-bold text-gray-500 block mb-1">مكتب / إدارة التعليم</label>
-            <input value={office} onChange={e=>setOffice(e.target.value)}
-              className={ic} style={st} />
+            <input value={office} onChange={e=>setOffice(e.target.value)} className={ic} style={st} />
           </div>
         </div>
       </div>
 
       <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 space-y-3">
-        <h3 className="font-black text-blue-800 text-sm mb-1">📝 بيانات البرنامج</h3>
+        <h3 className="font-black text-blue-800 text-sm mb-1">بيانات البرنامج</h3>
         <div>
           <label className="text-xs font-bold text-gray-500 block mb-1">اسم البرنامج</label>
-          <input value={progName} onChange={e=>setProgName(e.target.value)}
-            placeholder="اسم البرنامج..." className={ic} style={st} />
+          <input value={progName} onChange={e=>setProgName(e.target.value)} placeholder="اسم البرنامج..." className={ic} style={st} />
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="text-xs font-bold text-gray-500 block mb-1">المنفذ</label>
-            <input value={executor} onChange={e=>setExecutor(e.target.value)}
-              placeholder="المعلم / ..." className={ic} style={st} />
-          </div>
-          <div>
-            <label className="text-xs font-bold text-gray-500 block mb-1">مكان التنفيذ</label>
-            <input value={location} onChange={e=>setLocation(e.target.value)}
-              placeholder="الفصول الدراسية / ..." className={ic} style={st} />
-          </div>
-          <div>
-            <label className="text-xs font-bold text-gray-500 block mb-1">المستهدفون</label>
-            <input value={targetGroup} onChange={e=>setTargetGroup(e.target.value)}
-              placeholder="الطلاب / المعلمون / ..." className={ic} style={st} />
-          </div>
-          <div>
-            <label className="text-xs font-bold text-gray-500 block mb-1">عدد المستفيدين</label>
-            <input value={benefCount} onChange={e=>setBenefCount(e.target.value)}
-              placeholder="أكثر من 70 طالب / ..." className={ic} style={st} />
-          </div>
+          <div><label className="text-xs font-bold text-gray-500 block mb-1">المنفذ</label><input value={executor} onChange={e=>setExecutor(e.target.value)} placeholder="المعلم / ..." className={ic} style={st} /></div>
+          <div><label className="text-xs font-bold text-gray-500 block mb-1">مكان التنفيذ</label><input value={location} onChange={e=>setLocation(e.target.value)} placeholder="الفصول الدراسية / ..." className={ic} style={st} /></div>
+          <div><label className="text-xs font-bold text-gray-500 block mb-1">المستهدفون</label><input value={targetGroup} onChange={e=>setTargetGroup(e.target.value)} placeholder="الطلاب / ..." className={ic} style={st} /></div>
+          <div><label className="text-xs font-bold text-gray-500 block mb-1">عدد المستفيدين</label><input value={benefCount} onChange={e=>setBenefCount(e.target.value)} placeholder="أكثر من 70 طالب / ..." className={ic} style={st} /></div>
         </div>
         <div>
           <label className="text-xs font-bold text-gray-500 block mb-1">تاريخ التنفيذ (هجري)</label>
           <div className="flex gap-2 items-center">
-            <select value={dateDay} onChange={e=>setDateDay(e.target.value)}
-              className="flex-1 px-2 py-2 rounded-xl border-2 border-gray-200 text-sm font-bold text-center focus:outline-none" style={st}>
+            <select value={dateDay} onChange={e=>setDateDay(e.target.value)} className="flex-1 px-2 py-2 rounded-xl border-2 border-gray-200 text-sm font-bold text-center focus:outline-none" style={st}>
               <option value="">يوم</option>
               {Array.from({length:30},(_,i)=>i+1).map(d=><option key={d} value={d}>{String(d).padStart(2,"0")}</option>)}
             </select>
             <span className="font-bold text-gray-400">/</span>
-            <select value={dateMonth} onChange={e=>setDateMonth(e.target.value)}
-              className="flex-1 px-2 py-2 rounded-xl border-2 border-gray-200 text-sm font-bold focus:outline-none" style={st}>
+            <select value={dateMonth} onChange={e=>setDateMonth(e.target.value)} className="flex-1 px-2 py-2 rounded-xl border-2 border-gray-200 text-sm font-bold focus:outline-none" style={st}>
               <option value="">الشهر</option>
               {HIJRI_M.map((m,i)=><option key={i} value={m}>{m}</option>)}
             </select>
             <span className="font-bold text-gray-400">/</span>
-            <select value={dateYear} onChange={e=>setDateYear(e.target.value)}
-              className="flex-1 px-2 py-2 rounded-xl border-2 border-gray-200 text-sm font-bold text-center focus:outline-none" style={st}>
+            <select value={dateYear} onChange={e=>setDateYear(e.target.value)} className="flex-1 px-2 py-2 rounded-xl border-2 border-gray-200 text-sm font-bold text-center focus:outline-none" style={st}>
               {[1445,1446,1447,1448,1449].map(y=><option key={y} value={y}>{y}</option>)}
             </select>
             <span className="text-sm font-bold text-gray-500">هـ</span>
@@ -7044,58 +6961,41 @@ ${activeWit.length > 0 ? `<div class="ws-title">الشـواهـد</div><div cla
       </div>
 
       <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-        <h3 className="font-black text-blue-800 text-sm mb-3">🎯 الأهداف</h3>
+        <h3 className="font-black text-blue-800 text-sm mb-3">الأهداف</h3>
         <div className="space-y-2">
           {objectives.map((obj,i)=>(
             <div key={i} className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black text-white flex-shrink-0"
-                style={{background:"#1a6696"}}>{i+1}</div>
-              <input value={obj} onChange={e=>setObjectives(ob=>ob.map((x,j)=>j===i?e.target.value:x))}
-                placeholder={`الهدف ${i+1}...`} className={ic} style={st} />
-              {objectives.length > 3 &&
-                <button onClick={()=>setObjectives(ob=>ob.filter((_,j)=>j!==i))} className="text-red-400 px-1 text-sm">✕</button>}
+              <div className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black text-white flex-shrink-0" style={{background:"#1a6696"}}>{i+1}</div>
+              <input value={obj} onChange={e=>setObjectives(ob=>ob.map((x,j)=>j===i?e.target.value:x))} placeholder={"الهدف "+(i+1)+"..."} className={ic} style={st} />
+              {objectives.length > 3 && <button onClick={()=>setObjectives(ob=>ob.filter((_,j)=>j!==i))} className="text-red-400 px-1 text-sm">x</button>}
             </div>
           ))}
-          <button onClick={()=>setObjectives(ob=>[...ob,""])}
-            className="text-xs font-black text-blue-700 hover:underline mt-1">+ إضافة هدف</button>
+          <button onClick={()=>setObjectives(ob=>[...ob,""])} className="text-xs font-black text-blue-700 hover:underline mt-1">+ إضافة هدف</button>
         </div>
       </div>
 
       <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-        <h3 className="font-black text-blue-800 text-sm mb-1">📸 الشواهد</h3>
-        <p className="text-xs text-blue-400 mb-3 bg-blue-50 rounded-xl px-3 py-2">
-          💡 انقر على أي مربع ← ثم اضغط <strong>Ctrl+V</strong> للصق الصورة مباشرة من الحافظة، أو اضغط لاختيار ملف
-        </p>
+        <h3 className="font-black text-blue-800 text-sm mb-1">الشواهد</h3>
+        <p className="text-xs text-blue-400 mb-3 bg-blue-50 rounded-xl px-3 py-2">انقر على أي مربع ثم اضغط Ctrl+V للصق الصورة مباشرة، أو اضغط لاختيار ملف</p>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           {witnesses.map((w, idx) => (
-            <div key={idx} className="relative">
+            <div key={idx}>
               {w ? (
                 <div className="relative rounded-2xl overflow-hidden border-2 border-blue-400 group">
-                  <img src={w} alt={`شاهد ${idx+1}`} className="w-full object-cover" style={{maxHeight:160}} />
+                  <img src={w} alt={"شاهد "+(idx+1)} className="w-full object-cover" style={{maxHeight:160}} />
                   <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all flex items-center justify-center">
-                    <button onClick={()=>removeWitness(idx)}
-                      className="opacity-0 group-hover:opacity-100 bg-red-500 text-white text-xs font-black px-3 py-1.5 rounded-xl transition-opacity">
-                      🗑️ حذف
-                    </button>
+                    <button onClick={()=>removeWitness(idx)} className="opacity-0 group-hover:opacity-100 bg-red-500 text-white text-xs font-black px-3 py-1.5 rounded-xl">حذف</button>
                   </div>
-                  <div className="absolute bottom-0 left-0 right-0 text-center text-xs font-black text-white py-0.5"
-                    style={{background:"rgba(26,102,150,0.85)"}}>
-                    شاهد {idx+1}
-                  </div>
+                  <div className="absolute bottom-0 left-0 right-0 text-center text-xs font-black text-white py-0.5" style={{background:"rgba(26,102,150,0.85)"}}>شاهد {idx+1}</div>
                 </div>
               ) : (
-                <label
-                  tabIndex={0}
-                  onPaste={e => handlePaste(idx, e)}
-                  className="flex flex-col items-center justify-center gap-1.5 rounded-2xl border-2 border-dashed border-blue-300 bg-blue-50 cursor-pointer hover:bg-blue-100 hover:border-blue-500 transition-all focus:border-blue-500 focus:bg-blue-100 focus:outline-none"
-                  style={{minHeight:130, padding:"16px 8px"}}>
+                <label tabIndex={0} onPaste={e=>handlePaste(idx,e)}
+                  className="flex flex-col items-center justify-center gap-1.5 rounded-2xl border-2 border-dashed border-blue-300 bg-blue-50 cursor-pointer hover:bg-blue-100 hover:border-blue-500 transition-all focus:border-blue-500 focus:outline-none"
+                  style={{minHeight:130,padding:"16px 8px"}}>
                   <span className="text-3xl">📷</span>
-                  <span className="text-xs font-black text-blue-700 text-center">شاهد {idx+1}</span>
-                  <span className="text-xs text-blue-400 text-center leading-relaxed">
-                    Ctrl+V للصق<br/>أو اضغط لاختيار ملف
-                  </span>
-                  <input type="file" accept="image/*" className="hidden"
-                    onChange={e=>{ if(e.target.files[0]) handleFile(idx, e.target.files[0]); e.target.value=""; }} />
+                  <span className="text-xs font-black text-blue-700">شاهد {idx+1}</span>
+                  <span className="text-xs text-blue-400 text-center leading-relaxed">Ctrl+V للصق<br/>أو اضغط لملف</span>
+                  <input type="file" accept="image/*" className="hidden" onChange={e=>{ if(e.target.files[0]) handleFile(idx,e.target.files[0]); e.target.value=""; }} />
                 </label>
               )}
             </div>
@@ -7104,26 +7004,14 @@ ${activeWit.length > 0 ? `<div class="ws-title">الشـواهـد</div><div cla
       </div>
 
       <div className="flex gap-3">
-        <button onClick={()=>{setSaved(true);setTimeout(()=>setSaved(false),2000);}}
-          className="flex-1 py-4 rounded-2xl text-white font-black text-sm shadow-lg transition-all"
-          style={{background:"linear-gradient(135deg,#1a6696,#0f2d55)"}}>
-          {saved ? "✅ تم الحفظ" : "💾 حفظ التقرير"}
+        <button onClick={()=>{setSaved(true);setTimeout(()=>setSaved(false),2000);}} className="flex-1 py-4 rounded-2xl text-white font-black text-sm shadow-lg" style={{background:"linear-gradient(135deg,#1a6696,#0f2d55)"}}>
+          {saved ? "تم الحفظ" : "حفظ التقرير"}
         </button>
-        <button onClick={printReport}
-          className="flex-1 py-4 rounded-2xl text-white font-black text-sm shadow-lg"
-          style={{background:"linear-gradient(135deg,#155724,#28a745)"}}>
-          🖨️ طباعة / PDF
+        <button onClick={printReport} className="flex-1 py-4 rounded-2xl text-white font-black text-sm shadow-lg" style={{background:"linear-gradient(135deg,#155724,#28a745)"}}>
+          طباعة / PDF
         </button>
-        <button onClick={()=>{
-          if(window.confirm("تصفير جميع البيانات؟")) {
-            setRegion(""); setOffice("مكتب التعليم"); setProgName(""); setExecutor("");
-            setLocation(""); setTargetGroup(""); setObjectives(["","","","",""]);
-            setBenefCount(""); setDateDay(""); setDateMonth(""); setDateYear("1447");
-            setWitnesses([null,null,null,null,null]);
-            try { localStorage.removeItem("prog_report_v2"); } catch(e) {}
-          }}}
-          className="px-5 py-4 rounded-2xl text-gray-400 font-black text-sm border-2 border-gray-200 hover:border-red-300 hover:text-red-500 transition-all">
-          🗑️
+        <button onClick={()=>{ if(window.confirm("تصفير جميع البيانات؟")) { setRegion(""); setOffice("مكتب التعليم"); setProgName(""); setExecutor(""); setLocation(""); setTargetGroup(""); setObjectives(["","","","",""]); setBenefCount(""); setDateDay(""); setDateMonth(""); setDateYear("1447"); setWitnesses([null,null,null,null,null]); try { localStorage.removeItem("prog_report_v2"); } catch(e) {} }}} className="px-5 py-4 rounded-2xl text-gray-400 font-black text-sm border-2 border-gray-200 hover:border-red-300 hover:text-red-500 transition-all">
+          🗑
         </button>
       </div>
     </div>
@@ -7391,7 +7279,6 @@ function TeacherProfilePage({ teachers, attendance, week, weekArchive, classList
   const [showLeaveForm, setShowLeaveForm] = useState(false);
   const [leaveForm, setLeaveForm] = useState({ type:"اضطراري", dateH:"", dateM:"", reason:"", days:1, status:"بانتظار الموافقة" });
 
-  // - تحميل إجازات المعلمين من Firebase -
   React.useEffect(() => {
     DB.get("school-teacher-leaves", {}).then(data => {
       if (data && typeof data === "object") setLeaves(data);
@@ -7727,28 +7614,24 @@ function GradeAnalysisPage() {
 
   const [xlsxMsg, setXlsxMsg] = useState("");
   const [xlsxLoading, setXlsxLoading] = useState(false);
+  const [gaLoaded,    setGaLoaded]   = useState(false);
 
-  // - تحميل الدرجات من Firebase عند فتح الصفحة -
   React.useEffect(() => {
     DB.get("school-grade-analysis", {}).then(data => {
       if (data && typeof data === "object") {
         const key = stage + "-" + sem;
-        if (data[key] && Array.isArray(data[key])) {
-          setStudents(data[key]);
-        }
+        if (data[key] && Array.isArray(data[key])) setStudents(data[key]);
       }
       setGaLoaded(true);
     });
   }, [stage, sem]);
 
-  // - حفظ تلقائي عند تغيير الدرجات -
   React.useEffect(() => {
     if (!gaLoaded || students.length === 0) return;
     const t = setTimeout(async () => {
       const existing = await DB.get("school-grade-analysis", {});
       const key = stage + "-" + sem;
-      const updated = { ...existing, [key]: students };
-      DB.set("school-grade-analysis", updated);
+      DB.set("school-grade-analysis", { ...existing, [key]: students });
     }, 1500);
     return () => clearTimeout(t);
   }, [students, gaLoaded, stage, sem]);
@@ -14791,24 +14674,20 @@ function AttendanceAnalysisPage() {
   );
 }
 
-export default // ===== نظام النوافذ العائمة =====
+// ===== نظام النوافذ العائمة =====
 
-// مكوّن النافذة العائمة الفردية
 function FloatingPanelWindow({ panel, onClose, onToggleMin, onMove, onBringFront, children }) {
-  const dragRef = useRef(null);
   const isDragging = useRef(false);
-  const dragStart = useRef({ mx: 0, my: 0, px: 0, py: 0 });
+  const dragStart  = useRef({ mx:0, my:0, px:0, py:0 });
 
   const startDrag = (e) => {
-    if (e.target.closest("button, input, select, textarea, label")) return;
+    if (e.target.closest("button,input,select,textarea,label")) return;
     isDragging.current = true;
-    dragStart.current = { mx: e.clientX, my: e.clientY, px: panel.x, py: panel.y };
+    dragStart.current = { mx:e.clientX, my:e.clientY, px:panel.x, py:panel.y };
     onBringFront(panel.id);
     const move = (ev) => {
       if (!isDragging.current) return;
-      const nx = dragStart.current.px + ev.clientX - dragStart.current.mx;
-      const ny = dragStart.current.py + ev.clientY - dragStart.current.my;
-      onMove(panel.id, Math.max(0, nx), Math.max(0, ny));
+      onMove(panel.id, Math.max(0, dragStart.current.px + ev.clientX - dragStart.current.mx), Math.max(0, dragStart.current.py + ev.clientY - dragStart.current.my));
     };
     const up = () => { isDragging.current = false; window.removeEventListener("mousemove", move); window.removeEventListener("mouseup", up); };
     window.addEventListener("mousemove", move);
@@ -14816,94 +14695,33 @@ function FloatingPanelWindow({ panel, onClose, onToggleMin, onMove, onBringFront
   };
 
   return (
-    <div
-      style={{
-        position: "fixed",
-        left: panel.x,
-        top: panel.y,
-        zIndex: 9000,
-        width: panel.minimized ? "auto" : 480,
-        maxWidth: "95vw",
-        maxHeight: panel.minimized ? "auto" : "85vh",
-        borderRadius: 18,
-        boxShadow: "0 20px 60px rgba(0,0,0,.35)",
-        display: "flex",
-        flexDirection: "column",
-        overflow: "hidden",
-        background: "#fff",
-        userSelect: "none",
-      }}
-      onClick={() => onBringFront(panel.id)}
-    >
-      {/* شريط العنوان */}
-      <div
-        onMouseDown={startDrag}
-        style={{
-          background: "linear-gradient(135deg,#0f172a,#1e3a5f)",
-          color: "#fff",
-          padding: "8px 12px",
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          cursor: "grab",
-          flexShrink: 0,
-          borderRadius: panel.minimized ? 18 : "18px 18px 0 0",
-        }}
-      >
-        <span style={{ fontSize: 18 }}>{panel.icon}</span>
-        <span style={{ flex: 1, fontFamily: "Cairo,sans-serif", fontWeight: 700, fontSize: 13 }}>{panel.label}</span>
-        <button
-          onClick={e => { e.stopPropagation(); onToggleMin(panel.id); }}
-          style={{ background: "rgba(255,255,255,.15)", border: "none", color: "#fff", borderRadius: 8, width: 26, height: 26, cursor: "pointer", fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center" }}
-        >{panel.minimized ? "⬆" : "⬇"}</button>
-        <button
-          onClick={e => { e.stopPropagation(); onClose(panel.id); }}
-          style={{ background: "rgba(239,68,68,.7)", border: "none", color: "#fff", borderRadius: 8, width: 26, height: 26, cursor: "pointer", fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center" }}
-        >✕</button>
+    <div style={{ position:"fixed", left:panel.x, top:panel.y, zIndex:9000, width:panel.minimized?"auto":480, maxWidth:"95vw", maxHeight:panel.minimized?"auto":"85vh", borderRadius:18, boxShadow:"0 20px 60px rgba(0,0,0,.35)", display:"flex", flexDirection:"column", overflow:"hidden", background:"#fff" }} onClick={()=>onBringFront(panel.id)}>
+      <div onMouseDown={startDrag} style={{ background:"linear-gradient(135deg,#0f172a,#1e3a5f)", color:"#fff", padding:"8px 12px", display:"flex", alignItems:"center", gap:8, cursor:"grab", flexShrink:0, borderRadius:panel.minimized?18:"18px 18px 0 0" }}>
+        <span style={{fontSize:18}}>{panel.icon}</span>
+        <span style={{flex:1,fontFamily:"Cairo,sans-serif",fontWeight:700,fontSize:13}}>{panel.label}</span>
+        <button onClick={e=>{e.stopPropagation();onToggleMin(panel.id);}} style={{background:"rgba(255,255,255,.15)",border:"none",color:"#fff",borderRadius:8,width:26,height:26,cursor:"pointer",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center"}}>{panel.minimized?"^":"v"}</button>
+        <button onClick={e=>{e.stopPropagation();onClose(panel.id);}} style={{background:"rgba(239,68,68,.7)",border:"none",color:"#fff",borderRadius:8,width:26,height:26,cursor:"pointer",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center"}}>x</button>
       </div>
-      {/* محتوى النافذة */}
-      {!panel.minimized && (
-        <div style={{ overflowY: "auto", flex: 1, padding: "12px", userSelect: "text", direction: "rtl" }}>
-          {children}
-        </div>
-      )}
+      {!panel.minimized && <div style={{overflowY:"auto",flex:1,padding:"12px",direction:"rtl"}}>{children}</div>}
     </div>
   );
 }
 
-// شريط الأدوات العائمة — يظهر دائماً في أسفل الشاشة
 function FloatBar({ openFloat, floatingPanels }) {
   const tools = [
-    { id:"classtimer",   label:"مؤقت الحصة",     icon:"⏱️" },
-    { id:"luckywheel",   label:"عجلة الحظ",       icon:"🎡" },
-    { id:"exitticket",   label:"تذكرة الخروج",   icon:"🎫" },
-    { id:"groupdivider", label:"مقسم المجموعات", icon:"👥" },
-    { id:"raffle",       label:"السحب العشوائي",  icon:"🎯" },
-    { id:"quiz",         label:"اختبار سريع",     icon:"❓" },
-    { id:"poll",         label:"تصويت",           icon:"📊" },
+    {id:"classtimer",icon:"⏱",label:"مؤقت"},{id:"luckywheel",icon:"🎡",label:"عجلة"},
+    {id:"exitticket",icon:"🎫",label:"تذكرة"},{id:"groupdivider",icon:"👥",label:"مجموعات"},
+    {id:"raffle",icon:"🎯",label:"سحب"},{id:"quiz",icon:"❓",label:"اختبار"},{id:"poll",icon:"📊",label:"تصويت"},
   ];
   return (
-    <div style={{
-      position: "fixed", bottom: 12, left: "50%", transform: "translateX(-50%)",
-      zIndex: 8999, background: "rgba(15,23,42,.92)", borderRadius: 20,
-      padding: "6px 10px", display: "flex", gap: 6, alignItems: "center",
-      boxShadow: "0 8px 32px rgba(0,0,0,.4)", backdropFilter: "blur(10px)",
-    }}>
-      <span style={{ color: "rgba(255,255,255,.5)", fontSize: 11, fontFamily: "Cairo,sans-serif", paddingLeft: 4 }}>🧰</span>
-      {tools.map(t => {
-        const active = floatingPanels.some(p => p.id === t.id);
+    <div style={{position:"fixed",bottom:12,left:"50%",transform:"translateX(-50%)",zIndex:8999,background:"rgba(15,23,42,.92)",borderRadius:20,padding:"6px 10px",display:"flex",gap:6,alignItems:"center",boxShadow:"0 8px 32px rgba(0,0,0,.4)"}}>
+      {tools.map(t=>{
+        const active = floatingPanels.some(p=>p.id===t.id);
         return (
-          <button key={t.id} onClick={() => openFloat(t.id, t.label, t.icon)}
-            title={t.label}
-            style={{
-              background: active ? "rgba(13,148,136,.7)" : "rgba(255,255,255,.1)",
-              border: active ? "1.5px solid #0d9488" : "1.5px solid rgba(255,255,255,.1)",
-              color: "#fff", borderRadius: 12, padding: "5px 10px",
-              cursor: "pointer", fontSize: 18, transition: "all .2s",
-              display: "flex", flexDirection: "column", alignItems: "center", gap: 1,
-            }}>
-            <span>{t.icon}</span>
-            <span style={{ fontSize: 9, fontFamily: "Cairo,sans-serif", opacity: .7 }}>{t.label}</span>
+          <button key={t.id} onClick={()=>openFloat(t.id,t.label,t.icon)} title={t.label}
+            style={{background:active?"rgba(13,148,136,.7)":"rgba(255,255,255,.1)",border:active?"1.5px solid #0d9488":"1.5px solid rgba(255,255,255,.1)",color:"#fff",borderRadius:12,padding:"5px 8px",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:1}}>
+            <span style={{fontSize:16}}>{t.icon}</span>
+            <span style={{fontSize:9,fontFamily:"Cairo,sans-serif",opacity:.7}}>{t.label}</span>
           </button>
         );
       })}
@@ -14911,7 +14729,8 @@ function FloatBar({ openFloat, floatingPanels }) {
   );
 }
 
-function SchoolWebsite() {
+
+export default function SchoolWebsite() {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
   const [parentPortal, setParentPortal] = useState(false);
@@ -14950,19 +14769,11 @@ function SchoolWebsite() {
   }, []);
 
   const navigate = (p) => { setPage(p); window.location.hash = p; setMenuOpen(false); };
-
-  // -- فتح نافذة عائمة --
-  const openFloat = (id, label, icon) => {
-    setFloatingPanels(prev => {
-      if (prev.find(p => p.id === id)) return prev; // لا تفتح نفس النافذة مرتين
-      const col = prev.length;
-      return [...prev, { id, label, icon, x: 80 + col * 30, y: 80 + col * 30, minimized: false }];
-    });
-  };
-  const closeFloat  = (id) => setFloatingPanels(prev => prev.filter(p => p.id !== id));
-  const toggleMin   = (id) => setFloatingPanels(prev => prev.map(p => p.id === id ? { ...p, minimized: !p.minimized } : p));
-  const movePanel   = (id, x, y) => setFloatingPanels(prev => prev.map(p => p.id === id ? { ...p, x, y } : p));
-  const bringFront  = (id) => setFloatingPanels(prev => { const p = prev.find(x => x.id === id); return p ? [...prev.filter(x => x.id !== id), p] : prev; });
+  const openFloat  = (id,label,icon) => setFloatingPanels(prev => prev.find(p=>p.id===id) ? prev : [...prev,{id,label,icon,x:80+prev.length*30,y:80+prev.length*30,minimized:false}]);
+  const closeFloat = (id) => setFloatingPanels(prev=>prev.filter(p=>p.id!==id));
+  const toggleMin  = (id) => setFloatingPanels(prev=>prev.map(p=>p.id===id?{...p,minimized:!p.minimized}:p));
+  const movePanel  = (id,x,y) => setFloatingPanels(prev=>prev.map(p=>p.id===id?{...p,x,y}:p));
+  const bringFront = (id) => setFloatingPanels(prev=>{ const p=prev.find(x=>x.id===id); return p?[...prev.filter(x=>x.id!==id),p]:prev; });
 
   useEffect(() => {
     (async () => {
@@ -15442,19 +15253,10 @@ function SchoolWebsite() {
       </footer>
     </div>
 
-    {/* ===== شريط الادوات العائمة ===== */}
     <FloatBar openFloat={openFloat} floatingPanels={floatingPanels} />
 
-    {/* ===== النوافذ العائمة ===== */}
     {floatingPanels.map(panel => (
-      <FloatingPanelWindow
-        key={panel.id}
-        panel={panel}
-        onClose={closeFloat}
-        onToggleMin={toggleMin}
-        onMove={movePanel}
-        onBringFront={bringFront}
-      >
+      <FloatingPanelWindow key={panel.id} panel={panel} onClose={closeFloat} onToggleMin={toggleMin} onMove={movePanel} onBringFront={bringFront}>
         {panel.id === "classtimer"   && <ClassTimerPage />}
         {panel.id === "luckywheel"   && <LuckyWheelPage />}
         {panel.id === "exitticket"   && <ExitTicketPage />}
