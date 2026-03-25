@@ -10338,141 +10338,351 @@ ${essayText}
 
 // ===== نظام التوصية بالدروس =====
 function LessonRecommendPage({ classList }) {
-  const [selectedClass, setSelectedClass] = useState("");
-  const [selectedStudent, setSelectedStudent] = useState(null);
+  const [selClass,   setSelClass]   = useState("");
+  const [selStudent, setSelStudent] = useState("");
+  const [plans,      setPlans]      = useState({});  // { studentKey: [plan,...] }
+  const [showForm,   setShowForm]   = useState(false);
+  const [saving,     setSaving]     = useState(false);
+  const [form,       setForm]       = useState({
+    subject:"", type:"pages", detail:"", link:"", days:[], dateDay:"", dateMonth:"", dateYear:"1447",
+    notes:"", status:"جديدة"
+  });
 
-  const SUBJECT_RESOURCES = {
-    "رياضيات": [{title:"خان أكاديمي — رياضيات",url:"https://ar.khanacademy.org/math",icon:"📐"},{title:"يوتيوب — شرح رياضيات",url:"https://www.youtube.com/results?search_query=شرح+رياضيات+متوسط",icon:"▶️"}],
-    "علوم":    [{title:"خان أكاديمي — علوم",url:"https://ar.khanacademy.org/science",icon:"🔬"},{title:"يوتيوب — شرح علوم",url:"https://www.youtube.com/results?search_query=شرح+علوم+متوسط",icon:"▶️"}],
-    "إنجليزي": [{title:"Duolingo — إنجليزي",url:"https://www.duolingo.com",icon:"🔠"},{title:"BBC Learning English",url:"https://www.bbc.co.uk/learningenglish",icon:"🌐"}],
-    "لغتي":   [{title:"يوتيوب — لغة عربية",url:"https://www.youtube.com/results?search_query=شرح+لغة+عربية+متوسط",icon:"📖"},{title:"مدرسة.كوم",url:"https://madrasa.com",icon:"🏫"}],
-    "دراسات إسلامية": [{title:"يوتيوب — تربية إسلامية",url:"https://www.youtube.com/results?search_query=شرح+تربية+إسلامية",icon:"🌙"},{title:"إسلام ويب",url:"https://islamweb.net",icon:"📿"}],
+  const SUBJECTS = ["القرآن الكريم","التربية الإسلامية","اللغة العربية","الرياضيات","العلوم","الاجتماعيات","اللغة الإنجليزية","التقنية","الفنون","التربية البدنية","أخرى"];
+  const DAYS_W   = ["الأحد","الاثنين","الثلاثاء","الأربعاء","الخميس"];
+  const H_MONTHS = ["محرم","صفر","ربيع الأول","ربيع الثاني","جمادى الأولى","جمادى الثانية","رجب","شعبان","رمضان","شوال","ذو القعدة","ذو الحجة"];
+  const STATUS_OPTIONS = [
+    { val:"جديدة",         col:"#6366f1", bg:"#eef2ff" },
+    { val:"قيد التنفيذ",   col:"#f59e0b", bg:"#fffbeb" },
+    { val:"تحسّن",          col:"#10b981", bg:"#ecfdf5" },
+    { val:"لم يتحسّن",     col:"#ef4444", bg:"#fef2f2" },
+    { val:"مكتملة",        col:"#0d9488", bg:"#f0fdfa" },
+  ];
+
+  useEffect(() => {
+    DB.get("school-remedial-plans", {}).then(d => setPlans(d && typeof d === "object" ? d : {}));
+  }, []);
+
+  const savePlans = async (updated) => {
+    setPlans(updated);
+    await DB.set("school-remedial-plans", updated);
   };
 
-  const cls = classList.find(c=>c.id===selectedClass);
-  const student = cls?.students?.find(s=>s.id===selectedStudent);
-  const evals = student?.evals||[];
+  const cls = classList.find(c => c.id === selClass);
+  const students = cls ? cls.students.filter(s => s.name) : [];
+  const studentKey = selClass + "_" + selStudent;
+  const studentPlans = (plans[studentKey] || []);
 
-  const weakSubjects = (() => {
-    const subjScores = {};
-    evals.forEach(ev => {
-      if (!ev.subject) return;
-      if (!subjScores[ev.subject]) subjScores[ev.subject]=[];
-      const lvMap={excel:5,vgood:4,good:3,accept:2,weak:1};
-      subjScores[ev.subject].push(lvMap[ev.level]||0);
-    });
-    return Object.entries(subjScores).map(([subj,scores])=>({
-      subj, avg:scores.reduce((a,b)=>a+b,0)/scores.length, count:scores.length
-    })).filter(x=>x.avg<3).sort((a,b)=>a.avg-b.avg);
-  })();
+  const addPlan = async () => {
+    if (!form.subject || !form.detail) { alert("أدخل المادة والتفاصيل"); return; }
+    setSaving(true);
+    const newPlan = {
+      ...form,
+      id: Date.now(),
+      createdAt: new Date().toLocaleDateString("ar-SA"),
+      followUps: []
+    };
+    const updated = { ...plans, [studentKey]: [...studentPlans, newPlan] };
+    await savePlans(updated);
+    setForm({ subject:"", type:"pages", detail:"", link:"", days:[], dateDay:"", dateMonth:"", dateYear:"1447", notes:"", status:"جديدة" });
+    setShowForm(false);
+    setSaving(false);
+  };
 
-  const levelLabel = avg => avg>=4?"ممتاز":avg>=3?"جيد":avg>=2?"مقبول":"يحتاج دعم";
-  const levelColor = avg => avg>=4?"#22c55e":avg>=3?"#f59e0b":avg>=2?"#fb923c":"#ef4444";
+  const updatePlanStatus = async (planId, newStatus) => {
+    const updated = {
+      ...plans,
+      [studentKey]: studentPlans.map(p => p.id === planId
+        ? { ...p, status: newStatus, followUps: [...(p.followUps||[]), { status: newStatus, date: new Date().toLocaleDateString("ar-SA") }] }
+        : p
+      )
+    };
+    await savePlans(updated);
+  };
+
+  const deletePlan = async (planId) => {
+    if (!window.confirm("حذف الخطة؟")) return;
+    const updated = { ...plans, [studentKey]: studentPlans.filter(p => p.id !== planId) };
+    await savePlans(updated);
+  };
+
+  const toggleDay = (day) => {
+    setForm(f => ({
+      ...f,
+      days: f.days.includes(day) ? f.days.filter(d => d !== day) : [...f.days, day]
+    }));
+  };
+
+  const typeLabels = { pages:"صفحات محددة", video:"رابط فيديو", pdf:"رابط PDF / ملف", mixed:"مختلط" };
 
   return (
-    <div dir="rtl" className="space-y-4">
-      <div className="rounded-3xl overflow-hidden shadow-xl" style={{background:"linear-gradient(135deg,#0891b2,#7c3aed)"}}>
-        <div className="p-6 text-white">
-          <h2 className="text-2xl font-black mb-1">💡 التوصية بالدروس</h2>
-          <p className="opacity-80 text-sm">تحليل نقاط ضعف الطالب واقتراح مصادر تعليمية مناسبة</p>
+    <div className="space-y-5 max-w-4xl mx-auto">
+
+      {/* رأس الصفحة */}
+      <div className="rounded-3xl p-6 text-white shadow-xl relative overflow-hidden"
+        style={{background:"linear-gradient(135deg,#1e3a5f 0%,#7c3aed 60%,#6366f1 100%)"}}>
+        <div style={{position:"absolute",top:-30,left:-30,width:150,height:150,borderRadius:"50%",background:"rgba(255,255,255,.05)"}} />
+        <div style={{position:"absolute",inset:0,background:"linear-gradient(120deg,transparent 40%,rgba(255,255,255,.07) 60%,transparent 80%)"}} />
+        <div className="relative">
+          <h2 className="text-2xl font-black mb-1">🩺 الخطط العلاجية</h2>
+          <p className="opacity-75 text-sm">إضافة خطط دعم فردية ومتابعة تحسّن الطالب</p>
         </div>
-      </div>
-      <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 space-y-3">
-        <div>
-          <label className="text-xs font-bold text-gray-500 block mb-1">الفصل</label>
-          <select value={selectedClass} onChange={e=>{setSelectedClass(e.target.value);setSelectedStudent(null);}}
-            className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 text-sm font-bold focus:outline-none" style={{fontFamily:"inherit"}}>
-            <option value="">— اختر الفصل —</option>
-            {classList.map(c=><option key={c.id} value={c.id}>{c.name||`${c.level}/${c.section}`}</option>)}
-          </select>
-        </div>
-        {cls && (
-          <div>
-            <label className="text-xs font-bold text-gray-500 block mb-1">الطالب</label>
-            <select value={selectedStudent||""} onChange={e=>setSelectedStudent(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 text-sm font-bold focus:outline-none" style={{fontFamily:"inherit"}}>
-              <option value="">— اختر الطالب —</option>
-              {(cls.students||[]).filter(s=>s.name).map(s=><option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>
-          </div>
-        )}
       </div>
 
-      {student && (
+      {/* اختيار الفصل والطالب */}
+      <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 space-y-4">
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="text-xs font-black text-gray-500 block mb-1.5">الفصل</label>
+            <select value={selClass} onChange={e=>{ setSelClass(e.target.value); setSelStudent(""); }}
+              className="w-full px-3 py-2.5 rounded-xl border-2 border-gray-200 focus:border-purple-400 focus:outline-none text-sm font-bold"
+              style={{fontFamily:"inherit"}}>
+              <option value="">— اختر الفصل —</option>
+              {classList.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="text-xs font-black text-gray-500 block mb-1.5">الطالب</label>
+            <select value={selStudent} onChange={e=>setSelStudent(e.target.value)}
+              disabled={!selClass}
+              className="w-full px-3 py-2.5 rounded-xl border-2 border-gray-200 focus:border-purple-400 focus:outline-none text-sm font-bold disabled:opacity-50"
+              style={{fontFamily:"inherit"}}>
+              <option value="">— اختر الطالب —</option>
+              {students.map(s=><option key={s.id} value={s.name}>{s.name}</option>)}
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* محتوى الطالب */}
+      {selStudent && (
         <div className="space-y-4">
-          {weakSubjects.length===0 ? (
-            <div className="bg-green-50 border border-green-200 rounded-2xl p-6 text-center">
-              <div className="text-3xl mb-2">🌟</div>
-              <div className="font-black text-green-700">أداء الطالب ممتاز في جميع المواد</div>
-              <div className="text-xs text-green-600 mt-1">لا توجد مواد تحتاج دعماً إضافياً</div>
+          {/* شريط إضافة + ملخص */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-purple-100 flex items-center justify-center text-xl">👤</div>
+              <div>
+                <div className="font-black text-gray-800">{selStudent}</div>
+                <div className="text-xs text-gray-400">{studentPlans.length} خطة علاجية</div>
+              </div>
             </div>
-          ) : (
-            <>
-              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
-                <div className="font-black text-amber-800 mb-3 text-sm">⚠️ مواد تحتاج متابعة — {student.name}</div>
-                <div className="space-y-2">
-                  {weakSubjects.map(w=>(
-                    <div key={w.subj} className="flex items-center justify-between bg-white rounded-xl px-4 py-3">
-                      <span className="font-bold text-gray-800 text-sm">{w.subj}</span>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-gray-400">{w.count} تقييم</span>
-                        <span className="text-xs font-black px-2 py-1 rounded-full text-white" style={{background:levelColor(w.avg)}}>
-                          {levelLabel(w.avg)}
-                        </span>
-                      </div>
-                    </div>
+            <button onClick={()=>setShowForm(!showForm)}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-2xl text-white font-black text-sm shadow-lg transition-all hover:shadow-xl"
+              style={{background:"linear-gradient(135deg,#7c3aed,#6366f1)"}}>
+              {showForm ? "✕ إلغاء" : "+ إضافة خطة"}
+            </button>
+          </div>
+
+          {/* نموذج إضافة خطة */}
+          {showForm && (
+            <div className="bg-white rounded-2xl p-5 shadow-sm border-2 border-purple-100 space-y-4">
+              <h3 className="font-black text-purple-700 text-sm">📋 خطة علاجية جديدة</h3>
+
+              {/* المادة ونوع الخطة */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-bold text-gray-500 block mb-1">المادة</label>
+                  <select value={form.subject} onChange={e=>setForm(f=>({...f,subject:e.target.value}))}
+                    className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 focus:border-purple-400 focus:outline-none text-sm"
+                    style={{fontFamily:"inherit"}}>
+                    <option value="">اختر المادة</option>
+                    {SUBJECTS.map(s=><option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-500 block mb-1">نوع الخطة</label>
+                  <select value={form.type} onChange={e=>setForm(f=>({...f,type:e.target.value}))}
+                    className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 focus:border-purple-400 focus:outline-none text-sm"
+                    style={{fontFamily:"inherit"}}>
+                    <option value="pages">📄 صفحات محددة</option>
+                    <option value="video">▶️ رابط فيديو</option>
+                    <option value="pdf">📎 رابط PDF / ملف</option>
+                    <option value="mixed">🔀 مختلط</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* التفاصيل */}
+              <div>
+                <label className="text-xs font-bold text-gray-500 block mb-1">
+                  {form.type === "pages" ? "الصفحات / الدروس المحددة" :
+                   form.type === "video" ? "وصف الفيديو / الموضوع" :
+                   form.type === "pdf"   ? "اسم الملف / الموضوع" : "تفاصيل الخطة"}
+                </label>
+                <textarea value={form.detail} onChange={e=>setForm(f=>({...f,detail:e.target.value}))}
+                  rows={2} placeholder={form.type==="pages"?"مثال: صفحات 45-52، درس الكسور...":"اكتب التفاصيل..."}
+                  className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 focus:border-purple-400 focus:outline-none text-sm resize-none"
+                  style={{fontFamily:"inherit"}} />
+              </div>
+
+              {/* رابط (فيديو أو PDF) */}
+              {(form.type === "video" || form.type === "pdf" || form.type === "mixed") && (
+                <div>
+                  <label className="text-xs font-bold text-gray-500 block mb-1">الرابط</label>
+                  <input value={form.link} onChange={e=>setForm(f=>({...f,link:e.target.value}))}
+                    placeholder="https://..."
+                    className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 focus:border-purple-400 focus:outline-none text-sm"
+                    style={{fontFamily:"inherit"}} />
+                </div>
+              )}
+
+              {/* الأيام المخصصة */}
+              <div>
+                <label className="text-xs font-bold text-gray-500 block mb-1.5">أيام التنفيذ</label>
+                <div className="flex gap-2 flex-wrap">
+                  {DAYS_W.map(d=>(
+                    <button key={d} onClick={()=>toggleDay(d)}
+                      className="px-3 py-1.5 rounded-xl text-xs font-bold transition-all"
+                      style={{background:form.days.includes(d)?"linear-gradient(135deg,#7c3aed,#6366f1)":"#f5f3ff",
+                        color:form.days.includes(d)?"#fff":"#7c3aed",border:"1.5px solid",
+                        borderColor:form.days.includes(d)?"#6366f1":"#ddd6fe"}}>
+                      {d}
+                    </button>
                   ))}
                 </div>
               </div>
-              <div className="space-y-3">
-                {weakSubjects.map(w=>{
-                  const resources = SUBJECT_RESOURCES[w.subj]||[{title:"بحث في يوتيوب",url:`https://www.youtube.com/results?search_query=شرح+${w.subj}`,icon:"▶️"}];
-                  return (
-                    <div key={w.subj} className="bg-white rounded-2xl p-5 shadow-sm border border-blue-100">
-                      <div className="font-black text-blue-800 mb-3 text-sm">📚 توصيات لمادة {w.subj}</div>
-                      <div className="space-y-2">
-                        {resources.map((r,i)=>(
-                          <a key={i} href={r.url} target="_blank" rel="noopener noreferrer"
-                            className="flex items-center gap-3 bg-blue-50 hover:bg-blue-100 rounded-xl px-4 py-3 transition-all group">
-                            <span className="text-xl">{r.icon}</span>
-                            <div className="flex-1">
-                              <div className="font-bold text-blue-800 text-sm group-hover:underline">{r.title}</div>
-                              <div className="text-xs text-blue-500">{r.url.substring(0,40)}...</div>
-                            </div>
-                            <span className="text-blue-400 group-hover:text-blue-600">←</span>
-                          </a>
+
+              {/* التاريخ */}
+              <div>
+                <label className="text-xs font-bold text-gray-500 block mb-1">تاريخ البدء (هجري)</label>
+                <div className="flex gap-2 items-center">
+                  <select value={form.dateDay} onChange={e=>setForm(f=>({...f,dateDay:e.target.value}))}
+                    className="flex-1 px-2 py-2 rounded-xl border-2 border-gray-200 text-sm font-bold text-center focus:outline-none"
+                    style={{fontFamily:"inherit"}}>
+                    <option value="">يوم</option>
+                    {Array.from({length:30},(_,i)=>i+1).map(d=><option key={d} value={d}>{String(d).padStart(2,"0")}</option>)}
+                  </select>
+                  <span className="font-bold text-gray-400">/</span>
+                  <select value={form.dateMonth} onChange={e=>setForm(f=>({...f,dateMonth:e.target.value}))}
+                    className="flex-1 px-2 py-2 rounded-xl border-2 border-gray-200 text-sm font-bold focus:outline-none"
+                    style={{fontFamily:"inherit"}}>
+                    <option value="">الشهر</option>
+                    {H_MONTHS.map((m,i)=><option key={i} value={m}>{m}</option>)}
+                  </select>
+                  <span className="font-bold text-gray-400">/</span>
+                  <select value={form.dateYear} onChange={e=>setForm(f=>({...f,dateYear:e.target.value}))}
+                    className="w-24 px-2 py-2 rounded-xl border-2 border-gray-200 text-sm font-bold text-center focus:outline-none"
+                    style={{fontFamily:"inherit"}}>
+                    {[1445,1446,1447,1448,1449].map(y=><option key={y} value={y}>{y}</option>)}
+                  </select>
+                  <span className="text-sm font-bold text-gray-500">هـ</span>
+                </div>
+              </div>
+
+              {/* ملاحظات */}
+              <div>
+                <label className="text-xs font-bold text-gray-500 block mb-1">ملاحظات إضافية</label>
+                <input value={form.notes} onChange={e=>setForm(f=>({...f,notes:e.target.value}))}
+                  placeholder="أي ملاحظات للمعلم..."
+                  className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 focus:border-purple-400 focus:outline-none text-sm"
+                  style={{fontFamily:"inherit"}} />
+              </div>
+
+              <button onClick={addPlan} disabled={saving}
+                className="w-full py-3 rounded-2xl text-white font-black text-sm shadow-lg disabled:opacity-50"
+                style={{background:"linear-gradient(135deg,#7c3aed,#6366f1)"}}>
+                {saving ? "⏳ جاري الحفظ..." : "💾 إضافة الخطة العلاجية"}
+              </button>
+            </div>
+          )}
+
+          {/* قائمة الخطط */}
+          {studentPlans.length === 0 ? (
+            <div className="bg-white rounded-2xl p-10 text-center shadow-sm border border-gray-100">
+              <div className="text-4xl mb-2">📋</div>
+              <div className="font-black text-gray-400">لا توجد خطط علاجية لهذا الطالب بعد</div>
+              <div className="text-sm text-gray-300 mt-1">اضغط "+ إضافة خطة" لإنشاء أول خطة</div>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {studentPlans.map(plan => {
+                const st = STATUS_OPTIONS.find(s=>s.val===plan.status) || STATUS_OPTIONS[0];
+                const dateStr = plan.dateDay && plan.dateMonth
+                  ? `${String(plan.dateDay).padStart(2,"0")} / ${plan.dateMonth} / ${plan.dateYear} هـ`
+                  : "";
+                return (
+                  <div key={plan.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                    {/* شريط الحالة */}
+                    <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-50"
+                      style={{background:st.bg}}>
+                      <div className="flex items-center gap-2">
+                        <span className="font-black text-sm" style={{color:st.col}}>
+                          {plan.subject}
+                        </span>
+                        <span className="text-xs px-2.5 py-0.5 rounded-full font-bold" style={{background:st.col,color:"#fff"}}>
+                          {plan.status}
+                        </span>
+                        <span className="text-xs px-2 py-0.5 rounded-lg font-bold bg-white" style={{color:"#7c3aed",border:"1px solid #e0d9ff"}}>
+                          {typeLabels[plan.type]}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-gray-400">{plan.createdAt}</span>
+                        <button onClick={()=>deletePlan(plan.id)} className="text-red-300 hover:text-red-500 text-xs px-1">🗑</button>
+                      </div>
+                    </div>
+
+                    <div className="p-4 space-y-2">
+                      {/* التفاصيل */}
+                      <p className="text-sm text-gray-700 font-medium">{plan.detail}</p>
+
+                      {/* الرابط */}
+                      {plan.link && (
+                        <a href={plan.link} target="_blank" rel="noreferrer"
+                          className="flex items-center gap-2 text-xs text-blue-600 hover:underline font-bold">
+                          🔗 {plan.type === "video" ? "▶️ فتح الفيديو" : "📎 فتح الملف"}
+                        </a>
+                      )}
+
+                      {/* الأيام والتاريخ */}
+                      <div className="flex flex-wrap gap-2 items-center">
+                        {plan.days?.map(d=>(
+                          <span key={d} className="text-xs px-2.5 py-0.5 rounded-full font-bold bg-purple-50 text-purple-700">{d}</span>
+                        ))}
+                        {dateStr && <span className="text-xs text-gray-400">📅 {dateStr}</span>}
+                        {plan.notes && <span className="text-xs text-gray-500 italic">· {plan.notes}</span>}
+                      </div>
+
+                      {/* متابعة التحسن */}
+                      {plan.followUps?.length > 0 && (
+                        <div className="flex gap-1.5 flex-wrap mt-1">
+                          {plan.followUps.map((f,i)=>{
+                            const fst = STATUS_OPTIONS.find(s=>s.val===f.status);
+                            return fst ? (
+                              <span key={i} className="text-xs px-2 py-0.5 rounded-lg font-bold"
+                                style={{background:fst.bg,color:fst.col}}>
+                                {f.date}: {f.status}
+                              </span>
+                            ) : null;
+                          })}
+                        </div>
+                      )}
+
+                      {/* تحديث الحالة */}
+                      <div className="flex gap-1.5 flex-wrap pt-2 border-t border-gray-50">
+                        <span className="text-xs text-gray-400 font-bold ml-1">تحديث الحالة:</span>
+                        {STATUS_OPTIONS.map(s=>(
+                          <button key={s.val} onClick={()=>updatePlanStatus(plan.id,s.val)}
+                            className="text-xs px-3 py-1 rounded-xl font-bold transition-all hover:opacity-80"
+                            style={{background:plan.status===s.val?s.col:s.bg,
+                              color:plan.status===s.val?"#fff":s.col,
+                              border:`1.5px solid ${s.col}40`}}>
+                            {s.val}
+                          </button>
                         ))}
                       </div>
                     </div>
-                  );
-                })}
-              </div>
-            </>
-          )}
-          {evals.length===0 && (
-            <div className="bg-gray-50 rounded-2xl p-6 text-center border">
-              <div className="text-3xl mb-2">📋</div>
-              <div className="font-black text-gray-500">لا توجد تقييمات لهذا الطالب بعد</div>
-              <div className="text-xs text-gray-400 mt-1">أضف تقييمات بالمواد من صفحة تقييم الطلاب</div>
+                  </div>
+                );
+              })}
             </div>
           )}
-        </div>
-      )}
-      {!student && !cls && (
-        <div className="bg-white rounded-2xl p-12 text-center shadow-sm border">
-          <div className="text-4xl mb-3">💡</div>
-          <div className="font-black text-gray-600">اختر فصلاً وطالباً لعرض التوصيات</div>
         </div>
       )}
     </div>
   );
 }
 
-
-// ===== النماذج الرسمية — الدليل الإجرائي =====
-const SCHOOL_NAME = "مدرسة عبيدة بن الحارث المتوسطة";
-const FORM_GREEN = "#2d6a4f";
-const FORM_LIGHT = "#d8f3dc";
 
 function OfficialFormsPage({ teachers, attendance, week }) {
   const [accounts,         setAccounts]        = useState([]);
@@ -15438,7 +15648,7 @@ export default function SchoolWebsite() {
     { id: "committeemeeting",  label: "اجتماعات اللجان",           icon: "📋" },
     { id: "dailyquiz",     label: "الاختبار اليومي",     icon: "🎯" },
     { id: "aiteacher",     label: "مساعد المعلم الذكي",  icon: "🤖" },
-    { id: "lessonrecommend",label: "التوصية بالدروس",    icon: "💡" },
+    { id: "lessonrecommend",label: "الخطط العلاجية",     icon: "🩺" },
   ];
 
   return (
