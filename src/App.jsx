@@ -5825,10 +5825,9 @@ function SMSPage({ teachers, attendance, week, classList }) {
     setSending(true); setResult(null);
 
     // تنظيف الأرقام: إزالة الصفر الأول وإضافة 966
-    const cleanNums = numbers.split(/[
-,،]+/)
+    const cleanNums = numbers.split(/[\n,]+/)
       .map(n => {
-        n = n.trim().replace(/\s/g, "");
+        n = n.trim().replace(/ /g, "");
         if (n.startsWith("00966")) return n.substring(2);
         if (n.startsWith("0"))    return "966" + n.substring(1);
         if (n.startsWith("+"))    return n.substring(1);
