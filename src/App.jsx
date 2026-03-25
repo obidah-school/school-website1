@@ -823,28 +823,132 @@ function HomePage({ teachers, announcements, activities, navigate, attendance, w
         </div>
       </div>
 
-      {/* - روابط سريعة - */}
+      {/* - روابط سريعة ملونة - */}
       <div className="grid grid-cols-4 gap-3 sm:grid-cols-8">
         {[
-          {id:"attendance",    icon:"📋", label:"الحضور",        color:"#0d9488"},
-          {id:"students",      icon:"👨‍🎓", label:"التقييمات",     color:"#7c3aed"},
-          {id:"messages",      icon:"✉️",  label:"الرسائل",       color:"#2563eb"},
-          {id:"earlywarning",  icon:"🚨",  label:"الإنذار المبكر",color:"#dc2626"},
-          {id:"gradeanalysis", icon:"📊",  label:"تحليل الدرجات", color:"#6366f1"},
-          {id:"portfolio",     icon:"📁",  label:"ملف الطالب",    color:"#7c3aed"},
-          {id:"meetings",      icon:"📅",  label:"الاجتماعات",    color:"#0891b2"},
-          {id:"settings",      icon:"⚙️",  label:"الإعدادات",     color:"#64748b"},
+          {id:"attendance",    icon:"📋", label:"الحضور",         grad:"linear-gradient(135deg,#0d9488,#059669)", glow:"rgba(13,148,136,.35)"},
+          {id:"students",      icon:"👨‍🎓", label:"التقييمات",      grad:"linear-gradient(135deg,#7c3aed,#6d28d9)", glow:"rgba(124,58,237,.35)"},
+          {id:"messages",      icon:"✉️",  label:"الرسائل",        grad:"linear-gradient(135deg,#2563eb,#1d4ed8)", glow:"rgba(37,99,235,.35)"},
+          {id:"earlywarning",  icon:"🚨",  label:"الإنذار المبكر", grad:"linear-gradient(135deg,#ef4444,#dc2626)", glow:"rgba(239,68,68,.35)"},
+          {id:"gradeanalysis", icon:"📊",  label:"تحليل الدرجات",  grad:"linear-gradient(135deg,#6366f1,#4f46e5)", glow:"rgba(99,102,241,.35)"},
+          {id:"portfolio",     icon:"📁",  label:"ملف الطالب",     grad:"linear-gradient(135deg,#8b5cf6,#7c3aed)", glow:"rgba(139,92,246,.35)"},
+          {id:"meetings",      icon:"📅",  label:"الاجتماعات",     grad:"linear-gradient(135deg,#0891b2,#0e7490)", glow:"rgba(8,145,178,.35)"},
+          {id:"settings",      icon:"⚙️",  label:"الإعدادات",      grad:"linear-gradient(135deg,#64748b,#475569)", glow:"rgba(100,116,139,.35)"},
         ].map(p=>(
           <button key={p.id} onClick={()=>navigate(p.id)}
-            className="bg-white rounded-2xl p-3 flex flex-col items-center gap-1.5 hover:shadow-md transition-all border border-gray-100 hover:scale-105">
-            <span className="text-2xl">{p.icon}</span>
-            <span className="text-xs font-black" style={{color:p.color}}>{p.label}</span>
+            className="rounded-2xl flex flex-col items-center gap-2 transition-all relative overflow-hidden group"
+            style={{background:"#fff",padding:"14px 8px",border:"1px solid #f0f0f0",boxShadow:`0 2px 12px ${p.glow}`}}>
+            <div style={{position:"absolute",inset:0,background:p.grad,opacity:0,transition:"opacity .25s",zIndex:0}} className="group-hover:opacity-100" />
+            <div style={{width:44,height:44,borderRadius:14,background:p.grad,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,position:"relative",zIndex:1,boxShadow:`0 4px 14px ${p.glow}`,transition:"transform .25s"}} className="group-hover:scale-110">{p.icon}</div>
+            <span style={{fontSize:10,fontWeight:900,fontFamily:"Cairo,sans-serif",position:"relative",zIndex:1,transition:"color .25s",color:"#374151"}} className="group-hover:text-white">{p.label}</span>
           </button>
         ))}
+      </div>
+
+      {/* - روابط خارجية - */}
+      <div className="grid grid-cols-2 gap-3">
+        {/* بطاقة ملف الأداء الوظيفي */}
+        <a href="https://fazeosama2020-crypto.github.io/school/ubaidah_school_v2.html"
+          target="_blank" rel="noreferrer"
+          className="flex items-center gap-4 rounded-2xl p-4 text-white shadow-lg hover:shadow-2xl hover:-translate-y-1 transition-all relative overflow-hidden"
+          style={{background:"linear-gradient(135deg,#0f2d55,#1a5276,#2471a3)"}}>
+          <div style={{position:"absolute",inset:0,background:"linear-gradient(120deg,transparent 35%,rgba(255,255,255,.08) 55%,transparent 80%)",pointerEvents:"none"}} />
+          <div style={{width:52,height:52,borderRadius:16,background:"rgba(255,255,255,.15)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,boxShadow:"0 4px 14px rgba(0,0,0,.25)"}}>
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+              <line x1="16" y1="13" x2="8" y2="13"/>
+              <line x1="16" y1="17" x2="8" y2="17"/>
+              <path d="M9.5 10.5l1 1 2-2" stroke="#4ade80" strokeWidth="1.8"/>
+            </svg>
+          </div>
+          <div className="relative flex-1">
+            <div style={{fontSize:14,fontWeight:900,fontFamily:"Cairo,sans-serif"}}>ملف الأداء الوظيفي</div>
+            <div style={{fontSize:10,opacity:.75,fontFamily:"Cairo,sans-serif",marginTop:3}}>رفع الشواهد · معايير الأداء · التقييم الذاتي</div>
+            <div className="flex gap-1.5 mt-2">
+              {["شواهد","أداء","تقييم"].map(t=><span key={t} style={{fontSize:9,background:"rgba(255,255,255,.15)",borderRadius:8,padding:"2px 7px",fontFamily:"Cairo,sans-serif",fontWeight:700}}>{t}</span>)}
+            </div>
+          </div>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.5)" strokeWidth="2" strokeLinecap="round">
+            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+            <polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+          </svg>
+        </a>
+
+        {/* بطاقة منصة الاختبارات */}
+        <a href="https://fazeosama2020-crypto.github.io/school/quiz.html"
+          target="_blank" rel="noreferrer"
+          className="flex items-center gap-4 rounded-2xl p-4 text-white shadow-lg hover:shadow-2xl hover:-translate-y-1 transition-all relative overflow-hidden"
+          style={{background:"linear-gradient(135deg,#4a1d96,#6d28d9,#7c3aed)"}}>
+          <div style={{position:"absolute",inset:0,background:"linear-gradient(120deg,transparent 35%,rgba(255,255,255,.08) 55%,transparent 80%)",pointerEvents:"none"}} />
+          <div style={{width:52,height:52,borderRadius:16,background:"rgba(255,255,255,.15)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,boxShadow:"0 4px 14px rgba(0,0,0,.25)"}}>
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="2" y="3" width="20" height="14" rx="2"/>
+              <line x1="8" y1="21" x2="16" y2="21"/>
+              <line x1="12" y1="17" x2="12" y2="21"/>
+              <path d="M7 8h10M7 12h6" stroke="rgba(255,255,255,.6)"/>
+              <path d="M14 12l2 2 4-4" stroke="#a78bfa" strokeWidth="2"/>
+            </svg>
+          </div>
+          <div className="relative flex-1">
+            <div style={{fontSize:14,fontWeight:900,fontFamily:"Cairo,sans-serif"}}>منصة الاختبارات</div>
+            <div style={{fontSize:10,opacity:.75,fontFamily:"Cairo,sans-serif",marginTop:3}}>اختبارات إلكترونية · نتائج فورية · تقارير</div>
+            <div className="flex gap-1.5 mt-2">
+              {["اختبار","نتائج","تقارير"].map(t=><span key={t} style={{fontSize:9,background:"rgba(255,255,255,.15)",borderRadius:8,padding:"2px 7px",fontFamily:"Cairo,sans-serif",fontWeight:700}}>{t}</span>)}
+            </div>
+          </div>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.5)" strokeWidth="2" strokeLinecap="round">
+            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+            <polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+          </svg>
+      </div>
+
+      {/* - روابط سريعة ملونة - */}
+      <div className="grid grid-cols-4 gap-3 sm:grid-cols-8">
+        {[
+          {id:"attendance",    icon:"📋", label:"الحضور",         grad:"linear-gradient(135deg,#0d9488,#059669)", glow:"rgba(13,148,136,.35)"},
+          {id:"students",      icon:"👨‍🎓", label:"التقييمات",      grad:"linear-gradient(135deg,#7c3aed,#6d28d9)", glow:"rgba(124,58,237,.35)"},
+          {id:"messages",      icon:"✉️",  label:"الرسائل",        grad:"linear-gradient(135deg,#2563eb,#1d4ed8)", glow:"rgba(37,99,235,.35)"},
+          {id:"earlywarning",  icon:"🚨",  label:"الإنذار المبكر", grad:"linear-gradient(135deg,#ef4444,#dc2626)", glow:"rgba(239,68,68,.35)"},
+          {id:"gradeanalysis", icon:"📊",  label:"تحليل الدرجات",  grad:"linear-gradient(135deg,#6366f1,#4f46e5)", glow:"rgba(99,102,241,.35)"},
+          {id:"portfolio",     icon:"📁",  label:"ملف الطالب",     grad:"linear-gradient(135deg,#8b5cf6,#7c3aed)", glow:"rgba(139,92,246,.35)"},
+          {id:"meetings",      icon:"📅",  label:"الاجتماعات",     grad:"linear-gradient(135deg,#0891b2,#0e7490)", glow:"rgba(8,145,178,.35)"},
+          {id:"settings",      icon:"⚙️",  label:"الإعدادات",      grad:"linear-gradient(135deg,#64748b,#475569)", glow:"rgba(100,116,139,.35)"},
+        ].map(p=>(
+          <button key={p.id} onClick={()=>navigate(p.id)}
+            className="rounded-2xl flex flex-col items-center gap-2 transition-all relative overflow-hidden group"
+            style={{background:"#fff", padding:"14px 8px", border:"1px solid #f0f0f0",
+              boxShadow:`0 2px 12px ${p.glow}`}}>
+            <div style={{position:"absolute",inset:0,background:p.grad,opacity:0,transition:"opacity .25s",zIndex:0}}
+              className="group-hover:opacity-100" />
+            <div style={{width:44,height:44,borderRadius:14,background:p.grad,display:"flex",
+              alignItems:"center",justifyContent:"center",fontSize:22,position:"relative",zIndex:1,
+              boxShadow:`0 4px 14px ${p.glow}`,transition:"transform .25s"}}
+              className="group-hover:scale-110">
+              {p.icon}
+            </div>
+            <span style={{fontSize:10,fontWeight:900,fontFamily:"Cairo,sans-serif",
+              position:"relative",zIndex:1,transition:"color .25s",color:"#374151"}}
+              className="group-hover:text-white">
+              {p.label}
+            </span>
+          </button>
+        ))}
+      </div>
+
+      {/* رؤية المدرسة */}
+      <div className="rounded-2xl p-5 text-center shadow-sm" style={{background:"linear-gradient(135deg,#f0fdf4,#eff6ff)"}}>
+        <div className="text-2xl mb-2">🏫</div>
+        <h3 className="font-black text-gray-700 mb-1 text-sm">رؤية المدرسة</h3>
+        <p className="text-xs text-gray-500 leading-relaxed max-w-lg mx-auto">
+          بيئة تعليمية متكاملة تُعلي من قيم الانتماء والإبداع، وتُهيئ منظومة تعليمية رائدة تُخرج مواطناً صالحاً مُتسلحاً بالعلم والمعرفة.
+        </p>
       </div>
     </div>
   );
 }
+
+
 
 function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, saveWeek, attendance, setAttendance, saveAttendance }) {
   const [selectedDay, setSelectedDay] = useState(0);
