@@ -6319,8 +6319,7 @@ function SMSPage({ teachers, attendance, week, classList }) {
     if (!message.trim())  { setResult({ ok:false, topMsg:"✏️ اكتب نص الرسالة" }); return; }
     setSending(true); setResult(null);
 
-    const cleanNums = numbers.split(/[
-,]+/)
+    const cleanNums = numbers.split(/[\n,]+/)
       .map(n => {
         n = n.trim().replace(/ /g, "");
         if (n.startsWith("00966")) return n.substring(2);
