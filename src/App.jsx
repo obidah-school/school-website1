@@ -5815,25 +5815,64 @@ function SMSPage({ teachers, attendance, week, classList }) {
     { id: "absence",    label: "غياب الطلاب",    icon: "🏫" },
   ];
 
-  // ===== SEND FUNCTION — مباشر بدون خادم وسيط =====
+  // ===== SEND FUNCTION — مسجّت مباشر =====
+  const MSEGAT_USER = "fazeosama2020@gmail.com";
+  const MSEGAT_KEY  = "2D3CBC49E4411A8890F67B7D9AA0EFCC";
+
   const sendSMS = async (numbers, message) => {
     if (!numbers?.trim()) { setResult({ ok:false, topMsg:"📞 أدخل رقماً واحداً على الأقل" }); return; }
     if (!message.trim()) { setResult({ ok:false, topMsg:"✏️ اكتب نص الرسالة" }); return; }
     setSending(true); setResult(null);
 
+    // تنظيف الأرقام: إزالة الصفر الأول وإضافة 966
+    const cleanNums = numbers.split(/[
+,،]+/)
+      .map(n => {
+        n = n.trim().replace(/\s/g, "");
+        if (n.startsWith("00966")) return n.substring(2);
+        if (n.startsWith("0"))    return "966" + n.substring(1);
+        if (n.startsWith("+"))    return n.substring(1);
+        if (n.startsWith("5"))    return "966" + n;
+        return n;
+      })
+      .filter(n => n.length >= 9)
+      .join(",");
+
+    if (!cleanNums) { setResult({ ok:false, topMsg:"❌ أرقام غير صحيحة" }); setSending(false); return; }
+
     try {
-      const res = await fetch("/api/send-sms", {
+      const body = {
+        userSender: MSEGAT_USER,
+        apiKey:     MSEGAT_KEY,
+        numbers:    cleanNums,
+        msgBody:    message,
+        sender:     sender || "2017351273",
+        msgEncoding:"UTF8"
+      };
+
+      const res = await fetch("https://www.msegat.com/gw/sendsms.php", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ numbers, message, sender: sender || "School1" }),
+        body: JSON.stringify(body),
       });
       const text = await res.text();
-      let data;
-      try { data = JSON.parse(text); } catch(e) { data = { success: false, message: "رد غير متوقع من السيرفر: " + text.substring(0,100) }; }
-      if (data.success) {
-        setResult({ ok:true, msg:"✅ تم الإرسال بنجاح!\n📋 رد الخادم: " + (data.response || "") });
+
+      // رموز استجابة مسجّت
+      const codes = {
+        "1": "تم الإرسال بنجاح",
+        "1610": "رصيد منخفض",
+        "1611": "API Key خاطئ",
+        "1612": "اسم المرسل غير صحيح",
+        "1615": "رقم غير صحيح",
+        "1616": "الرسالة فارغة",
+      };
+
+      const code = text.trim().replace(/"/g,"");
+      if (code === "1") {
+        setResult({ ok:true, msg:"✅ تم إرسال الرسالة بنجاح عبر مسجّت!" });
       } else {
-        setResult({ ok:false, topMsg:"❌ فشل الإرسال — " + (data.message || ""), attempts: data.attempts || [], msg: "تحقق من صحة API Key والرصيد والـ Sender ID" });
+        const errMsg = codes[code] || ("خطأ رقم: " + code);
+        setResult({ ok:false, topMsg:"❌ فشل الإرسال — " + errMsg, msg:"تحقق من الرصيد وصحة الأرقام" });
       }
     } catch(e) {
       setResult({ ok:false, topMsg:"❌ خطأ في الاتصال", msg: e.message });
