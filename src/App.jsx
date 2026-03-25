@@ -2051,7 +2051,6 @@ function ParentPortal({ classList, setClassList, saveClass, messages, setMessage
 function StrategiesPage() {
   const [strategies, setStrategies] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [floatingPanels, setFloatingPanels] = useState([]);
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState({ title:"", category:"", description:"", pdfBase64:"", pdfName:"", bookBase64:"", bookName:"" });
   const [saving, setSaving] = useState(false);
@@ -14732,6 +14731,7 @@ function FloatBar({ openFloat, floatingPanels }) {
 
 export default function SchoolWebsite() {
   const [loading, setLoading] = useState(true);
+  const [floatingPanels, setFloatingPanels] = useState([]);
   const [user, setUser] = useState(null);
   const [parentPortal, setParentPortal] = useState(false);
   const [teacherPortal, setTeacherPortal] = useState(false);
