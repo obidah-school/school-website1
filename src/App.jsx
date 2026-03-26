@@ -10145,12 +10145,24 @@ function LessonPrepPage() {
       });
 
       const data = await res.json();
-      const text = data?.content?.[0]?.text || "";
-      const clean = text.replace(/```json|```/g,"").trim();
-      const parsed = JSON.parse(clean);
-      setResult(parsed);
+      if (data.error) {
+        setError("خطأ من Claude: " + (data.error.message || JSON.stringify(data.error)));
+        setLoading(false); return;
+      }
+      const rawText = data?.content?.[0]?.text || "";
+      if (!rawText) { setError("لم يرجع Claude أي نص — تحقق من المفتاح والرصيد"); setLoading(false); return; }
+      let cleanJson = rawText.trim();
+      const jMatch = cleanJson.match(/\{[\s\S]*\}/);
+      if (jMatch) cleanJson = jMatch[0];
+      else cleanJson = cleanJson.replace(/```json|```/g,"").trim();
+      try {
+        const parsed = JSON.parse(cleanJson);
+        setResult(parsed);
+      } catch(parseErr) {
+        setError("خطأ في قراءة رد Claude — جرب مرة أخرى. تفاصيل: " + parseErr.message);
+      }
     } catch(e) {
-      setError("حدث خطأ: " + e.message + " — تأكد من مفتاح Claude API في Vercel");
+      setError("خطأ في الاتصال: " + e.message);
     }
     setLoading(false);
   };
