@@ -10109,49 +10109,14 @@ function LessonPrepPage() {
       { type: "text", text: "هذه صورة من الكتاب المدرسي. استخرج محتوى الدرس منها وأضفها لتحليلك." }
     ] : [];
 
-    const prompt = `أنت خبير تربوي متخصص في المناهج السعودية. حضّر درساً احترافياً كاملاً بناءً على المعلومات التالية:
-
-المادة: ${subject}
-المرحلة: ${grade}
-${lessonTitle ? "عنوان الدرس: " + lessonTitle : ""}
-${pastedText ? "محتوى الدرس:
-" + pastedText : ""}
-
-أرجع النتيجة بتنسيق JSON بالضبط هكذا:
-{
-  "title": "عنوان الدرس الكامل",
-  "duration": "مدة الحصة",
-  "objectives": [
-    {"level": "معرفة", "text": "..."},
-    {"level": "فهم", "text": "..."},
-    {"level": "تطبيق", "text": "..."},
-    {"level": "تحليل", "text": "..."},
-    {"level": "تقييم", "text": "..."},
-    {"level": "إبداع", "text": "..."}
-  ],
-  "higherThinking": [
-    {"skill": "التفكير الناقد", "activity": "..."},
-    {"skill": "حل المشكلات", "activity": "..."},
-    {"skill": "الإبداع والابتكار", "activity": "..."},
-    {"skill": "التعاون", "activity": "..."}
-  ],
-  "strategy": {
-    "name": "اسم الاستراتيجية",
-    "why": "سبب اختيارها",
-    "steps": ["الخطوة الأولى", "الخطوة الثانية", "الخطوة الثالثة", "الخطوة الرابعة"]
-  },
-  "lessonPlan": [
-    {"phase": "التهيئة", "duration": "5 دقائق", "activity": "...", "method": "..."},
-    {"phase": "العرض والشرح", "duration": "20 دقيقة", "activity": "...", "method": "..."},
-    {"phase": "التطبيق", "duration": "15 دقيقة", "activity": "...", "method": "..."},
-    {"phase": "التقويم", "duration": "5 دقائق", "activity": "...", "method": "..."},
-    {"phase": "الختام", "duration": "5 دقائق", "activity": "...", "method": "..."}
-  ],
-  "resources": ["المصدر الأول", "المصدر الثاني"],
-  "assessment": "طريقة التقييم المقترحة",
-  "tips": ["نصيحة للمعلم", "نصيحة للمعلم"]
-}
-لا تضف أي نص خارج الـ JSON.`;
+    const titlePart  = lessonTitle ? ("عنوان الدرس: " + lessonTitle + "\n") : "";
+    const textPart   = pastedText  ? ("محتوى الدرس:\n" + pastedText + "\n") : "";
+    const jsonSchema = '{"title":"...","duration":"...","objectives":[{"level":"معرفة","text":"..."},{"level":"فهم","text":"..."},{"level":"تطبيق","text":"..."},{"level":"تحليل","text":"..."},{"level":"تقييم","text":"..."},{"level":"إبداع","text":"..."}],"higherThinking":[{"skill":"التفكير الناقد","activity":"..."},{"skill":"حل المشكلات","activity":"..."},{"skill":"الإبداع والابتكار","activity":"..."},{"skill":"التعاون","activity":"..."}],"strategy":{"name":"...","why":"...","steps":["...","...","...","..."]},"lessonPlan":[{"phase":"التهيئة","duration":"5 دقائق","activity":"...","method":"..."},{"phase":"العرض والشرح","duration":"20 دقيقة","activity":"...","method":"..."},{"phase":"التطبيق","duration":"15 دقيقة","activity":"...","method":"..."},{"phase":"التقويم","duration":"5 دقائق","activity":"...","method":"..."},{"phase":"الختام","duration":"5 دقائق","activity":"...","method":"..."}],"resources":["...","..."],"assessment":"...","tips":["...","..."]}';
+    const prompt = "أنت خبير تربوي متخصص في المناهج السعودية. حضّر درساً احترافياً كاملاً بناءً على المعلومات التالية:\n" +
+      "المادة: " + subject + "\n" +
+      "المرحلة: " + grade + "\n" +
+      titlePart + textPart +
+      "\nأرجع النتيجة بتنسيق JSON فقط بهذا الشكل بالضبط، لا تضف أي نص خارج الـ JSON:\n" + jsonSchema;
 
     try {
       const msgs = [
@@ -16825,4 +16790,3 @@ export default function SchoolWebsite() {
     </>
   );
 }
-
