@@ -10232,8 +10232,7 @@ function LessonPrepPage() {
               onChange={e=>setPastedText(e.target.value)}
               onPaste={handlePaste}
               rows={5}
-              placeholder={"الصق نص الدرس من الكتاب هنا...
-أو اضغط Ctrl+V للصق صورة من الكتاب مباشرة 📷"}
+              placeholder={"الصق نص الدرس من الكتاب هنا...\nأو اضغط Ctrl+V للصق صورة من الكتاب مباشرة"}
               className="w-full px-3 py-3 rounded-xl border-2 border-gray-200 focus:border-purple-400 focus:outline-none text-sm resize-none"
               style={{fontFamily:"inherit"}} />
           </div>
