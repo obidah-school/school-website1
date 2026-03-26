@@ -10137,7 +10137,7 @@ function LessonPrepPage() {
           max_tokens: 4000,
           messages: pastedImage
             ? [{ role:"user", content: [
-                { type:"image", source:{ type:"base64", media_type:"image/jpeg", data: pastedImage.split(",")[1] }},
+                { type:"image", source:{ type:"base64", media_type: (pastedImage.split(";")[0].split(":")[1] || "image/png"), data: pastedImage.split(",")[1] }},
                 { type:"text", text: prompt }
               ]}]
             : [{ role:"user", content: prompt }]
