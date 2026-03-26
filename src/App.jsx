@@ -395,7 +395,7 @@ function SingleAnnouncementPage({ announcements, siteFont, annId }) {
         </button>
       </div>
       {/* المحتوى */}
-      <div className="max-w-4xl mx-auto px-4 py-8">
+      <div className="w-full px-2 py-4">
         {!ann ? (
           <div className={cx.empty}>
             <div className="text-4xl mb-2">📭</div>
@@ -475,7 +475,7 @@ function PublicAnnouncementsPage({ announcements, siteFont, onLogin, onTeacherPo
   const all = [...pinned, ...rest];
   return (
     <div dir="rtl" className="min-h-screen p-4" style={{ fontFamily: siteFont, background: "linear-gradient(135deg, #0d9488 0%, #065f46 50%, #064e3b 100%)" }}>
-      <div className="max-w-lg mx-auto">
+      <div className="w-full">
         {/* رأس الصفحة */}
         <div className="flex items-center justify-between mb-6 pt-4">
           <div className="text-center flex-1">
@@ -651,7 +651,7 @@ function HomePage({ teachers, announcements, activities, navigate, attendance, w
   return (
     <div>
       {/* - الترويسة الأصلية - */}
-      <div className="bg-gradient-to-l from-teal-600 via-teal-700 to-emerald-800 rounded-3xl p-8 mb-6 text-white text-center shadow-xl" style={{overflow:"hidden",position:"relative"}}>
+      <div className="bg-gradient-to-l from-teal-600 via-teal-700 to-emerald-800 p-8 mb-4 text-white text-center shadow-xl" style={{overflow:"hidden",position:"relative"}}>
         <div style={{position:"absolute",inset:0,background:"radial-gradient(circle at 50% 0%,rgba(212,175,55,.15) 0%,transparent 60%)",pointerEvents:"none"}} />
         <div className="flex justify-center mb-4 relative z-10">
           <SchoolLogo size="xl" animate={true} />
@@ -1139,7 +1139,7 @@ function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, sa
   return (
     <div dir="rtl">
       {/* العنوان */}
-      <div className="rounded-3xl p-6 mb-5 text-white shadow-xl"
+      <div className="rounded-b-2xl p-6 mb-5 text-white shadow-xl"
         style={{ background: "linear-gradient(135deg, #0d9488 0%, #065f46 100%)" }}>
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="text-center sm:text-right">
@@ -1799,7 +1799,7 @@ function ParentPortal({ classList, setClassList, saveClass, messages, setMessage
         <p className="opacity-80 text-sm">بوابة أولياء الأمور — متابعة مستوى الطالب</p>
       </div>
 
-      <div className="max-w-lg mx-auto w-full px-4 pb-10 flex-1">
+      <div className="w-full px-2 pb-10 flex-1">
         {/* بطاقة البحث */}
         <div className="bg-white rounded-3xl shadow-2xl p-6 mb-4">
           <h2 className="font-black text-gray-800 text-center mb-4">🔍 أدخل رقم هوية الطالب</h2>
@@ -3253,7 +3253,7 @@ function RafflePage() {
           ) : (
             <div className="space-y-4">
               {/* زر السحب الكبير */}
-              <div className="bg-gradient-to-br from-purple-600 via-pink-600 to-amber-500 rounded-3xl p-8 text-center text-white shadow-xl">
+              <div className="bg-gradient-to-br from-purple-600 via-pink-600 to-amber-500 rounded-b-2xl p-8 text-center text-white shadow-xl">
                 <div className="text-5xl mb-3">🎰</div>
                 <h3 className="text-2xl font-black mb-2">بدء السحب الآلي</h3>
                 <p className="opacity-80 text-sm mb-6">{entries.length} مشترك · 3 فائزين</p>
@@ -3623,7 +3623,7 @@ function TeacherPortal({ classList, setClassList, saveClass, siteFont, onBack, a
     <div dir="rtl" className="min-h-screen" style={{ fontFamily: siteFont, background: "linear-gradient(135deg, #eff6ff 0%, #f0fdf4 100%)" }}>
             {/* شريط التنقل */}
       <nav className="bg-white shadow-md sticky top-0 z-50 border-b border-blue-100">
-        <div className="max-w-5xl mx-auto px-4">
+        <div className="w-full px-3">
           <div className="flex items-center justify-between h-14">
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-xl flex items-center justify-center text-white text-base" style={{ background: "linear-gradient(135deg, #1e3a5f, #2563eb)" }}>🏫</div>
@@ -3649,9 +3649,9 @@ function TeacherPortal({ classList, setClassList, saveClass, siteFont, onBack, a
         </div>
       </nav>
 
-      <main className="max-w-5xl mx-auto px-4 py-6">
+      <main className="w-full py-3 px-2">
         {/* ترحيب */}
-        <div className="rounded-3xl p-6 mb-6 text-white shadow-xl" style={{ background: "linear-gradient(135deg, #1e3a5f 0%, #2563eb 60%, #3b82f6 100%)" }}>
+        <div className="rounded-b-2xl p-6 mb-6 text-white shadow-xl" style={{ background: "linear-gradient(135deg, #1e3a5f 0%, #2563eb 60%, #3b82f6 100%)" }}>
           <div className="text-4xl mb-2">👨‍🏫</div>
           <h2 className="text-2xl font-black">أهلاً، {currentTeacher.name}</h2>
           <p className="opacity-80 text-sm mt-1">مرحباً بك في بوابة المعلم</p>
@@ -4440,7 +4440,7 @@ function StudentsPage({ classList, setClassList, saveClass, deleteClass, teacher
   return (
     <div>
       {/* العنوان */}
-      <div className="rounded-3xl p-6 mb-5 text-white text-center shadow-xl"
+      <div className="rounded-b-2xl p-6 mb-5 text-white text-center shadow-xl"
         style={{ background: "linear-gradient(135deg, #1B3A6B 0%, #2E6DA4 60%, #1a8fe3 100%)" }}>
         <div className="text-4xl mb-2">👨‍🎓</div>
         <h2 className="text-2xl font-black mb-1">سجل تقييم الطلاب</h2>
@@ -4644,7 +4644,7 @@ function MessagesPage({ messages, setMessages, saveMessages, isParent, parentNam
   return (
     <div dir="rtl">
       {/* بانر الشراكة */}
-      <div className="rounded-3xl overflow-hidden mb-6 shadow-xl" style={{ background: "linear-gradient(135deg, #1e3a5f 0%, #2563eb 60%, #0ea5e9 100%)" }}>
+      <div className="rounded-b-2xl overflow-hidden mb-6 shadow-xl" style={{ background: "linear-gradient(135deg, #1e3a5f 0%, #2563eb 60%, #0ea5e9 100%)" }}>
         <div className="p-8 text-white">
           <div className="flex flex-col md:flex-row items-center gap-6">
             <div className="text-7xl flex-shrink-0">🤝</div>
@@ -4935,7 +4935,7 @@ function SurveyBuilder({ survey, onSave, onCancel }) {
   };
 
   return (
-    <div className="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden">
+    <div className="bg-white rounded-b-2xl shadow-xl border border-gray-100 overflow-hidden">
       {/* رأس البناء */}
       <div className="px-6 py-4 flex items-center justify-between" style={{ background: theme.header }}>
         <span className="font-black text-white text-lg">🛠️ {survey.id ? "تعديل الاستبيان" : "استبيان جديد"}</span>
@@ -5148,7 +5148,7 @@ function SurveyRespond({ survey, onClose }) {
   );
 
   return (
-    <div className="rounded-3xl overflow-hidden shadow-xl border border-gray-100" style={{ background: theme.bg, fontFamily: survey.font || "Tajawal" }}>
+    <div className="rounded-b-2xl overflow-hidden shadow-xl border border-gray-100" style={{ background: theme.bg, fontFamily: survey.font || "Tajawal" }}>
       <div className="px-6 py-5 text-white" style={{ background: `linear-gradient(135deg, ${theme.header}, ${theme.accent})` }}>
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -5322,7 +5322,7 @@ function SurveysPage({ surveys, setSurveys, saveSurveys, isParent }) {
   return (
     <div dir="rtl">
       {/* رأس الصفحة */}
-      <div className="rounded-3xl overflow-hidden mb-6 shadow-xl" style={{ background: "linear-gradient(135deg, #4c1d95 0%, #7c3aed 60%, #a78bfa 100%)" }}>
+      <div className="rounded-b-2xl overflow-hidden mb-6 shadow-xl" style={{ background: "linear-gradient(135deg, #4c1d95 0%, #7c3aed 60%, #a78bfa 100%)" }}>
         <div className="p-8 text-white">
           <div className="flex flex-col md:flex-row items-center gap-6">
             <div className="text-7xl flex-shrink-0">📊</div>
@@ -6527,7 +6527,7 @@ function StudentAbsencePage() {
     <div className="space-y-4">
 
       {/* - Header - */}
-      <div className="bg-gradient-to-l from-rose-900 to-red-800 rounded-2xl p-5 text-white shadow-xl">
+      <div className="bg-gradient-to-l from-rose-900 to-red-800 p-5 text-white shadow-xl">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-xl font-black flex items-center gap-2">
@@ -7115,7 +7115,7 @@ function ProgramReportPage() {
   );
 
   return (
-    <div className="space-y-5 max-w-4xl mx-auto">
+    <div className="space-y-5 w-full">
       {/* ===== ترويسة ===== */}
       <div className="bg-gradient-to-l from-teal-700 to-blue-900 rounded-2xl overflow-hidden text-white shadow-xl">
         {/* صف 1: وزارة / شعار / مدرسة */}
@@ -7402,7 +7402,7 @@ function MonthlyReportPage({ teachers, attendance, week, weekArchive, classList,
   return (
     <div dir="rtl">
       {/* رأس الصفحة */}
-      <div className="rounded-3xl overflow-hidden mb-6 shadow-xl" style={{background:"linear-gradient(135deg,#0f4c75,#1B6CA8)"}}>
+      <div className="rounded-b-2xl overflow-hidden mb-6 shadow-xl" style={{background:"linear-gradient(135deg,#0f4c75,#1B6CA8)"}}>
         <div className="p-6 text-white">
           <h2 className="text-2xl font-black mb-1">📋 التقرير الشهري والفصلي</h2>
           <p className="opacity-80 text-sm">تقارير متكاملة جاهزة للطباعة للمشرف والإدارة</p>
@@ -7610,7 +7610,7 @@ function TeacherProfilePage({ teachers, attendance, week, weekArchive, classList
   return (
     <div dir="rtl">
       {/* رأس الصفحة */}
-      <div className="rounded-3xl overflow-hidden mb-5 shadow-xl" style={{background:"linear-gradient(135deg,#1e3a5f,#7c3aed)"}}>
+      <div className="rounded-b-2xl overflow-hidden mb-5 shadow-xl" style={{background:"linear-gradient(135deg,#1e3a5f,#7c3aed)"}}>
         <div className="p-6 text-white">
           <h2 className="text-2xl font-black mb-1">👨‍🏫 ملف المعلم</h2>
           <p className="opacity-80 text-sm">بيانات شاملة لكل معلم — الأداء والإجازات والفصول</p>
@@ -8323,7 +8323,7 @@ function GradeAnalysisPage() {
   return (
     <div dir="rtl" className="space-y-4">
       {/* رأس الصفحة */}
-      <div className="rounded-3xl overflow-hidden shadow-xl" style={{background:"linear-gradient(135deg,#0f172a 0%,#1e3a5f 50%,#6366f1 100%)"}}>
+      <div className="rounded-b-2xl overflow-hidden shadow-xl" style={{background:"linear-gradient(135deg,#0f172a 0%,#1e3a5f 50%,#6366f1 100%)"}}>
         <div className="p-6 text-white">
           <h2 className="text-2xl font-black mb-1">📊 تحليل درجات الطلاب</h2>
           <p className="opacity-80 text-sm">دليل توزيع الدرجات — وزارة التعليم السعودية ١٤٤٧ هـ</p>
@@ -9661,7 +9661,7 @@ function DailyQuizPage({ classList }) {
 
   return (
     <div dir="rtl" className="space-y-4">
-      <div className="rounded-3xl overflow-hidden shadow-xl" style={{background:"linear-gradient(135deg,#7c3aed,#2563eb)"}}>
+      <div className="rounded-b-2xl overflow-hidden shadow-xl" style={{background:"linear-gradient(135deg,#7c3aed,#2563eb)"}}>
         <div className="p-6 text-white">
           <h2 className="text-2xl font-black mb-1">🎯 الاختبار الجماعي اليومي</h2>
           <p className="opacity-80 text-sm">توزيع المعايير على أيام — الإجابة مخفية حتى يجاوب الجميع</p>
@@ -9958,7 +9958,7 @@ ${essayText}
 
   return (
     <div dir="rtl" className="space-y-4">
-      <div className="rounded-3xl overflow-hidden shadow-xl" style={{background:"linear-gradient(135deg,#7c3aed,#ec4899)"}}>
+      <div className="rounded-b-2xl overflow-hidden shadow-xl" style={{background:"linear-gradient(135deg,#7c3aed,#ec4899)"}}>
         <div className="p-6 text-white">
           <h2 className="text-2xl font-black mb-1">🤖 مساعد المعلم الذكي</h2>
           <p className="opacity-80 text-sm">مدعوم بـ Claude AI — أسئلة، ملخصات، وتصحيح مقالات</p>
@@ -10064,6 +10064,453 @@ ${essayText}
 }
 
 // ===== نظام التوصية بالدروس =====
+// ===== تحضير الدرس الذكي =====
+function LessonPrepPage() {
+  const CLAUDE_API_KEY = import.meta.env.VITE_CLAUDE_API_KEY || "";
+  const [lessonTitle,   setLessonTitle]   = useState("");
+  const [subject,       setSubject]       = useState("");
+  const [grade,         setGrade]         = useState("");
+  const [pastedText,    setPastedText]    = useState("");
+  const [pastedImage,   setPastedImage]   = useState(null);
+  const [loading,       setLoading]       = useState(false);
+  const [result,        setResult]        = useState(null);
+  const [error,         setError]         = useState("");
+  const [activeSection, setActiveSection] = useState("all");
+
+  const SUBJECTS = ["القرآن الكريم","التربية الإسلامية","اللغة العربية","الرياضيات","العلوم","الاجتماعيات","اللغة الإنجليزية","التقنية","الفنون","التربية البدنية"];
+  const GRADES   = ["الأول المتوسط","الثاني المتوسط","الثالث المتوسط","الأول الثانوي","الثاني الثانوي","الثالث الثانوي"];
+
+  // معالجة لصق الصور
+  const handlePaste = (e) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.startsWith("image/")) {
+        const file = items[i].getAsFile();
+        const reader = new FileReader();
+        reader.onload = ev => setPastedImage(ev.target.result);
+        reader.readAsDataURL(file);
+        e.preventDefault();
+        break;
+      }
+    }
+  };
+
+  const generate = async () => {
+    if (!lessonTitle.trim() && !pastedText.trim() && !pastedImage) {
+      setError("أدخل عنوان الدرس أو النص أو الصورة"); return;
+    }
+    if (!subject || !grade) { setError("اختر المادة والمرحلة الدراسية"); return; }
+
+    setLoading(true); setError(""); setResult(null);
+
+    const imageMsg = pastedImage ? [
+      { type: "image", source: { type: "base64", media_type: "image/jpeg", data: pastedImage.split(",")[1] } },
+      { type: "text", text: "هذه صورة من الكتاب المدرسي. استخرج محتوى الدرس منها وأضفها لتحليلك." }
+    ] : [];
+
+    const prompt = `أنت خبير تربوي متخصص في المناهج السعودية. حضّر درساً احترافياً كاملاً بناءً على المعلومات التالية:
+
+المادة: ${subject}
+المرحلة: ${grade}
+${lessonTitle ? "عنوان الدرس: " + lessonTitle : ""}
+${pastedText ? "محتوى الدرس:
+" + pastedText : ""}
+
+أرجع النتيجة بتنسيق JSON بالضبط هكذا:
+{
+  "title": "عنوان الدرس الكامل",
+  "duration": "مدة الحصة",
+  "objectives": [
+    {"level": "معرفة", "text": "..."},
+    {"level": "فهم", "text": "..."},
+    {"level": "تطبيق", "text": "..."},
+    {"level": "تحليل", "text": "..."},
+    {"level": "تقييم", "text": "..."},
+    {"level": "إبداع", "text": "..."}
+  ],
+  "higherThinking": [
+    {"skill": "التفكير الناقد", "activity": "..."},
+    {"skill": "حل المشكلات", "activity": "..."},
+    {"skill": "الإبداع والابتكار", "activity": "..."},
+    {"skill": "التعاون", "activity": "..."}
+  ],
+  "strategy": {
+    "name": "اسم الاستراتيجية",
+    "why": "سبب اختيارها",
+    "steps": ["الخطوة الأولى", "الخطوة الثانية", "الخطوة الثالثة", "الخطوة الرابعة"]
+  },
+  "lessonPlan": [
+    {"phase": "التهيئة", "duration": "5 دقائق", "activity": "...", "method": "..."},
+    {"phase": "العرض والشرح", "duration": "20 دقيقة", "activity": "...", "method": "..."},
+    {"phase": "التطبيق", "duration": "15 دقيقة", "activity": "...", "method": "..."},
+    {"phase": "التقويم", "duration": "5 دقائق", "activity": "...", "method": "..."},
+    {"phase": "الختام", "duration": "5 دقائق", "activity": "...", "method": "..."}
+  ],
+  "resources": ["المصدر الأول", "المصدر الثاني"],
+  "assessment": "طريقة التقييم المقترحة",
+  "tips": ["نصيحة للمعلم", "نصيحة للمعلم"]
+}
+لا تضف أي نص خارج الـ JSON.`;
+
+    try {
+      const msgs = [
+        ...(imageMsg.length > 0 ? [{ role:"user", content: imageMsg }] : []),
+        { role:"user", content: prompt }
+      ];
+
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": CLAUDE_API_KEY,
+          "anthropic-version": "2023-06-01",
+          "anthropic-dangerous-direct-browser-access": "true"
+        },
+        body: JSON.stringify({
+          model: "claude-opus-4-5",
+          max_tokens: 4000,
+          messages: pastedImage
+            ? [{ role:"user", content: [
+                { type:"image", source:{ type:"base64", media_type:"image/jpeg", data: pastedImage.split(",")[1] }},
+                { type:"text", text: prompt }
+              ]}]
+            : [{ role:"user", content: prompt }]
+        })
+      });
+
+      const data = await res.json();
+      const text = data?.content?.[0]?.text || "";
+      const clean = text.replace(/```json|```/g,"").trim();
+      const parsed = JSON.parse(clean);
+      setResult(parsed);
+    } catch(e) {
+      setError("حدث خطأ: " + e.message + " — تأكد من مفتاح Claude API في Vercel");
+    }
+    setLoading(false);
+  };
+
+  const levelColors = {
+    "معرفة": {bg:"#dbeafe",col:"#1e40af"},
+    "فهم":   {bg:"#e0e7ff",col:"#3730a3"},
+    "تطبيق":{bg:"#d1fae5",col:"#065f46"},
+    "تحليل":{bg:"#fef3c7",col:"#92400e"},
+    "تقييم":{bg:"#fce7f3",col:"#9d174d"},
+    "إبداع":{bg:"#ede9fe",col:"#4c1d95"},
+  };
+  const phaseColors = ["#0d9488","#2563eb","#7c3aed","#f59e0b","#ef4444"];
+
+  const sections = [
+    {id:"all",      label:"الكل",           icon:"📋"},
+    {id:"obj",      label:"الأهداف",         icon:"🎯"},
+    {id:"think",    label:"مهارات التفكير",  icon:"🧠"},
+    {id:"strategy", label:"الاستراتيجية",    icon:"💡"},
+    {id:"plan",     label:"خطة الحصة",       icon:"📅"},
+    {id:"tips",     label:"نصائح",           icon:"⭐"},
+  ];
+
+  return (
+    <div className="w-full">
+      {/* رأس الصفحة */}
+      <div className="rounded-b-2xl p-6 text-white shadow-xl relative overflow-hidden mb-4"
+        style={{background:"linear-gradient(135deg,#0f172a 0%,#1e3a5f 40%,#7c3aed 100%)"}}>
+        <div style={{position:"absolute",inset:0,background:"linear-gradient(120deg,transparent 40%,rgba(255,255,255,.07) 60%,transparent 80%)"}} />
+        <div className="relative flex items-center gap-4">
+          <div style={{width:56,height:56,borderRadius:18,background:"rgba(255,255,255,.15)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:28}}>📚</div>
+          <div>
+            <h2 className="text-2xl font-black">تحضير الدرس الذكي</h2>
+            <p className="opacity-75 text-sm mt-0.5">أدخل عنوان الدرس أو انسخ محتواه — الذكاء الاصطناعي يحضّر لك درساً احترافياً كاملاً</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="px-2 space-y-4">
+        {/* نموذج الإدخال */}
+        <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 space-y-4">
+          <h3 className="font-black text-gray-800 text-sm">بيانات الدرس</h3>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-bold text-gray-500 block mb-1">المادة الدراسية</label>
+              <select value={subject} onChange={e=>setSubject(e.target.value)}
+                className="w-full px-3 py-2.5 rounded-xl border-2 border-gray-200 focus:border-purple-400 focus:outline-none text-sm font-bold"
+                style={{fontFamily:"inherit"}}>
+                <option value="">اختر المادة</option>
+                {SUBJECTS.map(s=><option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-bold text-gray-500 block mb-1">المرحلة الدراسية</label>
+              <select value={grade} onChange={e=>setGrade(e.target.value)}
+                className="w-full px-3 py-2.5 rounded-xl border-2 border-gray-200 focus:border-purple-400 focus:outline-none text-sm font-bold"
+                style={{fontFamily:"inherit"}}>
+                <option value="">اختر المرحلة</option>
+                {GRADES.map(g=><option key={g} value={g}>{g}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs font-bold text-gray-500 block mb-1">عنوان الدرس (اختياري إن أضفت نصاً)</label>
+            <input value={lessonTitle} onChange={e=>setLessonTitle(e.target.value)}
+              placeholder="مثال: الكسور العشرية، درس التضاد، الخلية وأجزاؤها..."
+              className="w-full px-3 py-2.5 rounded-xl border-2 border-gray-200 focus:border-purple-400 focus:outline-none text-sm"
+              style={{fontFamily:"inherit"}} />
+          </div>
+
+          <div>
+            <label className="text-xs font-bold text-gray-500 block mb-1">
+              محتوى الدرس — انسخ من الكتاب أو اكتب ما تريد
+            </label>
+            <textarea
+              value={pastedText}
+              onChange={e=>setPastedText(e.target.value)}
+              onPaste={handlePaste}
+              rows={5}
+              placeholder={"الصق نص الدرس من الكتاب هنا...
+أو اضغط Ctrl+V للصق صورة من الكتاب مباشرة 📷"}
+              className="w-full px-3 py-3 rounded-xl border-2 border-gray-200 focus:border-purple-400 focus:outline-none text-sm resize-none"
+              style={{fontFamily:"inherit"}} />
+          </div>
+
+          {/* صورة ملصوقة */}
+          {pastedImage && (
+            <div className="relative rounded-xl overflow-hidden border-2 border-purple-200">
+              <img src={pastedImage} alt="صورة الدرس" className="w-full max-h-64 object-contain bg-gray-50" />
+              <button onClick={()=>setPastedImage(null)}
+                className="absolute top-2 left-2 bg-red-500 text-white text-xs font-black px-3 py-1.5 rounded-lg">
+                🗑 حذف الصورة
+              </button>
+              <div className="absolute top-2 right-2 bg-purple-600 text-white text-xs font-black px-3 py-1 rounded-lg">
+                📷 صورة من الكتاب
+              </div>
+            </div>
+          )}
+
+          {error && <div className="bg-red-50 text-red-600 text-xs font-bold p-3 rounded-xl border border-red-100">{error}</div>}
+
+          <button onClick={generate} disabled={loading}
+            className="w-full py-4 rounded-2xl text-white font-black text-base shadow-xl disabled:opacity-60 relative overflow-hidden"
+            style={{background:"linear-gradient(135deg,#1e3a5f,#7c3aed)"}}>
+            {loading ? (
+              <span className="flex items-center justify-center gap-3">
+                <span className="animate-spin text-xl">⚙️</span>
+                جاري تحضير الدرس... قد يستغرق 15-30 ثانية
+              </span>
+            ) : "🚀 حضّر الدرس بالذكاء الاصطناعي"}
+          </button>
+        </div>
+
+        {/* النتائج */}
+        {result && (
+          <div className="space-y-4">
+            {/* شريط التنقل بين الأقسام */}
+            <div className="bg-white rounded-2xl p-2 shadow-sm border border-gray-100 flex gap-1.5 overflow-x-auto">
+              {sections.map(s=>(
+                <button key={s.id} onClick={()=>setActiveSection(s.id)}
+                  className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-black transition-all"
+                  style={{background:activeSection===s.id?"linear-gradient(135deg,#1e3a5f,#7c3aed)":"#f8fafc",
+                    color:activeSection===s.id?"#fff":"#374151"}}>
+                  <span>{s.icon}</span><span>{s.label}</span>
+                </button>
+              ))}
+            </div>
+
+            {/* معلومات عامة */}
+            <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex items-center gap-4 flex-wrap">
+              <div className="flex items-center gap-2">
+                <span className="text-2xl">📚</span>
+                <div>
+                  <div className="text-xs text-gray-400">الدرس</div>
+                  <div className="font-black text-gray-800">{result.title}</div>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-2xl">⏱</span>
+                <div>
+                  <div className="text-xs text-gray-400">المدة</div>
+                  <div className="font-black text-gray-800">{result.duration}</div>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-2xl">📖</span>
+                <div>
+                  <div className="text-xs text-gray-400">المادة</div>
+                  <div className="font-black text-gray-800">{subject} — {grade}</div>
+                </div>
+              </div>
+            </div>
+
+            {/* الأهداف — بلوم */}
+            {(activeSection==="all"||activeSection==="obj") && (
+              <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+                <h3 className="font-black text-gray-800 mb-4 flex items-center gap-2">
+                  <span className="text-xl">🎯</span> أهداف الدرس — تصنيف بلوم
+                </h3>
+                <div className="space-y-2">
+                  {result.objectives?.map((obj,i)=>{
+                    const c = levelColors[obj.level] || {bg:"#f3f4f6",col:"#374151"};
+                    return (
+                      <div key={i} className="flex items-start gap-3 p-3 rounded-xl"
+                        style={{background:c.bg}}>
+                        <span className="text-xs font-black px-2.5 py-1 rounded-lg flex-shrink-0 text-white"
+                          style={{background:c.col}}>{obj.level}</span>
+                        <span className="text-sm font-medium text-gray-800">{obj.text}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* مهارات التفكير العليا */}
+            {(activeSection==="all"||activeSection==="think") && (
+              <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+                <h3 className="font-black text-gray-800 mb-4 flex items-center gap-2">
+                  <span className="text-xl">🧠</span> مهارات التفكير العليا
+                </h3>
+                <div className="grid grid-cols-2 gap-3">
+                  {result.higherThinking?.map((ht,i)=>(
+                    <div key={i} className="p-4 rounded-2xl border border-purple-100 bg-purple-50">
+                      <div className="font-black text-purple-800 text-sm mb-1">{ht.skill}</div>
+                      <div className="text-xs text-gray-600 leading-relaxed">{ht.activity}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* الاستراتيجية */}
+            {(activeSection==="all"||activeSection==="strategy") && result.strategy && (
+              <div className="rounded-2xl p-5 shadow-sm text-white overflow-hidden relative"
+                style={{background:"linear-gradient(135deg,#0d9488,#0891b2)"}}>
+                <div style={{position:"absolute",inset:0,background:"linear-gradient(120deg,transparent 40%,rgba(255,255,255,.08) 60%,transparent 80%)"}} />
+                <div className="relative">
+                  <h3 className="font-black mb-1 flex items-center gap-2 text-lg">
+                    <span>💡</span> الاستراتيجية: {result.strategy.name}
+                  </h3>
+                  <p className="opacity-80 text-sm mb-4">{result.strategy.why}</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {result.strategy.steps?.map((step,i)=>(
+                      <div key={i} className="flex items-start gap-2 bg-white bg-opacity-15 rounded-xl p-3">
+                        <span className="w-6 h-6 rounded-full bg-white bg-opacity-25 flex items-center justify-center text-xs font-black flex-shrink-0">{i+1}</span>
+                        <span className="text-xs leading-relaxed">{step}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* خطة الحصة */}
+            {(activeSection==="all"||activeSection==="plan") && (
+              <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+                <h3 className="font-black text-gray-800 mb-4 flex items-center gap-2">
+                  <span className="text-xl">📅</span> خطة سير الحصة
+                </h3>
+                <div className="space-y-3">
+                  {result.lessonPlan?.map((phase,i)=>(
+                    <div key={i} className="flex gap-3">
+                      <div className="flex flex-col items-center">
+                        <div className="w-10 h-10 rounded-2xl flex items-center justify-center text-white font-black text-sm flex-shrink-0"
+                          style={{background:phaseColors[i]||"#64748b"}}>
+                          {i+1}
+                        </div>
+                        {i < (result.lessonPlan.length-1) && <div className="w-0.5 flex-1 bg-gray-200 my-1" />}
+                      </div>
+                      <div className="flex-1 pb-3">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-black text-sm text-gray-800">{phase.phase}</span>
+                          <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{phase.duration}</span>
+                          {phase.method && <span className="text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full font-bold">{phase.method}</span>}
+                        </div>
+                        <p className="text-sm text-gray-600 leading-relaxed">{phase.activity}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* المصادر والتقييم والنصائح */}
+            {(activeSection==="all"||activeSection==="tips") && (
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+                  <h3 className="font-black text-gray-800 mb-3 text-sm flex items-center gap-1">📊 التقييم</h3>
+                  <p className="text-sm text-gray-600 leading-relaxed">{result.assessment}</p>
+                </div>
+                <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+                  <h3 className="font-black text-gray-800 mb-3 text-sm flex items-center gap-1">📚 المصادر</h3>
+                  <ul className="space-y-1">
+                    {result.resources?.map((r,i)=>(
+                      <li key={i} className="text-xs text-gray-600 flex items-start gap-1.5">
+                        <span className="text-teal-500 font-black mt-0.5">•</span>{r}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                {result.tips?.length > 0 && (
+                  <div className="col-span-2 rounded-2xl p-4 border border-amber-100" style={{background:"#fffbeb"}}>
+                    <h3 className="font-black text-amber-800 mb-3 text-sm flex items-center gap-1">⭐ نصائح للمعلم</h3>
+                    <div className="space-y-2">
+                      {result.tips.map((tip,i)=>(
+                        <div key={i} className="flex items-start gap-2">
+                          <span className="text-amber-500 font-black">✦</span>
+                          <span className="text-sm text-amber-900">{tip}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* زر الطباعة */}
+            <button onClick={()=>{
+              const w=window.open("","_blank","width=900,height=700");
+              w.document.write(`<!DOCTYPE html><html dir="rtl"><head><meta charset="UTF-8">
+                <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
+                <style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Cairo',sans-serif;padding:20px;color:#1a1a1a}
+                h1{font-size:20px;font-weight:900;color:#1e3a5f;margin-bottom:16px}
+                .sec{margin-bottom:20px}.sec-title{font-size:14px;font-weight:900;color:#7c3aed;margin-bottom:8px;border-right:4px solid #7c3aed;padding-right:8px}
+                .obj{display:flex;align-items:center;gap:8px;margin-bottom:6px;padding:6px 10px;border-radius:8px}
+                .badge{font-size:10px;font-weight:700;padding:3px 10px;border-radius:20px;color:#fff;white-space:nowrap}
+                .phase{display:flex;gap:12px;margin-bottom:12px}.phase-num{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;font-size:13px;flex-shrink:0}
+                .tip{display:flex;gap:8px;margin-bottom:6px}@media print{@page{margin:15mm}}</style>
+              </head><body>
+              <h1>📚 تحضير درس: ${result.title}</h1>
+              <p style="color:#666;font-size:12px;margin-bottom:20px">${subject} — ${grade} — ${result.duration}</p>
+              <div class="sec"><div class="sec-title">🎯 أهداف الدرس</div>
+                ${result.objectives?.map(o=>`<div class="obj" style="background:${levelColors[o.level]?.bg||"#f3f4f6"}"><span class="badge" style="background:${levelColors[o.level]?.col||"#64748b"}">${o.level}</span><span style="font-size:12px">${o.text}</span></div>`).join("")}
+              </div>
+              <div class="sec"><div class="sec-title">🧠 مهارات التفكير العليا</div>
+                ${result.higherThinking?.map(h=>`<div class="obj" style="background:#f5f3ff"><b style="color:#7c3aed;font-size:12px">${h.skill}:</b> <span style="font-size:11px">${h.activity}</span></div>`).join("")}
+              </div>
+              <div class="sec"><div class="sec-title">💡 الاستراتيجية: ${result.strategy?.name}</div>
+                <p style="font-size:12px;color:#555;margin-bottom:8px">${result.strategy?.why}</p>
+                ${result.strategy?.steps?.map((s,i)=>`<div class="obj" style="background:#f0fdfa"><span class="badge" style="background:#0d9488">${i+1}</span><span style="font-size:11px">${s}</span></div>`).join("")}
+              </div>
+              <div class="sec"><div class="sec-title">📅 خطة الحصة</div>
+                ${result.lessonPlan?.map((p,i)=>`<div class="phase"><div class="phase-num" style="background:${phaseColors[i]||"#64748b"}">${i+1}</div><div><b style="font-size:12px">${p.phase}</b> <span style="font-size:10px;color:#999">(${p.duration})</span><br><span style="font-size:11px;color:#555">${p.activity}</span></div></div>`).join("")}
+              </div>
+              <div class="sec"><div class="sec-title">⭐ نصائح للمعلم</div>
+                ${result.tips?.map(t=>`<div class="tip"><span style="color:#f59e0b">✦</span><span style="font-size:12px">${t}</span></div>`).join("")}
+              </div>
+              <script>window.onload=()=>window.print()</script></body></html>`);
+              w.document.close();
+            }}
+              className="w-full py-3 rounded-2xl font-black text-sm text-white shadow-lg"
+              style={{background:"linear-gradient(135deg,#0f172a,#1e3a5f)"}}>
+              🖨️ طباعة تحضير الدرس
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+
 function LessonRecommendPage({ classList }) {
   const [selClass,   setSelClass]   = useState("");
   const [selStudent, setSelStudent] = useState("");
@@ -10145,10 +10592,10 @@ function LessonRecommendPage({ classList }) {
   const toggleDay = (d) => setForm(f => ({ ...f, days: f.days.includes(d) ? f.days.filter(x=>x!==d) : [...f.days, d] }));
 
   return (
-    <div className="space-y-5 max-w-4xl mx-auto">
+    <div className="space-y-5 w-full">
 
       {/* رأس */}
-      <div className="rounded-3xl p-6 text-white shadow-xl relative overflow-hidden"
+      <div className="rounded-b-2xl p-6 text-white shadow-xl relative overflow-hidden"
         style={{background:"linear-gradient(135deg,#1e3a5f 0%,#7c3aed 60%,#6366f1 100%)"}}>
         <div style={{position:"absolute",inset:0,background:"linear-gradient(120deg,transparent 40%,rgba(255,255,255,.07) 60%,transparent 80%)"}} />
         <div className="relative">
@@ -10776,7 +11223,7 @@ function OfficialFormsPage({ teachers, attendance, week }) {
   return (
     <div dir="rtl" className="space-y-4">
       {/* رأس الصفحة */}
-      <div className="rounded-3xl overflow-hidden shadow-xl" style={{background:`linear-gradient(135deg,${FORM_GREEN},#40916c)`}}>
+      <div className="rounded-b-2xl overflow-hidden shadow-xl" style={{background:`linear-gradient(135deg,${FORM_GREEN},#40916c)`}}>
         <div className="p-6 text-white">
           <h2 className="text-2xl font-black mb-1">📋 النماذج الرسمية</h2>
           <p className="opacity-80 text-sm">نماذج الدليل الإجرائي — وزارة التعليم السعودية</p>
@@ -11104,7 +11551,7 @@ function StudentPortfolioPage({ classList, weekArchive, attendance, week, teache
 
   return (
     <div dir="rtl" className="space-y-4">
-      <div className="rounded-3xl overflow-hidden shadow-xl" style={{background:"linear-gradient(135deg,#0f172a,#7c3aed)"}}>
+      <div className="rounded-b-2xl overflow-hidden shadow-xl" style={{background:"linear-gradient(135deg,#0f172a,#7c3aed)"}}>
         <div className="p-6 text-white">
           <h2 className="text-2xl font-black mb-1">📁 ملف الطالب الشامل</h2>
           <p className="opacity-80 text-sm">سجل متكامل — الأداء الأكاديمي والحضور والتقييمات</p>
@@ -11366,7 +11813,7 @@ function EarlyWarningPage({ classList }) {
 
   return (
     <div dir="rtl" className="space-y-4">
-      <div className="rounded-3xl overflow-hidden shadow-xl" style={{background:"linear-gradient(135deg,#dc2626,#b91c1c)"}}>
+      <div className="rounded-b-2xl overflow-hidden shadow-xl" style={{background:"linear-gradient(135deg,#dc2626,#b91c1c)"}}>
         <div className="p-6 text-white">
           <h2 className="text-2xl font-black mb-1">🚨 نظام الإنذار المبكر</h2>
           <p className="opacity-80 text-sm">رصد الطلاب المعرضين للتعثر قبل فوات الأوان</p>
@@ -11482,7 +11929,7 @@ function MeetingsPage({ teachers }) {
 
   return (
     <div dir="rtl" className="space-y-4">
-      <div className="rounded-3xl overflow-hidden shadow-xl" style={{background:"linear-gradient(135deg,#0f172a,#0891b2)"}}>
+      <div className="rounded-b-2xl overflow-hidden shadow-xl" style={{background:"linear-gradient(135deg,#0f172a,#0891b2)"}}>
         <div className="p-6 text-white">
           <h2 className="text-2xl font-black mb-1">📅 الاجتماعات والمواعيد</h2>
           <p className="opacity-80 text-sm">جدولة اجتماعات أولياء الأمور والمعلمين</p>
@@ -11640,8 +12087,8 @@ function HeatmapPage({ teachers, attendance, week, weekArchive, announcements, a
   });
 
   return (
-    <div dir="rtl" className="space-y-5">
-      <div className="rounded-3xl overflow-hidden shadow-xl" style={{background:"linear-gradient(135deg,#0f172a,#1e3a5f)"}}>
+    <div dir="rtl" className="space-y-4">
+      <div className="rounded-b-2xl overflow-hidden shadow-xl" style={{background:"linear-gradient(135deg,#0f172a,#1e3a5f)"}}>
         <div className="p-6 text-white">
           <h2 className="text-2xl font-black mb-1">🗺️ خريطة نشاط المدرسة</h2>
           <p className="opacity-80 text-sm">رؤية بصرية شاملة للأيام والأسابيع والنشاط المدرسي</p>
@@ -12082,7 +12529,7 @@ function CommitteeMeetingPage({ teachers }) {
   return (
     <div dir="rtl" className="space-y-4">
       {/* رأس الصفحة */}
-      <div className="rounded-3xl overflow-hidden shadow-xl" style={{background:`linear-gradient(135deg,#1a3a2a,${COM_GREEN})`}}>
+      <div className="rounded-b-2xl overflow-hidden shadow-xl" style={{background:`linear-gradient(135deg,#1a3a2a,${COM_GREEN})`}}>
         <div className="p-6 text-white">
           <h2 className="text-2xl font-black mb-1">📋 اجتماعات اللجان والفرق</h2>
           <p className="opacity-80 text-sm">وفق الدليل التنظيمي والإجرائي — وزارة التعليم</p>
@@ -13416,11 +13863,11 @@ function ClassTimerPage() {
         <p className="opacity-80 text-sm mt-1">٤٥ دقيقة · ٦ مراحل متكاملة</p>
       </div>
 
-      <div className="max-w-2xl mx-auto px-2">
+      <div className="w-full px-2">
 
         {/* بطاقة المرحلة الحالية */}
         {!done ? (
-          <div className="ct-slide rounded-3xl p-5 mb-4 text-white shadow-2xl relative overflow-hidden ct-shimmer"
+          <div className="ct-slide rounded-b-2xl p-5 mb-4 text-white shadow-2xl relative overflow-hidden ct-shimmer"
             style={{background: stageGradient}}>
             <div className="flex items-center gap-3 mb-3">
               <span className="text-4xl">{stage.icon}</span>
@@ -13757,7 +14204,7 @@ function ExitTicketPage() {
       )}
 
       {mode === "answer" && (
-        <div className="max-w-md mx-auto">
+        <div className="w-full">
           {!submitted ? (
             <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
               <div className="bg-teal-50 rounded-xl p-4 mb-5 text-center">
@@ -14159,7 +14606,7 @@ ${v.needs.filter(n=>n.need).length>0?`
   // --- واجهة القائمة ---
   if (tab === "list") return (
     <div className="space-y-4">
-      <div className="rounded-3xl p-6 text-white shadow-xl relative overflow-hidden"
+      <div className="rounded-b-2xl p-6 text-white shadow-xl relative overflow-hidden"
         style={{background:"linear-gradient(135deg,#7c2d12,#b45309,#d97706)"}}>
         <div style={{position:"absolute",inset:0,background:"linear-gradient(120deg,transparent 40%,rgba(255,255,255,.08) 60%,transparent 80%)"}} />
         <div className="relative flex items-center justify-between flex-wrap gap-3">
@@ -14241,7 +14688,7 @@ ${v.needs.filter(n=>n.need).length>0?`
     const pctV    = maxSc>0 ? Math.round(totalSc/maxSc*100) : 0;
     const col     = pctV>=90?"#059669":pctV>=75?"#0891b2":pctV>=60?"#d97706":"#ef4444";
     return (
-      <div className="space-y-4 max-w-4xl mx-auto">
+      <div className="space-y-4 w-full">
         <div className="flex items-center gap-3">
           <button onClick={() => setTab("list")} className="text-amber-600 font-black text-sm hover:underline">← القائمة</button>
           <span className="text-gray-300">/</span>
@@ -14349,7 +14796,7 @@ ${v.needs.filter(n=>n.need).length>0?`
   };
 
   return (
-    <div className="space-y-5 max-w-4xl mx-auto">
+    <div className="space-y-5 w-full">
       <div className="flex items-center gap-3">
         <button onClick={() => setTab("list")} className="text-amber-600 font-black text-sm hover:underline">← القائمة</button>
         <h2 className="font-black text-gray-800">بطاقة زيارة فنية جديدة</h2>
@@ -14845,7 +15292,7 @@ function AbsenceStatsPage({ teachers, attendance, week, weekArchive }) {
   return (
     <div dir="rtl">
       {/* رأس الصفحة */}
-      <div className="rounded-3xl overflow-hidden mb-6 shadow-xl" style={{background:"linear-gradient(135deg,#1e3a5f,#dc2626)"}}>
+      <div className="rounded-b-2xl overflow-hidden mb-6 shadow-xl" style={{background:"linear-gradient(135deg,#1e3a5f,#dc2626)"}}>
         <div className="p-6 text-white">
           <h2 className="text-2xl font-black mb-1">📊 التحليل الإحصائي للأداء</h2>
           <p className="opacity-80 text-sm">تحليل شامل لحضور وغياب المعلمين — {allWeeks.length} أسبوع مسجل</p>
@@ -15821,7 +16268,7 @@ export default function SchoolWebsite() {
       const hash = window.location.hash.replace("#","") || "home";
       if (hash.startsWith("ann-")) { setDirectAnnId(hash.replace("ann-","")); return; }
       setDirectAnnId(null);
-      if (["home","attendance","announcements","activities","settings","students","messages","surveys","sms","report","gradeanalysis","monthlyreport","teacherprofile","absencestats","attendancereport","student-absence","strategies","calendar","gallery","certificates","poll","raffle","broadcast","groupdivider","quiz","classtimer","luckywheel","exitticket","timetable","classvisits","honorboard","tasks","dailyquiz","aiteacher","lessonrecommend","officialforms","portfolio","earlywarning","meetings","heatmap","committeemeeting"].includes(hash)) setPage(hash);
+      if (["home","attendance","announcements","activities","settings","students","messages","surveys","sms","report","gradeanalysis","monthlyreport","teacherprofile","absencestats","attendancereport","student-absence","strategies","calendar","gallery","certificates","poll","raffle","broadcast","groupdivider","quiz","classtimer","luckywheel","exitticket","timetable","classvisits","honorboard","tasks","dailyquiz","aiteacher","lessonprep","lessonrecommend","officialforms","portfolio","earlywarning","meetings","heatmap","committeemeeting"].includes(hash)) setPage(hash);
     };
     window.addEventListener("hashchange", h); h();
     return () => window.removeEventListener("hashchange", h);
@@ -16035,6 +16482,7 @@ export default function SchoolWebsite() {
     { id: "committeemeeting",  label: "اجتماعات اللجان",           icon: "📋" },
     { id: "dailyquiz",     label: "الاختبار اليومي",     icon: "🎯" },
     { id: "aiteacher",     label: "مساعد المعلم الذكي",  icon: "🤖" },
+    { id: "lessonprep",    label: "تحضير الدرس الذكي",   icon: "📚" },
     { id: "lessonrecommend",label: "الخطط العلاجية",     icon: "🩺" },
   ];
 
@@ -16215,7 +16663,7 @@ export default function SchoolWebsite() {
       </div>
       <div className="relative z-10">
       <nav className="bg-white shadow-lg sticky top-0 z-50 border-b border-teal-100" style={{fontFamily:"'Cairo', 'Noto Naskh Arabic', sans-serif"}}>
-        <div className="max-w-6xl mx-auto px-4">
+        <div className="w-full px-3">
 
           {/* - صف أول: الشعار + اسم المدرسة + بيانات المستخدم - */}
           <div className="flex items-center justify-between py-2.5 border-b border-gray-100">
@@ -16323,7 +16771,7 @@ export default function SchoolWebsite() {
           )}
         </div>
       </nav>
-      <main className="max-w-6xl mx-auto px-4 py-6">
+      <main className="w-full py-3">
         {page === "home"          && <HomePage teachers={teachers} announcements={announcements} activities={activities} navigate={navigate} attendance={attendance} week={week} messages={messages} classList={classList} weekArchive={weekArchive} />}
         {page === "student-absence" && <StudentAbsencePage />}
         {page === "attendance"    && <AttendancePage teachers={teachers} setTeachers={setTeachers} saveTeachers={saveTeachers} week={week} setWeek={setWeek} saveWeek={saveWeek} attendance={attendance} setAttendance={setAttendance} saveAttendance={saveAttendance} />}
@@ -16363,6 +16811,7 @@ export default function SchoolWebsite() {
         {page === "heatmap"        && <HeatmapPage teachers={teachers} attendance={attendance} week={week} weekArchive={weekArchive} announcements={announcements} activities={activities} />}
         {page === "committeemeeting" && <CommitteeMeetingPage teachers={teachers} />}
         {page === "aiteacher"      && <AITeacherPage />}
+        {page === "lessonprep"     && <LessonPrepPage />}
         {page === "lessonrecommend"&& <LessonRecommendPage classList={classList} />}
         {page === "settings"      && <SettingsPage teachers={teachers} setTeachers={setTeachers} saveTeachers={saveTeachers} week={week} setWeek={setWeek} saveWeek={saveWeek} users={users} siteFont={siteFont} setSiteFont={setSiteFont} saveSiteFont={saveSiteFont} weekArchive={weekArchive} archiveCurrentWeek={archiveCurrentWeek} />}
       </main>
