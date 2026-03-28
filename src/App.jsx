@@ -7198,6 +7198,7 @@ function StudentAbsencePage() {
   const [editId,      setEditId]      = useState(null);
   const [editData,    setEditData]    = useState({});
   const xlsRef = useRef();
+  const [statsView, setStatsView] = useState(false);
 
   /* - load - */
   useEffect(() => {
@@ -7224,7 +7225,21 @@ function StudentAbsencePage() {
 
   const setStatus = (sid, status) => {
     const cur = getAtt(sid);
-    const upd = { ...attendance, [sid]: { ...cur, status, periods: status === "تأخر حصص" ? (cur.periods || []) : [] }};
+    const upd = { ...attendance, [sid]: {
+      ...cur, status,
+      periods: status === "تأخر حصص" ? (cur.periods || []) : [],
+      // إذا تغير الوضع من تأخر صباحي احتفظ بالبيانات
+      lateMinutes: cur.lateMinutes || "",
+      lateReason:  cur.lateReason  || "",
+      lateNote:    cur.lateNote    || "",
+    }};
+    setAttendance(upd);
+    persist(students, upd);
+  };
+
+  const updateMorningLate = (sid, field, val) => {
+    const cur = getAtt(sid);
+    const upd = { ...attendance, [sid]: { ...cur, [field]: val }};
     setAttendance(upd);
     persist(students, upd);
   };
@@ -7397,6 +7412,10 @@ function StudentAbsencePage() {
               📥 Excel
             </button>
             <input ref={xlsRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleExcel} />
+            <button onClick={()=>setStatsView(v=>!v)}
+              className="bg-white bg-opacity-20 hover:bg-opacity-30 border border-white border-opacity-30 rounded-xl px-3 py-2 text-sm font-bold">
+              📊 {statsView ? "الكشف" : "إحصائيات"}
+            </button>
             <button onClick={printReport}
               className="bg-white bg-opacity-20 hover:bg-opacity-30 border border-white border-opacity-30 rounded-xl px-3 py-2 text-sm font-bold">
               🖨 طباعة
@@ -7428,6 +7447,145 @@ function StudentAbsencePage() {
           </div>
         ))}
       </div>
+
+
+      {/* - إحصائيات التأخر الصباحي - */}
+      {statsView && (() => {
+        const today = date;
+        // حساب الأيام الفريدة
+        const allDays = Object.keys(Object.fromEntries(
+          Object.entries(
+            students.reduce((acc, stu) => {
+              const att = getAtt(stu.id);
+              if (att.status === "تأخر صباحي") {
+                acc[today] = (acc[today]||0)+1;
+              }
+              return acc;
+            }, {})
+          )
+        ));
+
+        // إحصائيات اليوم
+        const todayLate = students.filter(stu => getAtt(stu.id).status === "تأخر صباحي");
+        const todayAbsent = students.filter(stu => getAtt(stu.id).status === "غائب");
+        const reasonCount = {};
+        todayLate.forEach(stu => {
+          const r = getAtt(stu.id).lateReason || "غير محدد";
+          reasonCount[r] = (reasonCount[r]||0)+1;
+        });
+
+        const avgMinutes = todayLate.length > 0
+          ? Math.round(todayLate.reduce((s,stu)=>s+Number(getAtt(stu.id).lateMinutes||0),0)/todayLate.length)
+          : 0;
+
+        return (
+          <div className="bg-white rounded-2xl shadow-sm border border-amber-100 overflow-hidden">
+            {/* رأس الإحصائيات */}
+            <div className="flex items-center justify-between px-5 py-3 bg-amber-50 border-b border-amber-100">
+              <h3 className="font-black text-amber-800 flex items-center gap-2">📊 إحصائيات التأخر الصباحي — {date}</h3>
+              <button onClick={()=>{
+                const w=window.open("","_blank");
+                const rows = todayLate.map(stu=>{
+                  const a=getAtt(stu.id);
+                  return `<tr><td>${stu.name}</td><td>${a.lateMinutes||"-"} دقيقة</td><td>${a.lateReason||"-"}</td><td>${a.parentPhone||stu.phone||"-"}</td><td>${a.lateNote||"-"}</td></tr>`;
+                }).join("");
+                w.document.write(`<!DOCTYPE html><html dir="rtl"><head><meta charset="UTF-8"><style>
+                  body{font-family:Cairo,Arial,sans-serif;padding:20px}
+                  h2{color:#92400e;margin-bottom:4px}p{color:#6b7280;font-size:13px;margin-bottom:16px}
+                  table{width:100%;border-collapse:collapse}th{background:#fef3c7;padding:8px;text-align:right;font-size:12px;border:1px solid #fde68a}
+                  td{padding:7px 8px;font-size:12px;border:1px solid #fde68a}tr:nth-child(even){background:#fffbeb}
+                  .stats{display:flex;gap:12px;margin-bottom:16px}
+                  .stat{background:#fef3c7;border-radius:10px;padding:10px 16px;text-align:center}
+                  .stat b{display:block;font-size:22px;color:#b45309}.stat span{font-size:11px;color:#92400e}
+                  @media print{@page{margin:10mm}}
+                </style></head><body>
+                <h2>📊 إحصائية التأخر الصباحي</h2>
+                <p>الفصل: ${className} — التاريخ: ${date} — وقت الدوام: 6:45 ص</p>
+                <div class="stats">
+                  <div class="stat"><b>${todayLate.length}</b><span>متأخر</span></div>
+                  <div class="stat"><b>${todayAbsent.length}</b><span>غائب</span></div>
+                  <div class="stat"><b>${avgMinutes}</b><span>متوسط التأخر (دقيقة)</span></div>
+                  <div class="stat"><b>${students.length - todayLate.length - todayAbsent.length}</b><span>حاضر</span></div>
+                </div>
+                <table><thead><tr><th>اسم الطالب</th><th>مدة التأخر</th><th>السبب</th><th>جوال ولي الأمر</th><th>ملاحظات</th></tr></thead>
+                <tbody>${rows}</tbody></table>
+                <br><p style="font-size:11px;color:#9ca3af">مدرسة عبيدة بن الحارث المتوسطة — طُبع بتاريخ ${new Date().toLocaleDateString("ar-SA")}</p>
+                <script>window.onload=()=>window.print()</script></body></html>`);
+                w.document.close();
+              }} className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-xs font-black text-white bg-amber-600 hover:bg-amber-700">
+                🖨️ طباعة الإحصائية
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              {/* أرقام سريعة */}
+              <div className="grid grid-cols-4 gap-3">
+                {[
+                  {label:"متأخر اليوم", val:todayLate.length, col:"#f59e0b", bg:"#fffbeb"},
+                  {label:"غائب",        val:todayAbsent.length, col:"#ef4444", bg:"#fef2f2"},
+                  {label:"متوسط التأخر",val:avgMinutes+" د",  col:"#8b5cf6", bg:"#f5f3ff"},
+                  {label:"حاضر",        val:students.length-todayLate.length-todayAbsent.length, col:"#10b981", bg:"#ecfdf5"},
+                ].map((s,i)=>(
+                  <div key={i} className="rounded-2xl p-4 text-center" style={{background:s.bg}}>
+                    <div className="text-2xl font-black" style={{color:s.col}}>{s.val}</div>
+                    <div className="text-xs font-bold mt-1" style={{color:s.col}}>{s.label}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* أسباب التأخر */}
+              {Object.keys(reasonCount).length > 0 && (
+                <div>
+                  <div className="font-black text-sm text-gray-700 mb-2">📋 أسباب التأخر</div>
+                  <div className="flex flex-wrap gap-2">
+                    {Object.entries(reasonCount).sort((a,b)=>b[1]-a[1]).map(([reason,count])=>(
+                      <div key={reason} className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-50 border border-amber-100">
+                        <span className="text-xs font-bold text-amber-800">{reason}</span>
+                        <span className="w-6 h-6 rounded-full bg-amber-500 text-white text-xs font-black flex items-center justify-center">{count}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* قائمة المتأخرين */}
+              {todayLate.length > 0 && (
+                <div>
+                  <div className="font-black text-sm text-gray-700 mb-2">👥 المتأخرون ({todayLate.length})</div>
+                  <div className="space-y-2">
+                    {todayLate.map(stu => {
+                      const a = getAtt(stu.id);
+                      return (
+                        <div key={stu.id} className="flex items-center gap-3 p-3 bg-amber-50 rounded-xl border border-amber-100">
+                          <div className="flex-1">
+                            <div className="font-bold text-sm text-gray-800">{stu.name}</div>
+                            <div className="text-xs text-gray-500 mt-0.5 flex flex-wrap gap-2">
+                              {a.lateMinutes && <span className="text-amber-700 font-bold">⏱ {a.lateMinutes} دقيقة</span>}
+                              {a.lateReason  && <span>· {a.lateReason}</span>}
+                              {(a.parentPhone||stu.phone) && <span className="text-blue-600">📞 {a.parentPhone||stu.phone}</span>}
+                              {a.lateNote    && <span className="text-gray-400 italic">· {a.lateNote}</span>}
+                            </div>
+                          </div>
+                          <span className="text-xs px-2 py-1 rounded-lg font-bold bg-amber-500 text-white">
+                            {a.lateMinutes||"?"} د
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {todayLate.length === 0 && (
+                <div className="text-center py-8 text-gray-400">
+                  <div className="text-3xl mb-2">✅</div>
+                  <div className="font-bold">لا يوجد تأخر مسجّل لهذا اليوم</div>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* - Excel Hint - */}
       <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-2.5 text-xs text-blue-700 flex items-start gap-2">
@@ -7525,6 +7683,56 @@ function StudentAbsencePage() {
                             </button>
                           ))}
                         </div>
+                        {/* تفاصيل التأخر الصباحي */}
+                        {att.status === "تأخر صباحي" && (
+                          <div className="mt-2 p-2 bg-amber-50 rounded-xl border border-amber-100 space-y-1.5">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <div className="flex items-center gap-1">
+                                <span className="text-xs text-amber-700 font-bold">⏱ مدة التأخر:</span>
+                                <input type="number" min="1" max="120"
+                                  value={att.lateMinutes||""}
+                                  onChange={e=>updateMorningLate(stu.id,"lateMinutes",e.target.value)}
+                                  placeholder="دقائق"
+                                  className="w-16 px-2 py-1 text-xs rounded-lg border border-amber-200 text-center focus:outline-none focus:border-amber-400"
+                                  style={{fontFamily:"inherit"}} />
+                                <span className="text-xs text-amber-600">دقيقة</span>
+                              </div>
+                              <div className="flex items-center gap-1 flex-1">
+                                <span className="text-xs text-amber-700 font-bold">السبب:</span>
+                                <select value={att.lateReason||""}
+                                  onChange={e=>updateMorningLate(stu.id,"lateReason",e.target.value)}
+                                  className="flex-1 px-2 py-1 text-xs rounded-lg border border-amber-200 focus:outline-none focus:border-amber-400"
+                                  style={{fontFamily:"inherit"}}>
+                                  <option value="">اختر السبب</option>
+                                  <option>الأسرة والتوصيل</option>
+                                  <option>توصيل الإخوة</option>
+                                  <option>بُعد السكن</option>
+                                  <option>البقاء في المحلات القريبة</option>
+                                  <option>الباص المدرسي</option>
+                                  <option>وجود سيارة وتوصيل الإخوة</option>
+                                  <option>ظروف صحية</option>
+                                  <option>أخرى</option>
+                                </select>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-amber-700 font-bold">📞 رقم الوالد:</span>
+                              <input type="tel"
+                                value={att.parentPhone || stu.phone || ""}
+                                onChange={e=>updateMorningLate(stu.id,"parentPhone",e.target.value)}
+                                placeholder="05xxxxxxxx"
+                                className="w-36 px-2 py-1 text-xs rounded-lg border border-amber-200 focus:outline-none focus:border-amber-400"
+                                style={{fontFamily:"inherit"}} />
+                              <span className="text-xs text-amber-700 font-bold">ملاحظة:</span>
+                              <input type="text"
+                                value={att.lateNote||""}
+                                onChange={e=>updateMorningLate(stu.id,"lateNote",e.target.value)}
+                                placeholder="ملاحظات إضافية..."
+                                className="flex-1 px-2 py-1 text-xs rounded-lg border border-amber-200 focus:outline-none focus:border-amber-400"
+                                style={{fontFamily:"inherit"}} />
+                            </div>
+                          </div>
+                        )}
                       </td>
 
                       {/* حصص */}
