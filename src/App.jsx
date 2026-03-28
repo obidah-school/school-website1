@@ -5517,7 +5517,7 @@ function CircularsPage({ siteFont }) {
   const [form,         setForm]         = React.useState({
     title:"", body:"", footer:"مدرسة عبيدة بن الحارث المتوسطة",
     color:"#1e3a5f", accentColor:"#0d9488", textColor:"#fff",
-    badge:"", imageBase64:"", sender:"إدارة المدرسة",
+    badge:"", imageBase64:"", images:[], sender:"إدارة المدرسة",
     date: new Date().toLocaleDateString("ar-SA"),
     bodyFontSize:"16", bodyBold:false, bodyItalic:false,
     links:[]
@@ -5564,7 +5564,7 @@ function CircularsPage({ siteFont }) {
   const resetForm = () => {
     setForm({ title:"", body:"", footer:"مدرسة عبيدة بن الحارث المتوسطة",
       color:"#1e3a5f", accentColor:"#0d9488", textColor:"#fff",
-      badge:"", imageBase64:"", sender:"إدارة المدرسة",
+      badge:"", imageBase64:"", images:[], sender:"إدارة المدرسة",
       date: new Date().toLocaleDateString("ar-SA"),
       bodyFontSize:"16", bodyBold:false, bodyItalic:false, links:[] });
     setShowEmoji(false);
@@ -5581,6 +5581,7 @@ function CircularsPage({ siteFont }) {
       textColor:    c.textColor    || "#fff",
       badge:        c.badge        || "",
       imageBase64:  c.imageBase64  || "",
+      images:       c.images        || [],
       sender:       c.sender       || "إدارة المدرسة",
       date:         c.date         || new Date().toLocaleDateString("ar-SA"),
       bodyFontSize: c.bodyFontSize || "16",
@@ -5606,13 +5607,49 @@ function CircularsPage({ siteFont }) {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const handleImage = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = ev => setForm(f => ({...f, imageBase64: ev.target.result}));
-    reader.readAsDataURL(file);
+  const compressImage = (file, maxW=900, quality=0.78) => new Promise((resolve, reject) => {
+    if (file.size > 8 * 1024 * 1024) { reject("حجم الصورة يتجاوز 8 ميجابايت"); return; }
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const canvas = document.createElement("canvas");
+      let w = img.width, h = img.height;
+      if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
+      canvas.width = w; canvas.height = h;
+      canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+      resolve({ src: canvas.toDataURL("image/jpeg", quality), w, h,
+        size: Math.round(canvas.toDataURL("image/jpeg", quality).length * 0.75 / 1024) });
+    };
+    img.onerror = () => reject("خطأ في قراءة الصورة");
+    img.src = url;
+  });
+
+  const handleImage = async (e) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    if ((form.images||[]).length + files.length > 6) { alert("الحد الأقصى 6 صور"); return; }
+    for (const file of files) {
+      try {
+        const result = await compressImage(file);
+        setForm(f => ({...f,
+          imageBase64: f.imageBase64 || result.src, // أول صورة كصورة رئيسية
+          images: [...(f.images||[]), { src: result.src, size: "medium", w: result.w, h: result.h, kb: result.kb }]
+        }));
+      } catch(err) { alert(err); }
+    }
+    e.target.value = "";
   };
+
+  const removeImage = (idx) => setForm(f => {
+    const imgs = f.images.filter((_,i)=>i!==idx);
+    return {...f, images: imgs, imageBase64: imgs[0]?.src || ""};
+  });
+
+  const setImageSize = (idx, size) => setForm(f => {
+    const imgs = [...f.images]; imgs[idx] = {...imgs[idx], size};
+    return {...f, images: imgs};
+  });
 
   const addLink = () => setForm(f => ({...f, links:[...f.links, {label:"",url:""}]}));
   const updateLink = (i, field, val) => setForm(f => {
@@ -5894,21 +5931,39 @@ function CircularsPage({ siteFont }) {
                 </div>
               </div>
 
-              {/* صورة */}
+              {/* الصور */}
               <div>
-                <label className="text-xs font-bold text-gray-500 block mb-2">صورة (اختياري)</label>
-                <div className="flex items-center gap-3">
-                  <label className="flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 border-dashed border-gray-300 cursor-pointer hover:border-teal-400 text-sm font-bold text-gray-500 hover:text-teal-600 transition-all">
-                    📷 رفع صورة
-                    <input type="file" accept="image/*" className="hidden" onChange={handleImage} />
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs font-bold text-gray-500">الصور (حتى 6 صور)</label>
+                  <label className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border-2 border-dashed border-teal-300 cursor-pointer hover:border-teal-500 text-xs font-bold text-teal-600 hover:bg-teal-50 transition-all">
+                    📷 إضافة صور
+                    <input type="file" accept="image/*" multiple className="hidden" onChange={handleImage} />
                   </label>
-                  {form.imageBase64 && (
-                    <div className="flex items-center gap-2">
-                      <img src={form.imageBase64} className="w-12 h-12 rounded-xl object-cover" alt="preview" />
-                      <button onClick={()=>setForm(f=>({...f,imageBase64:""}))} className="text-red-400 hover:text-red-600 font-bold text-xs">حذف</button>
-                    </div>
-                  )}
                 </div>
+                {(form.images||[]).length > 0 && (
+                  <div className="space-y-2">
+                    {(form.images||[]).map((img, idx) => (
+                      <div key={idx} className="flex items-center gap-3 p-2 bg-gray-50 rounded-xl border border-gray-200">
+                        <img src={img.src} className="w-16 h-12 rounded-lg object-cover flex-shrink-0" alt="" />
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs text-gray-500 mb-1 truncate">صورة {idx+1} — {img.kb||""}KB</div>
+                          {/* التحكم في الحجم */}
+                          <div className="flex gap-1">
+                            {[["s","صغيرة"],["medium","متوسطة"],["l","كبيرة"],["full","كاملة"]].map(([sz,lb])=>(
+                              <button key={sz} onClick={()=>setImageSize(idx,sz)}
+                                className={"px-2 py-0.5 rounded-lg text-xs font-bold transition-all " +
+                                  ((img.size||"medium")===sz ? "bg-teal-600 text-white" : "bg-white border border-gray-200 text-gray-600 hover:bg-teal-50")}>
+                                {lb}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        <button onClick={()=>removeImage(idx)}
+                          className="text-red-400 hover:text-red-600 w-7 h-7 flex items-center justify-center rounded-lg hover:bg-red-50 flex-shrink-0 font-bold">✕</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* روابط */}
@@ -6004,12 +6059,14 @@ function CircularCard({ circ, preview, onView, onCopy, onEdit, onDelete, copied 
             dangerouslySetInnerHTML={{__html: circ.body.replace(/\n/g,"<br>")}} />
         )}
 
-        {/* صورة التعميم الكاملة */}
-        {circ.imageBase64 && (
-          <img src={circ.imageBase64} alt=""
-            className="rounded-2xl mb-3 mx-auto"
-            style={{objectFit:"contain", maxHeight:180, maxWidth:"60%", display:"block"}} />
-        )}
+        {/* صور التعميم */}
+        {((circ.images&&circ.images.length>0) ? circ.images : (circ.imageBase64 ? [{src:circ.imageBase64,size:"medium"}] : [])).map((img,idx)=>{
+          const sz = img.size||"medium";
+          const styles = sz==="full"
+            ? {width:"100%",objectFit:"contain",borderRadius:12,marginBottom:8,display:"block"}
+            : {maxWidth:sz==="s"?"35%":sz==="l"?"85%":"60%",maxHeight:sz==="s"?120:sz==="l"?300:200,objectFit:"contain",borderRadius:12,marginBottom:8,display:"block",marginLeft:"auto",marginRight:"auto"};
+          return <img key={idx} src={img.src||img} alt="" style={styles} />;
+        })}
 
         {/* الروابط */}
         {circ.links?.filter(l=>l.url).length > 0 && (
@@ -6087,10 +6144,13 @@ function CircularView({ circ, onBack }) {
 
             {/* رأس التعميم */}
             <div className="text-center mb-6 relative">
-              {circ.imageBase64 && (
-                <img src={circ.imageBase64} className="w-full rounded-2xl object-cover mx-auto mb-4 border-4 border-white border-opacity-20 shadow-xl"
-                  style={{maxHeight:280}} alt="" />
-              )}
+              {((circ.images&&circ.images.length>0) ? circ.images : (circ.imageBase64 ? [{src:circ.imageBase64,size:"medium"}] : [])).map((img,idx)=>{
+                const sz=img.size||"medium";
+                const st=sz==="full"
+                  ? {width:"100%",objectFit:"contain",borderRadius:16,marginBottom:12,border:"2px solid rgba(255,255,255,.2)"}
+                  : {maxWidth:sz==="s"?"40%":sz==="l"?"90%":"70%",maxHeight:sz==="s"?150:sz==="l"?380:260,objectFit:"contain",borderRadius:16,marginBottom:12,display:"block",marginLeft:"auto",marginRight:"auto",border:"2px solid rgba(255,255,255,.2)"};
+                return <img key={idx} src={img.src||img} alt="" style={st} />;
+              })}
               {circ.badge && (
                 <div className="inline-block mb-3">
                   <span className="text-sm font-black px-4 py-1.5 rounded-full"
