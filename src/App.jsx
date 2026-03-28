@@ -5784,8 +5784,8 @@ function CircularsPage({ siteFont }) {
                   {form.body && (
                     <div className="mt-1 p-3 rounded-xl border border-gray-100 bg-gray-50">
                       <div className="text-xs text-gray-400 font-bold mb-1">معاينة النص:</div>
-                      <div className="text-sm leading-relaxed" style={{direction:"rtl"}}
-                        dangerouslySetInnerHTML={{__html:form.body}} />
+                      <div className="text-sm leading-relaxed" style={{direction:"rtl",whiteSpace:"pre-wrap"}}
+                        dangerouslySetInnerHTML={{__html:form.body.replace(/\n/g,"<br/>")}} />
                     </div>
                   )}
                 </div>
@@ -5925,8 +5925,15 @@ function CircularCard({ circ, preview, onView, onCopy, onEdit, onDelete, copied 
         {/* النص */}
         {circ.body && (
           <div className="leading-relaxed mb-3 p-3 rounded-xl"
-            style={{background:"rgba(255,255,255,.1)",color:"rgba(255,255,255,.9)",lineHeight:1.8}}
-            dangerouslySetInnerHTML={{__html: circ.body}} />
+            style={{background:"rgba(255,255,255,.1)",color:"rgba(255,255,255,.9)",lineHeight:1.8,whiteSpace:"pre-wrap"}}
+            dangerouslySetInnerHTML={{__html: circ.body.replace(/\n/g,"<br/>")}} />
+        )}
+
+        {/* صورة التعميم الكاملة */}
+        {circ.imageBase64 && (
+          <img src={circ.imageBase64} alt=""
+            className="w-full rounded-xl object-cover mb-3 border border-white border-opacity-20"
+            style={{maxHeight:200}} />
         )}
 
         {/* الروابط */}
@@ -6006,7 +6013,8 @@ function CircularView({ circ, onBack }) {
             {/* رأس التعميم */}
             <div className="text-center mb-6 relative">
               {circ.imageBase64 && (
-                <img src={circ.imageBase64} className="w-24 h-24 rounded-2xl object-cover mx-auto mb-4 border-4 border-white border-opacity-30 shadow-xl" alt="" />
+                <img src={circ.imageBase64} className="w-full rounded-2xl object-cover mx-auto mb-4 border-4 border-white border-opacity-20 shadow-xl"
+                  style={{maxHeight:280}} alt="" />
               )}
               {circ.badge && (
                 <div className="inline-block mb-3">
@@ -6029,8 +6037,8 @@ function CircularView({ circ, onBack }) {
             {circ.body && (
               <div className="rounded-2xl p-5 mb-5 leading-loose"
                 style={{background:"rgba(255,255,255,.12)",color:"rgba(255,255,255,.95)",
-                  border:"1px solid rgba(255,255,255,.15)",lineHeight:1.8}}
-                dangerouslySetInnerHTML={{__html: circ.body}} />
+                  border:"1px solid rgba(255,255,255,.15)",lineHeight:1.8,whiteSpace:"pre-wrap"}}
+                dangerouslySetInnerHTML={{__html: circ.body.replace(/\n/g,"<br/>")}} />
             )}
 
             {/* الروابط */}
