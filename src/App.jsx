@@ -5868,8 +5868,7 @@ function CircularView({ circ, onBack }) {
               <div className="rounded-2xl p-5 mb-5 text-sm leading-loose"
                 style={{background:"rgba(255,255,255,.12)",color:"rgba(255,255,255,.95)",
                   border:"1px solid rgba(255,255,255,.15)"}}>
-                {circ.body.split("
-").map((line,i)=>(
+                {circ.body.split("\n").map((line,i)=>(
                   <p key={i} className={line ? "" : "h-3"}>{line}</p>
                 ))}
               </div>
