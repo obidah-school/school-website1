@@ -650,7 +650,7 @@ function HomePage({ teachers, announcements, activities, navigate, attendance, w
 
   return (
     <div>
-      {/* - الترويسة الأصلية - */}
+      {/* -- الترويسة الأصلية -- */}
       <div className="bg-gradient-to-l from-teal-600 via-teal-700 to-emerald-800 rounded-3xl p-8 mb-6 text-white text-center shadow-xl" style={{overflow:"hidden",position:"relative"}}>
         <div style={{position:"absolute",inset:0,background:"radial-gradient(circle at 50% 0%,rgba(212,175,55,.15) 0%,transparent 60%)",pointerEvents:"none"}} />
         <div className="flex justify-center mb-4 relative z-10">
@@ -679,7 +679,7 @@ function HomePage({ teachers, announcements, activities, navigate, attendance, w
         </div>
       </div>
 
-      {/* - بطاقات KPI - */}
+      {/* -- بطاقات KPI -- */}
       <div className="grid grid-cols-2 gap-3 mb-6 sm:grid-cols-4">
         <div className="rounded-2xl p-4 text-center cursor-pointer hover:scale-105 transition-transform shadow-sm"
           style={{background:kpiBg(attendRate,90,75)}} onClick={()=>navigate("attendance")}>
@@ -711,7 +711,7 @@ function HomePage({ teachers, announcements, activities, navigate, attendance, w
         </div>
       </div>
 
-      {/* - تنبيهات + إعلانات + أنشطة - */}
+      {/* -- تنبيهات + إعلانات + أنشطة -- */}
       <div className="grid gap-4 sm:grid-cols-3 mb-6">
         <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
           <h3 className="font-black text-gray-800 mb-3 flex items-center gap-2 text-sm">
@@ -757,7 +757,7 @@ function HomePage({ teachers, announcements, activities, navigate, attendance, w
         </div>
       </div>
 
-      {/* - رؤية المدرسة ورسالتها (مُعادة) - */}
+      {/* -- رؤية المدرسة ورسالتها (مُعادة) -- */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
         <div className="text-center mb-6">
           <h3 className="text-xl font-black text-teal-900 mb-1">رؤيتنا ورسالتنا</h3>
@@ -782,7 +782,7 @@ function HomePage({ teachers, announcements, activities, navigate, attendance, w
         </div>
       </div>
 
-      {/* - الغياب هذا الأسبوع - */}
+      {/* -- الغياب هذا الأسبوع -- */}
       {mostAbsent.length>0 && (
         <div className="bg-white rounded-2xl p-5 shadow-sm border border-red-100 mb-6">
           <h3 className="font-black text-gray-800 mb-3 text-sm flex items-center gap-2">
@@ -800,7 +800,7 @@ function HomePage({ teachers, announcements, activities, navigate, attendance, w
         </div>
       )}
 
-      {/* - الأسبوع الحالي - */}
+      {/* -- الأسبوع الحالي -- */}
       <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 mb-6">
         <h3 className="font-black text-gray-800 mb-3 text-sm">📊 حضور الأسبوع الحالي</h3>
         <div className="grid grid-cols-5 gap-2">
@@ -823,7 +823,7 @@ function HomePage({ teachers, announcements, activities, navigate, attendance, w
         </div>
       </div>
 
-      {/* - روابط سريعة - */}
+      {/* -- روابط سريعة -- */}
       <div className="grid grid-cols-4 gap-3 sm:grid-cols-8">
         {[
           {id:"attendance",    icon:"📋", label:"الحضور",        color:"#0d9488"},
@@ -6221,7 +6221,7 @@ function SMSPage({ teachers, attendance, week, classList }) {
 function StudentAbsencePage() {
   const MADAR_URL = "https://app.mobile.net.sa";
   const FB_KEY    = "student-absence";
-  const PERIODS   = ["الأولى","الثانية","الثالثة","الرابعة","الخامسة","السادسة","السابعة"];
+  const PERIODS_T = ["الأولى","الثانية","الثالثة","الرابعة","الخامسة","السادسة","السابعة"];
   const STATUSES  = [
     { key:"حاضر",       label:"حاضر",        icon:"✅", color:"emerald" },
     { key:"غائب",       label:"غائب",         icon:"❌", color:"red"    },
@@ -6245,19 +6245,14 @@ function StudentAbsencePage() {
   const [editId,      setEditId]      = useState(null);
   const [editData,    setEditData]    = useState({});
   const xlsRef = useRef();
-  const [allClasses,  setAllClasses]  = React.useState({});
-  const [selClass,    setSelClass]    = React.useState("");
+  const [allClasses, setAllClasses] = React.useState({});
+  const [selClass,   setSelClass]   = React.useState("");
 
   /* -- load -- */
   useEffect(() => {
     DB.get(FB_KEY + "-students", []).then(d => d?.length && setStudents(d));
     DB.get(FB_KEY + "-class", "الصف الأول / أ").then(d => d && setClassName(d));
-    DB.get("school-absence-classes", {}).then(d => {
-      if (d && typeof d === "object" && Object.keys(d).length > 0) {
-        setAllClasses(d);
-        setSelClass(Object.keys(d)[0]);
-      }
-    });
+    DB.get("school-absence-classes",{}).then(d=>{ if(d&&typeof d==="object"&&Object.keys(d).length>0){setAllClasses(d);setSelClass(Object.keys(d)[0]);} });
   }, []);
 
   useEffect(() => {
@@ -6318,67 +6313,34 @@ function StudentAbsencePage() {
 
   /* -- excel -- */
   const handleExcel = (e, targetClass) => {
-    const files = Array.from(e.target.files || []);
-    if (!files.length) return;
-    e.target.value = "";
-
-    const processFile = async (file, clsName) => {
-      const ev = await file.arrayBuffer();
-      await loadXLSX();
-      const wb   = window.XLSX.read(ev, { type:"array" });
-      const ws   = wb.Sheets[wb.SheetNames[0]];
-      const rows = window.XLSX.utils.sheet_to_json(ws, { header:1 });
-      if (!rows.length) return 0;
-
-      // هل السطر الأول رأس عمود؟
-      const first = rows[0];
-      const isHeader = first.some(c => {
-        const s = String(c||"").trim();
-        return ["اسم","طالب","جوال","هاتف","name","phone","tel"].some(k => s.includes(k));
-      });
-      const data = isHeader ? rows.slice(1) : rows;
-
-      const incoming = [];
-      data.forEach((row, i) => {
-        const name  = String(row[0]||"").trim();
-        const phone = String(row[1]||"").trim();
-        const nid   = String(row[2]||"").trim();
-        if (name.length > 2) incoming.push({ id:"s"+Date.now()+i+Math.random(), name, phone, nationalId:nid });
-      });
-      return incoming;
-    };
-
-    const runImport = async () => {
-      for (const file of files) {
-        let clsName = targetClass;
-        if (!clsName) {
-          const guess = file.name.replace(/\.xlsx?|\.csv/i,"").trim();
-          clsName = window.prompt("اسم الفصل لملف: " + file.name, guess);
-          if (!clsName) continue;
-        }
-        try {
-          const incoming = await processFile(file, clsName);
-          if (!incoming || !incoming.length) {
-            window.alert("لم يُعثر على طلاب في: " + file.name + "\nتأكد أن العمود الأول هو الاسم");
-            continue;
-          }
-          // حفظ في قائمة الفصل
-          setAllClasses(prev => {
-            const existing = prev[clsName] || [];
-            const merged = [...existing];
-            incoming.forEach(ns => { if (!merged.find(s=>s.name===ns.name)) merged.push(ns); });
-            const next = { ...prev, [clsName]: merged };
-            DB.set("school-absence-classes", next);
-            return next;
+    const files = Array.from(e.target.files||[]); if(!files.length) return;
+    e.target.value="";
+    const run = async () => {
+      for(const file of files){
+        let cls = targetClass;
+        if(!cls){ const g=file.name.replace(/\.xlsx?|\.csv/i,"").trim(); cls=window.prompt("اسم الفصل لملف: "+file.name, g); if(!cls) continue; }
+        try{
+          const ev = await file.arrayBuffer();
+          await loadXLSX();
+          const wb=window.XLSX.read(ev,{type:"array"});
+          const rows=window.XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1});
+          if(!rows.length){window.alert("الملف فارغ: "+file.name);continue;}
+          const isHdr = rows[0].some(c=>["اسم","طالب","جوال","name","phone"].some(k=>String(c||"").toLowerCase().includes(k)));
+          const data = isHdr ? rows.slice(1) : rows;
+          const inc=[];
+          data.forEach((r,i)=>{ const n=String(r[0]||"").trim(),p=String(r[1]||"").trim(); if(n.length>2) inc.push({id:"s"+Date.now()+i+Math.random(),name:n,phone:p,nationalId:String(r[2]||"").trim()}); });
+          if(!inc.length){window.alert("لم يُعثر على طلاب في: "+file.name+"\nتأكد أن العمود الأول هو الاسم");continue;}
+          setAllClasses(prev=>{
+            const ex=prev[cls]||[]; const m=[...ex];
+            inc.forEach(ns=>{if(!m.find(s=>s.name===ns.name))m.push(ns);});
+            const next={...prev,[cls]:m}; DB.set("school-absence-classes",next); return next;
           });
-          setSelClass(clsName);
-          window.alert("✅ " + clsName + ": " + incoming.length + " طالب");
-        } catch(err) {
-          window.alert("خطأ في " + file.name + ": " + err.message);
-        }
+          setSelClass(cls);
+          window.alert("✅ "+cls+": "+inc.length+" طالب");
+        }catch(err){window.alert("خطأ في "+file.name+": "+err.message);}
       }
     };
-    runImport();
+    run();
   };
 
   /* -- madar modal -- */
@@ -6391,7 +6353,7 @@ function StudentAbsencePage() {
     else if (att.status === "تأخر صباحي")
       msg = `السلام عليكم ورحمة الله وبركاته\nنُفيدكم بأن ابنكم الطالب / ${stu.name}\nتأخّر عن الحضور الصباحي بتاريخ ${dateAr}\nنرجو الحرص على الالتزام بالحضور في وقته.\nمع تحيات إدارة مدرسة عبيدة بن الحارث المتوسطة`;
     else if (att.status === "تأخر حصص") {
-      const perNames = (att.periods||[]).sort((a,b)=>a-b).map(p => "الحصة " + PERIODS[p]).join("، ");
+      const perNames = (att.periods||[]).sort((a,b)=>a-b).map(p => "الحصة " + PERIODS_T[p]).join("، ");
       msg = `السلام عليكم ورحمة الله وبركاته\nنُفيدكم بأن ابنكم الطالب / ${stu.name}\nتأخّر عن ${perNames} بتاريخ ${dateAr}\nنرجو متابعة الأمر.\nمع تحيات إدارة مدرسة عبيدة بن الحارث المتوسطة`;
     }
     setModal({ stu, msg }); setCopied(false);
@@ -6409,7 +6371,7 @@ function StudentAbsencePage() {
     const rows = students.map((s,i) => {
       const att = getAtt(s.id);
       const perTxt = att.status === "تأخر حصص" && att.periods?.length
-        ? (att.periods||[]).sort((a,b)=>a-b).map(p=>PERIODS[p]).join("، ") : "—";
+        ? (att.periods||[]).sort((a,b)=>a-b).map(p=>PERIODS_T[p]).join("، ") : "—";
       const statusColor = { حاضر:"#059669", غائب:"#dc2626", "تأخر صباحي":"#d97706", "تأخر حصص":"#ea580c" }[att.status]||"#374151";
       return `<tr style="border-bottom:1px solid #e5e7eb; background:${i%2?"#f9fafb":"#fff"}">
         <td style="padding:8px 12px; text-align:center; color:#6b7280; font-size:12px">${i+1}</td>
@@ -6451,7 +6413,7 @@ function StudentAbsencePage() {
   };
 
   /* -- derived -- */
-  const currentStudents = selClass && allClasses[selClass] ? allClasses[selClass] : students;
+  const currentStudents = selClass&&allClasses[selClass] ? allClasses[selClass] : students;
   const filtered = currentStudents.filter(s => !search || s.name.includes(search) || (s.nationalId||"").includes(search));
   const counts   = STATUSES.reduce((acc,s) => { acc[s.key] = currentStudents.filter(st => getAtt(st.id).status === s.key).length; return acc; }, {});
 
@@ -6466,7 +6428,7 @@ function StudentAbsencePage() {
   return (
     <div className="space-y-4">
 
-      {/* - Header - */}
+      {/* -- Header -- */}
       <div className="bg-gradient-to-l from-rose-900 to-red-800 rounded-2xl p-5 text-white shadow-xl">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -6475,35 +6437,23 @@ function StudentAbsencePage() {
             </h2>
             <p className="text-xs opacity-70 mt-1">رصد الغياب والتأخر الصباحي والتأخر عن الحصص</p>
             <div className="flex items-center gap-2 mt-2 flex-wrap">
-              {/* قائمة الفصول المنسدلة */}
               <select value={selClass} onChange={e=>setSelClass(e.target.value)}
                 className="bg-white bg-opacity-20 border border-white border-opacity-30 rounded-lg px-3 py-1.5 text-sm font-black focus:outline-none text-white"
                 style={{fontFamily:"inherit"}}>
-                <option value="" style={{color:"#000"}}>— اختر الفصل —</option>
-                {["الأول المتوسط","الثاني المتوسط","الثالث المتوسط"].map(grade=>(
-                  <optgroup key={grade} label={grade} style={{color:"#000"}}>
-                    {["أ","ب","ج","د"].map(sec=>{
-                      const cls = grade+" "+sec;
-                      const count = allClasses[cls]?.length || 0;
-                      return <option key={cls} value={cls} style={{color:"#000"}}>{cls} {count>0?"("+count+")":""}</option>;
-                    })}
+                <option value="" style={{color:"#000"}}>-- اختر الفصل --</option>
+                {["الأول المتوسط","الثاني المتوسط","الثالث المتوسط"].map(g=>(
+                  <optgroup key={g} label={g}>
+                    {["أ","ب","ج","د"].map(s=>{ const cls=g+" "+s; const n=(allClasses[cls]||[]).length;
+                      return <option key={cls} value={cls} style={{color:"#000"}}>{cls}{n?" ("+n+")":""}</option>; })}
                   </optgroup>
                 ))}
-                {Object.keys(allClasses).filter(k=>!["أ","ب","ج","د"].some(s=>k.endsWith(" "+s)&&["الأول المتوسط","الثاني المتوسط","الثالث المتوسط"].some(g=>k.startsWith(g)))).map(cls=>(
-                  <option key={cls} value={cls} style={{color:"#000"}}>{cls} ({allClasses[cls]?.length||0})</option>
-                ))}
               </select>
-              {/* رفع ملف للفصل المختار */}
               <label className="cursor-pointer bg-white bg-opacity-20 border border-white border-opacity-30 rounded-lg px-2 py-1.5 text-xs font-bold hover:bg-opacity-30 flex items-center gap-1">
-                📥 {selClass ? "استيراد لـ "+selClass : "استيراد Excel"}
+                📥 {selClass?"استيراد: "+selClass:"اختر فصلاً أولاً"}
                 <input type="file" accept=".xlsx,.xls,.csv" className="hidden" multiple
-                  onChange={e=>handleExcel(e, selClass||"")} />
+                  onChange={e=>handleExcel(e,selClass)} />
               </label>
-              {selClass && allClasses[selClass] && (
-                <span className="text-xs opacity-70 bg-white bg-opacity-15 px-2 py-1 rounded-lg">
-                  {allClasses[selClass].length} طالب
-                </span>
-              )}
+              {selClass&&allClasses[selClass]&&(<span className="text-xs opacity-70 bg-white bg-opacity-15 px-2 py-1 rounded-lg">{allClasses[selClass].length} طالب</span>)}
             </div>
           </div>
           <div className="flex flex-wrap gap-2 items-center">
@@ -6531,7 +6481,7 @@ function StudentAbsencePage() {
         )}
       </div>
 
-      {/* - Stats - */}
+      {/* -- Stats -- */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {STATUSES.map(s => (
           <div key={s.key} className={`bg-white rounded-2xl p-4 text-center shadow-sm border-b-4 ${
@@ -6546,13 +6496,13 @@ function StudentAbsencePage() {
         ))}
       </div>
 
-      {/* - Excel Hint - */}
+      {/* -- Excel Hint -- */}
       <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-2.5 text-xs text-blue-700 flex items-start gap-2">
         <span className="text-base mt-0.5">📌</span>
         <div><span className="font-bold">تنسيق Excel:</span> عمود أ: اسم الطالب | عمود ب: جوال ولي الأمر | عمود ج: رقم الهوية — السطر الأول يُتجاهل تلقائياً</div>
       </div>
 
-      {/* - Add Form - */}
+      {/* -- Add Form -- */}
       {showAdd && (
         <div className="bg-white rounded-2xl shadow-md border border-rose-100 p-5">
           <h3 className="font-bold text-gray-700 mb-4 text-sm">➕ إضافة طالب جديد</h3>
@@ -6571,12 +6521,12 @@ function StudentAbsencePage() {
         </div>
       )}
 
-      {/* - Search - */}
+      {/* -- Search -- */}
       <input value={search} onChange={e => setSearch(e.target.value)}
         placeholder="🔍 بحث باسم الطالب أو رقم الهوية…"
         className="w-full border-2 border-gray-200 focus:border-rose-400 rounded-2xl px-4 py-3 text-sm focus:outline-none" />
 
-      {/* - Table - */}
+      {/* -- Table -- */}
       {students.length === 0 ? (
         <div className="text-center py-16 bg-white rounded-2xl shadow-sm border border-gray-100">
           <div className="text-5xl mb-3">👨‍🎓</div>
@@ -6647,7 +6597,7 @@ function StudentAbsencePage() {
                       {/* حصص */}
                       <td className="px-3 py-3">
                         <div className="flex justify-center gap-1 flex-wrap">
-                          {PERIODS.map((p, pi) => {
+                          {PERIODS_T.map((p, pi) => {
                             const active   = att.status === "تأخر حصص";
                             const selected = active && (att.periods||[]).includes(pi);
                             return (
@@ -6665,7 +6615,7 @@ function StudentAbsencePage() {
                         </div>
                         {att.status === "تأخر حصص" && (att.periods||[]).length > 0 && (
                           <div className="text-center text-xs text-orange-600 font-bold mt-1.5">
-                            {(att.periods||[]).sort((a,b)=>a-b).map(p=>PERIODS[p]).join(" ، ")}
+                            {(att.periods||[]).sort((a,b)=>a-b).map(p=>PERIODS_T[p]).join(" ، ")}
                           </div>
                         )}
                       </td>
@@ -6750,7 +6700,7 @@ function StudentAbsencePage() {
                     <div>
                       <div className="text-xs text-gray-500 font-bold mb-1.5">اختر الحصص المتأخر عنها:</div>
                       <div className="flex flex-wrap gap-1.5">
-                        {PERIODS.map((p, pi) => (
+                        {PERIODS_T.map((p, pi) => (
                           <button key={pi} onClick={() => togglePeriod(stu.id, pi)}
                             className={`w-10 h-10 rounded-xl text-xs font-bold border transition-all ${(att.periods||[]).includes(pi) ? "bg-orange-500 text-white border-orange-500 shadow-md" : "bg-white text-gray-600 border-gray-300 hover:border-orange-400"}`}>
                             {pi+1}
@@ -6759,7 +6709,7 @@ function StudentAbsencePage() {
                       </div>
                       {(att.periods||[]).length > 0 && (
                         <div className="text-xs text-orange-600 font-bold mt-1.5">
-                          {(att.periods||[]).sort((a,b)=>a-b).map(p=>PERIODS[p]).join(" ، ")}
+                          {(att.periods||[]).sort((a,b)=>a-b).map(p=>PERIODS_T[p]).join(" ، ")}
                         </div>
                       )}
                     </div>
@@ -6771,7 +6721,7 @@ function StudentAbsencePage() {
         </div>
       )}
 
-      {/* - Madar Modal - */}
+      {/* -- Madar Modal -- */}
       {modal && (
         <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4" onClick={() => setModal(null)}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md" onClick={e => e.stopPropagation()}>
@@ -8309,8 +8259,8 @@ function GradeAnalysisPage() {
         ))}
       </div>
 
-      {/* - لوحة القيادة - */}
-      {/* - استيراد إكسل - */}
+      {/* -- لوحة القيادة -- */}
+      {/* -- استيراد إكسل -- */}
       {tab==="excel" && (
         <div className="space-y-4">
           {/* إرشادات */}
@@ -8619,7 +8569,7 @@ function GradeAnalysisPage() {
         </div>
       )}
 
-      {/* - نماذج التقويم - */}
+      {/* -- نماذج التقويم -- */}
       {tab==="models" && (
         <div className="space-y-4">
           <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100">
@@ -8680,7 +8630,7 @@ function GradeAnalysisPage() {
         </div>
       )}
 
-      {/* - التحليل الشامل - */}
+      {/* -- التحليل الشامل -- */}
       {tab==="analysis" && !analytics && (
         <div className="bg-white rounded-2xl p-12 text-center shadow-sm border"><div className="text-4xl mb-2">📈</div><div className="font-black text-gray-400">أضف بيانات أولاً</div></div>
       )}
@@ -8777,7 +8727,7 @@ function GradeAnalysisPage() {
           </div>
         </div>
       )}
-      {/* - التحليل الإحصائي العام - */}
+      {/* -- التحليل الإحصائي العام -- */}
       {tab==="general" && (
         <div className="space-y-5">
           {!analytics ? (
@@ -9099,7 +9049,7 @@ function GradeAnalysisPage() {
         </div>
       )}
 
-      {/* - بيانات الطلاب الكاملة - */}
+      {/* -- بيانات الطلاب الكاملة -- */}
       {tab==="studata" && (
         <div className="space-y-4">
           {filtered.length===0 ? (
@@ -9234,7 +9184,7 @@ function GradeAnalysisPage() {
         </div>
       )}
 
-      {/* - تحليل الاختبار - */}
+      {/* -- تحليل الاختبار -- */}
       {tab==="exam" && (
         <div className="space-y-4">
           {!analytics ? (
@@ -9344,7 +9294,7 @@ function GradeAnalysisPage() {
         </div>
       )}
 
-      {/* - مقارنة الفترات - */}
+      {/* -- مقارنة الفترات -- */}
 
       {tab==="comparison" && (
         <div className="space-y-5">
@@ -9488,7 +9438,7 @@ function GradeAnalysisPage() {
         </div>
       )}
 
-      {/* - التقرير الكامل - */}
+      {/* -- التقرير الكامل -- */}
       {tab==="report" && (
         <div className="space-y-4">
           {!analytics ? (
@@ -10774,9 +10724,9 @@ function OfficialFormsPage({ teachers, attendance, week }) {
 }
 
 
-// -
+// ------------------------------------------------------
 // صفحة ملف الطالب الشامل
-// -
+// ------------------------------------------------------
 function StudentPortfolioPage({ classList, weekArchive, attendance, week, teachers }) {
   const [selClass,   setSelClass]   = useState("");
   const [selStudent, setSelStudent] = useState("");
@@ -11035,9 +10985,9 @@ function StudentImprovementPlan({ student, subjEvals, lvLabel, lvColor }) {
   );
 }
 
-// -
+// --------------------------------------------------------------
 // صفحة تنبيه الطلاب المعرضين للرسوب
-// -
+// --------------------------------------------------------------
 function EarlyWarningPage({ classList }) {
   const [threshold, setThreshold] = useState(60);
   const [selectedClass, setSelectedClass] = useState("all");
@@ -11150,9 +11100,9 @@ function EarlyWarningPage({ classList }) {
   );
 }
 
-// -
+// --------------------------------------------------------------
 // صفحة الاجتماعات وحجز المواعيد
-// -
+// --------------------------------------------------------------
 function MeetingsPage({ teachers }) {
   const [meetings, setMeetings] = useState([]);
   const [form,     setForm]     = useState({title:"",teacher:"",date:"",dateH:"",time:"",type:"حضوري",notes:""});
@@ -11314,9 +11264,9 @@ function MeetingsPage({ teachers }) {
   );
 }
 
-// -
+// --------------------------------------------------------------
 // خريطة حرارية للنشاط المدرسي
-// -
+// --------------------------------------------------------------
 function HeatmapPage({ teachers, attendance, week, weekArchive, announcements, activities }) {
   const dayNames = ["الأحد","الاثنين","الثلاثاء","الأربعاء","الخميس"];
 
@@ -11461,9 +11411,9 @@ function HeatmapPage({ teachers, attendance, week, weekArchive, announcements, a
 }
 
 
-// -
+// --------------------------------------------------------------
 // صفحة اجتماعات اللجان والفرق — الدليل التنظيمي والإجرائي
-// -
+// --------------------------------------------------------------
 const SCHOOL_COMMITTEES = [
   { id:"monthly",      label:"الاجتماع الشهري",              type:"شهري",    members:[
     {name:"",role:"مدير المدرسة",        job:"رئيساً"},
@@ -11549,7 +11499,7 @@ const SCHOOL_COMMITTEES = [
 
 const HIJRI_M = ["محرم","صفر","ربيع الأول","ربيع الثاني","جمادى الأولى","جمادى الآخرة","رجب","شعبان","رمضان","شوال","ذو القعدة","ذو الحجة"];
 const DAYS_AR = ["الأحد","الاثنين","الثلاثاء","الأربعاء","الخميس","الجمعة","السبت"];
-const PERIODS  = ["الحصة الأولى","الحصة الثانية","الحصة الثالثة","الحصة الرابعة","الحصة الخامسة","الحصة السادسة","ما بعد الدوام","فترة الإشراف"];
+const COM_PERIODS = ["الحصة الأولى","الحصة الثانية","الحصة الثالثة","الحصة الرابعة","الحصة الخامسة","الحصة السادسة","ما بعد الدوام","فترة الإشراف"];
 const COM_GREEN = "#4a7c59";
 const COM_LIGHT = "#d8f3dc";
 
@@ -11806,7 +11756,7 @@ function CommitteeMeetingPage({ teachers }) {
         ))}
       </div>
 
-      {/* - نموذج الإدخال - */}
+      {/* ---------- نموذج الإدخال ---------- */}
       {tab==="form" && (
         <div className="space-y-4">
 
@@ -11985,7 +11935,7 @@ function CommitteeMeetingPage({ teachers }) {
         </div>
       )}
 
-      {/* - معاينة المحضر - */}
+      {/* ---------- معاينة المحضر ---------- */}
       {tab==="preview" && (
         <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100">
           {/* كليشة المعاينة */}
@@ -12107,7 +12057,7 @@ function CommitteeMeetingPage({ teachers }) {
         </div>
       )}
 
-      {/* - السجل - */}
+      {/* ---------- السجل ---------- */}
       {tab==="history" && (
         <div className="space-y-3">
           {history.length===0 ? (
@@ -15106,7 +15056,7 @@ export default function SchoolWebsite() {
     `}</style>
     <div dir="rtl" className="min-h-screen relative overflow-x-hidden" style={{ fontFamily: siteFont, background: "linear-gradient(160deg, #f0fdfa 0%, #ecfdf5 25%, #f5f5f4 60%, #fefce8 100%)" }}>
 
-      {/* - رذاذ الزوايا المتحرك - */}
+      {/* -- رذاذ الزوايا المتحرك -- */}
       <div aria-hidden="true" className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
         <style>{`
           @import url('https://fonts.googleapis.com/css2?family=Noto+Naskh+Arabic:wght@400;600;700&family=Noto+Kufi+Arabic:wght@400;700&family=Cairo:wght@400;700;900&family=Tajawal:wght@400;700&family=Reem+Kufi:wght@400;700&family=Lateef&family=Amiri:wght@400;700&display=swap');
@@ -15237,7 +15187,7 @@ export default function SchoolWebsite() {
       <nav className="bg-white shadow-lg sticky top-0 z-50 border-b border-teal-100" style={{fontFamily:"'Cairo', 'Noto Naskh Arabic', sans-serif"}}>
         <div className="max-w-6xl mx-auto px-4">
 
-          {/* - صف أول: الشعار + اسم المدرسة + بيانات المستخدم - */}
+          {/* -- صف أول: الشعار + اسم المدرسة + بيانات المستخدم -- */}
           <div className="flex items-center justify-between py-2.5 border-b border-gray-100">
             <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate("home")}>
               <SchoolLogo size="sm" animate={false} />
@@ -15258,7 +15208,7 @@ export default function SchoolWebsite() {
             </div>
           </div>
 
-          {/* - صف ثانٍ: أزرار التنقل (desktop) - */}
+          {/* -- صف ثانٍ: أزرار التنقل (desktop) -- */}
           <div className="hidden lg:block py-2">
             {/* الصف الأول من الأزرار */}
             <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
@@ -15302,7 +15252,7 @@ export default function SchoolWebsite() {
             </div>
           </div>
 
-          {/* - موبايل - */}
+          {/* -- موبايل -- */}
           {menuOpen && (
             <div className="lg:hidden py-3 space-y-1">
               <div className="grid grid-cols-2 gap-2 mb-3">
