@@ -5460,6 +5460,52 @@ function SurveysPage({ surveys, setSurveys, saveSurveys, isParent }) {
 }
 
 // ===== صفحة التعاميم =====
+// ===== عرض التعميم العام (بدون تسجيل دخول) =====
+function PublicCircularLoader({ circId, siteFont }) {
+  const [circ,    setCirc]    = React.useState(null);
+  const [loading, setLoading] = React.useState(true);
+  const [notFound,setNotFound]= React.useState(false);
+
+  React.useEffect(() => {
+    DB.get("school-circulars", []).then(list => {
+      const found = list.find(c => c.id === circId);
+      if (found) setCirc(found);
+      else setNotFound(true);
+      setLoading(false);
+    });
+  }, [circId]);
+
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center" style={{fontFamily:siteFont}}>
+      <div className="text-center">
+        <div className="text-5xl mb-4 animate-pulse">📜</div>
+        <div className="text-gray-500 font-bold">جاري تحميل التعميم...</div>
+      </div>
+    </div>
+  );
+
+  if (notFound || !circ) return (
+    <div className="min-h-screen flex items-center justify-center" style={{fontFamily:siteFont}}>
+      <div className="text-center">
+        <div className="text-5xl mb-4">❌</div>
+        <div className="text-gray-500 font-bold">التعميم غير موجود</div>
+        <button onClick={()=>{ window.location.hash=""; window.location.reload(); }}
+          className="mt-4 px-6 py-2 bg-teal-600 text-white rounded-xl font-bold text-sm">
+          العودة للموقع
+        </button>
+      </div>
+    </div>
+  );
+
+  return (
+    <CircularView
+      circ={circ}
+      onBack={()=>{ window.location.hash=""; window.location.reload(); }}
+    />
+  );
+}
+
+
 function CircularsPage({ siteFont }) {
   const [circulars,    setCirculars]    = React.useState([]);
   const [loading,      setLoading]      = React.useState(true);
@@ -17053,6 +17099,14 @@ export default function SchoolWebsite() {
   );
 
   if (directAnnId) return <SingleAnnouncementPage announcements={announcements} siteFont={siteFont} annId={directAnnId} />;
+
+  // عرض التعميم العام بدون تسجيل دخول
+  const hashVal = window.location.hash.replace("#","");
+  if (hashVal.startsWith("circ-")) {
+    const circId = hashVal.replace("circ-","");
+    return <PublicCircularLoader circId={circId} siteFont={siteFont} />;
+  }
+
   if (!user && publicAnnouncements) return <PublicAnnouncementsPage announcements={announcements} siteFont={siteFont} onBack={() => setPublicAnnouncements(false)} />;
   if (!user && studentRaffle) return <StudentRafflePortal siteFont={siteFont} onBack={() => setStudentRaffle(false)} />;
   if (!user && teacherPortal) return <TeacherPortal classList={classList} setClassList={setClassList} saveClass={saveClass} siteFont={siteFont} onBack={() => setTeacherPortal(false)} attendance={attendance} teachers={teachers} week={week} onSendNote={handleSendNote} messages={messages} />;
