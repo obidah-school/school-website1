@@ -7195,6 +7195,8 @@ function StudentAbsencePage() {
   const [modal,       setModal]       = useState(null);   // { stu, msg }
   const [copied,      setCopied]      = useState(false);
   const [className,   setClassName]   = useState("الصف الأول / أ");
+  const [allClasses,  setAllClasses]  = useState({});   // { "فصل":  [students] }
+  const [selClass,    setSelClass]    = useState("");
   const [editId,      setEditId]      = useState(null);
   const [editData,    setEditData]    = useState({});
   const xlsRef = useRef();
@@ -7204,6 +7206,12 @@ function StudentAbsencePage() {
   useEffect(() => {
     DB.get(FB_KEY + "-students", []).then(d => d?.length && setStudents(d));
     DB.get(FB_KEY + "-class", "الصف الأول / أ").then(d => d && setClassName(d));
+    DB.get("school-absence-classes", {}).then(d => {
+      if (d && typeof d === "object" && Object.keys(d).length > 0) {
+        setAllClasses(d);
+        setSelClass(prev => prev || Object.keys(d)[0]);
+      }
+    });
   }, []);
 
   useEffect(() => {
@@ -7277,33 +7285,62 @@ function StudentAbsencePage() {
   };
 
   /* - excel - */
-  const handleExcel = e => {
-    const file = e.target.files[0]; if (!file) return;
-    file.arrayBuffer().then(async ev => {
+  const handleExcel = async e => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+
+    for (const file of files) {
+      // اسم الفصل من اسم الملف أو prompt
+      const guessedName = file.name.replace(/\.xlsx?|\.csv/i,"").trim();
+      const clsName = window.prompt(
+        "اسم الفصل لملف: " + file.name + "\n(يمكن تعديله)",
+        guessedName || "الصف الأول / أ"
+      );
+      if (!clsName) continue; // تجاهل إذا ألغى
+
       try {
+        const ev = await file.arrayBuffer();
         await loadXLSX();
-        const XLSX = window.XLSX;
-        const wb   = XLSX.read(ev, { type:"array" });
+        const wb   = window.XLSX.read(ev, { type:"array" });
         const ws   = wb.Sheets[wb.SheetNames[0]];
-        const rows = XLSX.utils.sheet_to_json(ws, { header:1 });
+        const rows = window.XLSX.utils.sheet_to_json(ws, { header:1 });
+
         const incoming = [];
         rows.forEach((row, i) => {
-          if (i === 0) return;
-          const name = String(row[0] || "").trim();
+          if (i === 0) return; // تجاهل السطر الأول
+          const name  = String(row[0] || "").trim();
           const phone = String(row[1] || "").trim();
-          const nationalId = String(row[2] || "").trim();
-          if (name) incoming.push({ id: Date.now().toString() + i, name, phone, nationalId });
+          if (name.length > 2) {
+            incoming.push({
+              id: Date.now().toString() + i + Math.random(),
+              name, phone, nationalId:""
+            });
+          }
         });
-        if (incoming.length) {
-          const merged = [...students];
-          incoming.forEach(ns => { if (!merged.find(s => s.name === ns.name)) merged.push(ns); });
-          setStudents(merged); persist(merged, attendance);
-          window.alert("✅ تم استيراد " + incoming.length + " طالب");
+
+        if (incoming.length > 0) {
+          setAllClasses(prev => {
+            const existing = prev[clsName] || [];
+            // دمج بدون تكرار
+            const merged = [...existing];
+            incoming.forEach(ns => {
+              if (!merged.find(s => s.name === ns.name)) merged.push(ns);
+            });
+            const updated = { ...prev, [clsName]: merged };
+            DB.set("school-absence-classes", updated);
+            return updated;
+          });
+          setSelClass(clsName);
+          window.alert("✅ تم استيراد " + incoming.length + " طالب في فصل: " + clsName);
+        } else {
+          window.alert("لم يُعثر على طلاب في: " + file.name);
         }
-      } catch { window.alert("خطأ في قراءة الملف"); }
-    });
+      } catch(err) {
+        window.alert("خطأ في قراءة " + file.name + ": " + err.message);
+      }
+    }
     e.target.value = "";
-  };
+  };;
 
   /* - madar modal - */
   const openModal = stu => {
@@ -7375,8 +7412,15 @@ function StudentAbsencePage() {
   };
 
   /* - derived - */
-  const filtered = students.filter(s => !search || s.name.includes(search) || (s.nationalId||"").includes(search));
-  const counts   = STATUSES.reduce((acc,s) => { acc[s.key] = students.filter(st => getAtt(st.id).status === s.key).length; return acc; }, {});
+  // الطلاب الحاليون: من الفصل المحدد أو القائمة العادية
+  const currentStudents = selClass && allClasses[selClass]
+    ? allClasses[selClass]
+    : students;
+
+  const filtered = currentStudents.filter(s =>
+    !search || s.name.includes(search) || (s.nationalId||"").includes(search)
+  );
+  const counts   = STATUSES.reduce((acc,s) => { acc[s.key] = currentStudents.filter(st => getAtt(st.id).status === s.key).length; return acc; }, {});
 
   const statusBadge = s => ({
     حاضر:       "bg-emerald-100 text-emerald-700 border-emerald-300",
@@ -7397,10 +7441,20 @@ function StudentAbsencePage() {
               <span className="text-2xl">📋</span> غياب وتأخر الطلاب
             </h2>
             <p className="text-xs opacity-70 mt-1">رصد الغياب والتأخر الصباحي والتأخر عن الحصص</p>
-            <div className="flex items-center gap-2 mt-2">
-              <input value={className} onChange={e => { setClassName(e.target.value); persist(students, attendance, e.target.value); }}
-                className="bg-white bg-opacity-20 border border-white border-opacity-30 rounded-lg px-2 py-1 text-sm font-bold focus:outline-none text-white w-36"
-                placeholder="اسم الفصل" />
+            <div className="flex items-center gap-2 mt-2 flex-wrap">
+              {Object.keys(allClasses).length > 0 ? (<>
+                <select value={selClass} onChange={e=>setSelClass(e.target.value)}
+                  className="bg-white bg-opacity-20 border border-white border-opacity-30 rounded-lg px-3 py-1.5 text-sm font-black focus:outline-none text-white"
+                  style={{fontFamily:"inherit"}}>
+                  <option value="">كل الفصول</option>
+                  {Object.keys(allClasses).map(cls=><option key={cls} value={cls} style={{color:"#000"}}>{cls}</option>)}
+                </select>
+                {selClass && <span className="text-xs opacity-70 bg-white bg-opacity-15 px-2 py-1 rounded-lg">{(allClasses[selClass]||[]).length} طالب</span>}
+              </>) : (
+                <input value={className} onChange={e => { setClassName(e.target.value); persist(students, attendance, e.target.value); }}
+                  className="bg-white bg-opacity-20 border border-white border-opacity-30 rounded-lg px-2 py-1 text-sm font-bold focus:outline-none text-white w-36"
+                  placeholder="اسم الفصل" />
+              )}
               <span className="text-xs opacity-60">الفصل الدراسي</span>
             </div>
           </div>
@@ -7411,7 +7465,7 @@ function StudentAbsencePage() {
               className="bg-white bg-opacity-20 hover:bg-opacity-30 border border-white border-opacity-30 rounded-xl px-3 py-2 text-sm font-bold flex items-center gap-1">
               📥 Excel
             </button>
-            <input ref={xlsRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleExcel} />
+            <input ref={xlsRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" multiple onChange={handleExcel} />
             <button onClick={()=>setStatsView(v=>!v)}
               className="bg-white bg-opacity-20 hover:bg-opacity-30 border border-white border-opacity-30 rounded-xl px-3 py-2 text-sm font-bold">
               📊 {statsView ? "الكشف" : "إحصائيات"}
@@ -7466,8 +7520,8 @@ function StudentAbsencePage() {
         ));
 
         // إحصائيات اليوم
-        const todayLate = students.filter(stu => getAtt(stu.id).status === "تأخر صباحي");
-        const todayAbsent = students.filter(stu => getAtt(stu.id).status === "غائب");
+        const todayLate = currentStudents.filter(stu => getAtt(stu.id).status === "تأخر صباحي");
+        const todayAbsent = currentStudents.filter(stu => getAtt(stu.id).status === "غائب");
         const reasonCount = {};
         todayLate.forEach(stu => {
           const r = getAtt(stu.id).lateReason || "غير محدد";
@@ -7500,12 +7554,12 @@ function StudentAbsencePage() {
                   @media print{@page{margin:10mm}}
                 </style></head><body>
                 <h2>📊 إحصائية التأخر الصباحي</h2>
-                <p>الفصل: ${className} — التاريخ: ${date} — وقت الدوام: 6:45 ص</p>
+                <p>الفصل: ${selClass || className} — التاريخ: ${date} — وقت الدوام: 6:45 ص</p>
                 <div class="stats">
                   <div class="stat"><b>${todayLate.length}</b><span>متأخر</span></div>
                   <div class="stat"><b>${todayAbsent.length}</b><span>غائب</span></div>
                   <div class="stat"><b>${avgMinutes}</b><span>متوسط التأخر (دقيقة)</span></div>
-                  <div class="stat"><b>${students.length - todayLate.length - todayAbsent.length}</b><span>حاضر</span></div>
+                  <div class="stat"><b>${currentStudents.length - todayLate.length - todayAbsent.length}</b><span>حاضر</span></div>
                 </div>
                 <table><thead><tr><th>اسم الطالب</th><th>مدة التأخر</th><th>السبب</th><th>جوال ولي الأمر</th><th>ملاحظات</th></tr></thead>
                 <tbody>${rows}</tbody></table>
@@ -7590,8 +7644,45 @@ function StudentAbsencePage() {
       {/* - Excel Hint - */}
       <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-2.5 text-xs text-blue-700 flex items-start gap-2">
         <span className="text-base mt-0.5">📌</span>
-        <div><span className="font-bold">تنسيق Excel:</span> عمود أ: اسم الطالب | عمود ب: جوال ولي الأمر | عمود ج: رقم الهوية — السطر الأول يُتجاهل تلقائياً</div>
+        <div><span className="font-bold">تنسيق Excel:</span> عمود أ: اسم الطالب | عمود ب: جوال ولي الأمر — ارفع ملف لكل فصل، وسيُطلب منك تسمية الفصل تلقائياً</div>
       </div>
+
+      {/* - تبويبات الفصول - */}
+      {Object.keys(allClasses).length > 0 && (
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-3">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-xs font-black text-gray-500">الفصول ({Object.keys(allClasses).length}):</span>
+            <button onClick={()=>setSelClass("")}
+              className={"text-xs px-3 py-1 rounded-xl font-bold transition-all " + (!selClass ? "bg-rose-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-rose-50")}>
+              الكل ({Object.values(allClasses).reduce((s,c)=>s+c.length,0)} طالب)
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {Object.entries(allClasses).map(([cls, stus]) => (
+              <div key={cls} className="flex items-center gap-0.5">
+                <button onClick={()=>setSelClass(cls)}
+                  className={"text-xs px-3 py-1.5 rounded-r-xl font-bold transition-all border-y border-r " +
+                    (selClass===cls ? "bg-rose-600 text-white border-rose-600 shadow-sm" : "bg-white text-gray-600 border-gray-200 hover:border-rose-300 hover:text-rose-700")}>
+                  {cls} <span className="opacity-70">({stus.length})</span>
+                </button>
+                <button onClick={()=>{
+                  if(!window.confirm("حذف فصل " + cls + "؟")) return;
+                  setAllClasses(prev=>{
+                    const u={...prev}; delete u[cls];
+                    DB.set("school-absence-classes",u);
+                    return u;
+                  });
+                  if(selClass===cls) setSelClass("");
+                }}
+                  className={"text-xs px-1.5 py-1.5 rounded-l-xl font-bold border-y border-l transition-all " +
+                    (selClass===cls ? "bg-rose-700 text-white border-rose-700" : "bg-white text-red-300 border-gray-200 hover:bg-red-50 hover:text-red-500")}>
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* - Add Form - */}
       {showAdd && (
