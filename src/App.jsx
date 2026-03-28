@@ -5701,7 +5701,7 @@ function CircularsPage({ siteFont }) {
                           onClick={()=>{
                             const ta=document.getElementById("circ-ta");
                             const s=ta.selectionStart, e2=ta.selectionEnd;
-                            const sel=ta.value.substring(s,e2)||"النص هنا";
+                            const sel=ta.value.substring(s,e2)|| "";
                             const ins = o+sel+c;
                             const v=ta.value.substring(0,s)+ins+ta.value.substring(e2);
                             setForm(f=>({...f,body:v}));
@@ -5724,7 +5724,7 @@ function CircularsPage({ siteFont }) {
                         onClick={()=>{
                           const ta=document.getElementById("circ-ta");
                           const s=ta.selectionStart, e2=ta.selectionEnd;
-                          const sel=ta.value.substring(s,e2)||"النص";
+                          const sel=ta.value.substring(s,e2); if(!sel)return; ;
                           const ins=o+sel+c;
                           const v=ta.value.substring(0,s)+ins+ta.value.substring(e2);
                           setForm(f=>({...f,body:v}));
@@ -5744,7 +5744,7 @@ function CircularsPage({ siteFont }) {
                           onClick={()=>{
                             const ta=document.getElementById("circ-ta");
                             const s=ta.selectionStart, e2=ta.selectionEnd;
-                            const sel=ta.value.substring(s,e2)||"النص";
+                            const sel=ta.value.substring(s,e2); if(!sel)return; ;
                             const ins='<span style="color:'+col+'">'+sel+'</span>';
                             const v=ta.value.substring(0,s)+ins+ta.value.substring(e2);
                             setForm(f=>({...f,body:v}));
@@ -5762,7 +5762,7 @@ function CircularsPage({ siteFont }) {
                           onClick={()=>{
                             const ta=document.getElementById("circ-ta");
                             const s=ta.selectionStart, e2=ta.selectionEnd;
-                            const sel=ta.value.substring(s,e2)||"النص";
+                            const sel=ta.value.substring(s,e2); if(!sel)return; ;
                             const ins='<span style="background:'+col+';padding:0 3px;border-radius:4px">'+sel+'</span>';
                             const v=ta.value.substring(0,s)+ins+ta.value.substring(e2);
                             setForm(f=>({...f,body:v}));
@@ -5780,7 +5780,7 @@ function CircularsPage({ siteFont }) {
                         onClick={()=>{
                           const ta=document.getElementById("circ-ta");
                           const s=ta.selectionStart, e2=ta.selectionEnd;
-                          const sel=ta.value.substring(s,e2)||"النص";
+                          const sel=ta.value.substring(s,e2); if(!sel)return; ;
                           const ins='<div style="text-align:'+dir+'">'+sel+'</div>';
                           const v=ta.value.substring(0,s)+ins+ta.value.substring(e2);
                           setForm(f=>({...f,body:v}));
@@ -5841,15 +5841,15 @@ function CircularsPage({ siteFont }) {
                     onChange={e=>setForm(f=>({...f,body:e.target.value}))}
                     rows={6}
                     placeholder="اكتب نص التعميم... ثم حدد أي كلمة واضغط زر التنسيق المطلوب"
-                    className="w-full px-3 py-2.5 rounded-xl border-2 border-gray-200 focus:border-teal-400 focus:outline-none text-sm resize-none font-mono"
-                    style={{fontFamily:"inherit",direction:"rtl"}}
+                    className="w-full px-3 py-2.5 rounded-xl border-2 border-gray-200 focus:border-teal-400 focus:outline-none text-sm resize-none"
+                    style={{fontFamily:"inherit",direction:"rtl",lineHeight:1.7}}
                   />
                   {/* معاينة النص المنسق */}
                   {form.body && (
                     <div className="mt-1 p-3 rounded-xl border border-gray-100 bg-gray-50">
                       <div className="text-xs text-gray-400 font-bold mb-1">معاينة النص:</div>
-                      <div className="text-sm leading-relaxed" style={{direction:"rtl",whiteSpace:"pre-wrap"}}
-                        dangerouslySetInnerHTML={{__html:form.body.replace(/\n/g,"<br/>")}} />
+                      <div className="text-sm leading-relaxed" style={{direction:"rtl"}}
+                        dangerouslySetInnerHTML={{__html:form.body}} />
                     </div>
                   )}
                 </div>
@@ -5989,15 +5989,15 @@ function CircularCard({ circ, preview, onView, onCopy, onEdit, onDelete, copied 
         {/* النص */}
         {circ.body && (
           <div className="leading-relaxed mb-3 p-3 rounded-xl"
-            style={{background:"rgba(255,255,255,.1)",color:"rgba(255,255,255,.9)",lineHeight:1.8,whiteSpace:"pre-wrap"}}
-            dangerouslySetInnerHTML={{__html: circ.body.replace(/\n/g,"<br/>")}} />
+            style={{background:"rgba(255,255,255,.1)",color:"rgba(255,255,255,.9)",lineHeight:1.8}}
+            dangerouslySetInnerHTML={{__html: circ.body}} />
         )}
 
         {/* صورة التعميم الكاملة */}
         {circ.imageBase64 && (
           <img src={circ.imageBase64} alt=""
-            className="w-full rounded-xl object-contain mb-3"
-            style={{maxHeight:300, background:"rgba(255,255,255,.05)"}} />
+            className="w-full rounded-2xl mb-3"
+            style={{objectFit:"contain", maxHeight:"none", display:"block", width:"100%"}} />
         )}
 
         {/* الروابط */}
@@ -6101,8 +6101,8 @@ function CircularView({ circ, onBack }) {
             {circ.body && (
               <div className="rounded-2xl p-5 mb-5 leading-loose"
                 style={{background:"rgba(255,255,255,.12)",color:"rgba(255,255,255,.95)",
-                  border:"1px solid rgba(255,255,255,.15)",lineHeight:1.8,whiteSpace:"pre-wrap"}}
-                dangerouslySetInnerHTML={{__html: circ.body.replace(/\n/g,"<br/>")}} />
+                  border:"1px solid rgba(255,255,255,.15)",lineHeight:1.8}}
+                dangerouslySetInnerHTML={{__html: circ.body}} />
             )}
 
             {/* الروابط */}
