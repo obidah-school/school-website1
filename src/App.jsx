@@ -5626,92 +5626,125 @@ function CircularsPage({ siteFont }) {
                 </div>
                 <div className="col-span-2">
                   <label className="text-xs font-bold text-gray-500 block mb-1">نص التعميم</label>
-                  {/* شريط أدوات التنسيق */}
-                  <div className="flex items-center gap-1 mb-1 p-1.5 bg-gray-50 rounded-xl flex-wrap border border-gray-200">
+                  {/* شريط تنسيق بسيط وموثوق */}
+                  <div className="flex flex-wrap gap-1 mb-1.5 p-2 bg-gray-50 rounded-xl border border-gray-200">
+
                     {/* حجم الخط */}
-                    <select
-                      className="text-xs px-1.5 py-1 rounded-lg border border-gray-200 bg-white font-bold focus:outline-none"
-                      style={{fontFamily:"inherit"}}
-                      onMouseDown={e=>e.preventDefault()}
-                      onChange={e=>{
-                        const sz = e.target.value;
-                        if(!sz) return;
-                        const sel = window.getSelection();
-                        if(sel && sel.rangeCount>0 && !sel.isCollapsed){
-                          document.execCommand("fontSize",false,"7");
-                          const spans = document.querySelectorAll('[size="7"]');
-                          spans.forEach(s=>{s.removeAttribute("size"); s.style.fontSize=sz+"px";});
-                        }
-                        e.target.value="";
-                      }}>
-                      <option value="">حجم</option>
-                      {[12,14,16,18,20,24,28,32,36].map(s=>(
-                        <option key={s} value={s}>{s}px</option>
-                      ))}
-                    </select>
-                    {/* فاصل */}
-                    <div className="w-px h-6 bg-gray-200" />
-                    {/* عريض */}
-                    <button onMouseDown={e=>{e.preventDefault();document.execCommand("bold");}}
-                      className="w-7 h-7 rounded-lg font-black text-sm hover:bg-gray-200 transition-all flex items-center justify-center" title="عريض">
-                      <b>B</b>
-                    </button>
-                    {/* مائل */}
-                    <button onMouseDown={e=>{e.preventDefault();document.execCommand("italic");}}
-                      className="w-7 h-7 rounded-lg text-sm hover:bg-gray-200 transition-all flex items-center justify-center" title="مائل">
-                      <i>I</i>
-                    </button>
-                    {/* تسطير */}
-                    <button onMouseDown={e=>{e.preventDefault();document.execCommand("underline");}}
-                      className="w-7 h-7 rounded-lg text-sm hover:bg-gray-200 transition-all flex items-center justify-center" title="تسطير">
-                      <u>U</u>
-                    </button>
-                    {/* فاصل */}
-                    <div className="w-px h-6 bg-gray-200" />
-                    {/* لون النص */}
-                    <div className="flex items-center gap-1">
-                      <span className="text-xs text-gray-500">لون النص:</span>
-                      {["#000000","#ffffff","#ef4444","#f59e0b","#10b981","#3b82f6","#8b5cf6","#ec4899"].map(col=>(
-                        <button key={col} onMouseDown={e=>{e.preventDefault();document.execCommand("foreColor",false,col);}}
-                          className="w-5 h-5 rounded-full border-2 border-white shadow-sm hover:scale-110 transition-all"
-                          style={{background:col}} title={col} />
+                    <div className="flex items-center gap-1 bg-white rounded-lg px-2 py-1 border border-gray-200 text-xs font-bold text-gray-600">
+                      حجم:
+                      {[["صغير","<small>","</small>"],["عادي","",""],["كبير","<big>","</big>"],["ضخم","<h3 style=\'margin:4px 0\'>","</h3>"]].map(([lab,o,c])=>(
+                        <button key={lab} onMouseDown={e=>e.preventDefault()}
+                          onClick={()=>{
+                            const ta=document.getElementById("circ-ta");
+                            const s=ta.selectionStart, e2=ta.selectionEnd;
+                            const sel=ta.value.substring(s,e2)||"النص هنا";
+                            const ins = o+sel+c;
+                            const v=ta.value.substring(0,s)+ins+ta.value.substring(e2);
+                            setForm(f=>({...f,body:v}));
+                          }}
+                          className="px-2 py-0.5 rounded-md hover:bg-purple-100 text-purple-700 font-bold transition-all">
+                          {lab}
+                        </button>
                       ))}
                     </div>
-                    {/* لون الخلفية */}
+
+                    <div className="w-px h-6 bg-gray-300 self-center" />
+
+                    {/* تنسيق */}
+                    {[
+                      ["B","<b>","</b>","font-black"],
+                      ["I","<i>","</i>","italic"],
+                      ["U","<u>","</u>","underline"],
+                    ].map(([lab,o,c,cls])=>(
+                      <button key={lab} onMouseDown={e=>e.preventDefault()}
+                        onClick={()=>{
+                          const ta=document.getElementById("circ-ta");
+                          const s=ta.selectionStart, e2=ta.selectionEnd;
+                          const sel=ta.value.substring(s,e2)||"النص";
+                          const ins=o+sel+c;
+                          const v=ta.value.substring(0,s)+ins+ta.value.substring(e2);
+                          setForm(f=>({...f,body:v}));
+                        }}
+                        className={"w-7 h-7 rounded-lg bg-white border border-gray-200 hover:bg-blue-50 flex items-center justify-center text-sm "+cls}>
+                        {lab}
+                      </button>
+                    ))}
+
+                    <div className="w-px h-6 bg-gray-300 self-center" />
+
+                    {/* ألوان النص */}
+                    <div className="flex items-center gap-1">
+                      <span className="text-xs text-gray-500">لون:</span>
+                      {[["#ef4444","أحمر"],["#f59e0b","ذهبي"],["#10b981","أخضر"],["#3b82f6","أزرق"],["#8b5cf6","بنفسجي"],["#ec4899","وردي"],["#000000","أسود"],["#ffffff","أبيض"]].map(([col,name])=>(
+                        <button key={col} title={name} onMouseDown={e=>e.preventDefault()}
+                          onClick={()=>{
+                            const ta=document.getElementById("circ-ta");
+                            const s=ta.selectionStart, e2=ta.selectionEnd;
+                            const sel=ta.value.substring(s,e2)||"النص";
+                            const ins='<span style="color:'+col+'">'+sel+'</span>';
+                            const v=ta.value.substring(0,s)+ins+ta.value.substring(e2);
+                            setForm(f=>({...f,body:v}));
+                          }}
+                          className="w-5 h-5 rounded-full border-2 border-white shadow hover:scale-110 transition-all"
+                          style={{background:col}} />
+                      ))}
+                    </div>
+
+                    {/* خلفية النص */}
                     <div className="flex items-center gap-1">
                       <span className="text-xs text-gray-500">خلفية:</span>
-                      {["transparent","#fef9c3","#dcfce7","#dbeafe","#fce7f3","#ffedd5","#f3e8ff","#fee2e2"].map(col=>(
-                        <button key={col} onMouseDown={e=>{e.preventDefault();document.execCommand("backColor",false,col==="transparent"?"#ffffff":col);}}
+                      {[["#fef9c3","صفراء"],["#dcfce7","خضراء"],["#dbeafe","زرقاء"],["#fce7f3","وردية"],["#ffedd5","برتقالية"],["#f3e8ff","بنفسجية"]].map(([col,name])=>(
+                        <button key={col} title={name} onMouseDown={e=>e.preventDefault()}
+                          onClick={()=>{
+                            const ta=document.getElementById("circ-ta");
+                            const s=ta.selectionStart, e2=ta.selectionEnd;
+                            const sel=ta.value.substring(s,e2)||"النص";
+                            const ins='<span style="background:'+col+';padding:0 3px;border-radius:4px">'+sel+'</span>';
+                            const v=ta.value.substring(0,s)+ins+ta.value.substring(e2);
+                            setForm(f=>({...f,body:v}));
+                          }}
                           className="w-5 h-5 rounded-full border border-gray-300 hover:scale-110 transition-all"
-                          style={{background:col==="transparent"?"repeating-linear-gradient(45deg,#ddd 0,#ddd 2px,#fff 0,#fff 4px)":col}} title="تلوين خلفية" />
+                          style={{background:col}} />
                       ))}
                     </div>
-                    {/* فاصل */}
-                    <div className="w-px h-6 bg-gray-200" />
+
+                    <div className="w-px h-6 bg-gray-300 self-center" />
+
                     {/* محاذاة */}
-                    <button onMouseDown={e=>{e.preventDefault();document.execCommand("justifyRight");}}
-                      className="w-7 h-7 rounded-lg text-sm hover:bg-gray-200 flex items-center justify-center" title="يمين">⫤</button>
-                    <button onMouseDown={e=>{e.preventDefault();document.execCommand("justifyCenter");}}
-                      className="w-7 h-7 rounded-lg text-sm hover:bg-gray-200 flex items-center justify-center" title="وسط">≡</button>
-                    <button onMouseDown={e=>{e.preventDefault();document.execCommand("justifyLeft");}}
-                      className="w-7 h-7 rounded-lg text-sm hover:bg-gray-200 flex items-center justify-center" title="يسار">⊣</button>
-                    {/* فاصل */}
-                    <div className="w-px h-6 bg-gray-200" />
+                    {[["⫤","right"],["≡","center"],["⊣","left"]].map(([ic,dir])=>(
+                      <button key={dir} onMouseDown={e=>e.preventDefault()}
+                        onClick={()=>{
+                          const ta=document.getElementById("circ-ta");
+                          const s=ta.selectionStart, e2=ta.selectionEnd;
+                          const sel=ta.value.substring(s,e2)||"النص";
+                          const ins='<div style="text-align:'+dir+'">'+sel+'</div>';
+                          const v=ta.value.substring(0,s)+ins+ta.value.substring(e2);
+                          setForm(f=>({...f,body:v}));
+                        }}
+                        className="w-7 h-7 rounded-lg bg-white border border-gray-200 hover:bg-gray-100 flex items-center justify-center font-bold">
+                        {ic}
+                      </button>
+                    ))}
+
+                    <div className="w-px h-6 bg-gray-300 self-center" />
+
                     {/* إيموجي */}
                     <div className="relative">
-                      <button onMouseDown={e=>{e.preventDefault();setShowEmoji(v=>!v);}}
-                        className="px-2 py-1 rounded-lg text-xs font-bold border border-gray-200 bg-white hover:bg-yellow-50">
-                        😊
+                      <button onMouseDown={e=>e.preventDefault()} onClick={()=>setShowEmoji(v=>!v)}
+                        className="px-2 py-1 rounded-lg bg-white border border-gray-200 hover:bg-yellow-50 text-sm font-bold">
+                        😊 إيموجي
                       </button>
                       {showEmoji && (
                         <div className="absolute top-full right-0 mt-1 bg-white rounded-2xl shadow-xl border border-gray-100 p-2 z-50"
-                          style={{width:260,maxHeight:180,overflowY:"auto"}}>
+                          style={{width:256,maxHeight:180,overflowY:"auto"}}>
                           <div className="grid grid-cols-8 gap-0.5">
-                            {["😊","😄","😃","🎉","👍","✅","⭐","🔥","💡","📌","⚠️","📢","📣","🏫","🎓","📚","✏️","📝","🗓️","⏰","🔔","👨‍🏫","👩‍🏫","🤝","💪","🌟","🏆","❤️","🙏","📱","💻","📊","📈","🎯","✔️","❌","⭕","🔑","🔒","📩","💌","🌹","🌸","🌺","🌷","🌻","☀️","🌙","⚡","🎊","🥇","🎖️","📋","🖊️","🔖","🌍","🕌","🤲","🫶","💯","🆕","🔴","🟡","🟢","🔵","🟤","⚫","⚪"].map(em=>(
-                              <button key={em}
-                                onMouseDown={e=>{
-                                  e.preventDefault();
-                                  document.execCommand("insertText",false,em);
+                            {["😊","😄","😃","🎉","👍","✅","⭐","🔥","💡","📌","⚠️","📢","📣","🏫","🎓","📚","✏️","📝","🗓️","⏰","🔔","👨‍🏫","👩‍🏫","🤝","💪","🌟","🏆","❤️","🙏","📱","💻","📊","📈","🎯","✔️","❌","⭕","🔑","🔒","📩","💌","🌹","🌸","🌺","🌷","🌻","☀️","🌙","⚡","🎊","🥇","🎖️","📋","🖊️","🔖","🌍","🕌","🤲","🫶","💯","🆕","🔴","🟡","🟢","🔵"].map(em=>(
+                              <button key={em} onMouseDown={e=>e.preventDefault()}
+                                onClick={()=>{
+                                  const ta=document.getElementById("circ-ta");
+                                  const s=ta.selectionStart;
+                                  const v=ta.value.substring(0,s)+em+ta.value.substring(s);
+                                  setForm(f=>({...f,body:v}));
                                   setShowEmoji(false);
                                 }}
                                 className="text-lg hover:bg-gray-100 rounded-lg p-0.5">{em}</button>
@@ -5720,25 +5753,41 @@ function CircularsPage({ siteFont }) {
                         </div>
                       )}
                     </div>
+
+                    {/* مسح التنسيق */}
+                    <button onMouseDown={e=>e.preventDefault()}
+                      onClick={()=>{
+                        const ta=document.getElementById("circ-ta");
+                        const s=ta.selectionStart, e2=ta.selectionEnd;
+                        const sel=ta.value.substring(s,e2);
+                        const clean=sel.replace(/<[^>]+>/g,"");
+                        const v=ta.value.substring(0,s)+clean+ta.value.substring(e2);
+                        setForm(f=>({...f,body:v}));
+                      }}
+                      className="px-2 py-1 rounded-lg bg-red-50 border border-red-200 text-red-600 text-xs font-bold hover:bg-red-100"
+                      title="مسح تنسيق النص المحدد">
+                      ✕ مسح
+                    </button>
                   </div>
-                  {/* محرر نص غني */}
-                  <div
-                    id="circ-editor"
-                    contentEditable
-                    suppressContentEditableWarning
-                    dir="rtl"
-                    onInput={e=>setForm(f=>({...f,body:e.currentTarget.innerHTML}))}
-                    onFocus={()=>setShowEmoji(false)}
-                    className="w-full rounded-xl border-2 border-gray-200 focus:border-teal-400 focus:outline-none"
-                    style={{minHeight:150,padding:"12px 14px",fontFamily:"inherit",fontSize:16,lineHeight:1.8,direction:"rtl",textAlign:"right",whiteSpace:"pre-wrap"}}
-                    ref={el=>{
-                      if(el && !el.matches(":focus")){
-                        const html = form.body||"";
-                        if(el.innerHTML !== html) el.innerHTML = html;
-                      }
-                    }}
+
+                  {/* مربع النص */}
+                  <textarea
+                    id="circ-ta"
+                    value={form.body}
+                    onChange={e=>setForm(f=>({...f,body:e.target.value}))}
+                    rows={6}
+                    placeholder="اكتب نص التعميم... ثم حدد أي كلمة واضغط زر التنسيق المطلوب"
+                    className="w-full px-3 py-2.5 rounded-xl border-2 border-gray-200 focus:border-teal-400 focus:outline-none text-sm resize-none font-mono"
+                    style={{fontFamily:"inherit",direction:"rtl"}}
                   />
-                  {!form.body && <div className="text-xs text-gray-400 -mt-1 mr-1">اكتب نص التعميم هنا — حدد أي نص وطبّق التنسيق من الشريط أعلاه</div>}
+                  {/* معاينة النص المنسق */}
+                  {form.body && (
+                    <div className="mt-1 p-3 rounded-xl border border-gray-100 bg-gray-50">
+                      <div className="text-xs text-gray-400 font-bold mb-1">معاينة النص:</div>
+                      <div className="text-sm leading-relaxed" style={{direction:"rtl"}}
+                        dangerouslySetInnerHTML={{__html:form.body}} />
+                    </div>
+                  )}
                 </div>
                 <div className="col-span-2">
                   <label className="text-xs font-bold text-gray-500 block mb-1">النص السفلي</label>
