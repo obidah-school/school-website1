@@ -5459,6 +5459,467 @@ function SurveysPage({ surveys, setSurveys, saveSurveys, isParent }) {
   );
 }
 
+// ===== صفحة التعاميم =====
+function CircularsPage({ siteFont }) {
+  const [circulars,    setCirculars]    = React.useState([]);
+  const [loading,      setLoading]      = React.useState(true);
+  const [showForm,     setShowForm]     = React.useState(false);
+  const [editId,       setEditId]       = React.useState(null);
+  const [viewId,       setViewId]       = React.useState(null);
+  const [copiedId,     setCopiedId]     = React.useState(null);
+  const [form,         setForm]         = React.useState({
+    title:"", body:"", footer:"مدرسة عبيدة بن الحارث المتوسطة",
+    color:"#1e3a5f", accentColor:"#0d9488", textColor:"#fff",
+    badge:"", imageBase64:"", sender:"إدارة المدرسة",
+    date: new Date().toLocaleDateString("ar-SA"),
+    links:[]
+  });
+
+  const COLORS = [
+    {name:"أزرق داكن",   bg:"#1e3a5f", accent:"#0d9488"},
+    {name:"أخضر زمردي",  bg:"#065f46", accent:"#f59e0b"},
+    {name:"بنفسجي ملكي", bg:"#4c1d95", accent:"#ec4899"},
+    {name:"أحمر داكن",   bg:"#7f1d1d", accent:"#f97316"},
+    {name:"رمادي أنيق",  bg:"#1e293b", accent:"#38bdf8"},
+    {name:"تيل فاخر",    bg:"#134e4a", accent:"#fbbf24"},
+  ];
+  const SHAPES = ["✦","❋","◈","❖","✿","⬡","◉","❂"];
+
+  React.useEffect(() => {
+    DB.get("school-circulars", []).then(d => {
+      setCirculars(Array.isArray(d) ? d : []);
+      setLoading(false);
+    });
+    // Check URL hash for direct view
+    const hash = window.location.hash.replace("#","");
+    if (hash.startsWith("circ-")) setViewId(hash.replace("circ-",""));
+  }, []);
+
+  const saveCirculars = async (updated) => {
+    setCirculars(updated);
+    await DB.set("school-circulars", updated);
+  };
+
+  const saveCircular = async () => {
+    if (!form.title.trim()) { alert("أدخل عنوان التعميم"); return; }
+    const now = Date.now();
+    let updated;
+    if (editId) {
+      updated = circulars.map(c => c.id === editId ? {...c, ...form, updatedAt: new Date().toLocaleDateString("ar-SA")} : c);
+    } else {
+      updated = [...circulars, {...form, id: String(now), createdAt: new Date().toLocaleDateString("ar-SA")}];
+    }
+    await saveCirculars(updated);
+    resetForm();
+  };
+
+  const resetForm = () => {
+    setForm({ title:"", body:"", footer:"مدرسة عبيدة بن الحارث المتوسطة",
+      color:"#1e3a5f", accentColor:"#0d9488", textColor:"#fff",
+      badge:"", imageBase64:"", sender:"إدارة المدرسة",
+      date: new Date().toLocaleDateString("ar-SA"), links:[] });
+    setEditId(null); setShowForm(false);
+  };
+
+  const startEdit = (c) => {
+    setForm({...c}); setEditId(c.id); setShowForm(true);
+    window.scrollTo({top:0, behavior:"smooth"});
+  };
+
+  const deleteCircular = async (id) => {
+    if (!window.confirm("حذف هذا التعميم؟")) return;
+    await saveCirculars(circulars.filter(c => c.id !== id));
+  };
+
+  const copyLink = (id) => {
+    const url = window.location.origin + window.location.pathname + "#circ-" + id;
+    navigator.clipboard.writeText(url).catch(() => {});
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const handleImage = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => setForm(f => ({...f, imageBase64: ev.target.result}));
+    reader.readAsDataURL(file);
+  };
+
+  const addLink = () => setForm(f => ({...f, links:[...f.links, {label:"",url:""}]}));
+  const updateLink = (i, field, val) => setForm(f => {
+    const links = [...f.links]; links[i] = {...links[i], [field]:val}; return {...f, links};
+  });
+  const removeLink = (i) => setForm(f => ({...f, links: f.links.filter((_,idx)=>idx!==i)}));
+
+  // عرض تعميم واحد (صفحة عامة)
+  const viewCircular = viewId ? circulars.find(c => c.id === viewId) : null;
+
+  if (viewCircular) return (
+    <CircularView circ={viewCircular} onBack={()=>{setViewId(null);window.history.pushState({},"",window.location.pathname);}} />
+  );
+
+  if (loading) return <div className="flex items-center justify-center py-20"><div className="text-4xl animate-spin">⚙️</div></div>;
+
+  return (
+    <div className="w-full">
+      {/* رأس الصفحة */}
+      <div className="rounded-b-2xl p-6 text-white shadow-xl relative overflow-hidden mb-4"
+        style={{background:"linear-gradient(135deg,#1e3a5f 0%,#0d9488 100%)"}}>
+        <div style={{position:"absolute",inset:0,background:"linear-gradient(120deg,transparent 40%,rgba(255,255,255,.07) 60%,transparent 80%)"}} />
+        <div style={{position:"absolute",top:-20,left:-20,fontSize:100,opacity:.06,userSelect:"none"}}>📜</div>
+        <div className="relative flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div style={{width:52,height:52,borderRadius:16,background:"rgba(255,255,255,.15)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:26}}>📜</div>
+            <div>
+              <h2 className="text-2xl font-black">التعاميم المدرسية</h2>
+              <p className="opacity-75 text-sm">{circulars.length} تعميم — شارك الرابط مع المعلمين</p>
+            </div>
+          </div>
+          <button onClick={()=>{setShowForm(!showForm); if(showForm) resetForm();}}
+            className="px-5 py-2.5 rounded-2xl font-black text-sm shadow-lg transition-all"
+            style={{background:showForm?"rgba(255,255,255,.2)":"rgba(255,255,255,.9)",color:showForm?"#fff":"#1e3a5f"}}>
+            {showForm ? "✕ إلغاء" : "+ تعميم جديد"}
+          </button>
+        </div>
+      </div>
+
+      <div className="px-2 space-y-4">
+        {/* نموذج الإضافة/التعديل */}
+        {showForm && (
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+              <h3 className="font-black text-gray-800">{editId ? "✏️ تعديل التعميم" : "📝 تعميم جديد"}</h3>
+              {editId && <button onClick={resetForm} className="text-gray-400 hover:text-gray-600 text-sm">إلغاء التعديل</button>}
+            </div>
+            <div className="p-5 space-y-4">
+              {/* معاينة مباشرة */}
+              <div className="rounded-2xl overflow-hidden shadow-lg" style={{minHeight:120}}>
+                <CircularCard circ={{...form, id:"preview"}} preview onView={()=>{}} onCopy={()=>{}} onEdit={()=>{}} onDelete={()=>{}} />
+              </div>
+
+              {/* الحقول */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="col-span-2">
+                  <label className="text-xs font-bold text-gray-500 block mb-1">عنوان التعميم *</label>
+                  <input value={form.title} onChange={e=>setForm(f=>({...f,title:e.target.value}))}
+                    placeholder="مثال: الاجتماع الأسبوعي، موعد الاختبارات..."
+                    className="w-full px-3 py-2.5 rounded-xl border-2 border-gray-200 focus:border-teal-400 focus:outline-none text-sm font-bold"
+                    style={{fontFamily:"inherit"}} />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-500 block mb-1">شارة / وسم</label>
+                  <input value={form.badge} onChange={e=>setForm(f=>({...f,badge:e.target.value}))}
+                    placeholder="مثال: عاجل، مهم..."
+                    className="w-full px-3 py-2.5 rounded-xl border-2 border-gray-200 focus:border-teal-400 focus:outline-none text-sm"
+                    style={{fontFamily:"inherit"}} />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-500 block mb-1">اسم المرسل</label>
+                  <input value={form.sender} onChange={e=>setForm(f=>({...f,sender:e.target.value}))}
+                    className="w-full px-3 py-2.5 rounded-xl border-2 border-gray-200 focus:border-teal-400 focus:outline-none text-sm"
+                    style={{fontFamily:"inherit"}} />
+                </div>
+                <div className="col-span-2">
+                  <label className="text-xs font-bold text-gray-500 block mb-1">نص التعميم</label>
+                  <textarea value={form.body} onChange={e=>setForm(f=>({...f,body:e.target.value}))}
+                    rows={4} placeholder="اكتب تفاصيل التعميم هنا..."
+                    className="w-full px-3 py-2.5 rounded-xl border-2 border-gray-200 focus:border-teal-400 focus:outline-none text-sm resize-none"
+                    style={{fontFamily:"inherit"}} />
+                </div>
+                <div className="col-span-2">
+                  <label className="text-xs font-bold text-gray-500 block mb-1">النص السفلي</label>
+                  <input value={form.footer} onChange={e=>setForm(f=>({...f,footer:e.target.value}))}
+                    className="w-full px-3 py-2.5 rounded-xl border-2 border-gray-200 focus:border-teal-400 focus:outline-none text-sm"
+                    style={{fontFamily:"inherit"}} />
+                </div>
+              </div>
+
+              {/* الألوان */}
+              <div>
+                <label className="text-xs font-bold text-gray-500 block mb-2">لون التعميم</label>
+                <div className="flex gap-2 flex-wrap">
+                  {COLORS.map(col=>(
+                    <button key={col.bg} onClick={()=>setForm(f=>({...f,color:col.bg,accentColor:col.accent}))}
+                      className="flex items-center gap-2 px-3 py-2 rounded-xl border-2 text-xs font-bold transition-all"
+                      style={{background:col.bg,color:"#fff",borderColor:form.color===col.bg?"#fff":"transparent",
+                        boxShadow:form.color===col.bg?"0 0 0 3px "+col.bg+", 0 0 0 5px rgba(255,255,255,.5)":"none"}}>
+                      {col.name}
+                    </button>
+                  ))}
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs text-gray-500 font-bold">مخصص:</label>
+                    <input type="color" value={form.color} onChange={e=>setForm(f=>({...f,color:e.target.value}))}
+                      className="w-10 h-10 rounded-xl border-2 border-gray-200 cursor-pointer" />
+                    <input type="color" value={form.accentColor} onChange={e=>setForm(f=>({...f,accentColor:e.target.value}))}
+                      className="w-10 h-10 rounded-xl border-2 border-gray-200 cursor-pointer" />
+                  </div>
+                </div>
+              </div>
+
+              {/* صورة */}
+              <div>
+                <label className="text-xs font-bold text-gray-500 block mb-2">صورة (اختياري)</label>
+                <div className="flex items-center gap-3">
+                  <label className="flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 border-dashed border-gray-300 cursor-pointer hover:border-teal-400 text-sm font-bold text-gray-500 hover:text-teal-600 transition-all">
+                    📷 رفع صورة
+                    <input type="file" accept="image/*" className="hidden" onChange={handleImage} />
+                  </label>
+                  {form.imageBase64 && (
+                    <div className="flex items-center gap-2">
+                      <img src={form.imageBase64} className="w-12 h-12 rounded-xl object-cover" alt="preview" />
+                      <button onClick={()=>setForm(f=>({...f,imageBase64:""}))} className="text-red-400 hover:text-red-600 font-bold text-xs">حذف</button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* روابط */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs font-bold text-gray-500">روابط خارجية</label>
+                  <button onClick={addLink} className="text-xs bg-teal-50 text-teal-700 px-3 py-1 rounded-lg font-bold hover:bg-teal-100">+ إضافة رابط</button>
+                </div>
+                {form.links.map((lk,i)=>(
+                  <div key={i} className="flex gap-2 mb-2">
+                    <input value={lk.label} onChange={e=>updateLink(i,"label",e.target.value)}
+                      placeholder="نص الرابط" className="flex-1 px-2 py-2 rounded-xl border border-gray-200 text-xs focus:outline-none" style={{fontFamily:"inherit"}} />
+                    <input value={lk.url} onChange={e=>updateLink(i,"url",e.target.value)}
+                      placeholder="https://..." className="flex-1 px-2 py-2 rounded-xl border border-gray-200 text-xs focus:outline-none" style={{fontFamily:"inherit"}} />
+                    <button onClick={()=>removeLink(i)} className="text-red-400 px-2">✕</button>
+                  </div>
+                ))}
+              </div>
+
+              <button onClick={saveCircular}
+                className="w-full py-3 rounded-2xl text-white font-black text-sm shadow-lg"
+                style={{background:"linear-gradient(135deg,#1e3a5f,#0d9488)"}}>
+                💾 {editId ? "حفظ التعديلات" : "نشر التعميم"}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* قائمة التعاميم */}
+        {circulars.length === 0 && !showForm ? (
+          <div className="bg-white rounded-2xl p-12 text-center shadow-sm border">
+            <div className="text-5xl mb-3">📜</div>
+            <div className="font-black text-gray-400 text-lg">لا توجد تعاميم بعد</div>
+            <div className="text-sm text-gray-300 mt-1">اضغط "+ تعميم جديد" لإنشاء أول تعميم</div>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {circulars.slice().reverse().map(circ => (
+              <CircularCard key={circ.id} circ={circ}
+                onView={()=>setViewId(circ.id)}
+                onCopy={()=>copyLink(circ.id)}
+                onEdit={()=>startEdit(circ)}
+                onDelete={()=>deleteCircular(circ.id)}
+                copied={copiedId===circ.id}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// بطاقة التعميم
+function CircularCard({ circ, preview, onView, onCopy, onEdit, onDelete, copied }) {
+  const shapes = ["✦","❋","◈","❖","✿","⬡","◉","❂"];
+  return (
+    <div className="rounded-2xl overflow-hidden shadow-lg relative" style={{background:circ.color||"#1e3a5f"}}>
+      {/* زخارف خلفية */}
+      <div style={{position:"absolute",top:-30,left:-30,fontSize:120,opacity:.05,userSelect:"none",color:circ.accentColor||"#0d9488"}}>{shapes[0]}</div>
+      <div style={{position:"absolute",bottom:-20,right:-20,fontSize:90,opacity:.05,userSelect:"none",color:circ.accentColor||"#0d9488"}}>{shapes[2]}</div>
+      <div style={{position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-50%)",fontSize:200,opacity:.03,userSelect:"none",color:"#fff"}}>{shapes[4]}</div>
+      {/* شريط اللهجة */}
+      <div style={{height:4,background:"linear-gradient(90deg,"+circ.accentColor+",rgba(255,255,255,.3),"+circ.accentColor+")"}} />
+      <div className="p-5 relative">
+        {/* الرأس */}
+        <div className="flex items-start justify-between mb-3">
+          <div className="flex items-center gap-3">
+            {circ.imageBase64
+              ? <img src={circ.imageBase64} className="w-12 h-12 rounded-xl object-cover border-2 border-white border-opacity-30" alt="" />
+              : <div style={{width:44,height:44,borderRadius:14,background:"rgba(255,255,255,.15)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,border:"2px solid rgba(255,255,255,.2)"}}>📜</div>
+            }
+            <div>
+              {circ.badge && (
+                <span className="text-xs font-black px-2.5 py-0.5 rounded-full mb-1 inline-block"
+                  style={{background:circ.accentColor,color:"#fff"}}>
+                  {circ.badge}
+                </span>
+              )}
+              <div className="font-black text-white text-lg leading-tight" style={{textShadow:"0 2px 8px rgba(0,0,0,.3)"}}>{circ.title}</div>
+            </div>
+          </div>
+          {/* الأيقونات الزخرفية */}
+          <div className="flex gap-1" style={{opacity:.4}}>
+            {shapes.slice(0,3).map((s,i)=><span key={i} style={{fontSize:12,color:circ.accentColor}}>{s}</span>)}
+          </div>
+        </div>
+
+        {/* النص */}
+        {circ.body && (
+          <div className="text-sm leading-relaxed mb-3 p-3 rounded-xl" style={{background:"rgba(255,255,255,.1)",color:"rgba(255,255,255,.9)"}}>
+            {circ.body}
+          </div>
+        )}
+
+        {/* الروابط */}
+        {circ.links?.filter(l=>l.url).length > 0 && (
+          <div className="flex flex-wrap gap-2 mb-3">
+            {circ.links.filter(l=>l.url).map((lk,i)=>(
+              <a key={i} href={lk.url} target="_blank" rel="noreferrer"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all hover:opacity-80"
+                style={{background:circ.accentColor,color:"#fff"}}>
+                🔗 {lk.label || "رابط"}
+              </a>
+            ))}
+          </div>
+        )}
+
+        {/* شريط سفلي */}
+        <div className="flex items-center justify-between pt-3 border-t" style={{borderColor:"rgba(255,255,255,.15)"}}>
+          <div className="text-xs" style={{color:"rgba(255,255,255,.65)"}}>
+            <span className="font-bold">{circ.sender}</span>
+            {circ.date && <span> · {circ.date}</span>}
+          </div>
+          {!preview && (
+            <div className="flex gap-1.5">
+              <button onClick={onView}
+                className="px-3 py-1.5 rounded-xl text-xs font-black transition-all hover:opacity-80"
+                style={{background:"rgba(255,255,255,.15)",color:"#fff"}}>
+                👁 فتح
+              </button>
+              <button onClick={onCopy}
+                className="px-3 py-1.5 rounded-xl text-xs font-black transition-all"
+                style={{background:copied?"#10b981":"rgba(255,255,255,.9)",color:copied?"#fff":circ.color}}>
+                {copied ? "✅ تم النسخ" : "🔗 نسخ الرابط"}
+              </button>
+              <button onClick={onEdit} className="px-2 py-1.5 rounded-xl text-xs" style={{background:"rgba(255,255,255,.1)",color:"#fff"}}>✏️</button>
+              <button onClick={onDelete} className="px-2 py-1.5 rounded-xl text-xs" style={{background:"rgba(255,0,0,.2)",color:"#fff"}}>🗑</button>
+            </div>
+          )}
+        </div>
+      </div>
+      {/* شريط اللهجة السفلي */}
+      <div style={{height:3,background:"linear-gradient(90deg,rgba(255,255,255,.1),"+circ.accentColor+",rgba(255,255,255,.1))"}} />
+    </div>
+  );
+}
+
+// صفحة عرض التعميم العامة (بدون دخول)
+function CircularView({ circ, onBack }) {
+  const shapes = ["✦","❋","◈","❖","✿","⬡","◉","❂"];
+  React.useEffect(() => {
+    document.title = circ.title + " — مدرسة عبيدة بن الحارث المتوسطة";
+    return () => { document.title = "مدرسة عبيدة بن الحارث المتوسطة"; };
+  }, [circ]);
+  return (
+    <div className="min-h-screen flex items-center justify-center p-4"
+      style={{background:"linear-gradient(160deg,#f0fdfa,#ecfdf5,#f5f5f4)"}}>
+      <div className="w-full max-w-lg">
+        {/* شعار المدرسة */}
+        <div className="text-center mb-6">
+          <div className="font-black text-gray-600 text-sm">مدرسة عبيدة بن الحارث المتوسطة</div>
+          <div className="text-xs text-gray-400">وزارة التعليم · الإدارة العامة للتعليم بجدة</div>
+        </div>
+
+        {/* بطاقة التعميم الكاملة */}
+        <div className="rounded-3xl overflow-hidden shadow-2xl" style={{background:circ.color}}>
+          {/* شريط علوي */}
+          <div style={{height:6,background:"linear-gradient(90deg,"+circ.accentColor+",rgba(255,255,255,.4),"+circ.accentColor+")"}} />
+
+          {/* زخارف */}
+          <div className="relative p-8">
+            <div style={{position:"absolute",top:-40,left:-40,fontSize:200,opacity:.04,userSelect:"none",color:circ.accentColor}}>{shapes[4]}</div>
+            <div style={{position:"absolute",top:10,right:10,opacity:.15}}>
+              <div className="flex gap-2">
+                {shapes.slice(0,4).map((s,i)=><span key={i} style={{fontSize:14,color:circ.accentColor}}>{s}</span>)}
+              </div>
+            </div>
+
+            {/* رأس التعميم */}
+            <div className="text-center mb-6 relative">
+              {circ.imageBase64 && (
+                <img src={circ.imageBase64} className="w-24 h-24 rounded-2xl object-cover mx-auto mb-4 border-4 border-white border-opacity-30 shadow-xl" alt="" />
+              )}
+              {circ.badge && (
+                <div className="inline-block mb-3">
+                  <span className="text-sm font-black px-4 py-1.5 rounded-full"
+                    style={{background:circ.accentColor,color:"#fff",boxShadow:"0 4px 14px rgba(0,0,0,.2)"}}>
+                    {circ.badge}
+                  </span>
+                </div>
+              )}
+              <h1 className="text-2xl font-black text-white leading-tight mb-2"
+                style={{textShadow:"0 2px 12px rgba(0,0,0,.3)"}}>
+                {circ.title}
+              </h1>
+              <div className="flex justify-center gap-2 opacity-40 my-3">
+                {shapes.slice(0,5).map((s,i)=><span key={i} style={{fontSize:12,color:circ.accentColor}}>{s}</span>)}
+              </div>
+            </div>
+
+            {/* نص التعميم */}
+            {circ.body && (
+              <div className="rounded-2xl p-5 mb-5 text-sm leading-loose"
+                style={{background:"rgba(255,255,255,.12)",color:"rgba(255,255,255,.95)",
+                  border:"1px solid rgba(255,255,255,.15)"}}>
+                {circ.body.split("
+").map((line,i)=>(
+                  <p key={i} className={line ? "" : "h-3"}>{line}</p>
+                ))}
+              </div>
+            )}
+
+            {/* الروابط */}
+            {circ.links?.filter(l=>l.url).length > 0 && (
+              <div className="flex flex-col gap-2 mb-5">
+                {circ.links.filter(l=>l.url).map((lk,i)=>(
+                  <a key={i} href={lk.url} target="_blank" rel="noreferrer"
+                    className="flex items-center justify-center gap-2 py-3 rounded-2xl font-black text-sm transition-all hover:opacity-90"
+                    style={{background:circ.accentColor,color:"#fff",boxShadow:"0 4px 16px rgba(0,0,0,.2)"}}>
+                    🔗 {lk.label || "فتح الرابط"}
+                  </a>
+                ))}
+              </div>
+            )}
+
+            {/* الفاصل الزخرفي */}
+            <div className="flex items-center gap-3 my-5">
+              <div className="flex-1 h-px" style={{background:"rgba(255,255,255,.15)"}} />
+              <div className="flex gap-1.5 opacity-30">
+                {shapes.slice(0,3).map((s,i)=><span key={i} style={{fontSize:10,color:circ.accentColor}}>{s}</span>)}
+              </div>
+              <div className="flex-1 h-px" style={{background:"rgba(255,255,255,.15)"}} />
+            </div>
+
+            {/* الأسفل */}
+            <div className="text-center">
+              <div className="text-sm font-black" style={{color:"rgba(255,255,255,.9)"}}>{circ.footer || "مدرسة عبيدة بن الحارث المتوسطة"}</div>
+              <div className="text-xs mt-1" style={{color:"rgba(255,255,255,.5)"}}>
+                {circ.sender} {circ.date ? "· " + circ.date : ""}
+              </div>
+            </div>
+          </div>
+
+          {/* شريط سفلي */}
+          <div style={{height:6,background:"linear-gradient(90deg,rgba(255,255,255,.1),"+circ.accentColor+",rgba(255,255,255,.1))"}} />
+        </div>
+
+        <button onClick={onBack}
+          className="w-full mt-4 py-3 rounded-2xl font-black text-sm text-gray-600 bg-white bg-opacity-80 hover:bg-opacity-100 transition-all shadow-sm">
+          ← العودة لقائمة التعاميم
+        </button>
+      </div>
+    </div>
+  );
+}
+
+
 function AnnouncementsPage({ announcements, setAnnouncements, saveAnnouncements }) {
   const [showForm, setShowForm] = useState(false);
   const [newAnn, setNewAnn] = useState({ title: "", content: "", category: "إعلانات", priority: "عادي", bgColor: "", titleColor: "#1f2937", titleSize: "text-xl" });
@@ -16244,7 +16705,7 @@ export default function SchoolWebsite() {
       const hash = window.location.hash.replace("#","") || "home";
       if (hash.startsWith("ann-")) { setDirectAnnId(hash.replace("ann-","")); return; }
       setDirectAnnId(null);
-      if (["home","attendance","announcements","activities","settings","students","messages","surveys","sms","report","gradeanalysis","monthlyreport","teacherprofile","absencestats","attendancereport","student-absence","strategies","calendar","gallery","certificates","poll","raffle","broadcast","groupdivider","quiz","classtimer","luckywheel","exitticket","timetable","classvisits","honorboard","tasks","dailyquiz","aiteacher","lessonprep","lessonrecommend","officialforms","portfolio","earlywarning","meetings","heatmap","committeemeeting"].includes(hash)) setPage(hash);
+      if (["home","attendance","announcements","circulars","activities","settings","students","messages","surveys","sms","report","gradeanalysis","monthlyreport","teacherprofile","absencestats","attendancereport","student-absence","strategies","calendar","gallery","certificates","poll","raffle","broadcast","groupdivider","quiz","classtimer","luckywheel","exitticket","timetable","classvisits","honorboard","tasks","dailyquiz","aiteacher","lessonprep","lessonrecommend","officialforms","portfolio","earlywarning","meetings","heatmap","committeemeeting"].includes(hash)) setPage(hash);
     };
     window.addEventListener("hashchange", h); h();
     return () => window.removeEventListener("hashchange", h);
@@ -16420,6 +16881,7 @@ export default function SchoolWebsite() {
     { id: "student-absence", label: "غياب الطلاب",   icon: "🎒" },
     { id: "students",        label: "تقييم الطلاب",  icon: "👨‍🎓" },
     { id: "announcements", label: "الإعلانات",       icon: "📢" },
+    { id: "circulars",     label: "التعاميم",         icon: "📜" },
     { id: "activities",    label: "الأنشطة",         icon: "⚡" },
     { id: "messages",      label: "رسائل الأهالي",  icon: "✉️" },
     { id: "sms",           label: "رسائل SMS",       icon: "📱" },
@@ -16752,6 +17214,7 @@ export default function SchoolWebsite() {
         {page === "student-absence" && <StudentAbsencePage />}
         {page === "attendance"    && <AttendancePage teachers={teachers} setTeachers={setTeachers} saveTeachers={saveTeachers} week={week} setWeek={setWeek} saveWeek={saveWeek} attendance={attendance} setAttendance={setAttendance} saveAttendance={saveAttendance} />}
         {page === "students"      && <StudentsPage classList={classList} setClassList={setClassList} saveClass={saveClass} deleteClass={deleteClass} onSendNote={handleSendNote} messages={messages} />}
+        {page === "circulars"     && <CircularsPage siteFont={siteFont} />}
         {page === "announcements" && <AnnouncementsPage announcements={announcements} setAnnouncements={setAnnouncements} saveAnnouncements={saveAnnouncements} />}
         {page === "activities"    && <ActivitiesPage activities={activities} setActivities={setActivities} saveActivities={saveActivities} />}
         {page === "messages"      && <MessagesPage messages={messages} setMessages={setMessages} saveMessages={saveMessages} isParent={false} />}
