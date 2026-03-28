@@ -6245,14 +6245,11 @@ function StudentAbsencePage() {
   const [editId,      setEditId]      = useState(null);
   const [editData,    setEditData]    = useState({});
   const xlsRef = useRef();
-  const [allClasses, setAllClasses] = React.useState({});
-  const [selClass,   setSelClass]   = React.useState("");
 
   /* -- load -- */
   useEffect(() => {
     DB.get(FB_KEY + "-students", []).then(d => d?.length && setStudents(d));
     DB.get(FB_KEY + "-class", "الصف الأول / أ").then(d => d && setClassName(d));
-    DB.get("school-absence-classes",{}).then(d=>{ if(d&&typeof d==="object"&&Object.keys(d).length>0){setAllClasses(d);setSelClass(Object.keys(d)[0]);} });
   }, []);
 
   useEffect(() => {
@@ -6312,13 +6309,11 @@ function StudentAbsencePage() {
   };
 
   /* -- excel -- */
-  const handleExcel = (e, targetClass) => {
+  const handleExcel = (e) => {
     const files = Array.from(e.target.files||[]); if(!files.length) return;
     e.target.value="";
     const run = async () => {
       for(const file of files){
-        let cls = targetClass;
-        if(!cls){ const g=file.name.replace(/\.xlsx?|\.csv/i,"").trim(); cls=window.prompt("اسم الفصل لملف: "+file.name, g); if(!cls) continue; }
         try{
           const ev = await file.arrayBuffer();
           await loadXLSX();
@@ -6330,13 +6325,13 @@ function StudentAbsencePage() {
           const inc=[];
           data.forEach((r,i)=>{ const n=String(r[0]||"").trim(),p=String(r[1]||"").trim(); if(n.length>2) inc.push({id:"s"+Date.now()+i+Math.random(),name:n,phone:p,nationalId:String(r[2]||"").trim()}); });
           if(!inc.length){window.alert("لم يُعثر على طلاب في: "+file.name+"\nتأكد أن العمود الأول هو الاسم");continue;}
-          setAllClasses(prev=>{
-            const ex=prev[cls]||[]; const m=[...ex];
+          setStudents(prev=>{
+            const m=[...prev];
             inc.forEach(ns=>{if(!m.find(s=>s.name===ns.name))m.push(ns);});
-            const next={...prev,[cls]:m}; DB.set("school-absence-classes",next); return next;
+            persist(m, attendance);
+            return m;
           });
-          setSelClass(cls);
-          window.alert("✅ "+cls+": "+inc.length+" طالب");
+          window.alert("✅ تم استيراد "+inc.length+" طالب");
         }catch(err){window.alert("خطأ في "+file.name+": "+err.message);}
       }
     };
@@ -6413,7 +6408,7 @@ function StudentAbsencePage() {
   };
 
   /* -- derived -- */
-  const currentStudents = selClass&&allClasses[selClass] ? allClasses[selClass] : students;
+  const currentStudents = students;
   const filtered = currentStudents.filter(s => !search || s.name.includes(search) || (s.nationalId||"").includes(search));
   const counts   = STATUSES.reduce((acc,s) => { acc[s.key] = currentStudents.filter(st => getAtt(st.id).status === s.key).length; return acc; }, {});
 
@@ -6436,25 +6431,6 @@ function StudentAbsencePage() {
               <span className="text-2xl">📋</span> غياب وتأخر الطلاب
             </h2>
             <p className="text-xs opacity-70 mt-1">رصد الغياب والتأخر الصباحي والتأخر عن الحصص</p>
-            <div className="flex items-center gap-2 mt-2 flex-wrap">
-              <select value={selClass} onChange={e=>setSelClass(e.target.value)}
-                className="bg-white bg-opacity-20 border border-white border-opacity-30 rounded-lg px-3 py-1.5 text-sm font-black focus:outline-none text-white"
-                style={{fontFamily:"inherit"}}>
-                <option value="" style={{color:"#000"}}>-- اختر الفصل --</option>
-                {["الأول المتوسط","الثاني المتوسط","الثالث المتوسط"].map(g=>(
-                  <optgroup key={g} label={g}>
-                    {["أ","ب","ج","د"].map(s=>{ const cls=g+" "+s; const n=(allClasses[cls]||[]).length;
-                      return <option key={cls} value={cls} style={{color:"#000"}}>{cls}{n?" ("+n+")":""}</option>; })}
-                  </optgroup>
-                ))}
-              </select>
-              <label className="cursor-pointer bg-white bg-opacity-20 border border-white border-opacity-30 rounded-lg px-2 py-1.5 text-xs font-bold hover:bg-opacity-30 flex items-center gap-1">
-                📥 {selClass?"استيراد: "+selClass:"اختر فصلاً أولاً"}
-                <input type="file" accept=".xlsx,.xls,.csv" className="hidden" multiple
-                  onChange={e=>handleExcel(e,selClass)} />
-              </label>
-              {selClass&&allClasses[selClass]&&(<span className="text-xs opacity-70 bg-white bg-opacity-15 px-2 py-1 rounded-lg">{allClasses[selClass].length} طالب</span>)}
-            </div>
           </div>
           <div className="flex flex-wrap gap-2 items-center">
             <input type="date" value={date} onChange={e => setDate(e.target.value)}
@@ -6541,7 +6517,9 @@ function StudentAbsencePage() {
               <thead>
                 <tr className="bg-gradient-to-l from-rose-900 to-red-800 text-white text-xs">
                   <th className="px-3 py-3 text-center w-10">#</th>
-                  <th className="px-3 py-3 text-right min-w-48">الطالب</th>
+                  <th className="px-3 py-3 text-right min-w-40">الاسم</th>
+                  <th className="px-3 py-3 text-center min-w-32">رقم الهوية</th>
+                  <th className="px-3 py-3 text-center min-w-32">رقم الجوال</th>
                   <th className="px-3 py-3 text-center min-w-64">الحالة</th>
                   <th className="px-3 py-3 text-center min-w-64">الحصص المتأخر عنها</th>
                   <th className="px-3 py-3 text-center w-24">المدار / إبلاغ</th>
@@ -6564,21 +6542,33 @@ function StudentAbsencePage() {
                           <div className="space-y-1">
                             <input value={editData.name} onChange={e=>setEditData(p=>({...p,name:e.target.value}))}
                               className="border border-gray-300 rounded-lg px-2 py-1 text-xs w-full focus:outline-none focus:border-rose-400" placeholder="الاسم" />
-                            <input value={editData.nationalId} onChange={e=>setEditData(p=>({...p,nationalId:e.target.value}))}
-                              className="border border-gray-300 rounded-lg px-2 py-1 text-xs w-full focus:outline-none focus:border-rose-400" placeholder="رقم الهوية" />
-                            <input value={editData.phone} onChange={e=>setEditData(p=>({...p,phone:e.target.value}))}
-                              className="border border-gray-300 rounded-lg px-2 py-1 text-xs w-full focus:outline-none focus:border-rose-400" placeholder="الجوال" />
                             <div className="flex gap-1 pt-1">
                               <button onClick={saveEdit} className="bg-rose-600 text-white rounded-lg px-3 py-1 text-xs font-bold">حفظ</button>
                               <button onClick={()=>setEditId(null)} className="bg-gray-100 text-gray-600 rounded-lg px-3 py-1 text-xs">إلغاء</button>
                             </div>
                           </div>
                         ) : (
-                          <>
-                            <div className="font-bold text-gray-800">{stu.name}</div>
-                            {stu.nationalId && <div className="text-xs text-gray-400 mt-0.5">🪪 {stu.nationalId}</div>}
-                            {stu.phone      && <div className="text-xs text-gray-400">📞 {stu.phone}</div>}
-                          </>
+                          <div className="font-bold text-gray-800">{stu.name}</div>
+                        )}
+                      </td>
+
+                      {/* رقم الهوية */}
+                      <td className="px-3 py-3 text-center">
+                        {isEdit ? (
+                          <input value={editData.nationalId} onChange={e=>setEditData(p=>({...p,nationalId:e.target.value}))}
+                            className="border border-gray-300 rounded-lg px-2 py-1 text-xs w-full focus:outline-none focus:border-rose-400" placeholder="رقم الهوية" />
+                        ) : (
+                          <span className="text-xs text-gray-600 font-mono">{stu.nationalId || "—"}</span>
+                        )}
+                      </td>
+
+                      {/* رقم الجوال */}
+                      <td className="px-3 py-3 text-center">
+                        {isEdit ? (
+                          <input value={editData.phone} onChange={e=>setEditData(p=>({...p,phone:e.target.value}))}
+                            className="border border-gray-300 rounded-lg px-2 py-1 text-xs w-full focus:outline-none focus:border-rose-400" placeholder="الجوال" />
+                        ) : (
+                          <span className="text-xs text-gray-600 font-mono">{stu.phone || "—"}</span>
                         )}
                       </td>
 
@@ -6659,8 +6649,8 @@ function StudentAbsencePage() {
                     <div>
                       <span className="text-xs text-gray-400 ml-1">{idx+1}.</span>
                       <span className="font-bold text-gray-800 text-sm">{stu.name}</span>
-                      {stu.nationalId && <div className="text-xs text-gray-400 mt-0.5">🪪 {stu.nationalId}</div>}
-                      {stu.phone      && <div className="text-xs text-gray-400">📞 {stu.phone}</div>}
+                      {stu.nationalId && <div className="text-xs text-gray-500 mt-0.5">🪪 <span className="font-mono">{stu.nationalId}</span></div>}
+                      {stu.phone      && <div className="text-xs text-gray-500">📞 <span className="font-mono">{stu.phone}</span></div>}
                     </div>
                     <div className="flex gap-1.5 flex-shrink-0">
                       {att.status !== "حاضر" && (
