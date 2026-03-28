@@ -5626,54 +5626,105 @@ function CircularsPage({ siteFont }) {
                 </div>
                 <div className="col-span-2">
                   <label className="text-xs font-bold text-gray-500 block mb-1">نص التعميم</label>
-                  {/* شريط الأدوات */}
-                  <div className="flex items-center gap-2 mb-2 p-2 bg-gray-50 rounded-xl flex-wrap">
+                  {/* شريط أدوات التنسيق */}
+                  <div className="flex items-center gap-1 mb-1 p-1.5 bg-gray-50 rounded-xl flex-wrap border border-gray-200">
                     {/* حجم الخط */}
-                    <div className="flex items-center gap-1 bg-white rounded-lg px-2 py-1 border border-gray-200">
-                      <span className="text-xs text-gray-500 font-bold">حجم:</span>
-                      <button onClick={()=>setForm(f=>({...f,bodyFontSize:String(Math.max(12,Number(f.bodyFontSize)-2))}))}
-                        className="w-6 h-6 flex items-center justify-center rounded font-black text-gray-600 hover:bg-gray-100">−</button>
-                      <span className="text-xs font-black text-gray-700 w-6 text-center">{form.bodyFontSize}</span>
-                      <button onClick={()=>setForm(f=>({...f,bodyFontSize:String(Math.min(36,Number(f.bodyFontSize)+2))}))}
-                        className="w-6 h-6 flex items-center justify-center rounded font-black text-gray-600 hover:bg-gray-100">+</button>
-                    </div>
+                    <select onChange={e=>document.execCommand("fontSize",false,e.target.value)}
+                      className="text-xs px-1.5 py-1 rounded-lg border border-gray-200 bg-white font-bold focus:outline-none"
+                      style={{fontFamily:"inherit"}}>
+                      <option value="">حجم</option>
+                      {[1,2,3,4,5,6,7].map(s=><option key={s} value={s}>{["صغير جداً","صغير","متوسط","كبير","كبير جداً","ضخم","ضخم جداً"][s-1]}</option>)}
+                    </select>
+                    {/* فاصل */}
+                    <div className="w-px h-6 bg-gray-200" />
                     {/* عريض */}
-                    <button onClick={()=>setForm(f=>({...f,bodyBold:!f.bodyBold}))}
-                      className="px-3 py-1.5 rounded-lg text-xs font-black border-2 transition-all"
-                      style={{background:form.bodyBold?"#1e3a5f":"#fff",color:form.bodyBold?"#fff":"#374151",borderColor:form.bodyBold?"#1e3a5f":"#e5e7eb"}}>
-                      <b>ع</b>
+                    <button onMouseDown={e=>{e.preventDefault();document.execCommand("bold");}}
+                      className="w-7 h-7 rounded-lg font-black text-sm hover:bg-gray-200 transition-all flex items-center justify-center" title="عريض">
+                      <b>B</b>
                     </button>
                     {/* مائل */}
-                    <button onClick={()=>setForm(f=>({...f,bodyItalic:!f.bodyItalic}))}
-                      className="px-3 py-1.5 rounded-lg text-xs font-black border-2 transition-all"
-                      style={{background:form.bodyItalic?"#0d9488":"#fff",color:form.bodyItalic?"#fff":"#374151",borderColor:form.bodyItalic?"#0d9488":"#e5e7eb"}}>
-                      <i>م</i>
+                    <button onMouseDown={e=>{e.preventDefault();document.execCommand("italic");}}
+                      className="w-7 h-7 rounded-lg text-sm hover:bg-gray-200 transition-all flex items-center justify-center" title="مائل">
+                      <i>I</i>
                     </button>
-                    {/* فيسات */}
+                    {/* تسطير */}
+                    <button onMouseDown={e=>{e.preventDefault();document.execCommand("underline");}}
+                      className="w-7 h-7 rounded-lg text-sm hover:bg-gray-200 transition-all flex items-center justify-center" title="تسطير">
+                      <u>U</u>
+                    </button>
+                    {/* فاصل */}
+                    <div className="w-px h-6 bg-gray-200" />
+                    {/* لون النص */}
+                    <div className="flex items-center gap-1">
+                      <span className="text-xs text-gray-500">لون النص:</span>
+                      {["#000000","#ffffff","#ef4444","#f59e0b","#10b981","#3b82f6","#8b5cf6","#ec4899"].map(col=>(
+                        <button key={col} onMouseDown={e=>{e.preventDefault();document.execCommand("foreColor",false,col);}}
+                          className="w-5 h-5 rounded-full border-2 border-white shadow-sm hover:scale-110 transition-all"
+                          style={{background:col}} title={col} />
+                      ))}
+                    </div>
+                    {/* لون الخلفية */}
+                    <div className="flex items-center gap-1">
+                      <span className="text-xs text-gray-500">خلفية:</span>
+                      {["transparent","#fef9c3","#dcfce7","#dbeafe","#fce7f3","#ffedd5","#f3e8ff","#fee2e2"].map(col=>(
+                        <button key={col} onMouseDown={e=>{e.preventDefault();document.execCommand("backColor",false,col==="transparent"?"#ffffff":col);}}
+                          className="w-5 h-5 rounded-full border border-gray-300 hover:scale-110 transition-all"
+                          style={{background:col==="transparent"?"repeating-linear-gradient(45deg,#ddd 0,#ddd 2px,#fff 0,#fff 4px)":col}} title="تلوين خلفية" />
+                      ))}
+                    </div>
+                    {/* فاصل */}
+                    <div className="w-px h-6 bg-gray-200" />
+                    {/* محاذاة */}
+                    <button onMouseDown={e=>{e.preventDefault();document.execCommand("justifyRight");}}
+                      className="w-7 h-7 rounded-lg text-sm hover:bg-gray-200 flex items-center justify-center" title="يمين">⫤</button>
+                    <button onMouseDown={e=>{e.preventDefault();document.execCommand("justifyCenter");}}
+                      className="w-7 h-7 rounded-lg text-sm hover:bg-gray-200 flex items-center justify-center" title="وسط">≡</button>
+                    <button onMouseDown={e=>{e.preventDefault();document.execCommand("justifyLeft");}}
+                      className="w-7 h-7 rounded-lg text-sm hover:bg-gray-200 flex items-center justify-center" title="يسار">⊣</button>
+                    {/* فاصل */}
+                    <div className="w-px h-6 bg-gray-200" />
+                    {/* إيموجي */}
                     <div className="relative">
-                      <button onClick={()=>setShowEmoji(e=>!e)}
-                        className="px-3 py-1.5 rounded-lg text-xs font-black border-2 border-gray-200 bg-white hover:bg-yellow-50 transition-all">
-                        😊 إيموجي
+                      <button onMouseDown={e=>{e.preventDefault();setShowEmoji(v=>!v);}}
+                        className="px-2 py-1 rounded-lg text-xs font-bold border border-gray-200 bg-white hover:bg-yellow-50">
+                        😊
                       </button>
                       {showEmoji && (
-                        <div className="absolute top-full right-0 mt-1 bg-white rounded-2xl shadow-xl border border-gray-100 p-3 z-50"
-                          style={{width:280,maxHeight:200,overflowY:"auto"}}>
-                          <div className="grid grid-cols-8 gap-1">
-                            {["😊","😄","😃","🎉","👍","✅","⭐","🔥","💡","📌","⚠️","📢","📣","🏫","🎓","📚","✏️","📝","🗓️","⏰","🔔","👨‍🏫","👩‍🏫","🤝","💪","🌟","🏆","❤️","🙏","📱","💻","📊","📈","🎯","✔️","❌","⭕","🔑","🔒","📩","💌","🌹","🌸","🌺","🌷","🌻","☀️","🌙","⚡","🎊","🥇","🎖️","📋","🖊️","📣","🔖","🌍","🕌","🤲","🫶","💯","🆕","🔴","🟡","🟢","🔵"].map(em=>(
-                              <button key={em} onClick={()=>{ setForm(f=>({...f,body:f.body+em})); }}
-                                className="text-xl hover:bg-gray-100 rounded-lg p-1 transition-all"
-                                title={em}>{em}</button>
+                        <div className="absolute top-full right-0 mt-1 bg-white rounded-2xl shadow-xl border border-gray-100 p-2 z-50"
+                          style={{width:260,maxHeight:180,overflowY:"auto"}}>
+                          <div className="grid grid-cols-8 gap-0.5">
+                            {["😊","😄","😃","🎉","👍","✅","⭐","🔥","💡","📌","⚠️","📢","📣","🏫","🎓","📚","✏️","📝","🗓️","⏰","🔔","👨‍🏫","👩‍🏫","🤝","💪","🌟","🏆","❤️","🙏","📱","💻","📊","📈","🎯","✔️","❌","⭕","🔑","🔒","📩","💌","🌹","🌸","🌺","🌷","🌻","☀️","🌙","⚡","🎊","🥇","🎖️","📋","🖊️","🔖","🌍","🕌","🤲","🫶","💯","🆕","🔴","🟡","🟢","🔵","🟤","⚫","⚪"].map(em=>(
+                              <button key={em}
+                                onMouseDown={e=>{
+                                  e.preventDefault();
+                                  document.execCommand("insertText",false,em);
+                                  setShowEmoji(false);
+                                }}
+                                className="text-lg hover:bg-gray-100 rounded-lg p-0.5">{em}</button>
                             ))}
                           </div>
                         </div>
                       )}
                     </div>
                   </div>
-                  <textarea value={form.body} onChange={e=>setForm(f=>({...f,body:e.target.value}))}
-                    rows={5} placeholder="اكتب تفاصيل التعميم هنا..."
-                    className="w-full px-3 py-2.5 rounded-xl border-2 border-gray-200 focus:border-teal-400 focus:outline-none resize-none"
-                    style={{fontFamily:"inherit", fontSize:form.bodyFontSize+"px",
-                      fontWeight:form.bodyBold?"bold":"normal", fontStyle:form.bodyItalic?"italic":"normal"}} />
+                  {/* محرر نص غني */}
+                  <div
+                    id="circ-editor"
+                    contentEditable
+                    suppressContentEditableWarning
+                    dir="rtl"
+                    onInput={e=>setForm(f=>({...f,body:e.currentTarget.innerHTML}))}
+                    onFocus={()=>setShowEmoji(false)}
+                    className="w-full rounded-xl border-2 border-gray-200 focus:border-teal-400 focus:outline-none"
+                    style={{minHeight:120,padding:"10px 12px",fontFamily:"inherit",fontSize:16,lineHeight:1.8,direction:"rtl",textAlign:"right"}}
+                    dangerouslySetInnerHTML={undefined}
+                    ref={el=>{
+                      if(el && el.innerHTML !== form.body && !el.matches(":focus")){
+                        el.innerHTML = form.body||"";
+                      }
+                    }}
+                    placeholder="اكتب نص التعميم هنا — اختر أي نص وطبّق التنسيق من الشريط أعلاه"
+                  />
                 </div>
                 <div className="col-span-2">
                   <label className="text-xs font-bold text-gray-500 block mb-1">النص السفلي</label>
@@ -5811,12 +5862,8 @@ function CircularCard({ circ, preview, onView, onCopy, onEdit, onDelete, copied 
         {/* النص */}
         {circ.body && (
           <div className="leading-relaxed mb-3 p-3 rounded-xl"
-            style={{background:"rgba(255,255,255,.1)",color:"rgba(255,255,255,.9)",
-              fontSize:(circ.bodyFontSize||"14")+"px",
-              fontWeight:circ.bodyBold?"bold":"normal",
-              fontStyle:circ.bodyItalic?"italic":"normal"}}>
-            {circ.body}
-          </div>
+            style={{background:"rgba(255,255,255,.1)",color:"rgba(255,255,255,.9)",lineHeight:1.8}}
+            dangerouslySetInnerHTML={{__html: circ.body}} />
         )}
 
         {/* الروابط */}
@@ -5919,14 +5966,8 @@ function CircularView({ circ, onBack }) {
             {circ.body && (
               <div className="rounded-2xl p-5 mb-5 leading-loose"
                 style={{background:"rgba(255,255,255,.12)",color:"rgba(255,255,255,.95)",
-                  border:"1px solid rgba(255,255,255,.15)",
-                  fontSize:(circ.bodyFontSize||"16")+"px",
-                  fontWeight:circ.bodyBold?"bold":"normal",
-                  fontStyle:circ.bodyItalic?"italic":"normal"}}>
-                {circ.body.split("\n").map((line,i)=>(
-                  <p key={i} className={line ? "" : "h-3"}>{line}</p>
-                ))}
-              </div>
+                  border:"1px solid rgba(255,255,255,.15)",lineHeight:1.8}}
+                dangerouslySetInnerHTML={{__html: circ.body}} />
             )}
 
             {/* الروابط */}
