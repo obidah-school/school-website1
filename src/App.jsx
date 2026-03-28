@@ -5690,43 +5690,38 @@ function CircularsPage({ siteFont }) {
                 </div>
                 <div className="col-span-2">
                   <label className="text-xs font-bold text-gray-500 block mb-1">نص التعميم</label>
-                  {/* شريط تنسيق بسيط وموثوق */}
-                  <div className="flex flex-wrap gap-1 mb-1.5 p-2 bg-gray-50 rounded-xl border border-gray-200">
+                                    {/* شريط تنسيق */}
+                  <div className="flex flex-wrap gap-1 mb-1 p-1.5 bg-gray-50 rounded-xl border border-gray-200">
 
-                    {/* حجم الخط */}
-                    <div className="flex items-center gap-1 bg-white rounded-lg px-2 py-1 border border-gray-200 text-xs font-bold text-gray-600">
-                      حجم:
-                      {[["صغير","<small>","</small>"],["عادي","",""],["كبير","<big>","</big>"],["ضخم","<h3 style=\'margin:4px 0\'>","</h3>"]].map(([lab,o,c])=>(
+                    {/* أحجام الخط */}
+                    <div className="flex items-center gap-0.5 bg-white rounded-lg px-1.5 py-1 border border-gray-200">
+                      <span className="text-xs text-gray-400 ml-1">حجم:</span>
+                      {[["س","<small>","</small>"],["ع","",""],["ك","<h4 style='margin:2px 0'>","</h4>"],["ض","<h2 style='margin:2px 0'>","</h2>"]].map(([lab,o,c])=>(
                         <button key={lab} onMouseDown={e=>e.preventDefault()}
                           onClick={()=>{
                             const ta=document.getElementById("circ-ta");
                             const s=ta.selectionStart, e2=ta.selectionEnd;
-                            const sel=ta.value.substring(s,e2)|| "";
-                            const ins = o+sel+c;
-                            const v=ta.value.substring(0,s)+ins+ta.value.substring(e2);
+                            if(s===e2){alert("حدد النص أولاً"); return;}
+                            const sel=ta.value.substring(s,e2);
+                            const v=ta.value.substring(0,s)+(o+sel+c)+ta.value.substring(e2);
                             setForm(f=>({...f,body:v}));
                           }}
-                          className="px-2 py-0.5 rounded-md hover:bg-purple-100 text-purple-700 font-bold transition-all">
-                          {lab}
+                          className="w-6 h-6 rounded text-xs font-black hover:bg-purple-100 text-purple-700">{lab}
                         </button>
                       ))}
                     </div>
 
-                    <div className="w-px h-6 bg-gray-300 self-center" />
+                    <div className="w-px h-6 bg-gray-200 self-center" />
 
                     {/* تنسيق */}
-                    {[
-                      ["B","<b>","</b>","font-black"],
-                      ["I","<i>","</i>","italic"],
-                      ["U","<u>","</u>","underline"],
-                    ].map(([lab,o,c,cls])=>(
+                    {[["B","<b>","</b>","font-black text-gray-700"],["I","<i>","</i>","italic text-gray-700"],["U","<u>","</u>","underline text-gray-700"]].map(([lab,o,c,cls])=>(
                       <button key={lab} onMouseDown={e=>e.preventDefault()}
                         onClick={()=>{
                           const ta=document.getElementById("circ-ta");
                           const s=ta.selectionStart, e2=ta.selectionEnd;
-                          const sel=ta.value.substring(s,e2); if(!sel)return; ;
-                          const ins=o+sel+c;
-                          const v=ta.value.substring(0,s)+ins+ta.value.substring(e2);
+                          if(s===e2){alert("حدد النص أولاً"); return;}
+                          const sel=ta.value.substring(s,e2);
+                          const v=ta.value.substring(0,s)+(o+sel+c)+ta.value.substring(e2);
                           setForm(f=>({...f,body:v}));
                         }}
                         className={"w-7 h-7 rounded-lg bg-white border border-gray-200 hover:bg-blue-50 flex items-center justify-center text-sm "+cls}>
@@ -5734,37 +5729,39 @@ function CircularsPage({ siteFont }) {
                       </button>
                     ))}
 
-                    <div className="w-px h-6 bg-gray-300 self-center" />
+                    <div className="w-px h-6 bg-gray-200 self-center" />
 
                     {/* ألوان النص */}
-                    <div className="flex items-center gap-1">
-                      <span className="text-xs text-gray-500">لون:</span>
-                      {[["#ef4444","أحمر"],["#f59e0b","ذهبي"],["#10b981","أخضر"],["#3b82f6","أزرق"],["#8b5cf6","بنفسجي"],["#ec4899","وردي"],["#000000","أسود"],["#ffffff","أبيض"]].map(([col,name])=>(
+                    <div className="flex items-center gap-0.5">
+                      <span className="text-xs text-gray-400">لون:</span>
+                      {[["#ef4444","أحمر"],["#f97316","برتقالي"],["#eab308","ذهبي"],["#10b981","أخضر"],["#3b82f6","أزرق"],["#8b5cf6","بنفسجي"],["#ec4899","وردي"],["#000000","أسود"],["#ffffff","أبيض"]].map(([col,name])=>(
                         <button key={col} title={name} onMouseDown={e=>e.preventDefault()}
                           onClick={()=>{
                             const ta=document.getElementById("circ-ta");
                             const s=ta.selectionStart, e2=ta.selectionEnd;
-                            const sel=ta.value.substring(s,e2); if(!sel)return; ;
-                            const ins='<span style="color:'+col+'">'+sel+'</span>';
-                            const v=ta.value.substring(0,s)+ins+ta.value.substring(e2);
+                            if(s===e2){alert("حدد النص أولاً"); return;}
+                            const sel=ta.value.substring(s,e2);
+                            const v=ta.value.substring(0,s)+'<span style="color:'+col+'">'+sel+'</span>'+ta.value.substring(e2);
                             setForm(f=>({...f,body:v}));
                           }}
                           className="w-5 h-5 rounded-full border-2 border-white shadow hover:scale-110 transition-all"
-                          style={{background:col}} />
+                          style={{background:col, outline: col==="#ffffff"?"1px solid #ddd":"none"}} />
                       ))}
                     </div>
 
+                    <div className="w-px h-6 bg-gray-200 self-center" />
+
                     {/* خلفية النص */}
-                    <div className="flex items-center gap-1">
-                      <span className="text-xs text-gray-500">خلفية:</span>
+                    <div className="flex items-center gap-0.5">
+                      <span className="text-xs text-gray-400">خلفية:</span>
                       {[["#fef9c3","صفراء"],["#dcfce7","خضراء"],["#dbeafe","زرقاء"],["#fce7f3","وردية"],["#ffedd5","برتقالية"],["#f3e8ff","بنفسجية"]].map(([col,name])=>(
                         <button key={col} title={name} onMouseDown={e=>e.preventDefault()}
                           onClick={()=>{
                             const ta=document.getElementById("circ-ta");
                             const s=ta.selectionStart, e2=ta.selectionEnd;
-                            const sel=ta.value.substring(s,e2); if(!sel)return; ;
-                            const ins='<span style="background:'+col+';padding:0 3px;border-radius:4px">'+sel+'</span>';
-                            const v=ta.value.substring(0,s)+ins+ta.value.substring(e2);
+                            if(s===e2){alert("حدد النص أولاً"); return;}
+                            const sel=ta.value.substring(s,e2);
+                            const v=ta.value.substring(0,s)+'<mark style="background:'+col+';padding:1px 4px;border-radius:4px">'+sel+'</mark>'+ta.value.substring(e2);
                             setForm(f=>({...f,body:v}));
                           }}
                           className="w-5 h-5 rounded-full border border-gray-300 hover:scale-110 transition-all"
@@ -5772,35 +5769,47 @@ function CircularsPage({ siteFont }) {
                       ))}
                     </div>
 
-                    <div className="w-px h-6 bg-gray-300 self-center" />
+                    <div className="w-px h-6 bg-gray-200 self-center" />
 
                     {/* محاذاة */}
-                    {[["⫤","right"],["≡","center"],["⊣","left"]].map(([ic,dir])=>(
-                      <button key={dir} onMouseDown={e=>e.preventDefault()}
+                    {[["◀","right","يمين"],["▬","center","وسط"],["▶","left","يسار"]].map(([ic,dir,name])=>(
+                      <button key={dir} title={name} onMouseDown={e=>e.preventDefault()}
                         onClick={()=>{
                           const ta=document.getElementById("circ-ta");
                           const s=ta.selectionStart, e2=ta.selectionEnd;
-                          const sel=ta.value.substring(s,e2); if(!sel)return; ;
-                          const ins='<div style="text-align:'+dir+'">'+sel+'</div>';
-                          const v=ta.value.substring(0,s)+ins+ta.value.substring(e2);
+                          const sel=ta.value.substring(s,e2);
+                          const text=sel||"السطر";
+                          const v=ta.value.substring(0,s)+'<div style="text-align:'+dir+'">'+text+'</div>'+ta.value.substring(e2);
                           setForm(f=>({...f,body:v}));
                         }}
-                        className="w-7 h-7 rounded-lg bg-white border border-gray-200 hover:bg-gray-100 flex items-center justify-center font-bold">
-                        {ic}
+                        className="w-7 h-7 rounded-lg bg-white border border-gray-200 hover:bg-gray-100 flex items-center justify-center text-xs font-bold">{ic}
                       </button>
                     ))}
 
-                    <div className="w-px h-6 bg-gray-300 self-center" />
+                    <div className="w-px h-6 bg-gray-200 self-center" />
+
+                    {/* سطر جديد */}
+                    <button onMouseDown={e=>e.preventDefault()}
+                      onClick={()=>{
+                        const ta=document.getElementById("circ-ta");
+                        const s=ta.selectionStart;
+                        const v=ta.value.substring(0,s)+"\n"+ta.value.substring(s);
+                        setForm(f=>({...f,body:v}));
+                        setTimeout(()=>{ta.selectionStart=ta.selectionEnd=s+1;ta.focus();},10);
+                      }}
+                      className="px-2 py-1 rounded-lg bg-white border border-gray-200 hover:bg-gray-100 text-xs font-bold text-gray-600">
+                      ↵ سطر
+                    </button>
 
                     {/* إيموجي */}
                     <div className="relative">
                       <button onMouseDown={e=>e.preventDefault()} onClick={()=>setShowEmoji(v=>!v)}
-                        className="px-2 py-1 rounded-lg bg-white border border-gray-200 hover:bg-yellow-50 text-sm font-bold">
-                        😊 إيموجي
+                        className="px-2 py-1 rounded-lg bg-white border border-gray-200 hover:bg-yellow-50 text-xs font-bold">
+                        😊
                       </button>
                       {showEmoji && (
                         <div className="absolute top-full right-0 mt-1 bg-white rounded-2xl shadow-xl border border-gray-100 p-2 z-50"
-                          style={{width:256,maxHeight:180,overflowY:"auto"}}>
+                          style={{width:252,maxHeight:170,overflowY:"auto"}}>
                           <div className="grid grid-cols-8 gap-0.5">
                             {["😊","😄","😃","🎉","👍","✅","⭐","🔥","💡","📌","⚠️","📢","📣","🏫","🎓","📚","✏️","📝","🗓️","⏰","🔔","👨‍🏫","👩‍🏫","🤝","💪","🌟","🏆","❤️","🙏","📱","💻","📊","📈","🎯","✔️","❌","⭕","🔑","🔒","📩","💌","🌹","🌸","🌺","🌷","🌻","☀️","🌙","⚡","🎊","🥇","🎖️","📋","🖊️","🔖","🌍","🕌","🤲","🫶","💯","🆕","🔴","🟡","🟢","🔵"].map(em=>(
                               <button key={em} onMouseDown={e=>e.preventDefault()}
@@ -5810,31 +5819,33 @@ function CircularsPage({ siteFont }) {
                                   const v=ta.value.substring(0,s)+em+ta.value.substring(s);
                                   setForm(f=>({...f,body:v}));
                                   setShowEmoji(false);
+                                  setTimeout(()=>{ta.selectionStart=ta.selectionEnd=s+em.length;ta.focus();},10);
                                 }}
-                                className="text-lg hover:bg-gray-100 rounded-lg p-0.5">{em}</button>
+                                className="text-lg hover:bg-gray-100 rounded-lg p-0.5">{em}
+                              </button>
                             ))}
                           </div>
                         </div>
                       )}
                     </div>
 
-                    {/* مسح التنسيق */}
+                    {/* مسح تنسيق */}
                     <button onMouseDown={e=>e.preventDefault()}
                       onClick={()=>{
                         const ta=document.getElementById("circ-ta");
                         const s=ta.selectionStart, e2=ta.selectionEnd;
+                        if(s===e2){alert("حدد النص أولاً"); return;}
                         const sel=ta.value.substring(s,e2);
                         const clean=sel.replace(/<[^>]+>/g,"");
                         const v=ta.value.substring(0,s)+clean+ta.value.substring(e2);
                         setForm(f=>({...f,body:v}));
                       }}
-                      className="px-2 py-1 rounded-lg bg-red-50 border border-red-200 text-red-600 text-xs font-bold hover:bg-red-100"
-                      title="مسح تنسيق النص المحدد">
-                      ✕ مسح
+                      className="px-2 py-1 rounded-lg bg-red-50 border border-red-200 text-red-500 text-xs font-bold hover:bg-red-100">
+                      ✕
                     </button>
                   </div>
 
-                  {/* مربع النص */}
+{/* مربع النص */}
                   <textarea
                     id="circ-ta"
                     value={form.body}
@@ -5849,7 +5860,7 @@ function CircularsPage({ siteFont }) {
                     <div className="mt-1 p-3 rounded-xl border border-gray-100 bg-gray-50">
                       <div className="text-xs text-gray-400 font-bold mb-1">معاينة النص:</div>
                       <div className="text-sm leading-relaxed" style={{direction:"rtl"}}
-                        dangerouslySetInnerHTML={{__html:form.body}} />
+                        dangerouslySetInnerHTML={{__html:form.body.replace(/\n/g,"<br>")}} />
                     </div>
                   )}
                 </div>
@@ -5990,14 +6001,14 @@ function CircularCard({ circ, preview, onView, onCopy, onEdit, onDelete, copied 
         {circ.body && (
           <div className="leading-relaxed mb-3 p-3 rounded-xl"
             style={{background:"rgba(255,255,255,.1)",color:"rgba(255,255,255,.9)",lineHeight:1.8}}
-            dangerouslySetInnerHTML={{__html: circ.body}} />
+            dangerouslySetInnerHTML={{__html: circ.body.replace(/\n/g,"<br>")}} />
         )}
 
         {/* صورة التعميم الكاملة */}
         {circ.imageBase64 && (
           <img src={circ.imageBase64} alt=""
-            className="w-full rounded-2xl mb-3"
-            style={{objectFit:"contain", maxHeight:"none", display:"block", width:"100%"}} />
+            className="rounded-2xl mb-3 mx-auto"
+            style={{objectFit:"contain", maxHeight:180, maxWidth:"60%", display:"block"}} />
         )}
 
         {/* الروابط */}
@@ -6102,7 +6113,7 @@ function CircularView({ circ, onBack }) {
               <div className="rounded-2xl p-5 mb-5 leading-loose"
                 style={{background:"rgba(255,255,255,.12)",color:"rgba(255,255,255,.95)",
                   border:"1px solid rgba(255,255,255,.15)",lineHeight:1.8}}
-                dangerouslySetInnerHTML={{__html: circ.body}} />
+                dangerouslySetInnerHTML={{__html: circ.body.replace(/\n/g,"<br>")}} />
             )}
 
             {/* الروابط */}
