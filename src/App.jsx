@@ -5629,11 +5629,25 @@ function CircularsPage({ siteFont }) {
                   {/* شريط أدوات التنسيق */}
                   <div className="flex items-center gap-1 mb-1 p-1.5 bg-gray-50 rounded-xl flex-wrap border border-gray-200">
                     {/* حجم الخط */}
-                    <select onChange={e=>document.execCommand("fontSize",false,e.target.value)}
+                    <select
                       className="text-xs px-1.5 py-1 rounded-lg border border-gray-200 bg-white font-bold focus:outline-none"
-                      style={{fontFamily:"inherit"}}>
+                      style={{fontFamily:"inherit"}}
+                      onMouseDown={e=>e.preventDefault()}
+                      onChange={e=>{
+                        const sz = e.target.value;
+                        if(!sz) return;
+                        const sel = window.getSelection();
+                        if(sel && sel.rangeCount>0 && !sel.isCollapsed){
+                          document.execCommand("fontSize",false,"7");
+                          const spans = document.querySelectorAll('[size="7"]');
+                          spans.forEach(s=>{s.removeAttribute("size"); s.style.fontSize=sz+"px";});
+                        }
+                        e.target.value="";
+                      }}>
                       <option value="">حجم</option>
-                      {[1,2,3,4,5,6,7].map(s=><option key={s} value={s}>{["صغير جداً","صغير","متوسط","كبير","كبير جداً","ضخم","ضخم جداً"][s-1]}</option>)}
+                      {[12,14,16,18,20,24,28,32,36].map(s=>(
+                        <option key={s} value={s}>{s}px</option>
+                      ))}
                     </select>
                     {/* فاصل */}
                     <div className="w-px h-6 bg-gray-200" />
@@ -5716,15 +5730,15 @@ function CircularsPage({ siteFont }) {
                     onInput={e=>setForm(f=>({...f,body:e.currentTarget.innerHTML}))}
                     onFocus={()=>setShowEmoji(false)}
                     className="w-full rounded-xl border-2 border-gray-200 focus:border-teal-400 focus:outline-none"
-                    style={{minHeight:120,padding:"10px 12px",fontFamily:"inherit",fontSize:16,lineHeight:1.8,direction:"rtl",textAlign:"right"}}
-                    dangerouslySetInnerHTML={undefined}
+                    style={{minHeight:150,padding:"12px 14px",fontFamily:"inherit",fontSize:16,lineHeight:1.8,direction:"rtl",textAlign:"right",whiteSpace:"pre-wrap"}}
                     ref={el=>{
-                      if(el && el.innerHTML !== form.body && !el.matches(":focus")){
-                        el.innerHTML = form.body||"";
+                      if(el && !el.matches(":focus")){
+                        const html = form.body||"";
+                        if(el.innerHTML !== html) el.innerHTML = html;
                       }
                     }}
-                    placeholder="اكتب نص التعميم هنا — اختر أي نص وطبّق التنسيق من الشريط أعلاه"
                   />
+                  {!form.body && <div className="text-xs text-gray-400 -mt-1 mr-1">اكتب نص التعميم هنا — حدد أي نص وطبّق التنسيق من الشريط أعلاه</div>}
                 </div>
                 <div className="col-span-2">
                   <label className="text-xs font-bold text-gray-500 block mb-1">النص السفلي</label>
