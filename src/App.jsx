@@ -6219,210 +6219,266 @@ function SMSPage({ teachers, attendance, week, classList }) {
 
 // ==================== STUDENT ABSENCE PAGE ====================
 function StudentAbsencePage() {
-  const MADAR_URL  = "https://app.mobile.net.sa";
-  const FB_KEY     = "sa2025";
-  const PERIODS_T  = ["الأولى","الثانية","الثالثة","الرابعة","الخامسة","السادسة","السابعة"];
-  const STATUSES   = [
+  const MADAR_URL = "https://app.mobile.net.sa";
+  const FB_KEY    = "sa2025";
+  const SCHOOL_START = "06:45";
+  const PERIODS_T = ["الأولى","الثانية","الثالثة","الرابعة","الخامسة","السادسة","السابعة"];
+  const PERIOD_STARTS = ["07:00","07:45","08:30","09:15","10:15","11:00","11:45"];
+  const STATUSES = [
     { key:"حاضر",       label:"حاضر",        icon:"✅", color:"emerald" },
     { key:"غائب",       label:"غائب",         icon:"❌", color:"red"    },
     { key:"تأخر صباحي", label:"تأخر صباحي",  icon:"🌅", color:"amber"  },
     { key:"تأخر حصص",  label:"تأخر حصص",    icon:"⏰", color:"orange" },
   ];
+  const LATE_REASONS = [
+    "الأسرة وتوصيل الأخوة",
+    "بُعد السكن",
+    "البقاء في المحلات القريبة",
+    "الباص المدرسي",
+    "وجود سيارة وتوصيل الأخوة",
+    "إضافة من المدرسة",
+    "أخرى",
+  ];
   const GRADES = [
-    { label: "الأول المتوسط",   sections: ["أ","ب","ج","د"] },
-    { label: "الثاني المتوسط",  sections: ["أ","ب","ج","د"] },
-    { label: "الثالث المتوسط",  sections: ["أ","ب","ج","د"] },
+    { label: "الأول المتوسط",  sections: ["أ","ب","ج","د"] },
+    { label: "الثاني المتوسط", sections: ["أ","ب","ج","د"] },
+    { label: "الثالث المتوسط", sections: ["أ","ب","ج","د"] },
   ];
   const ALL_CLASSES = GRADES.flatMap(g => g.sections.map(s => g.label + " " + s));
 
-  // ─── State ───────────────────────────────────────────────
-  const [allData,     setAllData]     = React.useState({});   // { className: [students] }
-  const [selClass,    setSelClass]    = React.useState("");
-  const [attendance,  setAttendance]  = React.useState({});   // { sid: {status,periods} } for current date
-  const [date,        setDate]        = React.useState(() => new Date().toISOString().split("T")[0]);
-  const [search,      setSearch]      = React.useState("");
-  const [showAdd,     setShowAdd]     = React.useState(false);
-  const [newName,     setNewName]     = React.useState("");
-  const [newPhone,    setNewPhone]    = React.useState("");
-  const [newId,       setNewId]       = React.useState("");
-  const [modal,       setModal]       = React.useState(null);
-  const [copied,      setCopied]      = React.useState(false);
-  const [editId,      setEditId]      = React.useState(null);
-  const [editData,    setEditData]    = React.useState({});
-  const [saving,      setSaving]      = React.useState(false);
-  const [saved,       setSaved]       = React.useState(false);
-  const [sideOpen,    setSideOpen]    = React.useState(true);
+  /* ── tabs ──────────────────────────────────────────────── */
+  const [activeTab, setActiveTab] = React.useState("attendance");
+
+  /* ── shared ────────────────────────────────────────────── */
+  const [allData,    setAllData]   = React.useState({});
+  const [selClass,   setSelClass]  = React.useState("");
+  const [date,       setDate]      = React.useState(() => new Date().toISOString().split("T")[0]);
+  const [saving,     setSaving]    = React.useState(false);
+  const [saved,      setSaved]     = React.useState(false);
+
+  /* ── attendance tab ────────────────────────────────────── */
+  const [attendance, setAttendance]= React.useState({});
+  const [search,     setSearch]    = React.useState("");
+  const [showAdd,    setShowAdd]   = React.useState(false);
+  const [newName,    setNewName]   = React.useState("");
+  const [newPhone,   setNewPhone]  = React.useState("");
+  const [newId,      setNewId]     = React.useState("");
+  const [modal,      setModal]     = React.useState(null);
+  const [copied,     setCopied]    = React.useState(false);
+  const [editId,     setEditId]    = React.useState(null);
+  const [editData,   setEditData]  = React.useState({});
   const xlsRef = React.useRef();
 
-  // ─── Load ────────────────────────────────────────────────
+  /* ── late tab ──────────────────────────────────────────── */
+  // lateRecs[date][studentId] = { minutes, reason, notes, parentPhone, periodMins:{0:5,1:3,...} }
+  const [lateRecs,   setLateRecs]  = React.useState({});
+  const [lateSearch, setLateSearch]= React.useState("");
+  const [weekOffset, setWeekOffset]= React.useState(0); // for weekly stats
+
+  /* ── load ──────────────────────────────────────────────── */
   React.useEffect(() => {
-    DB.get(FB_KEY + "-all", {}).then(d => {
-      if (d && typeof d === "object") {
-        setAllData(d);
-        const first = Object.keys(d).find(k => (d[k]||[]).length > 0) || ALL_CLASSES[0];
-        setSelClass(prev => prev || first);
-      } else {
-        setSelClass(ALL_CLASSES[0]);
-      }
+    DB.get(FB_KEY+"-all",{}).then(d => {
+      if(d && typeof d==="object"){ setAllData(d);
+        const first = Object.keys(d).find(k=>(d[k]||[]).length>0) || ALL_CLASSES[0];
+        setSelClass(prev=>prev||first);
+      } else setSelClass(ALL_CLASSES[0]);
     });
+    DB.get(FB_KEY+"-late",{}).then(d=>{ if(d&&typeof d==="object") setLateRecs(d); });
   }, []);
 
   React.useEffect(() => {
-    DB.get(FB_KEY + "-att-" + date, {}).then(d => setAttendance(d || {}));
+    DB.get(FB_KEY+"-att-"+date,{}).then(d=>setAttendance(d||{}));
   }, [date]);
 
-  // ─── Persist ─────────────────────────────────────────────
-  const saveAll = React.useCallback(async (data, att) => {
+  /* ── persist ───────────────────────────────────────────── */
+  const saveAll = React.useCallback(async(data, att) => {
     setSaving(true);
-    await DB.set(FB_KEY + "-all", data);
-    await DB.set(FB_KEY + "-att-" + date, att);
-    setSaving(false); setSaved(true);
-    setTimeout(() => setSaved(false), 1800);
+    await DB.set(FB_KEY+"-all", data);
+    await DB.set(FB_KEY+"-att-"+date, att);
+    setSaving(false); setSaved(true); setTimeout(()=>setSaved(false),1800);
   }, [date]);
 
-  // ─── Helpers ─────────────────────────────────────────────
-  const students   = React.useMemo(() => (allData[selClass] || []), [allData, selClass]);
-  const getAtt     = sid => attendance[sid] || { status: "حاضر", periods: [] };
+  const saveLate = React.useCallback(async(recs) => {
+    setSaving(true);
+    await DB.set(FB_KEY+"-late", recs);
+    setSaving(false); setSaved(true); setTimeout(()=>setSaved(false),1800);
+  }, []);
 
-  const updClass   = (cls, stus) => {
-    const next = { ...allData, [cls]: stus };
-    setAllData(next);
-    return next;
+  /* ── helpers ───────────────────────────────────────────── */
+  const students  = React.useMemo(()=>(allData[selClass]||[]),[allData,selClass]);
+  const getAtt    = sid => attendance[sid] || { status:"حاضر", periods:[] };
+  const updClass  = (cls, stus) => { const n={...allData,[cls]:stus}; setAllData(n); return n; };
+
+  /* ── attendance helpers ────────────────────────────────── */
+  const setStatus = (sid, status) => {
+    const cur=getAtt(sid);
+    const att={...attendance,[sid]:{...cur,status,periods:status==="تأخر حصص"?(cur.periods||[]):[] }};
+    setAttendance(att); saveAll(allData,att);
   };
-
-  const setStatus  = (sid, status) => {
-    const cur = getAtt(sid);
-    const att = { ...attendance, [sid]: { ...cur, status, periods: status === "تأخر حصص" ? (cur.periods||[]) : [] }};
-    setAttendance(att);
-    saveAll(allData, att);
+  const togglePeriod = (sid,pi) => {
+    const cur=getAtt(sid); const ps=cur.periods||[];
+    const att={...attendance,[sid]:{...cur,status:"تأخر حصص",periods:ps.includes(pi)?ps.filter(x=>x!==pi):[...ps,pi]}};
+    setAttendance(att); saveAll(allData,att);
   };
-
-  const togglePeriod = (sid, pi) => {
-    const cur = getAtt(sid);
-    const ps  = cur.periods || [];
-    const att = { ...attendance, [sid]: { ...cur, status:"تأخر حصص", periods: ps.includes(pi) ? ps.filter(x=>x!==pi) : [...ps,pi] }};
-    setAttendance(att);
-    saveAll(allData, att);
-  };
-
-  // ─── Add student ─────────────────────────────────────────
   const addStudent = () => {
-    if (!newName.trim() || !selClass) return;
-    const stu = { id: Date.now().toString(), name: newName.trim(), phone: newPhone.trim(), nationalId: newId.trim() };
-    const stus = [...students, stu];
-    const next = updClass(selClass, stus);
-    saveAll(next, attendance);
-    setNewName(""); setNewPhone(""); setNewId(""); setShowAdd(false);
+    if(!newName.trim()||!selClass) return;
+    const stu={id:Date.now().toString(),name:newName.trim(),phone:newPhone.trim(),nationalId:newId.trim()};
+    const stus=[...students,stu]; const next=updClass(selClass,stus);
+    saveAll(next,attendance); setNewName(""); setNewPhone(""); setNewId(""); setShowAdd(false);
   };
-
-  // ─── Remove student ──────────────────────────────────────
   const removeStudent = sid => {
-    if (!window.confirm("حذف الطالب نهائياً؟")) return;
-    const stus = students.filter(s => s.id !== sid);
-    const att  = { ...attendance }; delete att[sid];
-    const next = updClass(selClass, stus);
-    setAttendance(att);
-    saveAll(next, att);
+    if(!window.confirm("حذف الطالب نهائياً؟")) return;
+    const stus=students.filter(s=>s.id!==sid);
+    const att={...attendance}; delete att[sid];
+    const next=updClass(selClass,stus); setAttendance(att); saveAll(next,att);
   };
-
-  // ─── Edit ────────────────────────────────────────────────
-  const startEdit = stu => { setEditId(stu.id); setEditData({ name: stu.name, phone: stu.phone||"", nationalId: stu.nationalId||"" }); };
+  const startEdit = stu => { setEditId(stu.id); setEditData({name:stu.name,phone:stu.phone||"",nationalId:stu.nationalId||""}); };
   const saveEdit  = () => {
-    const stus = students.map(s => s.id === editId ? { ...s, ...editData } : s);
-    const next  = updClass(selClass, stus);
-    saveAll(next, attendance); setEditId(null);
+    const stus=students.map(s=>s.id===editId?{...s,...editData}:s);
+    const next=updClass(selClass,stus); saveAll(next,attendance); setEditId(null);
   };
-
-  // ─── Excel import ────────────────────────────────────────
-  // Detects the header row then maps columns by Arabic name
-  const parseExcelStudents = (rows) => {
-    // Find header row
-    let hdrIdx = -1;
-    let colName = -1, colPhone = -1, colId = -1;
-    for (let i = 0; i < Math.min(rows.length, 30); i++) {
-      const row = rows[i];
-      for (let j = 0; j < row.length; j++) {
-        const cell = String(row[j] || "").trim();
-        if (cell.includes("اسم الطالب") || cell === "الاسم") colName = j;
-        if (cell.includes("جوال الطالب") || cell.includes("جوال")) colPhone = j;
-        if (cell.includes("رخصة الاقامة") || cell.includes("الهوية") || cell.includes("رقم الهوية")) colId = j;
-      }
-      if (colName >= 0) { hdrIdx = i; break; }
-    }
-    const data = hdrIdx >= 0 ? rows.slice(hdrIdx + 1) : rows;
-    // Fallback: if no header found use cols 0,1,2
-    if (colName < 0) { colName = 0; colPhone = 1; colId = 2; }
-    const result = [];
-    data.forEach((r, i) => {
-      const name = String(r[colName] || "").trim();
-      const phone = colPhone >= 0 ? String(r[colPhone] || "").trim() : "";
-      const id    = colId   >= 0 ? String(r[colId]    || "").trim() : "";
-      if (name.length > 2 && name !== "اسم الطالب") result.push({
-        id: "s" + Date.now() + i + Math.random().toString(36).slice(2),
-        name, phone, nationalId: id
-      });
-    });
-    return result;
-  };
-
-  const handleExcel = async (e, targetClass) => {
-    const cls = targetClass || selClass;
-    if (!cls) { window.alert("اختر فصلاً أولاً"); return; }
-    const file = e.target.files?.[0]; if (!file) return;
-    e.target.value = "";
-    try {
-      const ev = await file.arrayBuffer();
-      await loadXLSX();
-      const wb   = window.XLSX.read(ev, { type: "array" });
-      const rows = window.XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1 });
-      if (!rows.length) { window.alert("الملف فارغ"); return; }
-      const inc = parseExcelStudents(rows);
-      if (!inc.length) { window.alert("لم يُعثر على طلاب — تأكد من تنسيق الملف"); return; }
-      const existing = allData[cls] || [];
-      const merged   = [...existing];
-      inc.forEach(ns => { if (!merged.find(s => s.name === ns.name)) merged.push(ns); });
-      const next = updClass(cls, merged);
-      saveAll(next, attendance);
-      window.alert("✅ تم استيراد " + inc.length + " طالب إلى فصل " + cls);
-    } catch (err) { window.alert("خطأ: " + err.message); }
-  };
-
-  // ─── Delete all students in class ────────────────────────
   const clearClass = cls => {
-    if (!window.confirm("حذف جميع طلاب " + cls + "؟")) return;
-    const next = updClass(cls, []);
-    saveAll(next, attendance);
+    if(!window.confirm("حذف جميع طلاب "+cls+"؟")) return;
+    const next=updClass(cls,[]); saveAll(next,attendance);
   };
+  const statusBadge = s=>({
+    حاضر:"bg-emerald-100 text-emerald-700 border-emerald-300",
+    غائب:"bg-red-100 text-red-700 border-red-300",
+    "تأخر صباحي":"bg-amber-100 text-amber-700 border-amber-300",
+    "تأخر حصص":"bg-orange-100 text-orange-700 border-orange-300",
+  }[s]||"bg-gray-100 text-gray-500 border-gray-200");
 
-  // ─── Madar modal ─────────────────────────────────────────
-  const openModal = stu => {
-    const att    = getAtt(stu.id);
-    const dateAr = new Date(date).toLocaleDateString("ar-SA", { weekday:"long", year:"numeric", month:"long", day:"numeric" });
-    let msg = "";
-    if (att.status === "غائب")
-      msg = `السلام عليكم ورحمة الله وبركاته\nنُفيدكم بأن ابنكم الطالب / ${stu.name}\nغاب عن المدرسة بتاريخ ${dateAr}\nنرجو التواصل مع الإدارة لمعرفة السبب.\nمع تحيات إدارة المدرسة`;
-    else if (att.status === "تأخر صباحي")
-      msg = `السلام عليكم ورحمة الله وبركاته\nنُفيدكم بأن ابنكم الطالب / ${stu.name}\nتأخّر عن الحضور الصباحي بتاريخ ${dateAr}\nنرجو الحرص على الالتزام بالحضور في وقته.\nمع تحيات إدارة المدرسة`;
-    else if (att.status === "تأخر حصص") {
-      const perNames = (att.periods||[]).sort((a,b)=>a-b).map(p => "الحصة " + PERIODS_T[p]).join("، ");
-      msg = `السلام عليكم ورحمة الله وبركاته\nنُفيدكم بأن ابنكم الطالب / ${stu.name}\nتأخّر عن ${perNames} بتاريخ ${dateAr}\nنرجو متابعة الأمر.\nمع تحيات إدارة المدرسة`;
+  /* ── excel import ──────────────────────────────────────── */
+  const parseExcelStudents = rows => {
+    let hdrIdx=-1,colName=-1,colPhone=-1,colId=-1;
+    for(let i=0;i<Math.min(rows.length,30);i++){
+      const row=rows[i];
+      for(let j=0;j<row.length;j++){
+        const c=String(row[j]||"").trim();
+        if(c.includes("اسم الطالب")||c==="الاسم") colName=j;
+        if(c.includes("جوال الطالب")||c==="جوال") colPhone=j;
+        if(c.includes("رخصة الاقامة")||c.includes("رقم الهوية")) colId=j;
+      }
+      if(colName>=0){hdrIdx=i;break;}
     }
-    setModal({ stu, msg }); setCopied(false);
+    const data=hdrIdx>=0?rows.slice(hdrIdx+1):rows;
+    if(colName<0){colName=0;colPhone=1;colId=2;}
+    const res=[];
+    data.forEach((r,i)=>{
+      const name=String(r[colName]||"").trim();
+      const phone=colPhone>=0?String(r[colPhone]||"").trim():"";
+      const id=colId>=0?String(r[colId]||"").trim():"";
+      if(name.length>2&&name!=="اسم الطالب")
+        res.push({id:"s"+Date.now()+i+Math.random().toString(36).slice(2),name,phone,nationalId:id});
+    });
+    return res;
   };
-  const copyMsg = () => {
-    if (!modal?.msg) return;
-    navigator.clipboard.writeText(modal.msg).catch(()=>{});
-    setCopied(true); setTimeout(() => setCopied(false), 2000);
+  const handleExcel = async(e,targetClass)=>{
+    const cls=targetClass||selClass;
+    if(!cls){window.alert("اختر فصلاً أولاً");return;}
+    const file=e.target.files?.[0]; if(!file) return; e.target.value="";
+    try{
+      const ev=await file.arrayBuffer(); await loadXLSX();
+      const wb=window.XLSX.read(ev,{type:"array"});
+      const rows=window.XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1});
+      if(!rows.length){window.alert("الملف فارغ");return;}
+      const inc=parseExcelStudents(rows);
+      if(!inc.length){window.alert("لم يُعثر على طلاب");return;}
+      const existing=allData[cls]||[]; const merged=[...existing];
+      inc.forEach(ns=>{if(!merged.find(s=>s.name===ns.name))merged.push(ns);});
+      const next=updClass(cls,merged); saveAll(next,attendance);
+      window.alert("✅ تم استيراد "+inc.length+" طالب إلى فصل "+cls);
+    }catch(err){window.alert("خطأ: "+err.message);}
   };
 
-  // ─── Print ───────────────────────────────────────────────
-  const printReport = () => {
-    const dateAr = new Date(date).toLocaleDateString("ar-SA", { weekday:"long", year:"numeric", month:"long", day:"numeric" });
-    const rows = students.map((s,i) => {
-      const att = getAtt(s.id);
-      const perTxt = att.status === "تأخر حصص" && att.periods?.length
-        ? (att.periods||[]).sort((a,b)=>a-b).map(p=>PERIODS_T[p]).join("، ") : "—";
-      const col = { حاضر:"#059669", غائب:"#dc2626", "تأخر صباحي":"#d97706", "تأخر حصص":"#ea580c" }[att.status]||"#374151";
+  /* ── madar modal ───────────────────────────────────────── */
+  const openModal = stu => {
+    const att=getAtt(stu.id);
+    const dateAr=new Date(date).toLocaleDateString("ar-SA",{weekday:"long",year:"numeric",month:"long",day:"numeric"});
+    let msg="";
+    if(att.status==="غائب") msg=`السلام عليكم ورحمة الله وبركاته\nنُفيدكم بأن ابنكم الطالب / ${stu.name}\nغاب عن المدرسة بتاريخ ${dateAr}\nنرجو التواصل مع الإدارة لمعرفة السبب.\nمع تحيات إدارة المدرسة`;
+    else if(att.status==="تأخر صباحي") msg=`السلام عليكم ورحمة الله وبركاته\nنُفيدكم بأن ابنكم الطالب / ${stu.name}\nتأخّر عن الحضور الصباحي بتاريخ ${dateAr}\nمع تحيات إدارة المدرسة`;
+    else if(att.status==="تأخر حصص"){
+      const ps=(att.periods||[]).sort((a,b)=>a-b).map(p=>"الحصة "+PERIODS_T[p]).join("، ");
+      msg=`السلام عليكم ورحمة الله وبركاته\nنُفيدكم بأن ابنكم الطالب / ${stu.name}\nتأخّر عن ${ps} بتاريخ ${dateAr}\nمع تحيات إدارة المدرسة`;
+    }
+    setModal({stu,msg}); setCopied(false);
+  };
+  const copyMsg=()=>{ if(!modal?.msg) return; navigator.clipboard.writeText(modal.msg).catch(()=>{}); setCopied(true); setTimeout(()=>setCopied(false),2000); };
+
+  /* ── late tab helpers ──────────────────────────────────── */
+  const getLate = (d,sid) => (lateRecs[d]||{})[sid] || { minutes:"", reason:"", notes:"", parentPhone:"", periodMins:{} };
+  const setLateField = (sid, field, val) => {
+    const cur=getLate(date,sid);
+    const upd={...lateRecs,[date]:{...(lateRecs[date]||{}),[sid]:{...cur,[field]:val}}};
+    setLateRecs(upd); saveLate(upd);
+  };
+  const setPeriodMin = (sid,pi,val) => {
+    const cur=getLate(date,sid);
+    const pm={...(cur.periodMins||{}),[pi]:val};
+    const upd={...lateRecs,[date]:{...(lateRecs[date]||{}),[sid]:{...cur,periodMins:pm}}};
+    setLateRecs(upd); saveLate(upd);
+  };
+  const removeLate = sid => {
+    const d2={...(lateRecs[date]||{})}; delete d2[sid];
+    const upd={...lateRecs,[date]:d2}; setLateRecs(upd); saveLate(upd);
+  };
+
+  // All students across all classes with late records for current date
+  const allStudentsFlat = React.useMemo(()=>
+    ALL_CLASSES.flatMap(cls=>(allData[cls]||[]).map(s=>({...s,cls})))
+  ,[allData]);
+
+  // Students in selected class with late record today
+  const lateStudentsDay = React.useMemo(()=>{
+    const recs=lateRecs[date]||{};
+    return Object.keys(recs)
+      .map(sid=>{
+        const stu=allStudentsFlat.find(s=>s.id===sid);
+        return stu?{...stu,...recs[sid]}:null;
+      }).filter(Boolean);
+  },[lateRecs,date,allStudentsFlat]);
+
+  // Today's stats grouped by reason
+  const todayStats = React.useMemo(()=>{
+    const recs=lateRecs[date]||{};
+    const byReason={}; let total=0;
+    Object.values(recs).forEach(r=>{
+      if(r.minutes){ total++;
+        const k=r.reason||"غير محدد";
+        byReason[k]=(byReason[k]||0)+1;
+      }
+    });
+    return {total, byReason};
+  },[lateRecs,date]);
+
+  // Weekly stats (Mon–Thu of current week + offset)
+  const weekDates = React.useMemo(()=>{
+    const base=new Date(date);
+    const day=base.getDay();
+    const diff=day===0?-6:1-day;
+    const mon=new Date(base); mon.setDate(mon.getDate()+diff+(weekOffset*7));
+    return Array.from({length:5},(_,i)=>{
+      const d=new Date(mon); d.setDate(d.getDate()+i);
+      return d.toISOString().split("T")[0];
+    });
+  },[date,weekOffset]);
+
+  const weekStats = React.useMemo(()=>
+    weekDates.map(d=>({
+      date:d,
+      count:Object.values(lateRecs[d]||{}).filter(r=>r.minutes).length,
+      dateAr:new Date(d).toLocaleDateString("ar-SA",{weekday:"short",day:"numeric",month:"numeric"}),
+    }))
+  ,[lateRecs,weekDates]);
+
+  /* ── print attendance ──────────────────────────────────── */
+  const printAttendance = () => {
+    const dateAr=new Date(date).toLocaleDateString("ar-SA",{weekday:"long",year:"numeric",month:"long",day:"numeric"});
+    const rows=students.map((s,i)=>{
+      const att=getAtt(s.id);
+      const col={حاضر:"#059669",غائب:"#dc2626","تأخر صباحي":"#d97706","تأخر حصص":"#ea580c"}[att.status]||"#374151";
+      const perTxt=att.status==="تأخر حصص"&&att.periods?.length?(att.periods||[]).sort((a,b)=>a-b).map(p=>PERIODS_T[p]).join("، "):"—";
       return `<tr style="border-bottom:1px solid #e5e7eb;background:${i%2?"#f9fafb":"#fff"}">
         <td style="padding:8px 12px;text-align:center;color:#6b7280;font-size:12px">${i+1}</td>
         <td style="padding:8px 12px;font-weight:bold;font-size:13px">${s.name}</td>
@@ -6437,7 +6493,7 @@ function StudentAbsencePage() {
     <style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Cairo',sans-serif;direction:rtl;padding:20px}@media print{button{display:none!important}}</style></head><body>
     <div style="max-width:900px;margin:0 auto">
       <div style="background:linear-gradient(135deg,#7f1d1d,#991b1b);color:white;padding:20px 24px;border-radius:12px 12px 0 0">
-        <div style="font-size:18px;font-weight:900">📋 كشف الغياب والتأخر اليومي</div>
+        <div style="font-size:18px;font-weight:900">📋 كشف الغياب والحضور اليومي</div>
         <div style="font-size:13px;opacity:.85;margin-top:4px">${selClass} | ${dateAr}</div>
       </div>
       <table style="width:100%;border-collapse:collapse;border:1px solid #e5e7eb;border-top:none">
@@ -6448,8 +6504,7 @@ function StudentAbsencePage() {
           <th style="padding:10px 12px;text-align:center">رقم الجوال</th>
           <th style="padding:10px 12px;text-align:center">الحالة</th>
           <th style="padding:10px 12px;text-align:center">الحصص</th>
-        </tr></thead>
-        <tbody>${rows}</tbody>
+        </tr></thead><tbody>${rows}</tbody>
       </table>
       <div style="margin-top:30px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;text-align:center">
         ${["مشرف الدور","الوكيل","مدير المدرسة"].map(t=>`<div><div style="font-weight:bold;font-size:13px;margin-bottom:30px">${t}:</div><div style="border-top:1px solid #374151;padding-top:6px;color:#6b7280;font-size:11px">التوقيع</div></div>`).join("")}
@@ -6460,397 +6515,466 @@ function StudentAbsencePage() {
     </div></body></html>`);
   };
 
-  // ─── Derived ─────────────────────────────────────────────
-  const filtered = students.filter(s => !search || s.name.includes(search) || (s.nationalId||"").includes(search));
-  const counts   = STATUSES.reduce((acc,s) => { acc[s.key] = students.filter(st => getAtt(st.id).status === s.key).length; return acc; }, {});
+  /* ── print late report ──────────────────────────────────── */
+  const printLateReport = (mode) => {
+    const dateAr=new Date(date).toLocaleDateString("ar-SA",{weekday:"long",year:"numeric",month:"long",day:"numeric"});
+    const recs=lateRecs[date]||{};
+    const lateList=Object.keys(recs).map(sid=>{
+      const stu=allStudentsFlat.find(s=>s.id===sid);
+      return stu?{...stu,...recs[sid]}:null;
+    }).filter(r=>r&&r.minutes);
 
-  const statusBadge = s => ({
-    حاضر:          "bg-emerald-100 text-emerald-700 border-emerald-300",
-    غائب:          "bg-red-100 text-red-700 border-red-300",
-    "تأخر صباحي":  "bg-amber-100 text-amber-700 border-amber-300",
-    "تأخر حصص":    "bg-orange-100 text-orange-700 border-orange-300",
-  }[s] || "bg-gray-100 text-gray-500 border-gray-200");
+    if(mode==="list"){
+      const rows=lateList.map((r,i)=>`<tr style="border-bottom:1px solid #e5e7eb;background:${i%2?"#f9fafb":"#fff"}">
+        <td style="padding:8px 12px;text-align:center;font-size:12px">${i+1}</td>
+        <td style="padding:8px 12px;font-weight:bold;font-size:13px">${r.name}</td>
+        <td style="padding:8px 12px;text-align:center;font-size:12px">${r.cls}</td>
+        <td style="padding:8px 12px;text-align:center;font-weight:bold;color:#d97706;font-size:13px">${r.minutes} د</td>
+        <td style="padding:8px 12px;text-align:center;font-size:12px">${r.reason||"—"}</td>
+        <td style="padding:8px 12px;font-size:12px">${r.notes||"—"}</td>
+        <td style="padding:8px 12px;text-align:center;font-size:12px;font-family:monospace">${r.parentPhone||r.phone||"—"}</td>
+      </tr>`).join("");
+      printWindow(`<!DOCTYPE html><html dir="rtl"><head><meta charset="UTF-8"><title>كشف التأخر</title>
+      <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap" rel="stylesheet">
+      <style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Cairo',sans-serif;direction:rtl;padding:20px}@media print{button{display:none!important}}</style></head><body>
+      <div style="max-width:1000px;margin:0 auto">
+        <div style="background:linear-gradient(135deg,#92400e,#b45309);color:white;padding:20px 24px;border-radius:12px 12px 0 0">
+          <div style="font-size:18px;font-weight:900">⏰ كشف التأخر الصباحي اليومي</div>
+          <div style="font-size:13px;opacity:.85;margin-top:4px">${dateAr} | الدوام يبدأ ${SCHOOL_START} | إجمالي المتأخرين: ${lateList.length} طالب</div>
+        </div>
+        <table style="width:100%;border-collapse:collapse;border:1px solid #e5e7eb;border-top:none">
+          <thead><tr style="background:#1e293b;color:white;font-size:12px">
+            <th style="padding:10px">#</th><th style="padding:10px;text-align:right">اسم الطالب</th>
+            <th style="padding:10px">الفصل</th><th style="padding:10px">مدة التأخر</th>
+            <th style="padding:10px">السبب</th><th style="padding:10px;text-align:right">ملاحظات</th>
+            <th style="padding:10px">جوال الوالد</th>
+          </tr></thead><tbody>${rows}</tbody>
+        </table>
+        <div style="margin-top:30px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;text-align:center">
+          ${["مشرف الدور","الوكيل","مدير المدرسة"].map(t=>`<div><div style="font-weight:bold;font-size:13px;margin-bottom:30px">${t}:</div><div style="border-top:1px solid #374151;padding-top:6px;color:#6b7280;font-size:11px">التوقيع</div></div>`).join("")}
+        </div>
+        <div style="margin-top:20px;text-align:center"><button onclick="window.print()" style="background:#b45309;color:white;border:none;padding:10px 30px;border-radius:8px;font-family:'Cairo';font-size:14px;font-weight:bold;cursor:pointer">🖨 طباعة</button></div>
+      </div></body></html>`);
+    } else {
+      // احصائية
+      const byReason=todayStats.byReason;
+      const statRows=Object.keys(byReason).map(r=>`<tr style="border-bottom:1px solid #e5e7eb">
+        <td style="padding:10px 16px;font-size:14px;font-weight:bold">${r}</td>
+        <td style="padding:10px 16px;text-align:center;font-size:16px;font-weight:900;color:#b45309">${byReason[r]}</td>
+        <td style="padding:10px 16px;text-align:center;font-size:13px;color:#6b7280">${Math.round(byReason[r]/todayStats.total*100)}%</td>
+      </tr>`).join("");
+      const weekRows=weekStats.map(w=>`<tr style="border-bottom:1px solid #e5e7eb">
+        <td style="padding:8px 12px;font-size:13px;font-weight:bold">${w.dateAr}</td>
+        <td style="padding:8px 12px;text-align:center;font-size:14px;font-weight:900;color:#b45309">${w.count}</td>
+        <td style="padding:8px 12px"><div style="background:#fef3c7;height:12px;border-radius:6px;width:${Math.max(w.count*20,4)}px;min-width:4px"></div></td>
+      </tr>`).join("");
+      printWindow(`<!DOCTYPE html><html dir="rtl"><head><meta charset="UTF-8"><title>احصائية التأخر</title>
+      <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap" rel="stylesheet">
+      <style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Cairo',sans-serif;direction:rtl;padding:20px}@media print{button{display:none!important}}</style></head><body>
+      <div style="max-width:700px;margin:0 auto">
+        <div style="background:linear-gradient(135deg,#92400e,#b45309);color:white;padding:20px 24px;border-radius:12px;margin-bottom:20px">
+          <div style="font-size:20px;font-weight:900">📊 إحصائية التأخر الصباحي</div>
+          <div style="font-size:13px;opacity:.85;margin-top:4px">${dateAr}</div>
+          <div style="font-size:28px;font-weight:900;margin-top:10px">${todayStats.total} <span style="font-size:16px;opacity:.8">طالب متأخر اليوم</span></div>
+        </div>
+        <h3 style="font-size:16px;font-weight:900;margin-bottom:12px">📋 التأخر حسب السبب</h3>
+        <table style="width:100%;border-collapse:collapse;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;margin-bottom:24px">
+          <thead><tr style="background:#1e293b;color:white"><th style="padding:10px;text-align:right">السبب</th><th style="padding:10px">العدد</th><th style="padding:10px">النسبة</th></tr></thead>
+          <tbody>${statRows}</tbody>
+        </table>
+        <h3 style="font-size:16px;font-weight:900;margin-bottom:12px">📅 التأخر الأسبوعي</h3>
+        <table style="width:100%;border-collapse:collapse;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden">
+          <thead><tr style="background:#1e293b;color:white"><th style="padding:10px;text-align:right">اليوم</th><th style="padding:10px">العدد</th><th style="padding:10px;text-align:right">المقارنة</th></tr></thead>
+          <tbody>${weekRows}</tbody>
+        </table>
+        <div style="margin-top:20px;text-align:center"><button onclick="window.print()" style="background:#b45309;color:white;border:none;padding:10px 30px;border-radius:8px;font-family:'Cairo';font-size:14px;font-weight:bold;cursor:pointer">🖨 طباعة</button></div>
+      </div></body></html>`);
+    }
+  };
 
-  // ─── JSX ─────────────────────────────────────────────────
+  /* ── derived ────────────────────────────────────────────── */
+  const filtered = students.filter(s=>!search||s.name.includes(search)||(s.nationalId||"").includes(search));
+  const counts   = STATUSES.reduce((acc,s)=>{ acc[s.key]=students.filter(st=>getAtt(st.id).status===s.key).length; return acc; },{});
+  const lateFiltered = React.useMemo(()=>{
+    const recs=lateRecs[date]||{};
+    return students.filter(s=>!lateSearch||s.name.includes(lateSearch));
+  },[students,date,lateSearch]);
+
+  /* ── Shared class sidebar ───────────────────────────────── */
+  const ClassSidebar = () => (
+    <div className="w-52 flex-shrink-0 bg-white rounded-2xl shadow-md border border-gray-100 overflow-hidden">
+      <div className="bg-gradient-to-l from-rose-900 to-red-800 text-white px-3 py-3">
+        <span className="font-black text-sm">🏫 الفصول</span>
+      </div>
+      <div className="divide-y divide-gray-50 overflow-y-auto max-h-[70vh]">
+        {GRADES.map(grade=>(
+          <div key={grade.label}>
+            <div className="px-3 py-1.5 bg-gray-50 text-xs font-black text-gray-400">{grade.label}</div>
+            {grade.sections.map(sec=>{
+              const cls=grade.label+" "+sec;
+              const cnt=(allData[cls]||[]).length;
+              const isSel=cls===selClass;
+              return (
+                <div key={cls} onClick={()=>setSelClass(cls)}
+                  className={`flex items-center justify-between px-3 py-2 cursor-pointer transition-all text-xs ${isSel?"bg-rose-50 border-r-4 border-rose-700":"hover:bg-gray-50"}`}>
+                  <span className={`font-bold ${isSel?"text-rose-800":"text-gray-700"}`}>{isSel&&"▸ "}الفصل {sec}</span>
+                  <div className="flex items-center gap-1">
+                    {cnt>0&&<span className={`text-xs px-1.5 py-0.5 rounded-full font-bold ${isSel?"bg-rose-200 text-rose-800":"bg-gray-200 text-gray-600"}`}>{cnt}</span>}
+                    <label className="cursor-pointer text-gray-300 hover:text-teal-500 transition-colors" onClick={e=>e.stopPropagation()}>
+                      📥<input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={e=>{setSelClass(cls);handleExcel(e,cls);}}/>
+                    </label>
+                    {cnt>0&&<button onClick={e=>{e.stopPropagation();clearClass(cls);}} className="text-gray-200 hover:text-red-400 text-xs transition-colors">🗑️</button>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  /* ═══════════════════════════════════════════════════════ */
   return (
     <div className="space-y-4">
 
-      {/* ── Header ─────────────────────────────────────────── */}
+      {/* Header */}
       <div className="bg-gradient-to-l from-rose-900 to-red-800 rounded-2xl p-5 text-white shadow-xl">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="text-xl font-black flex items-center gap-2">
               <span>📋</span> غياب وتأخر الطلاب
-              {selClass && <span className="text-sm font-bold opacity-70 bg-white bg-opacity-20 px-2 py-0.5 rounded-lg">{selClass}</span>}
+              {selClass&&<span className="text-sm font-bold opacity-70 bg-white bg-opacity-20 px-2 py-0.5 rounded-lg">{selClass}</span>}
             </h2>
-            <p className="text-xs opacity-70 mt-1">رصد الغياب والتأخر الصباحي والتأخر عن الحصص</p>
+            <p className="text-xs opacity-70 mt-1">الدوام يبدأ الساعة {SCHOOL_START} — رصد الغياب والتأخر الصباحي والتأخر عن الحصص</p>
           </div>
           <div className="flex flex-wrap gap-2 items-center">
-            <input type="date" value={date} onChange={e => setDate(e.target.value)}
-              className="bg-white bg-opacity-20 border border-white border-opacity-30 rounded-xl px-3 py-2 text-sm font-bold focus:outline-none text-white" />
-            <button onClick={() => xlsRef.current?.click()}
-              className="bg-white bg-opacity-20 hover:bg-opacity-30 border border-white border-opacity-30 rounded-xl px-3 py-2 text-sm font-bold flex items-center gap-1">
-              📥 Excel
-            </button>
-            <input ref={xlsRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleExcel} />
-            <button onClick={printReport}
-              className="bg-white bg-opacity-20 hover:bg-opacity-30 border border-white border-opacity-30 rounded-xl px-3 py-2 text-sm font-bold">
-              🖨 طباعة
-            </button>
-            <button onClick={() => setShowAdd(v=>!v)}
-              className="bg-white text-rose-800 hover:bg-rose-50 rounded-xl px-4 py-2 text-sm font-bold shadow-sm">
-              ➕ إضافة طالب
-            </button>
+            <input type="date" value={date} onChange={e=>setDate(e.target.value)}
+              className="bg-white bg-opacity-20 border border-white border-opacity-30 rounded-xl px-3 py-2 text-sm font-bold focus:outline-none text-white"/>
+            {activeTab==="attendance"&&<>
+              <button onClick={()=>xlsRef.current?.click()} className="bg-white bg-opacity-20 hover:bg-opacity-30 border border-white border-opacity-30 rounded-xl px-3 py-2 text-sm font-bold">📥 Excel</button>
+              <input ref={xlsRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleExcel}/>
+              <button onClick={printAttendance} className="bg-white bg-opacity-20 hover:bg-opacity-30 border border-white border-opacity-30 rounded-xl px-3 py-2 text-sm font-bold">🖨 طباعة</button>
+              <button onClick={()=>setShowAdd(v=>!v)} className="bg-white text-rose-800 hover:bg-rose-50 rounded-xl px-4 py-2 text-sm font-bold shadow-sm">➕ إضافة طالب</button>
+            </>}
+            {activeTab==="late"&&<>
+              <button onClick={()=>printLateReport("list")} className="bg-white bg-opacity-20 hover:bg-opacity-30 border border-white border-opacity-30 rounded-xl px-3 py-2 text-sm font-bold">🖨 كشف التأخر</button>
+              <button onClick={()=>printLateReport("stats")} className="bg-white bg-opacity-20 hover:bg-opacity-30 border border-white border-opacity-30 rounded-xl px-3 py-2 text-sm font-bold">📊 طباعة الإحصائية</button>
+            </>}
           </div>
         </div>
-        {(saving || saved) && (
-          <div className={`mt-2 text-xs font-bold ${saved ? "text-emerald-300" : "text-white opacity-60"}`}>
-            {saving ? "⏳ جاري الحفظ…" : "✅ تم الحفظ"}
-          </div>
-        )}
+        {(saving||saved)&&<div className={`mt-2 text-xs font-bold ${saved?"text-emerald-300":"text-white opacity-60"}`}>{saving?"⏳ جاري الحفظ…":"✅ تم الحفظ"}</div>}
+
+        {/* Tabs */}
+        <div className="flex gap-2 mt-4">
+          {[
+            {id:"attendance",label:"✅ الحضور والغياب"},
+            {id:"late",     label:"⏰ التأخر الصباحي"},
+          ].map(t=>(
+            <button key={t.id} onClick={()=>setActiveTab(t.id)}
+              className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${activeTab===t.id?"bg-white text-rose-800 shadow-md":"bg-white bg-opacity-20 text-white hover:bg-opacity-30"}`}>
+              {t.label}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {/* ── Layout: sidebar + main ──────────────────────────── */}
-      <div className="flex gap-4 items-start">
-
-        {/* ── Right Sidebar — Classes ──────────────────────── */}
-        <div className="w-56 flex-shrink-0 bg-white rounded-2xl shadow-md border border-gray-100 overflow-hidden">
-          <div className="bg-gradient-to-l from-rose-900 to-red-800 text-white px-4 py-3 flex items-center justify-between">
-            <span className="font-black text-sm">🏫 الفصول الدراسية</span>
-          </div>
-          <div className="divide-y divide-gray-50">
-            {GRADES.map(grade => (
-              <div key={grade.label}>
-                <div className="px-3 py-2 bg-gray-50 text-xs font-black text-gray-500 uppercase tracking-wide">{grade.label}</div>
-                {grade.sections.map(sec => {
-                  const cls   = grade.label + " " + sec;
-                  const cnt   = (allData[cls] || []).length;
-                  const isSel = cls === selClass;
-                  return (
-                    <div key={cls}
-                      onClick={() => setSelClass(cls)}
-                      className={`flex items-center justify-between px-3 py-2.5 cursor-pointer transition-all text-sm ${isSel ? "bg-rose-50 border-r-4 border-rose-700" : "hover:bg-gray-50"}`}>
-                      <span className={`font-bold ${isSel ? "text-rose-800" : "text-gray-700"}`}>
-                        {isSel && "▸ "} الفصل {sec}
-                      </span>
-                      <div className="flex items-center gap-1">
-                        {cnt > 0 && <span className={`text-xs px-1.5 py-0.5 rounded-full font-bold ${isSel ? "bg-rose-200 text-rose-800" : "bg-gray-200 text-gray-600"}`}>{cnt}</span>}
-                        <label className="cursor-pointer text-gray-300 hover:text-teal-500 transition-colors" title={"استيراد طلاب " + cls} onClick={e=>e.stopPropagation()}>
-                          📥
-                          <input type="file" accept=".xlsx,.xls,.csv" className="hidden"
-                            onChange={e => { setSelClass(cls); handleExcel(e, cls); }} />
-                        </label>
-                        {cnt > 0 && (
-                          <button onClick={e=>{e.stopPropagation();clearClass(cls);}} title="حذف جميع طلاب الفصل"
-                            className="text-gray-200 hover:text-red-400 text-xs transition-colors">🗑️</button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* ── Main Content ─────────────────────────────────── */}
-        <div className="flex-1 min-w-0 space-y-4">
-
-          {/* Stats */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {STATUSES.map(s => (
-              <div key={s.key} className={`bg-white rounded-2xl p-3 text-center shadow-sm border-b-4 ${
-                { emerald:"border-emerald-400", red:"border-red-400", amber:"border-amber-400", orange:"border-orange-400" }[s.color]
-              }`}>
-                <div className="text-xl mb-0.5">{s.icon}</div>
-                <div className={`text-2xl font-black ${{ emerald:"text-emerald-600", red:"text-red-600", amber:"text-amber-600", orange:"text-orange-600" }[s.color]}`}>
-                  {counts[s.key] || 0}
+      {/* ╔══════════════════════════════════════════════════╗ */}
+      {/* ║         TAB 1 — ATTENDANCE                      ║ */}
+      {/* ╚══════════════════════════════════════════════════╝ */}
+      {activeTab==="attendance"&&(
+        <div className="flex gap-4 items-start">
+          <ClassSidebar/>
+          <div className="flex-1 min-w-0 space-y-4">
+            {/* Stats */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {STATUSES.map(s=>(
+                <div key={s.key} className={`bg-white rounded-2xl p-3 text-center shadow-sm border-b-4 ${{"emerald":"border-emerald-400","red":"border-red-400","amber":"border-amber-400","orange":"border-orange-400"}[s.color]}`}>
+                  <div className="text-xl mb-0.5">{s.icon}</div>
+                  <div className={`text-2xl font-black ${{"emerald":"text-emerald-600","red":"text-red-600","amber":"text-amber-600","orange":"text-orange-600"}[s.color]}`}>{counts[s.key]||0}</div>
+                  <div className="text-xs font-bold text-gray-500 mt-0.5">{s.label}</div>
                 </div>
-                <div className="text-xs font-bold text-gray-500 mt-0.5">{s.label}</div>
-              </div>
-            ))}
-          </div>
-
-          {/* Excel hint */}
-          <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-2 text-xs text-blue-700 flex items-start gap-2">
-            <span className="text-base mt-0.5">📌</span>
-            <div><span className="font-bold">تنسيق Excel المدار:</span> يُكتشف تلقائياً — اسم الطالب، رقم الجوال، رقم الهوية</div>
-          </div>
-
-          {/* Add form */}
-          {showAdd && (
-            <div className="bg-white rounded-2xl shadow-md border border-rose-100 p-5">
-              <h3 className="font-bold text-gray-700 mb-3 text-sm">➕ إضافة طالب جديد — {selClass || "اختر فصلاً"}</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
-                <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="اسم الطالب *"
-                  className="border-2 border-gray-200 focus:border-rose-400 rounded-xl px-3 py-2 text-sm focus:outline-none" />
-                <input value={newId} onChange={e => setNewId(e.target.value)} placeholder="رقم الهوية"
-                  className="border-2 border-gray-200 focus:border-rose-400 rounded-xl px-3 py-2 text-sm focus:outline-none" />
-                <input value={newPhone} onChange={e => setNewPhone(e.target.value)} placeholder="جوال ولي الأمر"
-                  className="border-2 border-gray-200 focus:border-rose-400 rounded-xl px-3 py-2 text-sm focus:outline-none" />
-              </div>
-              <div className="flex gap-2">
-                <button onClick={addStudent} className="bg-rose-600 hover:bg-rose-700 text-white rounded-xl px-6 py-2 text-sm font-bold">حفظ</button>
-                <button onClick={() => setShowAdd(false)} className="bg-gray-100 text-gray-600 rounded-xl px-5 py-2 text-sm font-bold">إلغاء</button>
-              </div>
+              ))}
             </div>
-          )}
-
-          {/* Search */}
-          <input value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="🔍 بحث باسم الطالب أو رقم الهوية…"
-            className="w-full border-2 border-gray-200 focus:border-rose-400 rounded-2xl px-4 py-3 text-sm focus:outline-none" />
-
-          {/* No class selected */}
-          {!selClass ? (
-            <div className="text-center py-16 bg-white rounded-2xl shadow-sm border border-gray-100">
-              <div className="text-5xl mb-3">🏫</div>
-              <p className="font-bold text-gray-400 text-sm">اختر فصلاً من القائمة على اليمين</p>
-            </div>
-          ) : students.length === 0 ? (
-            <div className="text-center py-16 bg-white rounded-2xl shadow-sm border border-gray-100">
-              <div className="text-5xl mb-3">👨‍🎓</div>
-              <p className="font-bold text-gray-500 text-sm">فصل {selClass}</p>
-              <p className="text-gray-400 text-xs mt-1">لا يوجد طلاب — أضف طالباً أو استورد ملف Excel بالضغط على 📥 بجانب اسم الفصل</p>
-            </div>
-          ) : (
-            <div className="bg-white rounded-2xl shadow-md border border-gray-100 overflow-hidden">
-
-              {/* Desktop table */}
-              <div className="hidden lg:block overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-gradient-to-l from-rose-900 to-red-800 text-white text-xs">
-                      <th className="px-3 py-3 text-center w-10">#</th>
-                      <th className="px-3 py-3 text-right min-w-40">الاسم</th>
-                      <th className="px-3 py-3 text-center min-w-28">رقم الهوية</th>
-                      <th className="px-3 py-3 text-center min-w-28">رقم الجوال</th>
-                      <th className="px-3 py-3 text-center min-w-56">الحالة</th>
-                      <th className="px-3 py-3 text-center min-w-56">الحصص المتأخر عنها</th>
-                      <th className="px-3 py-3 text-center w-20">إبلاغ</th>
-                      <th className="px-3 py-3 text-center w-20">إجراءات</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filtered.map((stu, idx) => {
-                      const att    = getAtt(stu.id);
-                      const isEdit = editId === stu.id;
-                      return (
-                        <tr key={stu.id} className={`border-b border-gray-50 hover:bg-rose-50/30 transition-colors ${idx%2===0?"bg-white":"bg-gray-50/20"}`}>
-
-                          {/* # */}
-                          <td className="px-3 py-3 text-center text-gray-400 text-xs font-bold">{idx+1}</td>
-
-                          {/* الاسم */}
-                          <td className="px-3 py-3">
-                            {isEdit ? (
-                              <div className="space-y-1">
-                                <input value={editData.name} onChange={e=>setEditData(p=>({...p,name:e.target.value}))}
-                                  className="border border-gray-300 rounded-lg px-2 py-1 text-xs w-full focus:outline-none focus:border-rose-400" placeholder="الاسم" />
-                                <div className="flex gap-1">
-                                  <button onClick={saveEdit} className="bg-rose-600 text-white rounded-lg px-3 py-1 text-xs font-bold">حفظ</button>
-                                  <button onClick={()=>setEditId(null)} className="bg-gray-100 text-gray-600 rounded-lg px-2 py-1 text-xs">إلغاء</button>
+            {/* Add form */}
+            {showAdd&&(
+              <div className="bg-white rounded-2xl shadow-md border border-rose-100 p-5">
+                <h3 className="font-bold text-gray-700 mb-3 text-sm">➕ إضافة طالب — {selClass||"اختر فصلاً"}</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
+                  <input value={newName} onChange={e=>setNewName(e.target.value)} placeholder="اسم الطالب *" className="border-2 border-gray-200 focus:border-rose-400 rounded-xl px-3 py-2 text-sm focus:outline-none"/>
+                  <input value={newId} onChange={e=>setNewId(e.target.value)} placeholder="رقم الهوية" className="border-2 border-gray-200 focus:border-rose-400 rounded-xl px-3 py-2 text-sm focus:outline-none"/>
+                  <input value={newPhone} onChange={e=>setNewPhone(e.target.value)} placeholder="جوال ولي الأمر" className="border-2 border-gray-200 focus:border-rose-400 rounded-xl px-3 py-2 text-sm focus:outline-none"/>
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={addStudent} className="bg-rose-600 hover:bg-rose-700 text-white rounded-xl px-6 py-2 text-sm font-bold">حفظ</button>
+                  <button onClick={()=>setShowAdd(false)} className="bg-gray-100 text-gray-600 rounded-xl px-5 py-2 text-sm font-bold">إلغاء</button>
+                </div>
+              </div>
+            )}
+            {/* Search */}
+            <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 بحث باسم الطالب أو رقم الهوية…" className="w-full border-2 border-gray-200 focus:border-rose-400 rounded-2xl px-4 py-3 text-sm focus:outline-none"/>
+            {/* Table / empty */}
+            {!selClass?(
+              <div className="text-center py-16 bg-white rounded-2xl shadow-sm"><div className="text-5xl mb-3">🏫</div><p className="font-bold text-gray-400 text-sm">اختر فصلاً من القائمة على اليمين</p></div>
+            ):students.length===0?(
+              <div className="text-center py-16 bg-white rounded-2xl shadow-sm"><div className="text-5xl mb-3">👨‍🎓</div><p className="text-gray-400 text-xs mt-1">لا يوجد طلاب — أضف طالباً أو استورد ملف Excel بالضغط على 📥 بجانب اسم الفصل</p></div>
+            ):(
+              <div className="bg-white rounded-2xl shadow-md border border-gray-100 overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-gradient-to-l from-rose-900 to-red-800 text-white text-xs">
+                        <th className="px-3 py-3 text-center w-10">#</th>
+                        <th className="px-3 py-3 text-right min-w-40">الاسم</th>
+                        <th className="px-3 py-3 text-center min-w-28">رقم الهوية</th>
+                        <th className="px-3 py-3 text-center min-w-28">رقم الجوال</th>
+                        <th className="px-3 py-3 text-center min-w-60">الحالة</th>
+                        <th className="px-3 py-3 text-center min-w-56">الحصص المتأخر عنها</th>
+                        <th className="px-3 py-3 text-center w-20">إبلاغ</th>
+                        <th className="px-3 py-3 text-center w-20">إجراءات</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filtered.map((stu,idx)=>{
+                        const att=getAtt(stu.id); const isEdit=editId===stu.id;
+                        return (
+                          <tr key={stu.id} className={`border-b border-gray-50 hover:bg-rose-50/30 transition-colors ${idx%2===0?"bg-white":"bg-gray-50/20"}`}>
+                            <td className="px-3 py-3 text-center text-gray-400 text-xs font-bold">{idx+1}</td>
+                            <td className="px-3 py-3">
+                              {isEdit?(
+                                <div className="space-y-1">
+                                  <input value={editData.name} onChange={e=>setEditData(p=>({...p,name:e.target.value}))} className="border border-gray-300 rounded-lg px-2 py-1 text-xs w-full focus:outline-none focus:border-rose-400" placeholder="الاسم"/>
+                                  <div className="flex gap-1">
+                                    <button onClick={saveEdit} className="bg-rose-600 text-white rounded-lg px-3 py-1 text-xs font-bold">حفظ</button>
+                                    <button onClick={()=>setEditId(null)} className="bg-gray-100 text-gray-600 rounded-lg px-2 py-1 text-xs">إلغاء</button>
+                                  </div>
                                 </div>
-                              </div>
-                            ) : (
-                              <span className="font-bold text-gray-800">{stu.name}</span>
-                            )}
-                          </td>
-
-                          {/* رقم الهوية */}
-                          <td className="px-3 py-3 text-center">
-                            {isEdit ? (
-                              <input value={editData.nationalId} onChange={e=>setEditData(p=>({...p,nationalId:e.target.value}))}
-                                className="border border-gray-300 rounded-lg px-2 py-1 text-xs w-full focus:outline-none focus:border-rose-400" placeholder="الهوية" />
-                            ) : (
-                              <span className="text-xs text-gray-600 font-mono">{stu.nationalId || "—"}</span>
-                            )}
-                          </td>
-
-                          {/* رقم الجوال */}
-                          <td className="px-3 py-3 text-center">
-                            {isEdit ? (
-                              <input value={editData.phone} onChange={e=>setEditData(p=>({...p,phone:e.target.value}))}
-                                className="border border-gray-300 rounded-lg px-2 py-1 text-xs w-full focus:outline-none focus:border-rose-400" placeholder="الجوال" />
-                            ) : (
-                              <span className="text-xs text-gray-600 font-mono">{stu.phone || "—"}</span>
-                            )}
-                          </td>
-
-                          {/* الحالة */}
-                          <td className="px-3 py-3">
-                            <div className="flex flex-wrap justify-center gap-1">
-                              {STATUSES.map(s => (
-                                <button key={s.key} onClick={() => setStatus(stu.id, s.key)}
-                                  className={`px-2 py-1 rounded-lg text-xs font-bold border transition-all ${att.status===s.key ? statusBadge(s.key)+" shadow-sm" : "bg-white text-gray-400 border-gray-200 hover:border-gray-400 hover:text-gray-600"}`}>
-                                  {s.icon} {s.label}
-                                </button>
-                              ))}
-                            </div>
-                          </td>
-
-                          {/* الحصص */}
-                          <td className="px-3 py-3">
-                            <div className="flex justify-center gap-1 flex-wrap">
-                              {PERIODS_T.map((p, pi) => {
-                                const active   = att.status === "تأخر حصص";
-                                const selected = active && (att.periods||[]).includes(pi);
-                                return (
-                                  <button key={pi} onClick={() => active && togglePeriod(stu.id, pi)} title={`الحصة ${p}`}
-                                    className={`w-8 h-8 rounded-xl text-xs font-bold border transition-all
-                                      ${selected ? "bg-orange-500 text-white border-orange-500 shadow-md scale-110"
-                                      : active   ? "bg-white text-gray-600 border-gray-300 hover:border-orange-400 hover:text-orange-600"
-                                                 : "bg-gray-100 text-gray-300 border-gray-100 cursor-default"}`}>
-                                    {pi+1}
+                              ):<span className="font-bold text-gray-800">{stu.name}</span>}
+                            </td>
+                            <td className="px-3 py-3 text-center">
+                              {isEdit?<input value={editData.nationalId} onChange={e=>setEditData(p=>({...p,nationalId:e.target.value}))} className="border border-gray-300 rounded-lg px-2 py-1 text-xs w-full focus:outline-none" placeholder="الهوية"/>
+                              :<span className="text-xs text-gray-600 font-mono">{stu.nationalId||"—"}</span>}
+                            </td>
+                            <td className="px-3 py-3 text-center">
+                              {isEdit?<input value={editData.phone} onChange={e=>setEditData(p=>({...p,phone:e.target.value}))} className="border border-gray-300 rounded-lg px-2 py-1 text-xs w-full focus:outline-none" placeholder="الجوال"/>
+                              :<span className="text-xs text-gray-600 font-mono">{stu.phone||"—"}</span>}
+                            </td>
+                            <td className="px-3 py-3">
+                              <div className="flex flex-wrap justify-center gap-1">
+                                {STATUSES.map(s=>(
+                                  <button key={s.key} onClick={()=>setStatus(stu.id,s.key)}
+                                    className={`px-2 py-1 rounded-lg text-xs font-bold border transition-all ${att.status===s.key?statusBadge(s.key)+" shadow-sm":"bg-white text-gray-400 border-gray-200 hover:border-gray-400"}`}>
+                                    {s.icon} {s.label}
                                   </button>
-                                );
-                              })}
-                            </div>
-                            {att.status === "تأخر حصص" && (att.periods||[]).length > 0 && (
-                              <div className="text-center text-xs text-orange-600 font-bold mt-1">
-                                {(att.periods||[]).sort((a,b)=>a-b).map(p=>PERIODS_T[p]).join(" ، ")}
+                                ))}
                               </div>
-                            )}
-                          </td>
-
-                          {/* إبلاغ */}
-                          <td className="px-3 py-3 text-center">
-                            {att.status !== "حاضر" ? (
-                              <button onClick={() => openModal(stu)}
-                                className="bg-teal-600 hover:bg-teal-700 text-white rounded-xl px-3 py-1.5 text-xs font-bold shadow-sm mx-auto flex items-center gap-1">
-                                📲 إبلاغ
-                              </button>
-                            ) : <span className="text-gray-200 text-lg">—</span>}
-                          </td>
-
-                          {/* إجراءات */}
-                          <td className="px-3 py-3">
-                            <div className="flex justify-center gap-1">
-                              <button onClick={() => startEdit(stu)}
-                                className="text-blue-300 hover:text-blue-500 p-1.5 rounded-lg hover:bg-blue-50 transition-colors" title="تعديل">✏️</button>
-                              <button onClick={() => removeStudent(stu.id)}
-                                className="text-red-300 hover:text-red-500 p-1.5 rounded-lg hover:bg-red-50 transition-colors" title="حذف">🗑️</button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Mobile cards */}
-              <div className="lg:hidden divide-y divide-gray-100">
-                {filtered.map((stu, idx) => {
-                  const att = getAtt(stu.id);
-                  return (
-                    <div key={stu.id} className="p-4 space-y-3">
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <span className="text-xs text-gray-400 ml-1">{idx+1}.</span>
-                          <span className="font-bold text-gray-800 text-sm">{stu.name}</span>
-                          {stu.nationalId && <div className="text-xs text-gray-500 mt-0.5">🪪 <span className="font-mono">{stu.nationalId}</span></div>}
-                          {stu.phone      && <div className="text-xs text-gray-500">📞 <span className="font-mono">{stu.phone}</span></div>}
-                        </div>
-                        <div className="flex gap-1.5 flex-shrink-0">
-                          {att.status !== "حاضر" && (
-                            <button onClick={() => openModal(stu)} className="bg-teal-600 text-white rounded-xl px-2.5 py-1.5 text-xs font-bold">📲</button>
-                          )}
-                          <button onClick={() => startEdit(stu)} className="bg-blue-50 text-blue-500 rounded-xl px-2 py-1.5 text-xs">✏️</button>
-                          <button onClick={() => removeStudent(stu.id)} className="bg-red-50 text-red-400 rounded-xl px-2 py-1.5 text-xs">🗑️</button>
-                        </div>
-                      </div>
-                      {editId === stu.id && (
-                        <div className="bg-gray-50 rounded-xl p-3 space-y-2">
-                          <input value={editData.name} onChange={e=>setEditData(p=>({...p,name:e.target.value}))}
-                            className="border border-gray-300 rounded-lg px-2 py-1.5 text-xs w-full focus:outline-none" placeholder="الاسم" />
-                          <input value={editData.nationalId} onChange={e=>setEditData(p=>({...p,nationalId:e.target.value}))}
-                            className="border border-gray-300 rounded-lg px-2 py-1.5 text-xs w-full focus:outline-none" placeholder="رقم الهوية" />
-                          <input value={editData.phone} onChange={e=>setEditData(p=>({...p,phone:e.target.value}))}
-                            className="border border-gray-300 rounded-lg px-2 py-1.5 text-xs w-full focus:outline-none" placeholder="الجوال" />
-                          <div className="flex gap-2">
-                            <button onClick={saveEdit} className="bg-rose-600 text-white rounded-lg px-4 py-1.5 text-xs font-bold">حفظ</button>
-                            <button onClick={()=>setEditId(null)} className="bg-gray-200 text-gray-600 rounded-lg px-4 py-1.5 text-xs">إلغاء</button>
-                          </div>
-                        </div>
-                      )}
-                      <div className="flex flex-wrap gap-1.5">
-                        {STATUSES.map(s => (
-                          <button key={s.key} onClick={() => setStatus(stu.id, s.key)}
-                            className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-all ${att.status===s.key ? statusBadge(s.key) : "bg-white text-gray-400 border-gray-200"}`}>
-                            {s.icon} {s.label}
-                          </button>
-                        ))}
-                      </div>
-                      {att.status === "تأخر حصص" && (
-                        <div>
-                          <div className="text-xs text-gray-500 font-bold mb-1.5">اختر الحصص المتأخر عنها:</div>
-                          <div className="flex flex-wrap gap-1.5">
-                            {PERIODS_T.map((p, pi) => (
-                              <button key={pi} onClick={() => togglePeriod(stu.id, pi)}
-                                className={`w-10 h-10 rounded-xl text-xs font-bold border transition-all ${(att.periods||[]).includes(pi) ? "bg-orange-500 text-white border-orange-500 shadow-md" : "bg-white text-gray-600 border-gray-300 hover:border-orange-400"}`}>
-                                {pi+1}
-                              </button>
-                            ))}
-                          </div>
-                          {(att.periods||[]).length > 0 && (
-                            <div className="text-xs text-orange-600 font-bold mt-1.5">
-                              {(att.periods||[]).sort((a,b)=>a-b).map(p=>PERIODS_T[p]).join(" ، ")}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-        </div>{/* end main content */}
-      </div>{/* end layout */}
-
-      {/* ── Madar Modal ──────────────────────────────────── */}
-      {modal && (
-        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4" onClick={() => setModal(null)}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md" onClick={e => e.stopPropagation()}>
-            <div className="bg-gradient-to-l from-teal-800 to-teal-600 rounded-t-2xl p-5 text-white">
-              <h3 className="font-black text-lg flex items-center gap-2">📲 إبلاغ ولي الأمر</h3>
-              <p className="text-sm opacity-80 mt-1 font-bold">{modal.stu.name}</p>
-              {modal.stu.phone && <p className="text-xs opacity-60 mt-0.5">{modal.stu.phone}</p>}
-            </div>
-            <div className="p-5 space-y-4">
-              <div>
-                <div className="text-xs font-bold text-gray-500 mb-2">✉️ نص الرسالة المقترح:</div>
-                <div dir="rtl" className="bg-gray-50 border-2 border-gray-100 rounded-xl p-3.5 text-sm text-gray-700 leading-relaxed whitespace-pre-line font-medium">
-                  {modal.msg}
+                            </td>
+                            <td className="px-3 py-3">
+                              <div className="flex justify-center gap-1 flex-wrap">
+                                {PERIODS_T.map((p,pi)=>{
+                                  const active=att.status==="تأخر حصص"; const sel=active&&(att.periods||[]).includes(pi);
+                                  return <button key={pi} onClick={()=>active&&togglePeriod(stu.id,pi)} title={`الحصة ${p}`}
+                                    className={`w-8 h-8 rounded-xl text-xs font-bold border transition-all ${sel?"bg-orange-500 text-white border-orange-500 shadow-md scale-110":active?"bg-white text-gray-600 border-gray-300 hover:border-orange-400":"bg-gray-100 text-gray-300 border-gray-100 cursor-default"}`}>{pi+1}</button>;
+                                })}
+                              </div>
+                              {att.status==="تأخر حصص"&&(att.periods||[]).length>0&&(
+                                <div className="text-center text-xs text-orange-600 font-bold mt-1">{(att.periods||[]).sort((a,b)=>a-b).map(p=>PERIODS_T[p]).join(" ، ")}</div>
+                              )}
+                            </td>
+                            <td className="px-3 py-3 text-center">
+                              {att.status!=="حاضر"?<button onClick={()=>openModal(stu)} className="bg-teal-600 hover:bg-teal-700 text-white rounded-xl px-3 py-1.5 text-xs font-bold shadow-sm mx-auto flex items-center gap-1">📲 إبلاغ</button>
+                              :<span className="text-gray-200 text-lg">—</span>}
+                            </td>
+                            <td className="px-3 py-3">
+                              <div className="flex justify-center gap-1">
+                                <button onClick={()=>startEdit(stu)} className="text-blue-300 hover:text-blue-500 p-1.5 rounded-lg hover:bg-blue-50 transition-colors">✏️</button>
+                                <button onClick={()=>removeStudent(stu.id)} className="text-red-300 hover:text-red-500 p-1.5 rounded-lg hover:bg-red-50 transition-colors">🗑️</button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
               </div>
-              <div className="space-y-2">
-                <button onClick={copyMsg}
-                  className={`w-full py-3 rounded-xl text-sm font-bold transition-all shadow-sm ${copied ? "bg-emerald-500 text-white" : "bg-gray-100 hover:bg-gray-200 text-gray-700"}`}>
-                  {copied ? "✅ تم نسخ الرسالة!" : "📋 نسخ الرسالة"}
-                </button>
-                <a href={MADAR_URL} target="_blank" rel="noopener noreferrer"
-                  className="w-full py-3 rounded-xl text-sm font-bold bg-teal-600 hover:bg-teal-700 text-white text-center block shadow-md transition-colors">
-                  🌐 فتح المدار التقني وإرسال الرسالة
-                </a>
-                {modal.stu.phone && (
-                  <a href={`https://wa.me/${modal.stu.phone.replace(/^00/,"").replace(/^\+/,"")}?text=${encodeURIComponent(modal.msg)}`}
-                    target="_blank" rel="noopener noreferrer"
-                    className="w-full py-3 rounded-xl text-sm font-bold bg-green-500 hover:bg-green-600 text-white text-center block shadow-md transition-colors">
-                    💬 إرسال عبر واتساب
-                  </a>
-                )}
-              </div>
-              <p className="text-xs text-gray-400 text-center">انسخ الرسالة أولاً ثم افتح المدار وأرسلها</p>
-            </div>
-            <div className="px-5 pb-5">
-              <button onClick={() => setModal(null)} className="w-full py-2.5 rounded-xl text-sm font-bold text-gray-500 hover:bg-gray-100">إغلاق</button>
-            </div>
+            )}
           </div>
         </div>
       )}
 
+      {/* ╔══════════════════════════════════════════════════╗ */}
+      {/* ║         TAB 2 — MORNING TARDINESS               ║ */}
+      {/* ╚══════════════════════════════════════════════════╝ */}
+      {activeTab==="late"&&(
+        <div className="flex gap-4 items-start">
+          <ClassSidebar/>
+          <div className="flex-1 min-w-0 space-y-4">
+
+            {/* Daily stats bar */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="bg-white rounded-2xl p-3 text-center shadow-sm border-b-4 border-amber-400">
+                <div className="text-xl mb-0.5">⏰</div>
+                <div className="text-2xl font-black text-amber-600">{todayStats.total}</div>
+                <div className="text-xs font-bold text-gray-500 mt-0.5">متأخر اليوم</div>
+              </div>
+              {Object.entries(todayStats.byReason).slice(0,3).map(([r,c])=>(
+                <div key={r} className="bg-white rounded-2xl p-3 text-center shadow-sm border-b-4 border-orange-300">
+                  <div className="text-2xl font-black text-orange-600">{c}</div>
+                  <div className="text-xs font-bold text-gray-500 mt-0.5 leading-tight">{r}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Weekly mini chart */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="font-black text-sm text-gray-700">📅 التأخر الأسبوعي</div>
+                <div className="flex gap-2">
+                  <button onClick={()=>setWeekOffset(w=>w-1)} className="w-7 h-7 rounded-lg bg-gray-100 hover:bg-gray-200 text-xs font-bold">‹</button>
+                  <button onClick={()=>setWeekOffset(0)} className="px-2 h-7 rounded-lg bg-gray-100 hover:bg-gray-200 text-xs font-bold">اليوم</button>
+                  <button onClick={()=>setWeekOffset(w=>w+1)} className="w-7 h-7 rounded-lg bg-gray-100 hover:bg-gray-200 text-xs font-bold">›</button>
+                </div>
+              </div>
+              <div className="flex gap-3 items-end justify-around">
+                {weekStats.map((w,i)=>{
+                  const max=Math.max(...weekStats.map(x=>x.count),1);
+                  const pct=Math.round(w.count/max*100);
+                  const isToday=w.date===date;
+                  return (
+                    <div key={i} className="flex flex-col items-center gap-1 flex-1 cursor-pointer" onClick={()=>setDate(w.date)}>
+                      <div className="text-xs font-bold text-gray-600">{w.count||""}</div>
+                      <div className="w-full rounded-t-lg transition-all" style={{height:Math.max(pct*0.8,4)+"px",background:isToday?"#f59e0b":w.count>0?"#fcd34d":"#f3f4f6"}}/>
+                      <div className={`text-xs font-bold ${isToday?"text-amber-600":"text-gray-500"}`}>{w.dateAr}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Search */}
+            <input value={lateSearch} onChange={e=>setLateSearch(e.target.value)} placeholder="🔍 بحث باسم الطالب في الفصل المحدد…" className="w-full border-2 border-gray-200 focus:border-amber-400 rounded-2xl px-4 py-3 text-sm focus:outline-none"/>
+
+            {/* No class selected */}
+            {!selClass?(
+              <div className="text-center py-12 bg-white rounded-2xl shadow-sm"><p className="font-bold text-gray-400 text-sm">اختر فصلاً من القائمة على اليمين</p></div>
+            ):students.length===0?(
+              <div className="text-center py-12 bg-white rounded-2xl shadow-sm"><p className="text-gray-400 text-xs">استورد طلاب الفصل أولاً</p></div>
+            ):(
+              <div className="bg-white rounded-2xl shadow-md border border-gray-100 overflow-hidden">
+                {/* Period tardiness header note */}
+                <div className="bg-amber-50 border-b border-amber-100 px-4 py-2 text-xs text-amber-800 flex items-center gap-2">
+                  <span>⚠️</span>
+                  <span>الدوام الصباحي يبدأ <strong>06:45</strong> — أدخل عدد دقائق التأخر لكل طالب والسبب</span>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-gradient-to-l from-amber-700 to-orange-600 text-white text-xs">
+                        <th className="px-3 py-3 text-center w-8">#</th>
+                        <th className="px-3 py-3 text-right min-w-36">الاسم</th>
+                        <th className="px-3 py-3 text-center w-20">جوال الوالد</th>
+                        <th className="px-3 py-3 text-center w-20">تأخر صباحي (د)</th>
+                        <th className="px-3 py-3 text-center min-w-48">السبب</th>
+                        <th className="px-3 py-3 text-center min-w-40">ملاحظات</th>
+                        <th className="px-3 py-3 text-center" colSpan="7">دقائق التأخر عن الحصص</th>
+                        <th className="px-3 py-3 text-center w-12">مسح</th>
+                      </tr>
+                      <tr className="bg-orange-50 text-orange-700 text-xs border-b border-orange-100">
+                        <th colSpan="6"/>
+                        {PERIODS_T.map((p,i)=><th key={i} className="px-1 py-1 text-center text-xs w-14">{i+1}<br/><span className="font-normal text-gray-400">{PERIOD_STARTS[i]}</span></th>)}
+                        <th/>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {lateFiltered.map((stu,idx)=>{
+                        const rec=getLate(date,stu.id);
+                        const hasLate=rec.minutes&&parseInt(rec.minutes)>0;
+                        return (
+                          <tr key={stu.id} className={`border-b border-gray-50 transition-colors ${hasLate?"bg-amber-50/50 hover:bg-amber-50":"hover:bg-gray-50/50"} ${idx%2===0?"":"bg-gray-50/10"}`}>
+                            <td className="px-2 py-2 text-center text-gray-400 text-xs font-bold">{idx+1}</td>
+                            <td className="px-3 py-2">
+                              <div className="font-bold text-gray-800 text-xs">{stu.name}</div>
+                              {hasLate&&<div className="text-xs text-amber-600 font-bold mt-0.5">متأخر {rec.minutes} دقيقة</div>}
+                            </td>
+                            <td className="px-2 py-2">
+                              <input type="text" value={rec.parentPhone||stu.phone||""} onChange={e=>setLateField(stu.id,"parentPhone",e.target.value)}
+                                className="border border-gray-200 rounded-lg px-1.5 py-1 text-xs w-24 focus:outline-none focus:border-amber-400 font-mono" placeholder="05xxxxxxxx"/>
+                            </td>
+                            <td className="px-2 py-2 text-center">
+                              <input type="number" min="0" max="120" value={rec.minutes||""} onChange={e=>setLateField(stu.id,"minutes",e.target.value)}
+                                className={`border-2 rounded-lg px-2 py-1 text-xs w-16 text-center font-black focus:outline-none transition-all ${hasLate?"border-amber-400 bg-amber-50 text-amber-700":"border-gray-200 focus:border-amber-400"}`}
+                                placeholder="0"/>
+                            </td>
+                            <td className="px-2 py-2">
+                              <select value={rec.reason||""} onChange={e=>setLateField(stu.id,"reason",e.target.value)}
+                                className="border border-gray-200 rounded-lg px-1.5 py-1 text-xs w-full focus:outline-none focus:border-amber-400" style={{fontFamily:"inherit"}}>
+                                <option value="">— اختر السبب —</option>
+                                {LATE_REASONS.map(r=><option key={r} value={r}>{r}</option>)}
+                              </select>
+                            </td>
+                            <td className="px-2 py-2">
+                              <input type="text" value={rec.notes||""} onChange={e=>setLateField(stu.id,"notes",e.target.value)}
+                                className="border border-gray-200 rounded-lg px-1.5 py-1 text-xs w-full focus:outline-none focus:border-amber-400" placeholder="ملاحظات…"/>
+                            </td>
+                            {PERIODS_T.map((_,pi)=>(
+                              <td key={pi} className="px-1 py-2 text-center">
+                                <input type="number" min="0" max="45" value={(rec.periodMins||{})[pi]||""} onChange={e=>setPeriodMin(stu.id,pi,e.target.value)}
+                                  className={`border rounded-lg text-xs w-12 text-center font-bold focus:outline-none transition-all py-1 ${(rec.periodMins||{})[pi]?"border-orange-300 bg-orange-50 text-orange-700":"border-gray-200 focus:border-orange-400"}`}
+                                  placeholder="—"/>
+                              </td>
+                            ))}
+                            <td className="px-2 py-2 text-center">
+                              {(hasLate||rec.notes||Object.values(rec.periodMins||{}).some(v=>v))&&(
+                                <button onClick={()=>removeLate(stu.id)} className="text-red-300 hover:text-red-500 p-1 rounded-lg hover:bg-red-50 transition-colors text-sm">🗑️</button>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                {/* Reasons summary */}
+                {todayStats.total>0&&(
+                  <div className="border-t border-gray-100 p-4">
+                    <div className="text-xs font-black text-gray-600 mb-2">📊 ملخص أسباب التأخر اليوم — إجمالي {todayStats.total} طالب</div>
+                    <div className="flex flex-wrap gap-2">
+                      {Object.entries(todayStats.byReason).map(([r,c])=>(
+                        <span key={r} className="bg-amber-100 text-amber-800 text-xs font-bold px-3 py-1.5 rounded-full">
+                          {r}: {c}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Madar Modal */}
+      {modal&&(
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4" onClick={()=>setModal(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md" onClick={e=>e.stopPropagation()}>
+            <div className="bg-gradient-to-l from-teal-800 to-teal-600 rounded-t-2xl p-5 text-white">
+              <h3 className="font-black text-lg">📲 إبلاغ ولي الأمر</h3>
+              <p className="text-sm opacity-80 mt-1 font-bold">{modal.stu.name}</p>
+              {modal.stu.phone&&<p className="text-xs opacity-60 mt-0.5">{modal.stu.phone}</p>}
+            </div>
+            <div className="p-5 space-y-4">
+              <div className="bg-gray-50 border-2 border-gray-100 rounded-xl p-3.5 text-sm text-gray-700 leading-relaxed whitespace-pre-line font-medium" dir="rtl">{modal.msg}</div>
+              <div className="space-y-2">
+                <button onClick={copyMsg} className={`w-full py-3 rounded-xl text-sm font-bold transition-all ${copied?"bg-emerald-500 text-white":"bg-gray-100 hover:bg-gray-200 text-gray-700"}`}>{copied?"✅ تم النسخ!":"📋 نسخ الرسالة"}</button>
+                <a href={MADAR_URL} target="_blank" rel="noopener noreferrer" className="w-full py-3 rounded-xl text-sm font-bold bg-teal-600 hover:bg-teal-700 text-white text-center block shadow-md transition-colors">🌐 فتح المدار التقني</a>
+                {modal.stu.phone&&<a href={`https://wa.me/${modal.stu.phone.replace(/^00/,"").replace(/^\+/,"")}?text=${encodeURIComponent(modal.msg)}`} target="_blank" rel="noopener noreferrer" className="w-full py-3 rounded-xl text-sm font-bold bg-green-500 hover:bg-green-600 text-white text-center block shadow-md transition-colors">💬 إرسال عبر واتساب</a>}
+              </div>
+            </div>
+            <div className="px-5 pb-5"><button onClick={()=>setModal(null)} className="w-full py-2.5 rounded-xl text-sm font-bold text-gray-500 hover:bg-gray-100">إغلاق</button></div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
