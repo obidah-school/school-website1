@@ -5467,11 +5467,13 @@ function CircularsPage({ siteFont }) {
   const [editId,       setEditId]       = React.useState(null);
   const [viewId,       setViewId]       = React.useState(null);
   const [copiedId,     setCopiedId]     = React.useState(null);
+  const [showEmoji,    setShowEmoji]     = React.useState(false);
   const [form,         setForm]         = React.useState({
     title:"", body:"", footer:"مدرسة عبيدة بن الحارث المتوسطة",
     color:"#1e3a5f", accentColor:"#0d9488", textColor:"#fff",
     badge:"", imageBase64:"", sender:"إدارة المدرسة",
     date: new Date().toLocaleDateString("ar-SA"),
+    bodyFontSize:"16", bodyBold:false, bodyItalic:false,
     links:[]
   });
 
@@ -5517,7 +5519,9 @@ function CircularsPage({ siteFont }) {
     setForm({ title:"", body:"", footer:"مدرسة عبيدة بن الحارث المتوسطة",
       color:"#1e3a5f", accentColor:"#0d9488", textColor:"#fff",
       badge:"", imageBase64:"", sender:"إدارة المدرسة",
-      date: new Date().toLocaleDateString("ar-SA"), links:[] });
+      date: new Date().toLocaleDateString("ar-SA"),
+      bodyFontSize:"16", bodyBold:false, bodyItalic:false, links:[] });
+    setShowEmoji(false);
     setEditId(null); setShowForm(false);
   };
 
@@ -5622,10 +5626,54 @@ function CircularsPage({ siteFont }) {
                 </div>
                 <div className="col-span-2">
                   <label className="text-xs font-bold text-gray-500 block mb-1">نص التعميم</label>
+                  {/* شريط الأدوات */}
+                  <div className="flex items-center gap-2 mb-2 p-2 bg-gray-50 rounded-xl flex-wrap">
+                    {/* حجم الخط */}
+                    <div className="flex items-center gap-1 bg-white rounded-lg px-2 py-1 border border-gray-200">
+                      <span className="text-xs text-gray-500 font-bold">حجم:</span>
+                      <button onClick={()=>setForm(f=>({...f,bodyFontSize:String(Math.max(12,Number(f.bodyFontSize)-2))}))}
+                        className="w-6 h-6 flex items-center justify-center rounded font-black text-gray-600 hover:bg-gray-100">−</button>
+                      <span className="text-xs font-black text-gray-700 w-6 text-center">{form.bodyFontSize}</span>
+                      <button onClick={()=>setForm(f=>({...f,bodyFontSize:String(Math.min(36,Number(f.bodyFontSize)+2))}))}
+                        className="w-6 h-6 flex items-center justify-center rounded font-black text-gray-600 hover:bg-gray-100">+</button>
+                    </div>
+                    {/* عريض */}
+                    <button onClick={()=>setForm(f=>({...f,bodyBold:!f.bodyBold}))}
+                      className="px-3 py-1.5 rounded-lg text-xs font-black border-2 transition-all"
+                      style={{background:form.bodyBold?"#1e3a5f":"#fff",color:form.bodyBold?"#fff":"#374151",borderColor:form.bodyBold?"#1e3a5f":"#e5e7eb"}}>
+                      <b>ع</b>
+                    </button>
+                    {/* مائل */}
+                    <button onClick={()=>setForm(f=>({...f,bodyItalic:!f.bodyItalic}))}
+                      className="px-3 py-1.5 rounded-lg text-xs font-black border-2 transition-all"
+                      style={{background:form.bodyItalic?"#0d9488":"#fff",color:form.bodyItalic?"#fff":"#374151",borderColor:form.bodyItalic?"#0d9488":"#e5e7eb"}}>
+                      <i>م</i>
+                    </button>
+                    {/* فيسات */}
+                    <div className="relative">
+                      <button onClick={()=>setShowEmoji(e=>!e)}
+                        className="px-3 py-1.5 rounded-lg text-xs font-black border-2 border-gray-200 bg-white hover:bg-yellow-50 transition-all">
+                        😊 إيموجي
+                      </button>
+                      {showEmoji && (
+                        <div className="absolute top-full right-0 mt-1 bg-white rounded-2xl shadow-xl border border-gray-100 p-3 z-50"
+                          style={{width:280,maxHeight:200,overflowY:"auto"}}>
+                          <div className="grid grid-cols-8 gap-1">
+                            {["😊","😄","😃","🎉","👍","✅","⭐","🔥","💡","📌","⚠️","📢","📣","🏫","🎓","📚","✏️","📝","🗓️","⏰","🔔","👨‍🏫","👩‍🏫","🤝","💪","🌟","🏆","❤️","🙏","📱","💻","📊","📈","🎯","✔️","❌","⭕","🔑","🔒","📩","💌","🌹","🌸","🌺","🌷","🌻","☀️","🌙","⚡","🎊","🥇","🎖️","📋","🖊️","📣","🔖","🌍","🕌","🤲","🫶","💯","🆕","🔴","🟡","🟢","🔵"].map(em=>(
+                              <button key={em} onClick={()=>{ setForm(f=>({...f,body:f.body+em})); }}
+                                className="text-xl hover:bg-gray-100 rounded-lg p-1 transition-all"
+                                title={em}>{em}</button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                   <textarea value={form.body} onChange={e=>setForm(f=>({...f,body:e.target.value}))}
-                    rows={4} placeholder="اكتب تفاصيل التعميم هنا..."
-                    className="w-full px-3 py-2.5 rounded-xl border-2 border-gray-200 focus:border-teal-400 focus:outline-none text-sm resize-none"
-                    style={{fontFamily:"inherit"}} />
+                    rows={5} placeholder="اكتب تفاصيل التعميم هنا..."
+                    className="w-full px-3 py-2.5 rounded-xl border-2 border-gray-200 focus:border-teal-400 focus:outline-none resize-none"
+                    style={{fontFamily:"inherit", fontSize:form.bodyFontSize+"px",
+                      fontWeight:form.bodyBold?"bold":"normal", fontStyle:form.bodyItalic?"italic":"normal"}} />
                 </div>
                 <div className="col-span-2">
                   <label className="text-xs font-bold text-gray-500 block mb-1">النص السفلي</label>
@@ -5762,7 +5810,11 @@ function CircularCard({ circ, preview, onView, onCopy, onEdit, onDelete, copied 
 
         {/* النص */}
         {circ.body && (
-          <div className="text-sm leading-relaxed mb-3 p-3 rounded-xl" style={{background:"rgba(255,255,255,.1)",color:"rgba(255,255,255,.9)"}}>
+          <div className="leading-relaxed mb-3 p-3 rounded-xl"
+            style={{background:"rgba(255,255,255,.1)",color:"rgba(255,255,255,.9)",
+              fontSize:(circ.bodyFontSize||"14")+"px",
+              fontWeight:circ.bodyBold?"bold":"normal",
+              fontStyle:circ.bodyItalic?"italic":"normal"}}>
             {circ.body}
           </div>
         )}
@@ -5865,9 +5917,12 @@ function CircularView({ circ, onBack }) {
 
             {/* نص التعميم */}
             {circ.body && (
-              <div className="rounded-2xl p-5 mb-5 text-sm leading-loose"
+              <div className="rounded-2xl p-5 mb-5 leading-loose"
                 style={{background:"rgba(255,255,255,.12)",color:"rgba(255,255,255,.95)",
-                  border:"1px solid rgba(255,255,255,.15)"}}>
+                  border:"1px solid rgba(255,255,255,.15)",
+                  fontSize:(circ.bodyFontSize||"16")+"px",
+                  fontWeight:circ.bodyBold?"bold":"normal",
+                  fontStyle:circ.bodyItalic?"italic":"normal"}}>
                 {circ.body.split("\n").map((line,i)=>(
                   <p key={i} className={line ? "" : "h-3"}>{line}</p>
                 ))}
