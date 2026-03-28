@@ -5526,8 +5526,26 @@ function CircularsPage({ siteFont }) {
   };
 
   const startEdit = (c) => {
-    setForm({...c}); setEditId(c.id); setShowForm(true);
-    window.scrollTo({top:0, behavior:"smooth"});
+    setForm({
+      title:        c.title        || "",
+      body:         c.body         || "",
+      footer:       c.footer       || "مدرسة عبيدة بن الحارث المتوسطة",
+      color:        c.color        || "#1e3a5f",
+      accentColor:  c.accentColor  || "#0d9488",
+      textColor:    c.textColor    || "#fff",
+      badge:        c.badge        || "",
+      imageBase64:  c.imageBase64  || "",
+      sender:       c.sender       || "إدارة المدرسة",
+      date:         c.date         || new Date().toLocaleDateString("ar-SA"),
+      bodyFontSize: c.bodyFontSize || "16",
+      bodyBold:     c.bodyBold     || false,
+      bodyItalic:   c.bodyItalic   || false,
+      links:        c.links        || [],
+    });
+    setEditId(c.id);
+    setShowForm(true);
+    setShowEmoji(false);
+    setTimeout(() => window.scrollTo({top:0, behavior:"smooth"}), 50);
   };
 
   const deleteCircular = async (id) => {
@@ -5932,8 +5950,8 @@ function CircularCard({ circ, preview, onView, onCopy, onEdit, onDelete, copied 
         {/* صورة التعميم الكاملة */}
         {circ.imageBase64 && (
           <img src={circ.imageBase64} alt=""
-            className="w-full rounded-xl object-cover mb-3 border border-white border-opacity-20"
-            style={{maxHeight:200}} />
+            className="w-full rounded-xl object-contain mb-3"
+            style={{maxHeight:300, background:"rgba(255,255,255,.05)"}} />
         )}
 
         {/* الروابط */}
