@@ -17152,14 +17152,22 @@ export default function SchoolWebsite() {
                     ✨ المزيد {showExtra ? "▴" : "▾"}
                   </button>
                   {showExtra && (
-                    <div className="absolute top-full right-0 mt-2 bg-white rounded-2xl shadow-xl border border-gray-100 py-2 z-50 min-w-48">
-                      {extraPages.slice(9).map(p => (
-                        <button key={p.id} onClick={() => { navigate(p.id); setShowExtra(false); }}
-                          className={`w-full text-right px-4 py-2.5 text-sm font-bold hover:bg-purple-50 transition-all flex items-center gap-2 ${page === p.id ? "text-purple-700 bg-purple-50" : "text-gray-700"}`}
-                          style={{fontFamily:"'Cairo', sans-serif"}}>
-                          <span>{p.icon}</span>{p.label}
-                        </button>
-                      ))}
+                    <div className="absolute top-full right-0 mt-2 bg-white rounded-2xl shadow-xl border border-gray-100 z-50"
+                      style={{maxHeight:"80vh",overflowY:"auto",width:"320px"}}>
+                      <div className="p-2 border-b border-gray-50 sticky top-0 bg-white">
+                        <div className="text-xs font-black text-gray-400 px-2">كل الصفحات</div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-1 p-2">
+                        {extraPages.map(p => (
+                          <button key={p.id} onClick={() => { navigate(p.id); setShowExtra(false); }}
+                            className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-right text-xs font-bold transition-all hover:bg-purple-50"
+                            style={{color: page === p.id ? "#7c3aed" : "#374151",
+                              background: page === p.id ? "#f5f3ff" : "transparent"}}>
+                            <span style={{fontSize:14}}>{p.icon}</span>
+                            <span className="flex-1 text-right leading-tight">{p.label}</span>
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>
