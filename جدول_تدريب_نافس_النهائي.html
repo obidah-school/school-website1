@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>جدول تدريب نافس - مدرسة عبيدة بن الحارث</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap');
+  :root {
+    --navy:#0b1a8f; --navy2:#07116b; --gold:#f0a500;
+    --red:#c00000;
+    --mb:#dce8ff; --mh:#1a3fbf;
+    --sb:#d4f0e2; --sh:#1a7a3c;
+    --ab:#fff3dc; --ah:#b85c00;
+    --bg:#eef2fc; --bdr:#c5cfe8;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'Tajawal',Tahoma,Arial,sans-serif;direction:rtl;background:var(--bg);color:#111;padding:12px;}
+
+  /* HEADER */
+  .hdr{background:linear-gradient(135deg,var(--navy2) 0%,#1a3fa8 70%,#2d5fcc 100%);color:#fff;text-align:center;padding:22px 14px 16px;border-radius:14px;margin-bottom:16px;box-shadow:0 4px 20px rgba(11,26,143,.25);}
+  .hdr .s1{font-size:.95rem;opacity:.88;margin-bottom:5px;font-weight:700;}
+  .hdr .s2{font-size:1.6rem;font-weight:900;margin-bottom:5px;}
+  .hdr .s3{font-size:.88rem;opacity:.78;font-weight:500;}
+
+  /* CARDS */
+  .info{background:#fff;border-radius:10px;padding:13px 16px;margin-bottom:15px;box-shadow:0 2px 9px rgba(0,0,0,.07);}
+  .info h3{font-size:.93rem;color:var(--navy);margin-bottom:10px;font-weight:800;}
+  .grid4{display:grid;grid-template-columns:repeat(auto-fit,minmax(185px,1fr));gap:8px;}
+  .kc{border-radius:8px;padding:9px 12px;font-size:.8rem;}
+  .km{background:var(--mb);border-right:4px solid var(--mh);}
+  .ks{background:var(--sb);border-right:4px solid var(--sh);}
+  .ka{background:var(--ab);border-right:4px solid var(--ah);}
+  .kr{background:#ffe0e0;border-right:4px solid var(--red);}
+  .kc strong{display:block;margin-bottom:5px;font-size:.81rem;}
+  .kc span{display:inline-block;margin:2px 3px;background:#fff;border-radius:20px;padding:1px 8px;font-weight:600;box-shadow:0 1px 3px rgba(0,0,0,.08);}
+
+  /* NOTE */
+  .note{background:#fffbe6;border:1.5px solid #f0c060;border-radius:9px;padding:11px 15px;margin-bottom:15px;font-size:.83rem;font-weight:600;color:#6b4700;line-height:1.6;}
+
+  /* CLASS BOX */
+  .clsbox{margin-bottom:28px;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 3px 14px rgba(11,26,143,.10);border:1.5px solid var(--bdr);}
+  .clshd{background:linear-gradient(90deg,var(--navy) 0%,#1e40af 100%);color:#fff;padding:11px 16px;font-size:1.12rem;font-weight:800;display:flex;align-items:center;gap:10px;}
+  .clsbadge{background:var(--gold);color:var(--navy2);border-radius:50%;width:34px;height:34px;display:flex;align-items:center;justify-content:center;font-size:1rem;font-weight:900;flex-shrink:0;}
+  .clstch{background:#f0f4ff;padding:8px 14px;font-size:.8rem;display:flex;gap:16px;flex-wrap:wrap;border-bottom:1px solid var(--bdr);}
+  .clstch span{font-weight:700;}
+  .tmath{color:var(--mh);}  .tsci{color:var(--sh);}  .tarb{color:var(--ah);}
+  .clsfoot{background:#f5f7ff;padding:8px 16px;text-align:center;font-size:.8rem;font-weight:700;color:var(--navy);border-top:2px solid var(--bdr);}
+
+  /* TABLE */
+  table{width:100%;border-collapse:collapse;}
+  thead tr{background:#edf0fa;}
+  th{padding:8px 6px;text-align:center;font-size:.77rem;font-weight:800;color:var(--navy2);border:1px solid var(--bdr);white-space:nowrap;}
+  td{padding:7px 6px;border:1px solid #dde3f5;text-align:center;font-size:.77rem;vertical-align:middle;line-height:1.4;}
+
+  /* Day */
+  .dc{font-weight:800;font-size:.85rem;color:#fff;writing-mode:vertical-rl;text-orientation:mixed;padding:5px 4px;}
+  .d1{background:#0b3d91;}.d2{background:#1a5276;}.d3{background:#1d4e00;}.d4{background:#6b2d0a;}
+
+  /* Subject rows */
+  .rm{background:var(--mb);} .rs{background:var(--sb);} .ra{background:var(--ab);}
+  .sl{display:inline-block;padding:2px 8px;border-radius:20px;font-weight:700;font-size:.74rem;}
+  .ml{background:var(--mh);color:#fff;} .sl2{background:var(--sh);color:#fff;} .al{background:var(--ah);color:#fff;}
+  .pb{display:inline-block;background:#e8ecf8;color:var(--navy);border-radius:12px;padding:2px 7px;font-weight:700;font-size:.72rem;white-space:nowrap;}
+  .tp{font-weight:700;color:var(--navy2);font-size:.8rem;}
+  .tc{font-weight:600;color:#374151;font-size:.75rem;}
+  .ts{font-weight:800;color:var(--red);font-size:.78rem;}
+  .pg{font-weight:700;font-size:.72rem;color:#333;white-space:nowrap;}
+
+  /* CONFLICT TABLE */
+  .ctbl td,.ctbl th{padding:6px;border:1px solid #ccd;font-size:.76rem;}
+  .ctbl thead tr{background:#edf0fa;}
+
+  /* FOOTER */
+  .gfoot{background:linear-gradient(135deg,var(--navy2),#1e3fa8);color:#fff;border-radius:10px;padding:14px;text-align:center;font-size:.88rem;font-weight:700;margin-top:8px;}
+
+  @media print{body{background:#fff;padding:2px;} .clsbox{page-break-inside:avoid;box-shadow:none;}}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="hdr">
+  <div class="s1">🏫 مدرسة عبيدة بن الحارث المتوسطة</div>
+  <div class="s2">جدول تدريب نافس — الصف الثالث المتوسط</div>
+  <div class="s3">الفصول: 3/1 · 3/2 · 3/3 · 3/4 &nbsp;|&nbsp; الاثنين إلى الخميس</div>
+</div>
+
+<!-- TEACHER INFO (corrected from actual class schedules) -->
+<div class="info">
+  <h3>📋 توزيع المعلمين الأساسيين — مستخرج من جداول الفصول الفعلية</h3>
+  <div class="grid4">
+    <div class="kc km">
+      <strong>📐 رياضيات</strong>
+      <span>اللحياني — 3/1، 3/2، 3/3</span>
+      <span>اللهيبي — 3/4</span>
+      <span>وليد — متعاون</span>
+    </div>
+    <div class="kc ks">
+      <strong>🔬 علوم</strong>
+      <span>حسن — 3/1، 3/2، 3/3</span>
+      <span>حامد الزهراني — 3/4</span>
+      <span>نايف السلمي — متعاون</span>
+      <span>الطلحي — متعاون</span>
+    </div>
+    <div class="kc ka">
+      <strong>📖 لغتي</strong>
+      <span>عبدالواحد — 3/1، 3/2</span>
+      <span>اللقماني — 3/3، 3/4</span>
+      <span>الجحدلي — متعاون</span>
+      <span>مسلم — متعاون</span>
+      <span>النباتي — متعاون</span>
+    </div>
+    <div class="kc kr">
+      <strong style="color:var(--red)">🔴 بدلاء (يغطون حصص المتعاونين الأصلية)</strong>
+      <span>رجيان</span><span>حامد</span><span>علي القحطاني</span><span>عبدالهادي</span>
+    </div>
+  </div>
+</div>
+
+<!-- NOTE -->
+<div class="note">
+  📌 <strong>هيكل الجدول التدريبي:</strong>
+  كل فصل يحصل يومياً على: حصتان رياضيات + حصتان علوم + حصتان لغتي.
+  تم تدوير ترتيب المواد بين الفصول الأربعة لضمان ألا يكون المعلم الأساسي في فصلين مختلفين بنفس الوقت.
+  البديل (باللون الأحمر) يغطي حصة المدرب <em>المتعاون</em> في فصله الأصلي خلال فترة التدريب.
+</div>
+
+<!--
+==============================================================
+  3/1 : ح1-2 رياضيات (اللحياني) | ح3-4 لغتي (عبدالواحد) | ح5-6 علوم (حسن)
+  3/2 : ح1-2 علوم (حسن)         | ح3-4 رياضيات (اللحياني)| ح5-6 لغتي (عبدالواحد)
+  3/3 : ح1-2 لغتي (اللقماني)   | ح3-4 علوم (حسن)         | ح5-6 رياضيات (اللحياني)
+  3/4 : ح1-2 رياضيات (اللهيبي) | ح3-4 لغتي (اللقماني)   | ح5-6 علوم (حامد الزهراني)
+==============================================================
+-->
+
+
+<!-- ==================== الفصل 3/1 ==================== -->
+<div class="clsbox">
+  <div class="clshd"><div class="clsbadge">١</div> الفصل 3/1</div>
+  <div class="clstch">
+    <span>📐 رياضيات: <b class="tmath">اللحياني</b></span>
+    <span>🔬 علوم: <b class="tsci">حسن</b></span>
+    <span>📖 لغتي: <b class="tarb">عبدالواحد</b></span>
+    <span style="color:var(--red)">إسلامية (بديل): حامد</span>
+  </div>
+  <table>
+    <thead><tr>
+      <th width="5%">اليوم</th><th width="7%">الحصة</th><th width="9%">المادة</th>
+      <th width="14%">الجزء/الصفحات</th><th width="14%">المدرب الأساسي</th>
+      <th width="13%">المتعاون</th><th width="12%">البديل 🔴</th>
+      <th width="26%">المحتوى</th>
+    </tr></thead>
+    <tbody>
+      <!-- الاثنين -->
+      <tr><td class="dc d1" rowspan="3">الاثنين</td>
+        <td><span class="pb">1–2</span></td><td class="rm"><span class="sl ml">رياضيات</span></td>
+        <td class="pg">الجزء الأول<br>ص 3–6</td><td><span class="tp">اللحياني</span></td>
+        <td><span class="tc">نايف السلمي</span></td><td><span class="ts">رجيان</span></td>
+        <td>التمهيد — مراجعة وبناء المفاهيم الأساسية</td></tr>
+      <tr><td><span class="pb">3–4</span></td><td class="ra"><span class="sl al">لغتي</span></td>
+        <td class="pg">الجزء الأول<br>ص 3–6</td><td><span class="tp">عبدالواحد</span></td>
+        <td><span class="tc">الجحدلي</span></td><td><span class="ts">حامد</span></td>
+        <td>النصوص التمهيدية — الفهم والاستيعاب والتعبير</td></tr>
+      <tr><td><span class="pb">5–6</span></td><td class="rs"><span class="sl sl2">علوم</span></td>
+        <td class="pg">الجزء الأول<br>ص 2–5</td><td><span class="tp">حسن</span></td>
+        <td><span class="tc">الطلحي</span></td><td><span class="ts">علي القحطاني</span></td>
+        <td>مقدمة الوحدة — الاستكشاف والملاحظة العلمية</td></tr>
+
+      <!-- الثلاثاء -->
+      <tr><td class="dc d2" rowspan="3">الثلاثاء</td>
+        <td><span class="pb">1–2</span></td><td class="rm"><span class="sl ml">رياضيات</span></td>
+        <td class="pg">الجزء الأول<br>ص 7–10</td><td><span class="tp">اللحياني</span></td>
+        <td><span class="tc">نايف السلمي</span></td><td><span class="ts">رجيان</span></td>
+        <td>تطبيقات — حل المسائل والتدريب الموجه</td></tr>
+      <tr><td><span class="pb">3–4</span></td><td class="ra"><span class="sl al">لغتي</span></td>
+        <td class="pg">الجزء الأول<br>ص 7–10</td><td><span class="tp">عبدالواحد</span></td>
+        <td><span class="tc">مسلم</span></td><td><span class="ts">حامد</span></td>
+        <td>القراءة والتعبير — المفردات والتراكيب اللغوية</td></tr>
+      <tr><td><span class="pb">5–6</span></td><td class="rs"><span class="sl sl2">علوم</span></td>
+        <td class="pg">الجزء الأول<br>ص 6–9</td><td><span class="tp">حسن</span></td>
+        <td><span class="tc">الطلحي</span></td><td><span class="ts">علي القحطاني</span></td>
+        <td>التجارب العلمية — التحليل والاستنتاج</td></tr>
+
+      <!-- الأربعاء -->
+      <tr><td class="dc d3" rowspan="3">الأربعاء</td>
+        <td><span class="pb">1–2</span></td><td class="rm"><span class="sl ml">رياضيات</span></td>
+        <td class="pg">الجزء الثاني<br>ص 4–7</td><td><span class="tp">اللحياني</span></td>
+        <td><span class="tc">نايف السلمي</span></td><td><span class="ts">رجيان</span></td>
+        <td>الوحدة الثانية — مفاهيم جديدة وأنشطة تطبيقية</td></tr>
+      <tr><td><span class="pb">3–4</span></td><td class="ra"><span class="sl al">لغتي</span></td>
+        <td class="pg">الجزء الثاني<br>ص 2–5</td><td><span class="tp">عبدالواحد</span></td>
+        <td><span class="tc">الجحدلي</span></td><td><span class="ts">حامد</span></td>
+        <td>الجزء الثاني — التراكيب النحوية والبلاغية</td></tr>
+      <tr><td><span class="pb">5–6</span></td><td class="rs"><span class="sl sl2">علوم</span></td>
+        <td class="pg">الجزء الأول<br>ص 10–13</td><td><span class="tp">حسن</span></td>
+        <td><span class="tc">الطلحي</span></td><td><span class="ts">علي القحطاني</span></td>
+        <td>التطبيق العملي — خرائط مفاهيمية وتقييم</td></tr>
+
+      <!-- الخميس -->
+      <tr><td class="dc d4" rowspan="3">الخميس</td>
+        <td><span class="pb">1–2</span></td><td class="rm"><span class="sl ml">رياضيات</span></td>
+        <td class="pg">الجزء الثاني<br>ص 8–11</td><td><span class="tp">اللحياني</span></td>
+        <td><span class="tc">نايف السلمي</span></td><td><span class="ts">رجيان</span></td>
+        <td>مراجعة شاملة — نماذج اختبار ومسائل تدريبية</td></tr>
+      <tr><td><span class="pb">3–4</span></td><td class="ra"><span class="sl al">لغتي</span></td>
+        <td class="pg">الجزء الثاني<br>ص 6–9</td><td><span class="tp">عبدالواحد</span></td>
+        <td><span class="tc">مسلم</span></td><td><span class="ts">حامد</span></td>
+        <td>التقويم اللغوي — الإنتاج الكتابي والإبداعي</td></tr>
+      <tr><td><span class="pb">5–6</span></td><td class="rs"><span class="sl sl2">علوم</span></td>
+        <td class="pg">الجزء الثاني<br>ص 2–9</td><td><span class="tp">حسن</span></td>
+        <td><span class="tc">الطلحي</span></td><td><span class="ts">علي القحطاني</span></td>
+        <td>مراجعة الجزء الثاني — تقييم ختامي ونماذج</td></tr>
+    </tbody>
+  </table>
+  <div class="clsfoot">مدير المدرسة: فازع القرني &nbsp;|&nbsp; الحصة السابعة حسب الجدول الأصلي</div>
+</div>
+
+
+<!-- ==================== الفصل 3/2 ==================== -->
+<div class="clsbox">
+  <div class="clshd"><div class="clsbadge">٢</div> الفصل 3/2</div>
+  <div class="clstch">
+    <span>📐 رياضيات: <b class="tmath">اللحياني</b></span>
+    <span>🔬 علوم: <b class="tsci">حسن</b></span>
+    <span>📖 لغتي: <b class="tarb">عبدالواحد</b></span>
+    <span style="color:var(--red)">إسلامية (بديل): حامد</span>
+  </div>
+  <table>
+    <thead><tr>
+      <th width="5%">اليوم</th><th width="7%">الحصة</th><th width="9%">المادة</th>
+      <th width="14%">الجزء/الصفحات</th><th width="14%">المدرب الأساسي</th>
+      <th width="13%">المتعاون</th><th width="12%">البديل 🔴</th>
+      <th width="26%">المحتوى</th>
+    </tr></thead>
+    <tbody>
+      <!-- الاثنين -->
+      <tr><td class="dc d1" rowspan="3">الاثنين</td>
+        <td><span class="pb">1–2</span></td><td class="rs"><span class="sl sl2">علوم</span></td>
+        <td class="pg">الجزء الأول<br>ص 2–5</td><td><span class="tp">حسن</span></td>
+        <td><span class="tc">الطلحي</span></td><td><span class="ts">علي القحطاني</span></td>
+        <td>مقدمة الوحدة — الاستكشاف والملاحظة العلمية</td></tr>
+      <tr><td><span class="pb">3–4</span></td><td class="rm"><span class="sl ml">رياضيات</span></td>
+        <td class="pg">الجزء الأول<br>ص 3–6</td><td><span class="tp">اللحياني</span></td>
+        <td><span class="tc">وليد</span></td><td><span class="ts">عبدالهادي</span></td>
+        <td>التمهيد — مراجعة وبناء المفاهيم الأساسية</td></tr>
+      <tr><td><span class="pb">5–6</span></td><td class="ra"><span class="sl al">لغتي</span></td>
+        <td class="pg">الجزء الأول<br>ص 3–6</td><td><span class="tp">عبدالواحد</span></td>
+        <td><span class="tc">مسلم</span></td><td><span class="ts">حامد</span></td>
+        <td>النصوص التمهيدية — الفهم والاستيعاب والتعبير</td></tr>
+
+      <!-- الثلاثاء -->
+      <tr><td class="dc d2" rowspan="3">الثلاثاء</td>
+        <td><span class="pb">1–2</span></td><td class="rs"><span class="sl sl2">علوم</span></td>
+        <td class="pg">الجزء الأول<br>ص 6–9</td><td><span class="tp">حسن</span></td>
+        <td><span class="tc">الطلحي</span></td><td><span class="ts">علي القحطاني</span></td>
+        <td>التجارب العلمية — التحليل والاستنتاج</td></tr>
+      <tr><td><span class="pb">3–4</span></td><td class="rm"><span class="sl ml">رياضيات</span></td>
+        <td class="pg">الجزء الأول<br>ص 7–10</td><td><span class="tp">اللحياني</span></td>
+        <td><span class="tc">وليد</span></td><td><span class="ts">عبدالهادي</span></td>
+        <td>تطبيقات — حل المسائل والتدريب الموجه</td></tr>
+      <tr><td><span class="pb">5–6</span></td><td class="ra"><span class="sl al">لغتي</span></td>
+        <td class="pg">الجزء الأول<br>ص 7–10</td><td><span class="tp">عبدالواحد</span></td>
+        <td><span class="tc">الجحدلي</span></td><td><span class="ts">حامد</span></td>
+        <td>القراءة والتعبير — المفردات والتراكيب اللغوية</td></tr>
+
+      <!-- الأربعاء -->
+      <tr><td class="dc d3" rowspan="3">الأربعاء</td>
+        <td><span class="pb">1–2</span></td><td class="rs"><span class="sl sl2">علوم</span></td>
+        <td class="pg">الجزء الأول<br>ص 10–13</td><td><span class="tp">حسن</span></td>
+        <td><span class="tc">الطلحي</span></td><td><span class="ts">علي القحطاني</span></td>
+        <td>التطبيق العملي — خرائط مفاهيمية وتقييم</td></tr>
+      <tr><td><span class="pb">3–4</span></td><td class="rm"><span class="sl ml">رياضيات</span></td>
+        <td class="pg">الجزء الثاني<br>ص 4–7</td><td><span class="tp">اللحياني</span></td>
+        <td><span class="tc">وليد</span></td><td><span class="ts">عبدالهادي</span></td>
+        <td>الوحدة الثانية — مفاهيم جديدة وأنشطة تطبيقية</td></tr>
+      <tr><td><span class="pb">5–6</span></td><td class="ra"><span class="sl al">لغتي</span></td>
+        <td class="pg">الجزء الثاني<br>ص 2–5</td><td><span class="tp">عبدالواحد</span></td>
+        <td><span class="tc">مسلم</span></td><td><span class="ts">حامد</span></td>
+        <td>الجزء الثاني — التراكيب النحوية والبلاغية</td></tr>
+
+      <!-- الخميس -->
+      <tr><td class="dc d4" rowspan="3">الخميس</td>
+        <td><span class="pb">1–2</span></td><td class="rs"><span class="sl sl2">علوم</span></td>
+        <td class="pg">الجزء الثاني<br>ص 2–9</td><td><span class="tp">حسن</span></td>
+        <td><span class="tc">الطلحي</span></td><td><span class="ts">علي القحطاني</span></td>
+        <td>مراجعة الجزء الثاني — تقييم ختامي ونماذج</td></tr>
+      <tr><td><span class="pb">3–4</span></td><td class="rm"><span class="sl ml">رياضيات</span></td>
+        <td class="pg">الجزء الثاني<br>ص 8–11</td><td><span class="tp">اللحياني</span></td>
+        <td><span class="tc">وليد</span></td><td><span class="ts">عبدالهادي</span></td>
+        <td>مراجعة شاملة — نماذج اختبار ومسائل تدريبية</td></tr>
+      <tr><td><span class="pb">5–6</span></td><td class="ra"><span class="sl al">لغتي</span></td>
+        <td class="pg">الجزء الثاني<br>ص 6–9</td><td><span class="tp">عبدالواحد</span></td>
+        <td><span class="tc">الجحدلي</span></td><td><span class="ts">حامد</span></td>
+        <td>التقويم اللغوي — الإنتاج الكتابي والإبداعي</td></tr>
+    </tbody>
+  </table>
+  <div class="clsfoot">مدير المدرسة: فازع القرني &nbsp;|&nbsp; الحصة السابعة حسب الجدول الأصلي</div>
+</div>
+
+
+<!-- ==================== الفصل 3/3 ==================== -->
+<div class="clsbox">
+  <div class="clshd"><div class="clsbadge">٣</div> الفصل 3/3</div>
+  <div class="clstch">
+    <span>📐 رياضيات: <b class="tmath">اللحياني</b></span>
+    <span>🔬 علوم: <b class="tsci">حسن</b></span>
+    <span>📖 لغتي: <b class="tarb">اللقماني</b></span>
+    <span style="color:var(--red)">إسلامية (بديل): رجيان</span>
+  </div>
+  <table>
+    <thead><tr>
+      <th width="5%">اليوم</th><th width="7%">الحصة</th><th width="9%">المادة</th>
+      <th width="14%">الجزء/الصفحات</th><th width="14%">المدرب الأساسي</th>
+      <th width="13%">المتعاون</th><th width="12%">البديل 🔴</th>
+      <th width="26%">المحتوى</th>
+    </tr></thead>
+    <tbody>
+      <!-- الاثنين -->
+      <tr><td class="dc d1" rowspan="3">الاثنين</td>
+        <td><span class="pb">1–2</span></td><td class="ra"><span class="sl al">لغتي</span></td>
+        <td class="pg">الجزء الأول<br>ص 3–6</td><td><span class="tp">اللقماني</span></td>
+        <td><span class="tc">مسلم</span></td><td><span class="ts">حامد</span></td>
+        <td>النصوص التمهيدية — الفهم والاستيعاب والتعبير</td></tr>
+      <tr><td><span class="pb">3–4</span></td><td class="rs"><span class="sl sl2">علوم</span></td>
+        <td class="pg">الجزء الأول<br>ص 2–5</td><td><span class="tp">حسن</span></td>
+        <td><span class="tc">حامد الزهراني</span></td><td><span class="ts">علي القحطاني</span></td>
+        <td>مقدمة الوحدة — الاستكشاف والملاحظة العلمية</td></tr>
+      <tr><td><span class="pb">5–6</span></td><td class="rm"><span class="sl ml">رياضيات</span></td>
+        <td class="pg">الجزء الأول<br>ص 3–6</td><td><span class="tp">اللحياني</span></td>
+        <td><span class="tc">وليد</span></td><td><span class="ts">عبدالهادي</span></td>
+        <td>التمهيد — مراجعة وبناء المفاهيم الأساسية</td></tr>
+
+      <!-- الثلاثاء -->
+      <tr><td class="dc d2" rowspan="3">الثلاثاء</td>
+        <td><span class="pb">1–2</span></td><td class="ra"><span class="sl al">لغتي</span></td>
+        <td class="pg">الجزء الأول<br>ص 7–10</td><td><span class="tp">اللقماني</span></td>
+        <td><span class="tc">النباتي</span></td><td><span class="ts">رجيان</span></td>
+        <td>القراءة والتعبير — المفردات والتراكيب اللغوية</td></tr>
+      <tr><td><span class="pb">3–4</span></td><td class="rs"><span class="sl sl2">علوم</span></td>
+        <td class="pg">الجزء الأول<br>ص 6–9</td><td><span class="tp">حسن</span></td>
+        <td><span class="tc">حامد الزهراني</span></td><td><span class="ts">علي القحطاني</span></td>
+        <td>التجارب العلمية — التحليل والاستنتاج</td></tr>
+      <tr><td><span class="pb">5–6</span></td><td class="rm"><span class="sl ml">رياضيات</span></td>
+        <td class="pg">الجزء الأول<br>ص 7–10</td><td><span class="tp">اللحياني</span></td>
+        <td><span class="tc">وليد</span></td><td><span class="ts">عبدالهادي</span></td>
+        <td>تطبيقات — حل المسائل والتدريب الموجه</td></tr>
+
+      <!-- الأربعاء -->
+      <tr><td class="dc d3" rowspan="3">الأربعاء</td>
+        <td><span class="pb">1–2</span></td><td class="ra"><span class="sl al">لغتي</span></td>
+        <td class="pg">الجزء الثاني<br>ص 2–5</td><td><span class="tp">اللقماني</span></td>
+        <td><span class="tc">مسلم</span></td><td><span class="ts">حامد</span></td>
+        <td>الجزء الثاني — التراكيب النحوية والبلاغية</td></tr>
+      <tr><td><span class="pb">3–4</span></td><td class="rs"><span class="sl sl2">علوم</span></td>
+        <td class="pg">الجزء الأول<br>ص 10–13</td><td><span class="tp">حسن</span></td>
+        <td><span class="tc">حامد الزهراني</span></td><td><span class="ts">علي القحطاني</span></td>
+        <td>التطبيق العملي — خرائط مفاهيمية وتقييم</td></tr>
+      <tr><td><span class="pb">5–6</span></td><td class="rm"><span class="sl ml">رياضيات</span></td>
+        <td class="pg">الجزء الثاني<br>ص 4–7</td><td><span class="tp">اللحياني</span></td>
+        <td><span class="tc">وليد</span></td><td><span class="ts">عبدالهادي</span></td>
+        <td>الوحدة الثانية — مفاهيم جديدة وأنشطة تطبيقية</td></tr>
+
+      <!-- الخميس -->
+      <tr><td class="dc d4" rowspan="3">الخميس</td>
+        <td><span class="pb">1–2</span></td><td class="ra"><span class="sl al">لغتي</span></td>
+        <td class="pg">الجزء الثاني<br>ص 6–9</td><td><span class="tp">اللقماني</span></td>
+        <td><span class="tc">النباتي</span></td><td><span class="ts">رجيان</span></td>
+        <td>التقويم اللغوي — الإنتاج الكتابي والإبداعي</td></tr>
+      <tr><td><span class="pb">3–4</span></td><td class="rs"><span class="sl sl2">علوم</span></td>
+        <td class="pg">الجزء الثاني<br>ص 2–9</td><td><span class="tp">حسن</span></td>
+        <td><span class="tc">حامد الزهراني</span></td><td><span class="ts">علي القحطاني</span></td>
+        <td>مراجعة الجزء الثاني — تقييم ختامي ونماذج</td></tr>
+      <tr><td><span class="pb">5–6</span></td><td class="rm"><span class="sl ml">رياضيات</span></td>
+        <td class="pg">الجزء الثاني<br>ص 8–11</td><td><span class="tp">اللحياني</span></td>
+        <td><span class="tc">وليد</span></td><td><span class="ts">عبدالهادي</span></td>
+        <td>مراجعة شاملة — نماذج اختبار ومسائل تدريبية</td></tr>
+    </tbody>
+  </table>
+  <div class="clsfoot">مدير المدرسة: فازع القرني &nbsp;|&nbsp; الحصة السابعة حسب الجدول الأصلي</div>
+</div>
+
+
+<!-- ==================== الفصل 3/4 ==================== -->
+<div class="clsbox">
+  <div class="clshd"><div class="clsbadge">٤</div> الفصل 3/4</div>
+  <div class="clstch">
+    <span>📐 رياضيات: <b class="tmath">اللهيبي</b></span>
+    <span>🔬 علوم: <b class="tsci">حامد الزهراني</b></span>
+    <span>📖 لغتي: <b class="tarb">اللقماني</b></span>
+    <span style="color:var(--red)">إسلامية (بديل): رجيان</span>
+  </div>
+  <table>
+    <thead><tr>
+      <th width="5%">اليوم</th><th width="7%">الحصة</th><th width="9%">المادة</th>
+      <th width="14%">الجزء/الصفحات</th><th width="14%">المدرب الأساسي</th>
+      <th width="13%">المتعاون</th><th width="12%">البديل 🔴</th>
+      <th width="26%">المحتوى</th>
+    </tr></thead>
+    <tbody>
+      <!-- الاثنين -->
+      <tr><td class="dc d1" rowspan="3">الاثنين</td>
+        <td><span class="pb">1–2</span></td><td class="rm"><span class="sl ml">رياضيات</span></td>
+        <td class="pg">الجزء الأول<br>ص 3–6</td><td><span class="tp">اللهيبي</span></td>
+        <td><span class="tc">وليد</span></td><td><span class="ts">عبدالهادي</span></td>
+        <td>التمهيد — مراجعة وبناء المفاهيم الأساسية</td></tr>
+      <tr><td><span class="pb">3–4</span></td><td class="ra"><span class="sl al">لغتي</span></td>
+        <td class="pg">الجزء الأول<br>ص 3–6</td><td><span class="tp">اللقماني</span></td>
+        <td><span class="tc">النباتي</span></td><td><span class="ts">رجيان</span></td>
+        <td>النصوص التمهيدية — الفهم والاستيعاب والتعبير</td></tr>
+      <tr><td><span class="pb">5–6</span></td><td class="rs"><span class="sl sl2">علوم</span></td>
+        <td class="pg">الجزء الأول<br>ص 2–5</td><td><span class="tp">حامد الزهراني</span></td>
+        <td><span class="tc">نايف السلمي</span></td><td><span class="ts">علي القحطاني</span></td>
+        <td>مقدمة الوحدة — الاستكشاف والملاحظة العلمية</td></tr>
+
+      <!-- الثلاثاء -->
+      <tr><td class="dc d2" rowspan="3">الثلاثاء</td>
+        <td><span class="pb">1–2</span></td><td class="rm"><span class="sl ml">رياضيات</span></td>
+        <td class="pg">الجزء الأول<br>ص 7–10</td><td><span class="tp">اللهيبي</span></td>
+        <td><span class="tc">وليد</span></td><td><span class="ts">عبدالهادي</span></td>
+        <td>تطبيقات — حل المسائل والتدريب الموجه</td></tr>
+      <tr><td><span class="pb">3–4</span></td><td class="ra"><span class="sl al">لغتي</span></td>
+        <td class="pg">الجزء الأول<br>ص 7–10</td><td><span class="tp">اللقماني</span></td>
+        <td><span class="tc">النباتي</span></td><td><span class="ts">رجيان</span></td>
+        <td>القراءة والتعبير — المفردات والتراكيب اللغوية</td></tr>
+      <tr><td><span class="pb">5–6</span></td><td class="rs"><span class="sl sl2">علوم</span></td>
+        <td class="pg">الجزء الأول<br>ص 6–9</td><td><span class="tp">حامد الزهراني</span></td>
+        <td><span class="tc">نايف السلمي</span></td><td><span class="ts">علي القحطاني</span></td>
+        <td>التجارب العلمية — التحليل والاستنتاج</td></tr>
+
+      <!-- الأربعاء -->
+      <tr><td class="dc d3" rowspan="3">الأربعاء</td>
+        <td><span class="pb">1–2</span></td><td class="rm"><span class="sl ml">رياضيات</span></td>
+        <td class="pg">الجزء الثاني<br>ص 4–7</td><td><span class="tp">اللهيبي</span></td>
+        <td><span class="tc">وليد</span></td><td><span class="ts">عبدالهادي</span></td>
+        <td>الوحدة الثانية — مفاهيم جديدة وأنشطة تطبيقية</td></tr>
+      <tr><td><span class="pb">3–4</span></td><td class="ra"><span class="sl al">لغتي</span></td>
+        <td class="pg">الجزء الثاني<br>ص 2–5</td><td><span class="tp">اللقماني</span></td>
+        <td><span class="tc">النباتي</span></td><td><span class="ts">رجيان</span></td>
+        <td>الجزء الثاني — التراكيب النحوية والبلاغية</td></tr>
+      <tr><td><span class="pb">5–6</span></td><td class="rs"><span class="sl sl2">علوم</span></td>
+        <td class="pg">الجزء الأول<br>ص 10–13</td><td><span class="tp">حامد الزهراني</span></td>
+        <td><span class="tc">الطلحي</span></td><td><span class="ts">علي القحطاني</span></td>
+        <td>التطبيق العملي — خرائط مفاهيمية وتقييم</td></tr>
+
+      <!-- الخميس -->
+      <tr><td class="dc d4" rowspan="3">الخميس</td>
+        <td><span class="pb">1–2</span></td><td class="rm"><span class="sl ml">رياضيات</span></td>
+        <td class="pg">الجزء الثاني<br>ص 8–11</td><td><span class="tp">اللهيبي</span></td>
+        <td><span class="tc">وليد</span></td><td><span class="ts">عبدالهادي</span></td>
+        <td>مراجعة شاملة — نماذج اختبار ومسائل تدريبية</td></tr>
+      <tr><td><span class="pb">3–4</span></td><td class="ra"><span class="sl al">لغتي</span></td>
+        <td class="pg">الجزء الثاني<br>ص 6–9</td><td><span class="tp">اللقماني</span></td>
+        <td><span class="tc">النباتي</span></td><td><span class="ts">رجيان</span></td>
+        <td>التقويم اللغوي — الإنتاج الكتابي والإبداعي</td></tr>
+      <tr><td><span class="pb">5–6</span></td><td class="rs"><span class="sl sl2">علوم</span></td>
+        <td class="pg">الجزء الثاني<br>ص 2–9</td><td><span class="tp">حامد الزهراني</span></td>
+        <td><span class="tc">نايف السلمي</span></td><td><span class="ts">علي القحطاني</span></td>
+        <td>مراجعة الجزء الثاني — تقييم ختامي ونماذج</td></tr>
+    </tbody>
+  </table>
+  <div class="clsfoot">مدير المدرسة: فازع القرني &nbsp;|&nbsp; الحصة السابعة حسب الجدول الأصلي</div>
+</div>
+
+
+<!-- CONFLICT VERIFICATION -->
+<div class="info">
+  <h3>✅ التحقق من عدم تعارض المعلم في فصلين معاً (كل حصة)</h3>
+  <table class="ctbl">
+    <thead><tr>
+      <th>الحصة</th><th>3/1 — المدرب الأساسي</th><th>3/2 — المدرب الأساسي</th>
+      <th>3/3 — المدرب الأساسي</th><th>3/4 — المدرب الأساسي</th><th>الحالة</th>
+    </tr></thead>
+    <tbody>
+      <tr>
+        <td><b>1–2</b></td>
+        <td style="background:var(--mb)">رياضيات — <b>اللحياني</b></td>
+        <td style="background:var(--sb)">علوم — <b>حسن</b></td>
+        <td style="background:var(--ab)">لغتي — <b>اللقماني</b></td>
+        <td style="background:var(--mb)">رياضيات — <b>اللهيبي</b></td>
+        <td style="color:green;font-weight:800">✓ لا تعارض</td>
+      </tr>
+      <tr>
+        <td><b>3–4</b></td>
+        <td style="background:var(--ab)">لغتي — <b>عبدالواحد</b></td>
+        <td style="background:var(--mb)">رياضيات — <b>اللحياني</b></td>
+        <td style="background:var(--sb)">علوم — <b>حسن</b></td>
+        <td style="background:var(--ab)">لغتي — <b>اللقماني</b></td>
+        <td style="color:green;font-weight:800">✓ لا تعارض</td>
+      </tr>
+      <tr>
+        <td><b>5–6</b></td>
+        <td style="background:var(--sb)">علوم — <b>حسن</b></td>
+        <td style="background:var(--ab)">لغتي — <b>عبدالواحد</b></td>
+        <td style="background:var(--mb)">رياضيات — <b>اللحياني</b></td>
+        <td style="background:var(--sb)">علوم — <b>حامد الزهراني</b></td>
+        <td style="color:green;font-weight:800">✓ لا تعارض</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- FOOTER -->
+<div class="gfoot">
+  مدير المدرسة: فازع القرني &nbsp;|&nbsp; مدرسة عبيدة بن الحارث المتوسطة &nbsp;|&nbsp; الاثنين إلى الخميس
+</div>
+
+</body>
+</html>
