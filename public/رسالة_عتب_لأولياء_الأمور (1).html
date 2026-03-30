@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>رسالة إلى أولياء الأمور</title>
+<link href="https://fonts.googleapis.com/css2?family=Amiri:ital,wght@0,400;0,700;1,400&family=Cairo:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --navy: #0c1a40;
+  --blue: #1a3a7c;
+  --gold: #b8942a;
+  --gold-light: #e8c86a;
+  --cream: #fdf8ee;
+  --parchment: #f5edd8;
+  --red: #7a1515;
+  --text: #1c1c2e;
+  --muted: #6b6b80;
+}
+
+body {
+  background: #d8d0c0;
+  background-image: radial-gradient(ellipse at 20% 20%, #ccc4b0 0%, transparent 55%),
+                    radial-gradient(ellipse at 80% 80%, #c4baa8 0%, transparent 55%);
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 40px 16px 60px;
+  font-family: 'Cairo', sans-serif;
+}
+
+.page {
+  max-width: 800px;
+  width: 100%;
+  background: var(--cream);
+  position: relative;
+  animation: rise 1s ease forwards;
+  border: 1px solid rgba(184,148,42,0.4);
+  box-shadow:
+    0 0 0 6px rgba(184,148,42,0.08),
+    0 0 0 12px rgba(184,148,42,0.04),
+    0 40px 100px rgba(0,0,0,0.3);
+}
+
+@keyframes rise {
+  from { opacity:0; transform: translateY(40px); }
+  to   { opacity:1; transform: translateY(0); }
+}
+
+.header {
+  background: linear-gradient(150deg, #0c1a40 0%, #1a3a7c 55%, #1e4494 100%);
+  padding: 34px 44px 28px;
+  position: relative;
+  overflow: hidden;
+}
+.header-geo {
+  position: absolute;
+  inset: 0;
+  background-image:
+    repeating-linear-gradient(60deg, rgba(255,255,255,0.025) 0, rgba(255,255,255,0.025) 1px, transparent 1px, transparent 28px),
+    repeating-linear-gradient(-60deg, rgba(255,255,255,0.025) 0, rgba(255,255,255,0.025) 1px, transparent 1px, transparent 28px);
+}
+.header-bottom-line {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, transparent 0%, var(--gold) 20%, var(--gold-light) 50%, var(--gold) 80%, transparent 100%);
+}
+.school-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--gold-light);
+  letter-spacing: 2px;
+  margin-bottom: 6px;
+  opacity: 0.85;
+}
+.letter-main-title {
+  font-family: 'Amiri', serif;
+  font-size: 30px;
+  color: #fff;
+  line-height: 1.5;
+  font-weight: 700;
+}
+.letter-main-title em {
+  color: var(--gold-light);
+  font-style: normal;
+  font-size: 22px;
+}
+.header-date {
+  margin-top: 10px;
+  font-size: 12px;
+  color: rgba(255,255,255,0.45);
+  font-weight: 300;
+}
+
+.stats-strip {
+  background: var(--parchment);
+  border-bottom: 1px solid rgba(184,148,42,0.25);
+  padding: 18px 44px;
+  display: flex;
+  justify-content: center;
+  gap: 0;
+  flex-wrap: wrap;
+}
+.stat {
+  text-align: center;
+  padding: 0 28px;
+  position: relative;
+}
+.stat + .stat::before {
+  content: '';
+  position: absolute;
+  right: 0; top: 10%; bottom: 10%;
+  width: 1px;
+  background: rgba(184,148,42,0.3);
+}
+.stat-num {
+  font-size: 28px;
+  font-weight: 900;
+  line-height: 1;
+  display: block;
+}
+.stat-num.danger { color: var(--red); }
+.stat-num.primary { color: var(--blue); }
+.stat-num.warn { color: #b06000; }
+.stat-lbl {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 4px;
+  display: block;
+  font-weight: 600;
+}
+
+.divider {
+  text-align: center;
+  padding: 20px 0 0;
+  color: var(--gold);
+  font-size: 18px;
+  letter-spacing: 10px;
+  opacity: 0.6;
+}
+.divider-line {
+  height: 1px;
+  margin: 10px 44px 0;
+  background: linear-gradient(90deg, transparent, rgba(184,148,42,0.35), transparent);
+}
+
+.body {
+  padding: 28px 50px 50px;
+}
+
+.opening-address {
+  font-family: 'Amiri', serif;
+  font-size: 17px;
+  color: var(--blue);
+  font-weight: 700;
+  margin-bottom: 24px;
+  border-right: 3px solid var(--gold);
+  padding-right: 14px;
+  line-height: 1.8;
+}
+
+.letter-text {
+  font-size: 15.5px;
+  color: var(--text);
+  line-height: 2.1;
+  font-weight: 400;
+}
+
+.letter-text p {
+  margin-bottom: 18px;
+  text-align: justify;
+}
+
+.highlight-red { color: var(--red); font-weight: 700; }
+.highlight-blue { color: var(--blue); font-weight: 700; }
+.highlight-gold { color: var(--gold); font-weight: 700; }
+
+.ayah-box {
+  background: linear-gradient(135deg, #f0e8d0 0%, #e8dcc0 100%);
+  border: 1px solid rgba(184,148,42,0.4);
+  border-right: 4px solid var(--gold);
+  padding: 18px 22px;
+  margin: 22px 0;
+  position: relative;
+}
+.ayah-text {
+  font-family: 'Amiri', serif;
+  font-size: 18px;
+  color: #3a2800;
+  line-height: 2;
+  text-align: center;
+}
+.ayah-source {
+  text-align: center;
+  font-size: 12px;
+  color: var(--gold);
+  margin-top: 8px;
+  font-weight: 600;
+}
+
+.hadith-box {
+  background: linear-gradient(135deg, #eaf0f8 0%, #dce8f4 100%);
+  border: 1px solid rgba(26,58,124,0.2);
+  border-right: 4px solid var(--blue);
+  padding: 16px 20px;
+  margin: 22px 0;
+}
+.hadith-text {
+  font-family: 'Amiri', serif;
+  font-size: 17px;
+  color: #0c1a40;
+  line-height: 2;
+  text-align: center;
+}
+.hadith-source {
+  text-align: center;
+  font-size: 12px;
+  color: var(--blue);
+  margin-top: 6px;
+  font-weight: 600;
+}
+
+.callout {
+  background: linear-gradient(135deg, #fdf0f0, #fae0e0);
+  border: 1px solid rgba(122,21,21,0.2);
+  border-right: 4px solid var(--red);
+  padding: 16px 20px;
+  margin: 22px 0;
+}
+.callout p {
+  color: #5a0f0f;
+  font-size: 14.5px;
+  line-height: 1.9;
+  margin: 0;
+  font-weight: 600;
+}
+
+.closing {
+  margin-top: 32px;
+  padding-top: 22px;
+  border-top: 1px solid rgba(184,148,42,0.25);
+  text-align: center;
+}
+.closing-dua {
+  font-family: 'Amiri', serif;
+  font-size: 16px;
+  color: var(--blue);
+  line-height: 2;
+  margin-bottom: 16px;
+}
+.closing-sig {
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 600;
+  letter-spacing: 1px;
+}
+.school-sig {
+  margin-top: 6px;
+  font-size: 15px;
+  color: var(--navy);
+  font-weight: 900;
+}
+
+.footer {
+  background: var(--navy);
+  padding: 14px 44px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.footer-text { color: rgba(255,255,255,0.4); font-size: 11px; }
+.footer-gold { color: var(--gold-light); font-size: 11px; font-weight: 600; }
+
+.section-title {
+  font-family: 'Amiri', serif;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--red);
+  margin: 28px 0 16px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid rgba(122,21,21,0.15);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.section-icon { font-size: 20px; }
+
+.pattern-box {
+  background: linear-gradient(135deg, #1a1a2e 0%, #0c1a40 100%);
+  border: 1px solid rgba(184,148,42,0.3);
+  padding: 22px 24px;
+  margin: 20px 0;
+  border-radius: 2px;
+}
+.pattern-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--gold-light);
+  letter-spacing: 2px;
+  text-align: center;
+  margin-bottom: 18px;
+  text-transform: uppercase;
+}
+.pattern-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+@media (max-width: 580px) {
+  .pattern-grid { grid-template-columns: repeat(2, 1fr); }
+}
+.pattern-item {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(184,148,42,0.2);
+  padding: 14px 10px;
+  text-align: center;
+  border-radius: 2px;
+  transition: background 0.2s;
+}
+.pattern-item:hover { background: rgba(255,255,255,0.08); }
+.pattern-icon { font-size: 22px; margin-bottom: 8px; }
+.pattern-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 4px;
+}
+.pattern-sub {
+  font-size: 11px;
+  color: rgba(255,255,255,0.45);
+  line-height: 1.4;
+}
+
+.penalties-box {
+  background: linear-gradient(135deg, #1c0a0a 0%, #2d1010 100%);
+  border: 1px solid rgba(122,21,21,0.4);
+  padding: 22px 24px;
+  margin: 20px 0;
+  border-radius: 2px;
+}
+.penalties-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #f0a0a0;
+  letter-spacing: 2px;
+  text-align: center;
+  margin-bottom: 18px;
+  text-transform: uppercase;
+}
+.penalties-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+@media (max-width: 540px) {
+  .penalties-grid { grid-template-columns: 1fr; }
+}
+.penalty-item {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(122,21,21,0.3);
+  padding: 14px 14px;
+  border-radius: 2px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.penalty-num { font-size: 20px; flex-shrink: 0; margin-top: 2px; }
+.penalty-text { font-size: 13px; color: rgba(255,220,220,0.85); line-height: 1.6; font-weight: 500; }
+
+.partner-box {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 20px 0;
+}
+@media (max-width: 560px) {
+  .partner-box { grid-template-columns: 1fr; }
+}
+.partner-col {
+  padding: 18px 18px;
+  border-radius: 2px;
+}
+.partner-col.positive {
+  background: linear-gradient(135deg, #eaf5ea, #d8eed8);
+  border: 1px solid rgba(40,120,40,0.25);
+  border-right: 4px solid #2d7a2d;
+}
+.partner-col.negative {
+  background: linear-gradient(135deg, #fdf0f0, #fae0e0);
+  border: 1px solid rgba(122,21,21,0.2);
+  border-right: 4px solid var(--red);
+}
+.partner-col-title {
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(0,0,0,0.08);
+}
+.partner-col.positive .partner-col-title { color: #1a5c1a; }
+.partner-col.negative .partner-col-title { color: var(--red); }
+.partner-col ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.partner-col ul li {
+  font-size: 13px;
+  line-height: 1.6;
+  padding-right: 16px;
+  position: relative;
+}
+.partner-col.positive ul li { color: #1c4a1c; }
+.partner-col.positive ul li::before { content: '•'; position: absolute; right: 0; color: #2d7a2d; font-weight: 900; }
+.partner-col.negative ul li { color: #5a0f0f; }
+.partner-col.negative ul li::before { content: '•'; position: absolute; right: 0; color: var(--red); font-weight: 900; }
+
+.corner-ornament {
+  position: absolute;
+  width: 50px; height: 50px;
+  top: 0; left: 0;
+  border-top: 3px solid var(--gold);
+  border-left: 3px solid var(--gold);
+  opacity: 0.4;
+}
+.corner-ornament.br {
+  top: auto; left: auto;
+  bottom: 0; right: 0;
+  border-top: none; border-left: none;
+  border-bottom: 3px solid var(--gold);
+  border-right: 3px solid var(--gold);
+}
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="corner-ornament"></div>
+  <div class="corner-ornament br"></div>
+
+  <div class="header">
+    <div class="header-geo"></div>
+    <div class="school-label">مدرسة عبيدة بن الحارث المتوسطة</div>
+    <div class="letter-main-title">
+      وقفات مع أولياء الأمور<br>
+      <em>حول إهمال الطلاب وعدم اهتمامهم بالاختبارات التجريبية المرتبطة بالاختبارات الوطنية والمركزية</em>
+    </div>
+    <div class="header-date">١٠ شوال ١٤٤٧ هـ</div>
+    <div class="header-bottom-line"></div>
+  </div>
+
+  <div class="stats-strip">
+    <div class="stat">
+      <span class="stat-num primary">140</span>
+      <span class="stat-lbl">إجمالي الطلاب</span>
+    </div>
+    <div class="stat">
+      <span class="stat-num danger">24</span>
+      <span class="stat-lbl">أجاب فقط</span>
+    </div>
+    <div class="stat">
+      <span class="stat-num warn">116</span>
+      <span class="stat-lbl">لم يشارك</span>
+    </div>
+    <div class="stat">
+      <span class="stat-num danger">17.1%</span>
+      <span class="stat-lbl">نسبة المشاركة</span>
+    </div>
+  </div>
+
+  <div class="divider">✦ &nbsp; ✦ &nbsp; ✦</div>
+  <div class="divider-line"></div>
+
+  <div class="body">
+
+    <div class="opening-address">
+      إلى كل أبٍ كريم وكل أمٍّ فاضلة،<br>
+      ولي أمر الطالب في مدرستنا الموقّرة...
+    </div>
+
+    <div class="ayah-box">
+      <div class="ayah-text">يَا أَيُّهَا الَّذِينَ آمَنُوا قُوا أَنفُسَكُمْ وَأَهْلِيكُمْ نَارًا</div>
+      <div class="ayah-source">سورة التحريم — الآية ٦</div>
+    </div>
+
+    <div class="letter-text">
+
+      <p>السلام عليكم ورحمة الله وبركاته،</p>
+
+      <p>
+        نكتب إليكم لا من باب التقريع ولا من باب الانتقاد، بل من باب
+        <span class="highlight-blue">الأمانة</span> التي نحملها تجاه أبنائكم،
+        ومن باب <span class="highlight-gold">الصدق</span> الذي يقتضيه الواجب الديني والتربوي.
+      </p>
+
+      <p>
+        أجرينا اختباراً تدريبياً على منصة نافس — وهو اختبار لا يستلزم خروجاً من البيت،
+        بل يُحلّ على الجهاز في راحة المنزل — وكان المأمول أن يُشارك فيه جميع أبنائنا
+        الـ <strong>140 طالباً</strong>.
+        فماذا كانت النتيجة؟
+      </p>
+
+      <div class="callout">
+        <p>
+          أجاب <span class="highlight-red">24 طالباً فقط</span> من أصل 140 طالباً.
+          أي أن <span class="highlight-red">116 طالباً — ما يقارب 83% من أبنائكم —</span>
+          لم يُكلّفوا أنفسهم بفتح الاختبار والإجابة عنه،
+          رغم أنه كان متاحاً على أجهزتهم في بيوتهم دون أي عناء.
+        </p>
+      </div>
+
+      <p>
+        أيها الوالدان الكريمان، نسألكم بصدق:
+        <span class="highlight-red">من المسؤول عن هذا؟</span>
+        هل المدرسة قصّرت حين وفّرت الاختبار ووضعته بين يدي الطالب على جهازه في بيته؟
+        أم أن الطالب لم يجد في بيته من يشجّعه، ومن يُذكّره، ومن يُحاسبه؟
+      </p>
+
+      <!-- ABSENCE SECTION -->
+      <div class="section-title">
+        <span class="section-icon">📋</span>
+        الغياب — الجرح الذي لا يُداوى بالصمت
+      </div>
+
+      <p>
+        ثمة ظاهرة أخرى لا تقل خطورةً عمّا سبق، بل هي في نظرنا
+        <span class="highlight-red">جذر المشكلة وأصلها</span>:
+        الغياب المتكرر دون عذر مقبول، الذي بات يسير على نمط ثابت
+        لا يخطئه أحد.
+      </p>
+
+      <div class="pattern-box">
+        <div class="pattern-title">نمط الغياب المتكرر</div>
+        <div class="pattern-grid">
+          <div class="pattern-item">
+            <div class="pattern-icon">📅</div>
+            <div class="pattern-label">أول الأسبوع</div>
+            <div class="pattern-sub">الأحد غياب اعتيادي</div>
+          </div>
+          <div class="pattern-item">
+            <div class="pattern-icon">📅</div>
+            <div class="pattern-label">آخر الأسبوع</div>
+            <div class="pattern-sub">الخميس إجازة مُخوَّلة</div>
+          </div>
+          <div class="pattern-item">
+            <div class="pattern-icon">🏖️</div>
+            <div class="pattern-label">قبل الإجازة</div>
+            <div class="pattern-sub">يوم أو يومان مسبقاً</div>
+          </div>
+          <div class="pattern-item">
+            <div class="pattern-icon">🔁</div>
+            <div class="pattern-label">بعد الإجازة</div>
+            <div class="pattern-sub">تمديد على حساب الدراسة</div>
+          </div>
+        </div>
+      </div>
+
+      <p>
+        هذا النمط لا يحدث من تلقاء نفسه.
+        الطالب لا يغيب وحده — <span class="highlight-red">الطالب يغيب لأن أحداً في البيت لم يُوقظه، أو لم يُلزمه، أو أذن له بالتغيب</span>،
+        بل ربما كان التغيب بعلم الوالدين وموافقتهم،
+        وكأن يوم الدراسة قابل للتنازل عنه متى جاءت رغبة أو راحة.
+      </p>
+
+      <div class="callout">
+        <p>
+          أيها الوالدان — هل تعلمان أن الطالب الذي يغيب أول الأسبوع
+          يفوته شرح المعلم لمحاور جديدة لا تُعاد؟
+          وأن الغائب آخر الأسبوع يُضيّع مراجعات وتقييمات؟
+          وأن التغيب قبل الإجازة وبعدها يجعل ذهنه منقطعاً عن المنهج
+          حتى يكاد لا يعود إليه أبداً؟
+          <span class="highlight-red">كل يوم غياب هو ثغرة في بنيان ابنكم، تتراكم الثغرات حتى ينهار البناء.</span>
+        </p>
+      </div>
+
+      <p>
+        ونسألكم بصريح العبارة:
+        <span class="highlight-red">هل تنتظرون النجاح من أبنائكم وهم على هذا الحال؟</span>
+        النجاح لا يأتي بالتمني، ولا يُبنى على حضور متقطّع وانتباه مشتّت.
+        النجاح يُبنى يوماً بيوم، وحصةً بحصة، وجهداً متواصلاً لا يُهدر في أيام الغياب.
+      </p>
+
+      <div class="hadith-box">
+        <div class="hadith-text">« كلُّكم راعٍ وكلُّكم مسؤولٌ عن رعيَّتِه »</div>
+        <div class="hadith-source">متفق عليه — رواه البخاري ومسلم</div>
+      </div>
+
+      <p>
+        أنتم يا أولياء الأمور رعاة أبنائكم، وهذه الرعاية لا تنتهي عند إطعامهم وكسوتهم —
+        وإن كان ذلك من الواجب الأصيل — بل
+        <span class="highlight-blue">الرعاية الحقيقية أن تسأل ابنك كل يوم: ماذا درست؟ هل أدّيت ما طُلب منك؟</span>
+        وحين يوجد اختبار على جهازه في بيته، أن تجلس إلى جانبه وتشجّعه على إتمامه.
+      </p>
+
+      <p>
+        نحن في المدرسة نقطع من أوقاتنا ونبذل من جهودنا، نُصمّم الاختبارات ونتابع المنصات
+        ونُعدّ التقارير — <span class="highlight-gold">كل ذلك من أجل مستقبل أبنائكم لا من أجل مستقبلنا</span>.
+        فهل يعقل أن يكون همّ المعلم بمستقبل ابنك أكبر من همّك أنت به؟
+        وهل ترضى لنفسك أن تكون المدرسة وحدها من تسعى بينما البيت يُحجم؟
+      </p>
+
+      <div class="callout">
+        <p>
+          إن الوظيفة اليوم لم تعُد تُوهَب، بل تُنتزع بالكفاءة والمنافسة والتميّز.
+          سوق العمل يزداد تضيّقاً كل عام، وأبناؤنا سيدخلونه بعد سنوات قليلة لا يعلم أحدنا كم هي قصيرة.
+          فمن يُعدّهم لذلك اليوم إن لم يكن أنتم وأنا معاً؟
+        </p>
+      </div>
+
+      <p>
+        تخيّلوا معنا: طالب يتعوّد اليوم على تجاهل اختبار لأنه لم يجد في بيته من يُذكّره،
+        سيتعوّد غداً على تجاهل متطلّبات العمل وتأجيل المسؤوليات.
+        <span class="highlight-red">والتهاون الذي يبدو اليوم بسيطاً يبني شخصيةً تعتاد على الإهمال</span>،
+        وحين يأتي يوم المحاسبة الحقيقي لن يكون أمامه أحد يحمل عنه تبعة ما ضيّع.
+      </p>
+
+      <div class="ayah-box">
+        <div class="ayah-text">وَأْمُرْ أَهْلَكَ بِالصَّلَاةِ وَاصْطَبِرْ عَلَيْهَا</div>
+        <div class="ayah-source">سورة طه — الآية ١٣٢</div>
+      </div>
+
+      <p>
+        أمر الله نبيّه ﷺ أن يأمر أهله ويصطبر على ذلك.
+        وهكذا الأمر مع أبنائكم: لا يكفي أن تأمر مرةً ثم تنسى،
+        بل المطلوب <span class="highlight-blue">المتابعة والصبر والاستمرار</span>.
+        ولا شك أن من وقف مع ابنه ووجّهه وتعب عليه
+        سيرى ثمرة ذلك حين يقف ابنه يوماً على أقدامه معتزاً بنفسه،
+        ويذكر لوالديه فضلهم وحرصهم عليه.
+      </p>
+
+      <p>
+        لسنا نطلب منكم المستحيل. نطلب
+        <span class="highlight-blue">دقائق معدودة</span> كل يوم:
+        اسألوا ابنكم عن واجباته، راجعوا ما يُرسله المعلم،
+        وحين يُوجَد اختبار تدريبي على جهازه — اجلسوا إلى جانبه وشجّعوه.
+        <span class="highlight-gold">هذا الاهتمام البسيط يصنع فارقاً لا تتصوّرون أثره في نفس الطالب وثقته ومستواه.</span>
+      </p>
+
+      <!-- PENALTIES SECTION -->
+      <div class="section-title">
+        <span class="section-icon">⚖️</span>
+        العقوبات ودرجات المواظبة — خسارة حقيقية يتجاهلها الأهل
+      </div>
+
+      <p>
+        لعلّ بعض أولياء الأمور لا يعلم — أو يعلم ويتجاهل — أن
+        <span class="highlight-red">الغياب المتكرر وعدم الالتزام بالاختبارات والمتطلبات له ثمن مباشر يدفعه الطالب من درجاته</span>.
+        درجات المواظبة والسلوك والمشاركة ليست هامشاً يُستهان به،
+        بل هي جزء من المعدّل الذي يُحدّد مستقبله الأكاديمي.
+      </p>
+
+      <div class="penalties-box">
+        <div class="penalties-title">ماذا يخسر طالبكم بهذا الإهمال؟</div>
+        <div class="penalties-grid">
+          <div class="penalty-item">
+            <div class="penalty-num">📉</div>
+            <div class="penalty-text">خصم من درجات المواظبة والانتظام عند تكرار الغياب</div>
+          </div>
+          <div class="penalty-item">
+            <div class="penalty-num">❌</div>
+            <div class="penalty-text">صفر في الاختبارات التجريبية التي لم يؤدِّها ويُحتسب غياباً</div>
+          </div>
+          <div class="penalty-item">
+            <div class="penalty-num">📊</div>
+            <div class="penalty-text">تدنّي المعدّل التراكمي بسبب الغياب وعدم المشاركة</div>
+          </div>
+          <div class="penalty-item">
+            <div class="penalty-num">🚫</div>
+            <div class="penalty-text">الحرمان من الاختبار النهائي عند تجاوز نسبة الغياب المقررة وزارياً</div>
+          </div>
+        </div>
+      </div>
+
+      <p>
+        هذه ليست تهديدات نخترعها، بل هي
+        <span class="highlight-blue">تعليمات وزارة التعليم الصريحة</span>
+        التي لا تُراعي أعذاراً لم تُقدَّم في وقتها.
+        والطالب الذي يغيب اليوم دون عذر موثّق
+        سيجد نفسه أمام عقوبة إدارية لا يملك أحد تجاوزها،
+        <span class="highlight-red">وحينها لن تنفع الاستغاثة ولا الشفاعة.</span>
+      </p>
+
+      <div class="callout">
+        <p>
+          نُناشدكم — أيها الوالدان الكريمان — أن تكونوا على قدر المسؤولية.
+          لا تنتظروا أن يأتيكم الخبر بعد فوات الأوان.
+          راجعوا درجات ابنكم، اسألوا عن غيابه، تابعوا اختباراته.
+          <span class="highlight-red">فإن لم تفعلوا، فأنتم شركاء في كل درجة تُخصم منه وكل فرصة تضيع عليه.</span>
+        </p>
+      </div>
+
+      <!-- FATHER AS PARTNER SECTION -->
+      <div class="section-title">
+        <span class="section-icon">🤝</span>
+        الأب شريك لا متفرّج — والأم حاضنة لا غائبة
+      </div>
+
+      <p>
+        ثمة صورة نريد أن نُصحّحها في أذهان بعض أولياء الأمور:
+        صورة أن دور الأب ينتهي عند توصيل ابنه إلى باب المدرسة،
+        أو أن دور الأم ينتهي عند تجهيز حقيبته في الصباح.
+      </p>
+
+      <p>
+        <span class="highlight-blue">الأب الحقيقي شريك لابنه في مسيرته التعليمية</span>،
+        يسأله عن اختباره قبل أن يسأله عن عشائه،
+        يُحفّزه حين يكسل، ويشدّه حين يتراخى، ويُشعره أن ما يفعله مهم وأن أحداً يهتم به.
+        الطالب الذي يشعر أن والده يتابعه ويراقبه
+        <span class="highlight-gold">يختلف كلياً عن الطالب الذي يعلم أنه مهما فعل لن يُحاسبه أحد.</span>
+      </p>
+
+      <div class="partner-box">
+        <div class="partner-col positive">
+          <div class="partner-col-title">✅ الأب الشريك المحفّز</div>
+          <ul>
+            <li>يسأل يومياً عن الواجبات والاختبارات</li>
+            <li>يُلزم ابنه بالحضور ويتابع غيابه</li>
+            <li>يُشجّع على الاختبارات التجريبية ويعلم أهميتها</li>
+            <li>يُعرّف ابنه بثمن الإهمال قبل أن يدفعه</li>
+            <li>يُشعر ابنه أن نجاحه فخر للعائلة</li>
+          </ul>
+        </div>
+        <div class="partner-col negative">
+          <div class="partner-col-title">❌ الأب المثبّط المتفرّج</div>
+          <ul>
+            <li>لا يعلم بالاختبارات حتى تنتهي</li>
+            <li>يُسهّل الغياب ولا يُساءل عنه</li>
+            <li>يرى الإهمال ويصمت أو يُبرّره</li>
+            <li>لا يُحاسب حتى تأتي النتيجة مخيّبة</li>
+            <li>يلوم المدرسة حين يكون هو جزء المشكلة</li>
+          </ul>
+        </div>
+      </div>
+
+      <p>
+        <span class="highlight-gold">كونوا الشريك لا المتفرّج.</span>
+        كونوا المحفّز لا المثبّط.
+        ابنكم لا يحتاج مدرسة فحسب — يحتاج بيتاً يؤمن بقيمة التعليم،
+        ووالدين يُجسّدان هذا الإيمان في كل قرار صغير وكبير.
+      </p>
+
+      <p>
+        إن واجب ولي الأمر لا يقتصر على توفير الجهاز والاشتراك والمصروف —
+        بل واجبه الحقيقي أن <span class="highlight-blue">يغرس في نفس ولده قيمة الالتزام</span>،
+        ويُعلّمه أن الحضور أمانة، وأن الغياب خيانة لنفسه قبل أن يكون خيانة للمدرسة.
+        الولد الذي يرى والده يُسهّل له الغياب ويُبرّر له التغيّب
+        سيتعلّم درساً واحداً فحسب:
+        <span class="highlight-red">أن الالتزام أمر اختياري، وأن المسؤولية قابلة للتفاوض.</span>
+        وهذا الدرس سيرافقه طوال حياته.
+      </p>
+
+      <p>
+        تقولون إنكم تريدون لأبنائكم البرّ والنجاح والمستقبل المشرق —
+        وهذا حق وواجب — لكن البرّ لا يُبنى بالأمنيات،
+        <span class="highlight-gold">وأنتم لن تنالوا برّ أبنائكم إن لم تبروا بهم أنتم أولاً في حسن تعليمهم وتربيتهم وحثّهم على الجدية.</span>
+        وإن أهملتم اليوم فلا تلوموا غداً إلا أنفسكم،
+        لأنكم ستكونون — بهذا الإهمال — جزءاً أصيلاً من تعثّرهم وتدنّي مستواهم.
+      </p>
+
+      <p>
+        ونختم بسؤال نتركه في ضمير كل أب وكل أم:</p>
+<p>        <span class="highlight-red">
+          حين يُسأل ابنك يوم الغد عن سبب تأخّره، ماذا ستكون إجابته؟
+          وهل ستكون راضياً أمام الله عن دورك في تلك الإجابة؟
+        </span>
+      </p>
+
+    </div>
+
+    <div class="closing">
+      <div class="closing-dua">
+        نسأل الله أن يوفّق أبناءنا وأبناءكم،<br>
+        وأن يُعيننا وإيّاكم على أداء الأمانة كما أمر،<br>
+        والله وليّ التوفيق.
+      </div>
+      <div class="closing-sig">الهيئة التعليمية</div>
+      <div class="school-sig">مدرسة عبيدة بن الحارث المتوسطة</div>
+    </div>
+
+  </div>
+
+  <div class="footer">
+    <span class="footer-text">١٠ شوال ١٤٤٧ هـ</span>
+    <span class="footer-gold">نافس — المعادلات الخطية والقيمة المطلقة (رياضيات)</span>
+    <span class="footer-text">المشاركة: 24 من 140</span>
+  </div>
+</div>
+</body>
+</html>
