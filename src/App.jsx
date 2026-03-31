@@ -265,6 +265,7 @@ function RichEditor({ value, onChange }) {
   const [showColors, setShowColors] = useState(false);
   const [showBgColors, setShowBgColors] = useState(false);
   const [showFonts, setShowFonts] = useState(false);
+  const [imgSize, setImgSize] = useState("medium"); // small | medium | above | large | full
 
   const emojis = ["⭐","🎉","📢","📌","🔔","✅","❌","❗","⚠️","💡","📅","🏫","👨‍🏫","👨‍🎓","📖","🖋️","🎓","🏆","🥇","⚽","🔬","🎨","🎵","💪","👏","🤝","💐","🌟","✨","🔥","💯","❤️","💚","💙","🇸🇦","🌙","☀️","🌈","🎯","📝","🏅","🌺","🍀","🦁","🦅","🕌","🤲","🫶","😊","😄","👍","🙏"];
   const stickers = ["🏆 تهانينا!","⭐ ممتاز!","✅ تم بنجاح","📢 تنبيه مهم","🎉 مبروك!","💡 تذكير","⚠️ عاجل","📌 ملاحظة","🏫 من إدارة المدرسة","👨‍🏫 للمعلمين الكرام","👨‍🎓 للطلاب الأعزاء","🤝 بالتوفيق للجميع","🌟 إعلان هام","🎯 للاهتمام"];
@@ -272,9 +273,20 @@ function RichEditor({ value, onChange }) {
   const bgColors = ["transparent","#FEF3C7","#DCFCE7","#DBEAFE","#F3E8FF","#FFE4E6","#E0F2FE","#FEF9C3","#D1FAE5","#FCE7F3","#FFF7ED","#F0FDF4"];
 
   const exec = (cmd, val = null) => { document.execCommand(cmd, false, val); editorRef.current?.focus(); };
+  const IMG_SIZES = {
+    small:  { w: "200px",  label: "صغير",         icon: "🔹" },
+    medium: { w: "50%",    label: "متوسط",         icon: "🔸" },
+    above:  { w: "70%",    label: "فوق المتوسط",   icon: "🔶" },
+    large:  { w: "90%",    label: "كبير",           icon: "🟧" },
+    full:   { w: "100%",   label: "كامل العرض",    icon: "🟥" },
+  };
   const handleImage = (e) => {
     const file = e.target.files?.[0]; if (!file) return;
-    readFileAsync(file, "dataurl").then(dataUrl => { exec("insertHTML", `<img src="${dataUrl}" style="max-width:100%;border-radius:12px;margin:8px 0;display:block;" />`); }); e.target.value = "";
+    const sz = IMG_SIZES[imgSize] || IMG_SIZES.medium;
+    readFileAsync(file, "dataurl").then(dataUrl => {
+      exec("insertHTML", `<img src="${dataUrl}" style="width:${sz.w};max-width:100%;border-radius:12px;margin:8px auto;display:block;" />`);
+    });
+    e.target.value = "";
   };
   const handleInput = () => { if (editorRef.current) onChange(editorRef.current.innerHTML); };
   useEffect(() => { if (editorRef.current && !editorRef.current.innerHTML && value) editorRef.current.innerHTML = value; }, []);
@@ -339,7 +351,15 @@ function RichEditor({ value, onChange }) {
           )}
         </div>
         <div className="w-px bg-gray-300 mx-1"></div>
-        <ToolBtn onClick={() => fileRef.current?.click()} title="إضافة صورة">📷 صورة</ToolBtn>
+        <div className="flex items-center gap-1">
+          <span className="text-xs text-gray-400 font-bold">📏</span>
+          <select value={imgSize} onChange={e => setImgSize(e.target.value)}
+            className="h-8 px-1 rounded-lg bg-gray-50 border border-gray-200 text-xs cursor-pointer focus:outline-none"
+            title="حجم الصورة عند الإضافة">
+            {Object.entries(IMG_SIZES).map(([k,v]) => <option key={k} value={k}>{v.icon} {v.label}</option>)}
+          </select>
+        </div>
+        <ToolBtn onClick={() => fileRef.current?.click()} title={`إضافة صورة — ${IMG_SIZES[imgSize]?.label}`}>📷 صورة</ToolBtn>
         <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleImage} />
         <div className="relative">
           <ToolBtn onClick={() => { closeAll(); setShowEmoji(!showEmoji); }} title="إيموجي">😊 إيموجي</ToolBtn>
@@ -1532,6 +1552,651 @@ function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, sa
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ===== صفحة دوام الإداريين =====
+function AdminAttendancePage() {
+  /* ─── بيانات دائمة ─── */
+  const LS_ADMINS   = "admin_att_staff_v1";
+  const LS_ATT      = "admin_att_records_v1";
+  const LS_WEEK     = "admin_att_week_v1";
+  const LS_ARCHIVE  = "admin_att_archive_v1";
+
+  const loadLS = (k, def) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : def; } catch { return def; } };
+  const saveLS = (k, v)   => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
+
+  const defaultWeek = () => {
+    const today = new Date();
+    const day = today.getDay(); // 0=sun
+    const diff = day === 0 ? 0 : day >= 1 && day <= 4 ? -(day) : 7 - day;
+    const sun = new Date(today); sun.setDate(today.getDate() + diff);
+    const DAYS = ["الأحد","الاثنين","الثلاثاء","الأربعاء","الخميس"];
+    return {
+      days: DAYS.map((name, i) => {
+        const d = new Date(sun); d.setDate(sun.getDate() + i);
+        return { name, dateM: d.toLocaleDateString("ar-SA-u-nu-latn", { year:"numeric", month:"2-digit", day:"2-digit" }) };
+      })
+    };
+  };
+
+  const [admins,   setAdmins]   = useState(() => loadLS(LS_ADMINS,  []));
+  const [att,      setAtt]      = useState(() => loadLS(LS_ATT,     {}));
+  const [week,     setWeek]     = useState(() => loadLS(LS_WEEK,    defaultWeek()));
+  const [archive,  setArchive]  = useState(() => loadLS(LS_ARCHIVE, []));
+
+  useEffect(() => saveLS(LS_ADMINS,  admins),  [admins]);
+  useEffect(() => saveLS(LS_ATT,     att),     [att]);
+  useEffect(() => saveLS(LS_WEEK,    week),    [week]);
+  useEffect(() => saveLS(LS_ARCHIVE, archive), [archive]);
+
+  /* ─── UI state ─── */
+  const [selDay,       setSelDay]       = useState(0);
+  const [searchQ,      setSearchQ]      = useState("");
+  const [showAddAdmin, setShowAddAdmin] = useState(false);
+  const [newName,      setNewName]      = useState("");
+  const [newId,        setNewId]        = useState("");
+  const [showImport,   setShowImport]   = useState(false);
+  const [showSummary,  setShowSummary]  = useState(false);
+  const [showDatePick, setShowDatePick] = useState(false);
+  const [showArchive,  setShowArchive]  = useState(false);
+  const [archYear,     setArchYear]     = useState(new Date().getFullYear());
+  const [archMonth,    setArchMonth]    = useState(new Date().getMonth()+1);
+  const [printYear,    setPrintYear]    = useState(new Date().getFullYear());
+
+  /* ─── ثوابت ─── */
+  const STATUS_OPTS = [
+    { val:"حاضر",    label:"حاضر",            icon:"✅", bg:"#dcfce7", brd:"#16a34a", clr:"#15803d" },
+    { val:"متأخر",   label:"متأخر صباحاً",    icon:"🌅", bg:"#fef3c7", brd:"#d97706", clr:"#92400e" },
+    { val:"مستأذن",  label:"مستأذن",          icon:"📋", bg:"#dbeafe", brd:"#2563eb", clr:"#1d4ed8" },
+    { val:"غائب",    label:"غائب",            icon:"❌", bg:"#fee2e2", brd:"#dc2626", clr:"#991b1b" },
+    { val:"انسحاب",  label:"انسحاب (بدون إذن)",icon:"🚶", bg:"#fdf4ff", brd:"#9333ea", clr:"#6b21a8" },
+  ];
+  const EXCUSE_REASONS = ["موعد مستشفى","مرض","حالة طارئة","أخرى"];
+
+  /* ─── مساعد تحديث ─── */
+  const upd = (ai, di, field, val) => {
+    setAtt(prev => ({
+      ...prev,
+      [ai]: {
+        ...prev[ai],
+        [di]: {
+          ...(prev[ai]?.[di] || {}),
+          [field]: val,
+          ...(field === "status" && val === "حاضر"   ? { lateMin:"", excuseReason:"", excuseOther:"", exitTime:"", notes:"" } : {}),
+          ...(field === "status" && val === "غائب"   ? { lateMin:"", exitTime:"" } : {}),
+          ...(field === "status" && val === "انسحاب" ? { lateMin:"", excuseReason:"" } : {}),
+        }
+      }
+    }));
+  };
+  const getR = (ai, di) => att[ai]?.[di] || {};
+  const getStatus = (ai, di) => getR(ai, di).status || "حاضر";
+
+  /* ─── إحصائيات ─── */
+  const cnt = (di, st) => admins.filter((_,ai) => getStatus(ai,di) === st).length;
+  const totalPresent = (di) => admins.length - cnt(di,"غائب") - cnt(di,"انسحاب");
+  const weekStats = (ai) => {
+    const abs  = week.days.filter((_,di) => getStatus(ai,di) === "غائب").length;
+    const late = week.days.filter((_,di) => getStatus(ai,di) === "متأخر").length;
+    const exc  = week.days.filter((_,di) => getStatus(ai,di) === "مستأذن").length;
+    const wlk  = week.days.filter((_,di) => getStatus(ai,di) === "انسحاب").length;
+    const lateMins = week.days.reduce((s,_,di) => {
+      const r = getR(ai,di); return r.status === "متأخر" ? s + (parseInt(r.lateMin)||0) : s;
+    }, 0);
+    return { abs, late, exc, wlk, lateMins };
+  };
+
+  /* ─── إضافة إداري ─── */
+  const addAdmin = () => {
+    const n = newName.trim(); if (!n) return;
+    setAdmins(prev => [...prev, { name: n, id: newId.trim() }]);
+    setNewName(""); setNewId(""); setShowAddAdmin(false);
+  };
+  const delAdmin = (ai) => {
+    if (!confirm("حذف هذا الإداري؟")) return;
+    setAdmins(prev => prev.filter((_,i) => i !== ai));
+    setAtt(prev => {
+      const nxt = {...prev}; delete nxt[ai];
+      const reindexed = {};
+      Object.keys(nxt).forEach(k => { const ki = parseInt(k); reindexed[ki > ai ? ki-1 : ki] = nxt[k]; });
+      return reindexed;
+    });
+  };
+
+  /* ─── استيراد إكسل ─── */
+  const handleImportXLSX = async (file) => {
+    await loadXLSX();
+    const buf = await file.arrayBuffer();
+    const wb = window.XLSX.read(buf);
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const data = window.XLSX.utils.sheet_to_json(ws, { header:1 });
+    const rows = data.flat().filter(c => String(c||"").trim().length > 2 && isNaN(String(c||"").trim()));
+    if (rows.length > 0) {
+      const names = rows.map(r => String(r).trim()).filter(Boolean);
+      const toAdd = names.filter(n => !admins.find(a => a.name === n));
+      setAdmins(prev => [...prev, ...toAdd.map(n => ({ name:n, id:"" }))]);
+      alert(`✅ تم إضافة ${toAdd.length} إداري جديد`);
+    }
+    setShowImport(false);
+  };
+
+  /* ─── أرشفة الأسبوع ─── */
+  const archiveWeek = () => {
+    if (!confirm("هل تريد أرشفة هذا الأسبوع وبدء أسبوع جديد؟")) return;
+    const entry = { week: JSON.parse(JSON.stringify(week)), att: JSON.parse(JSON.stringify(att)), archivedAt: new Date().toISOString() };
+    setArchive(prev => [entry, ...prev]);
+    setAtt({});
+    const nw = defaultWeek(); setWeek(nw);
+    setShowSummary(false); setSelDay(0);
+    alert("✅ تمت الأرشفة وبدأ أسبوع جديد");
+  };
+
+  /* ─── طباعة اليوم ─── */
+  const printDay = () => {
+    const day = week.days[selDay];
+    const rows = admins.map((a, ai) => {
+      const r = getR(ai, selDay); const st = r.status || "حاضر";
+      const stOpt = STATUS_OPTS.find(o => o.val === st) || STATUS_OPTS[0];
+      let detail = "—";
+      if (st === "متأخر")   detail = `تأخر صباحي — ${r.lateMin||"—"} دقيقة`;
+      if (st === "مستأذن")  detail = `${r.excuseReason||"—"}${r.excuseReason==="أخرى"?` (${r.excuseOther||""})`:""} ${r.exitTime ? "| خروج "+r.exitTime:""}`;
+      if (st === "غائب")    detail = r.notes || "—";
+      if (st === "انسحاب")  detail = `انسحاب الساعة ${r.exitTime||"—"}`;
+      return `<tr style="background:${stOpt.bg}"><td>${ai+1}</td><td style="text-align:right;padding:6px 10px">${a.name}${a.id?` <small style="color:#888">(${a.id})</small>`:""}</td><td>${stOpt.icon} ${stOpt.label}</td><td>${detail}</td><td>${r.notes||"—"}</td></tr>`;
+    }).join("");
+    printWindow(`<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8"><title>دوام الإداريين</title>
+    <style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Noto Sans Arabic',Arial,sans-serif;padding:24px;direction:rtl}
+    .hdr{text-align:center;margin-bottom:16px;padding-bottom:10px;border-bottom:3px solid #7c3aed}
+    .hdr h1{font-size:18px;color:#7c3aed;font-weight:900}.hdr p{font-size:12px;color:#555;margin-top:3px}
+    .stats{display:flex;gap:10px;justify-content:center;margin-bottom:14px;flex-wrap:wrap}
+    .st{background:#f5f3ff;border:1px solid #ddd8fe;border-radius:8px;padding:7px 16px;text-align:center}
+    .st span{display:block;font-size:20px;font-weight:900}.st small{font-size:10px;color:#555}
+    table{width:100%;border-collapse:collapse;font-size:12px}
+    th{background:#7c3aed;color:#fff;padding:7px;text-align:center}
+    td{border:1px solid #e5e7eb;padding:5px;text-align:center}
+    .footer{text-align:center;margin-top:16px;font-size:10px;color:#999}
+    @media print{@page{size:A4;margin:1.5cm}}</style></head><body>
+    <div class="hdr"><h1>مدرسة عبيدة بن الحارث المتوسطة</h1>
+    <p>سجل دوام الإداريين — ${day.name} | ${day.dateM} م</p></div>
+    <div class="stats">
+      <div class="st"><span>${totalPresent(selDay)}</span><small>✅ حاضر</small></div>
+      <div class="st"><span>${cnt(selDay,"متأخر")}</span><small>🌅 متأخر</small></div>
+      <div class="st"><span>${cnt(selDay,"مستأذن")}</span><small>📋 مستأذن</small></div>
+      <div class="st"><span>${cnt(selDay,"غائب")}</span><small>❌ غائب</small></div>
+      <div class="st"><span>${cnt(selDay,"انسحاب")}</span><small>🚶 انسحاب</small></div>
+    </div>
+    <table><thead><tr><th>م</th><th>اسم الإداري</th><th>الحالة</th><th>التفاصيل</th><th>ملاحظات</th></tr></thead>
+    <tbody>${rows}</tbody></table>
+    <div class="footer">تم الإصدار ${new Date().toLocaleDateString("ar-SA")} — بوابة مدرسة عبيدة بن الحارث الإلكترونية</div>
+    <script>window.onload=()=>window.print()</script></body></html>`);
+  };
+
+  /* ─── طباعة ملخص الأسبوع ─── */
+  const printWeekSummary = (wk, wkAtt, title="ملخص الأسبوع") => {
+    const getWSt = (ai,di) => (wkAtt[ai]?.[di]?.status) || "حاضر";
+    const getWR  = (ai,di) => wkAtt[ai]?.[di] || {};
+    const rows = admins.map((a,ai) => {
+      const abs  = wk.days.filter((_,di) => getWSt(ai,di)==="غائب").length;
+      const late = wk.days.filter((_,di) => getWSt(ai,di)==="متأخر").length;
+      const exc  = wk.days.filter((_,di) => getWSt(ai,di)==="مستأذن").length;
+      const wlk  = wk.days.filter((_,di) => getWSt(ai,di)==="انسحاب").length;
+      const color = abs>0?"#fef2f2":late+wlk>0?"#fdf4ff":"#fff";
+      const daysCells = wk.days.map((_,di)=>{
+        const st=getWSt(ai,di); const r=getWR(ai,di);
+        const ic = st==="حاضر"?"✅":st==="متأخر"?"🌅":st==="مستأذن"?"📋":st==="انسحاب"?"🚶":"❌";
+        return `<td>${ic}${st==="متأخر"&&r.lateMin?`<br><small>${r.lateMin}د</small>`:""}</td>`;
+      }).join("");
+      return `<tr style="background:${color}"><td>${ai+1}</td><td style="text-align:right;padding:5px 8px">${a.name}${a.id?` <small>(${a.id})</small>`:""}</td>
+        ${daysCells}
+        <td style="color:#ea580c;font-weight:bold">${late||"—"}</td>
+        <td style="color:#2563eb;font-weight:bold">${exc||"—"}</td>
+        <td style="color:#9333ea;font-weight:bold">${wlk||"—"}</td>
+        <td style="color:#dc2626;font-weight:bold">${abs||"—"}</td></tr>`;
+    }).join("");
+    printWindow(`<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8"><title>${title}</title>
+    <style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Noto Sans Arabic',Arial,sans-serif;padding:20px;direction:rtl}
+    .hdr{text-align:center;margin-bottom:14px;padding-bottom:8px;border-bottom:3px solid #7c3aed}
+    .hdr h1{font-size:16px;color:#7c3aed;font-weight:900}.hdr p{font-size:11px;color:#555;margin-top:2px}
+    table{width:100%;border-collapse:collapse;font-size:10px}
+    th{background:#7c3aed;color:#fff;padding:6px;text-align:center}
+    td{border:1px solid #e5e7eb;padding:4px;text-align:center}
+    .footer{text-align:center;margin-top:12px;font-size:9px;color:#aaa}
+    @media print{@page{size:A4 landscape;margin:1cm}}</style></head><body>
+    <div class="hdr"><h1>مدرسة عبيدة بن الحارث المتوسطة</h1>
+    <p>${title} — ${wk.days[0]?.dateM} إلى ${wk.days[wk.days.length-1]?.dateM} م</p></div>
+    <table><thead><tr><th>م</th><th>اسم الإداري</th>
+    ${wk.days.map(d=>`<th>${d.name}</th>`).join("")}
+    <th>🌅متأخر</th><th>📋مستأذن</th><th>🚶انسحاب</th><th>❌غائب</th></tr></thead>
+    <tbody>${rows}</tbody></table>
+    <div class="footer">تم الإصدار ${new Date().toLocaleDateString("ar-SA")} — بوابة مدرسة عبيدة بن الحارث الإلكترونية</div>
+    <script>window.onload=()=>window.print()</script></body></html>`);
+  };
+
+  /* ─── طباعة من بداية العام ─── */
+  const printYearReport = () => {
+    const thisYear = archive.filter(e => {
+      const d = new Date(e.archivedAt); return d.getFullYear() === printYear;
+    });
+    if (thisYear.length === 0 && !confirm("لا يوجد أرشيف لهذا العام. هل تريد طباعة الأسبوع الحالي فقط؟")) return;
+    const allWeeks = [...thisYear.map(e => ({ wk: e.week, wkAtt: e.att })), { wk: week, wkAtt: att }];
+    // تجميع إجماليات لكل إداري
+    const summary = admins.map((a,ai) => {
+      let totalAbs=0, totalLate=0, totalExc=0, totalWlk=0, totalLateMins=0;
+      allWeeks.forEach(({ wk:wk_, wkAtt:wa }) => {
+        wk_.days.forEach((_,di) => {
+          const st = wa[ai]?.[di]?.status || "حاضر";
+          const r = wa[ai]?.[di] || {};
+          if (st==="غائب")   totalAbs++;
+          if (st==="متأخر")  { totalLate++; totalLateMins += parseInt(r.lateMin||0); }
+          if (st==="مستأذن") totalExc++;
+          if (st==="انسحاب") totalWlk++;
+        });
+      });
+      return { a, totalAbs, totalLate, totalExc, totalWlk, totalLateMins };
+    });
+    const rows = summary.map((s,i) => {
+      const color = s.totalAbs>2?"#fef2f2":s.totalLate>3?"#fdf4ff":"#fff";
+      return `<tr style="background:${color}"><td>${i+1}</td>
+        <td style="text-align:right;padding:5px 10px">${s.a.name}${s.a.id?` <small>(${s.a.id})</small>`:""}</td>
+        <td style="color:#ea580c;font-weight:bold">${s.totalLate||"—"}</td>
+        <td style="color:#ea580c">${s.totalLateMins>0?s.totalLateMins+"د":"—"}</td>
+        <td style="color:#2563eb;font-weight:bold">${s.totalExc||"—"}</td>
+        <td style="color:#9333ea;font-weight:bold">${s.totalWlk||"—"}</td>
+        <td style="color:#dc2626;font-weight:bold">${s.totalAbs||"—"}</td></tr>`;
+    }).join("");
+    printWindow(`<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8"><title>تقرير دوام الإداريين ${printYear}</title>
+    <style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Noto Sans Arabic',Arial,sans-serif;padding:24px;direction:rtl}
+    .hdr{text-align:center;margin-bottom:16px;padding-bottom:10px;border-bottom:3px solid #7c3aed}
+    .hdr h1{font-size:18px;color:#7c3aed;font-weight:900}.hdr p{font-size:12px;color:#555;margin-top:3px}
+    table{width:100%;border-collapse:collapse;font-size:12px}
+    th{background:#7c3aed;color:#fff;padding:7px;text-align:center}
+    td{border:1px solid #e5e7eb;padding:5px;text-align:center}
+    .footer{text-align:center;margin-top:16px;font-size:10px;color:#999}
+    @media print{@page{size:A4;margin:1.5cm}}</style></head><body>
+    <div class="hdr"><h1>مدرسة عبيدة بن الحارث المتوسطة</h1>
+    <p>تقرير دوام الإداريين التراكمي — عام ${printYear} م (${allWeeks.length} أسبوع)</p></div>
+    <table><thead><tr>
+      <th>م</th><th>اسم الإداري</th><th>🌅تأخر</th><th>دقائق تأخر</th><th>📋استئذان</th><th>🚶انسحاب</th><th>❌غياب</th>
+    </tr></thead><tbody>${rows}</tbody></table>
+    <div class="footer">تم الإصدار ${new Date().toLocaleDateString("ar-SA")} — بوابة مدرسة عبيدة بن الحارث الإلكترونية</div>
+    <script>window.onload=()=>window.print()</script></body></html>`);
+  };
+
+  const filtered = admins.map((a,i) => ({a,ai:i})).filter(({a}) => a.name.includes(searchQ));
+
+  /* ─── JSX ─── */
+  return (
+    <div dir="rtl">
+      {/* Header */}
+      <div className="rounded-b-2xl p-6 mb-5 text-white shadow-xl" style={{ background:"linear-gradient(135deg,#7c3aed 0%,#5b21b6 100%)" }}>
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="text-center sm:text-right">
+            <div className="text-4xl mb-1">🏢</div>
+            <h2 className="text-2xl font-black">سجل دوام الإداريين</h2>
+            <p className="opacity-80 text-sm mt-1">مدرسة عبيدة بن الحارث المتوسطة — {new Date().getFullYear()}م</p>
+          </div>
+          <div className="flex gap-2 flex-wrap justify-center">
+            <button onClick={printDay} className="bg-white text-purple-700 px-3 py-2 rounded-xl text-xs font-bold hover:bg-purple-50 shadow">🖨️ طباعة اليوم</button>
+            <button onClick={() => setShowSummary(!showSummary)} className="bg-white text-indigo-700 px-3 py-2 rounded-xl text-xs font-bold hover:bg-indigo-50 shadow">📊 ملخص الأسبوع</button>
+            <button onClick={() => setShowArchive(!showArchive)} className="bg-white text-amber-700 px-3 py-2 rounded-xl text-xs font-bold hover:bg-amber-50 shadow">📁 الأرشيف والتقارير</button>
+            <button onClick={() => setShowAddAdmin(true)} className="bg-white text-green-700 px-3 py-2 rounded-xl text-xs font-bold hover:bg-green-50 shadow">➕ إضافة إداري</button>
+            <button onClick={() => setShowImport(true)} className="bg-white text-blue-700 px-3 py-2 rounded-xl text-xs font-bold hover:bg-blue-50 shadow">📥 إكسل</button>
+          </div>
+        </div>
+      </div>
+
+      {/* إحصائيات اليوم */}
+      {!showSummary && !showArchive && (
+        <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 mb-4">
+          {STATUS_OPTS.map(opt => (
+            <div key={opt.val} className="rounded-2xl p-3 text-center border-2" style={{ background:opt.bg, borderColor:opt.brd }}>
+              <div className="text-2xl font-black" style={{ color:opt.clr }}>{cnt(selDay,opt.val)}</div>
+              <div className="text-xs font-bold mt-1" style={{ color:opt.clr }}>{opt.icon} {opt.label}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* تبويب الأيام */}
+      {!showSummary && !showArchive && (
+        <div className="flex gap-2 mb-3 overflow-x-auto pb-1">
+          {week.days.map((d,i) => (
+            <button key={i} onClick={() => setSelDay(i)}
+              className={`px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-all flex-shrink-0 ${selDay===i?"bg-purple-600 text-white shadow-lg scale-105":"bg-white border-2 border-gray-200 text-gray-600 hover:border-purple-300"}`}>
+              <div>{d.name}</div>
+              <div className="text-xs opacity-70">{d.dateM}</div>
+            </button>
+          ))}
+          <button onClick={() => setShowDatePick(!showDatePick)}
+            className="px-3 py-2 rounded-xl text-xs font-bold bg-white border-2 border-dashed border-purple-300 text-purple-600 hover:bg-purple-50 flex-shrink-0">
+            📅 تغيير الأسبوع
+          </button>
+        </div>
+      )}
+
+      {/* تغيير تاريخ الأسبوع */}
+      {showDatePick && (
+        <div className="bg-white rounded-2xl shadow-lg border border-purple-100 p-4 mb-4">
+          <h3 className="font-bold text-purple-800 mb-3 text-sm">📅 تحديد أسبوع جديد</h3>
+          <AdminWeekPicker week={week} setWeek={w => { setWeek(w); setShowDatePick(false); setSelDay(0); }} />
+          <button onClick={() => setShowDatePick(false)} className="mt-2 text-xs text-gray-500 hover:text-gray-700">إلغاء</button>
+        </div>
+      )}
+
+      {/* ملخص الأسبوع */}
+      {showSummary && !showArchive && (
+        <div className="bg-white rounded-2xl shadow-lg border border-purple-100 p-4 mb-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-black text-purple-800">📊 ملخص دوام الأسبوع</h3>
+            <div className="flex gap-2">
+              <button onClick={() => printWeekSummary(week, att)} className="text-xs px-3 py-1.5 rounded-lg bg-purple-600 text-white font-bold">🖨️ طباعة</button>
+              <button onClick={archiveWeek} className="text-xs px-3 py-1.5 rounded-lg bg-amber-500 text-white font-bold">📁 أرشفة</button>
+              <button onClick={() => setShowSummary(false)} className="text-xs px-3 py-1.5 rounded-lg bg-gray-100 text-gray-600 font-bold">✕</button>
+            </div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-purple-50">
+                  <th className="p-2 text-right">م</th>
+                  <th className="p-2 text-right">الإداري</th>
+                  {week.days.map((d,i) => <th key={i} className="p-2 text-center">{d.name}</th>)}
+                  <th className="p-2 text-center text-orange-700">متأخر</th>
+                  <th className="p-2 text-center text-blue-700">مستأذن</th>
+                  <th className="p-2 text-center text-purple-700">انسحاب</th>
+                  <th className="p-2 text-center text-red-700">غائب</th>
+                </tr>
+              </thead>
+              <tbody>
+                {admins.map((a,ai) => {
+                  const s = weekStats(ai);
+                  const bg = s.abs>0?"#fef2f2":s.wlk>0?"#fdf4ff":s.late>0?"#fef3c7":"#fff";
+                  return (
+                    <tr key={ai} style={{ background:bg }} className="border-t border-gray-100">
+                      <td className="p-2 text-center text-gray-400">{ai+1}</td>
+                      <td className="p-2 font-medium text-gray-800">{a.name}{a.id&&<span className="text-xs text-gray-400 mr-1">({a.id})</span>}</td>
+                      {week.days.map((_,di) => {
+                        const st = getStatus(ai,di); const r = getR(ai,di);
+                        const opt = STATUS_OPTS.find(o=>o.val===st)||STATUS_OPTS[0];
+                        return <td key={di} className="p-1 text-center">
+                          <div>{opt.icon}</div>
+                          {st==="متأخر"&&r.lateMin&&<div className="text-xs text-orange-500">{r.lateMin}د</div>}
+                          {st==="انسحاب"&&r.exitTime&&<div className="text-xs text-purple-500">{r.exitTime}</div>}
+                        </td>;
+                      })}
+                      <td className="p-2 text-center font-bold text-orange-600">{s.late||"—"}</td>
+                      <td className="p-2 text-center font-bold text-blue-600">{s.exc||"—"}</td>
+                      <td className="p-2 text-center font-bold text-purple-600">{s.wlk||"—"}</td>
+                      <td className="p-2 text-center font-bold text-red-600">{s.abs||"—"}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* الأرشيف والتقارير */}
+      {showArchive && (
+        <div className="bg-white rounded-2xl shadow-lg border border-amber-100 p-4 mb-4">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-black text-amber-800 text-lg">📁 الأرشيف والتقارير التراكمية</h3>
+            <button onClick={() => setShowArchive(false)} className="text-gray-400 hover:text-gray-600 text-xl font-bold">✕</button>
+          </div>
+          {/* تقرير من بداية العام */}
+          <div className="bg-amber-50 rounded-xl p-4 mb-4 border border-amber-200">
+            <h4 className="font-bold text-amber-800 mb-3 text-sm">📋 طباعة تقرير من بداية العام</h4>
+            <div className="flex gap-3 flex-wrap items-center">
+              <div>
+                <label className="text-xs font-bold text-gray-600 block mb-1">السنة الميلادية</label>
+                <select value={printYear} onChange={e => setPrintYear(parseInt(e.target.value))}
+                  className="px-3 py-2 rounded-lg border border-amber-300 text-sm focus:outline-none bg-white">
+                  {[2022,2023,2024,2025,2026,2027,2028].map(y => <option key={y} value={y}>{y}</option>)}
+                </select>
+              </div>
+              <button onClick={printYearReport} className="bg-amber-600 text-white px-5 py-2 rounded-xl text-sm font-bold hover:bg-amber-700 mt-4">
+                🖨️ طباعة التقرير التراكمي {printYear}
+              </button>
+            </div>
+          </div>
+          {/* قائمة الأرشيف */}
+          <h4 className="font-bold text-gray-700 mb-2 text-sm">📂 الأسابيع المحفوظة ({archive.length} أسبوع)</h4>
+          {archive.length === 0 ? (
+            <div className="text-center py-6 text-gray-400 text-sm">لا يوجد أرشيف بعد. استخدم زر "أرشفة" في ملخص الأسبوع.</div>
+          ) : (
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {archive.map((e,i) => {
+                const d = new Date(e.archivedAt);
+                return (
+                  <div key={i} className="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-2 border border-gray-100">
+                    <div>
+                      <div className="text-sm font-bold text-gray-800">{e.week.days[0]?.dateM} — {e.week.days[e.week.days.length-1]?.dateM}</div>
+                      <div className="text-xs text-gray-400">تمت الأرشفة: {d.toLocaleDateString("ar-SA")}</div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button onClick={() => printWeekSummary(e.week, e.att, `ملخص أسبوع ${e.week.days[0]?.dateM}`)}
+                        className="text-xs px-3 py-1.5 rounded-lg bg-purple-600 text-white font-bold hover:bg-purple-700">🖨️</button>
+                      <button onClick={() => { if(confirm("حذف هذا الأسبوع من الأرشيف؟")) setArchive(prev=>prev.filter((_,j)=>j!==i)); }}
+                        className="text-xs px-2 py-1.5 rounded-lg bg-red-100 text-red-600 font-bold hover:bg-red-200">🗑️</button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* جدول الحضور اليومي */}
+      {!showSummary && !showArchive && (
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="bg-purple-600 text-white px-4 py-3 text-center">
+            <span className="font-black">{week.days[selDay]?.name}</span>
+            <span className="mx-2 opacity-60">|</span>
+            <span className="text-sm opacity-90">{week.days[selDay]?.dateM} م</span>
+          </div>
+          {/* بحث */}
+          <div className="p-3 border-b border-gray-100">
+            <input value={searchQ} onChange={e => setSearchQ(e.target.value)}
+              placeholder="🔍 بحث عن إداري..." dir="rtl"
+              className="w-full px-4 py-2 rounded-xl border-2 border-gray-200 focus:border-purple-400 focus:outline-none text-sm" />
+          </div>
+          {admins.length === 0 ? (
+            <div className="text-center py-12 text-gray-400">
+              <div className="text-5xl mb-3">👥</div>
+              <div className="font-bold">لا يوجد إداريون مضافون بعد</div>
+              <div className="text-sm mt-1">اضغط "إضافة إداري" أو استورد من إكسل</div>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr style={{ background:"#faf5ff" }}>
+                    <th className="p-3 text-right text-xs font-bold text-gray-500 w-8">م</th>
+                    <th className="p-3 text-right text-xs font-bold text-gray-500">الإداري</th>
+                    <th className="p-3 text-center text-xs font-bold text-gray-500">الحالة</th>
+                    <th className="p-3 text-center text-xs font-bold text-orange-700">التفاصيل</th>
+                    <th className="p-3 text-center text-xs font-bold text-gray-500">وقت الخروج</th>
+                    <th className="p-3 text-center text-xs font-bold text-gray-400">ملاحظات</th>
+                    <th className="p-3 w-8"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map(({ a, ai }) => {
+                    const r = getR(ai, selDay);
+                    const st = r.status || "حاضر";
+                    const opt = STATUS_OPTS.find(o => o.val === st) || STATUS_OPTS[0];
+                    return (
+                      <tr key={ai} style={{ background: opt.bg + "55" }} className="border-t border-gray-100">
+                        <td className="p-2 text-center text-xs text-gray-400 font-bold">{ai+1}</td>
+                        <td className="p-2.5">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: opt.brd }}></div>
+                            <div>
+                              <div className="font-medium text-gray-800 text-sm">{a.name}</div>
+                              {a.id && <div className="text-xs text-gray-400">هوية: {a.id}</div>}
+                            </div>
+                          </div>
+                        </td>
+                        {/* الحالة */}
+                        <td className="p-1.5">
+                          <div className="flex flex-wrap gap-1 justify-center">
+                            {STATUS_OPTS.map(o => (
+                              <button key={o.val} onClick={() => upd(ai, selDay, "status", o.val)}
+                                className="px-1.5 py-1 rounded-lg text-xs font-bold transition-all border-2"
+                                style={{
+                                  background: st===o.val ? o.bg : "#f9fafb",
+                                  borderColor: st===o.val ? o.brd : "#e5e7eb",
+                                  color: st===o.val ? o.clr : "#9ca3af",
+                                }}>
+                                {o.icon} {o.val === "انسحاب" ? "انسحاب" : o.val}
+                              </button>
+                            ))}
+                          </div>
+                        </td>
+                        {/* التفاصيل */}
+                        <td className="p-1.5 text-center">
+                          {st === "متأخر" && (
+                            <div className="flex items-center gap-1 justify-center">
+                              <input type="number" min="1" max="180" placeholder="دقائق"
+                                value={r.lateMin || ""}
+                                onChange={e => upd(ai, selDay, "lateMin", e.target.value)}
+                                className="w-16 px-2 py-1.5 rounded-lg border-2 border-orange-200 text-center text-xs font-bold focus:outline-none focus:border-orange-400 bg-orange-50" />
+                              <span className="text-xs text-orange-600 font-bold">د</span>
+                            </div>
+                          )}
+                          {st === "مستأذن" && (
+                            <div className="space-y-1">
+                              <select value={r.excuseReason || ""}
+                                onChange={e => upd(ai, selDay, "excuseReason", e.target.value)}
+                                className="px-2 py-1 rounded-lg border-2 border-blue-200 text-xs font-bold focus:outline-none bg-blue-50 text-blue-700 w-full">
+                                <option value="">— سبب الاستئذان —</option>
+                                {EXCUSE_REASONS.map(r => <option key={r}>{r}</option>)}
+                              </select>
+                              {r.excuseReason === "أخرى" && (
+                                <input type="text" placeholder="اذكر السبب..."
+                                  value={r.excuseOther || ""}
+                                  onChange={e => upd(ai, selDay, "excuseOther", e.target.value)}
+                                  className="w-full px-2 py-1 rounded-lg border-2 border-blue-200 text-xs focus:outline-none focus:border-blue-400" />
+                              )}
+                            </div>
+                          )}
+                          {st === "غائب" && <span className="text-red-400 text-lg">❌</span>}
+                          {st === "حاضر" && <span className="text-green-400 text-lg">✅</span>}
+                          {st === "انسحاب" && <span className="text-xs text-purple-600 font-bold">خروج بدون إذن</span>}
+                        </td>
+                        {/* وقت الخروج */}
+                        <td className="p-1.5 text-center">
+                          {(st === "مستأذن" || st === "انسحاب") && (
+                            <input type="time"
+                              value={r.exitTime || ""}
+                              onChange={e => upd(ai, selDay, "exitTime", e.target.value)}
+                              className="px-2 py-1 rounded-lg border-2 border-gray-200 text-xs focus:outline-none focus:border-purple-400 text-center" />
+                          )}
+                          {(st === "حاضر" || st === "غائب" || st === "متأخر") && <span className="text-gray-200 text-lg">—</span>}
+                        </td>
+                        {/* ملاحظات */}
+                        <td className="p-1.5">
+                          <input type="text" placeholder="ملاحظة..."
+                            value={r.notes || ""}
+                            onChange={e => upd(ai, selDay, "notes", e.target.value)}
+                            className="w-full px-2 py-1 rounded-lg border-2 border-gray-200 text-xs focus:outline-none focus:border-purple-400 text-center"
+                            style={{ minWidth:"80px" }} />
+                        </td>
+                        <td className="p-1 text-center">
+                          <button onClick={() => delAdmin(ai)} className="text-red-300 hover:text-red-500 text-lg" title="حذف">✕</button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* نافذة إضافة إداري */}
+      {showAddAdmin && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-black text-gray-800 text-lg">➕ إضافة إداري</h3>
+              <button onClick={() => setShowAddAdmin(false)} className="text-gray-400 hover:text-gray-600 text-xl font-bold">✕</button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-bold text-gray-600 block mb-1">الاسم <span className="text-red-500">*</span></label>
+                <input type="text" value={newName} onChange={e => setNewName(e.target.value)} onKeyDown={e => e.key==="Enter"&&addAdmin()}
+                  placeholder="اسم الإداري رباعياً"
+                  className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-purple-400 focus:outline-none text-sm" dir="rtl" autoFocus />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-gray-600 block mb-1">رقم الهوية <span className="text-gray-400">(اختياري)</span></label>
+                <input type="text" value={newId} onChange={e => setNewId(e.target.value)}
+                  placeholder="رقم الهوية الوطنية"
+                  className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-purple-400 focus:outline-none text-sm" dir="rtl" />
+              </div>
+            </div>
+            <div className="flex gap-2 mt-4">
+              <button onClick={addAdmin} className="flex-1 bg-purple-600 text-white py-2.5 rounded-xl font-bold hover:bg-purple-700">إضافة</button>
+              <button onClick={() => { setShowAddAdmin(false); setNewName(""); setNewId(""); }} className="px-4 py-2.5 rounded-xl bg-gray-100 text-gray-600 font-bold hover:bg-gray-200">إلغاء</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* نافذة استيراد إكسل */}
+      {showImport && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-black text-gray-800 text-lg">📥 استيراد من إكسل</h3>
+              <button onClick={() => setShowImport(false)} className="text-gray-400 hover:text-gray-600 text-xl font-bold">✕</button>
+            </div>
+            <div className="bg-blue-50 rounded-xl p-3 text-sm text-blue-700 mb-4 font-medium">
+              يجب أن يحتوي الملف على عمود بأسماء الإداريين. سيتم إضافة الأسماء الجديدة تلقائياً.
+            </div>
+            <label className="flex flex-col items-center justify-center border-2 border-dashed border-purple-300 rounded-xl p-8 cursor-pointer hover:border-purple-500 hover:bg-purple-50 transition-all">
+              <div className="text-4xl mb-2">📂</div>
+              <div className="font-bold text-gray-700">اضغط لاختيار ملف إكسل</div>
+              <div className="text-xs text-gray-400 mt-1">يدعم .xlsx و .xls</div>
+              <input type="file" accept=".xlsx,.xls" className="hidden"
+                onChange={e => { const f = e.target.files?.[0]; if (f) handleImportXLSX(f); }} />
+            </label>
+            <button onClick={() => setShowImport(false)} className="w-full mt-3 py-2.5 rounded-xl bg-gray-100 text-gray-600 font-bold hover:bg-gray-200">إلغاء</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─── مساعد تغيير تاريخ أسبوع الإداريين ─── */
+function AdminWeekPicker({ week, setWeek }) {
+  const [startDate, setStartDate] = useState("");
+  const generate = () => {
+    if (!startDate) return;
+    const d = new Date(startDate);
+    const DAYS = ["الأحد","الاثنين","الثلاثاء","الأربعاء","الخميس"];
+    setWeek({
+      days: DAYS.map((name, i) => {
+        const nd = new Date(d); nd.setDate(d.getDate() + i);
+        return { name, dateM: nd.toLocaleDateString("ar-SA-u-nu-latn", { year:"numeric", month:"2-digit", day:"2-digit" }) };
+      })
+    });
+  };
+  return (
+    <div className="flex gap-2 flex-wrap items-end">
+      <div>
+        <label className="text-xs font-bold text-gray-600 block mb-1">تاريخ أول الأسبوع (الأحد)</label>
+        <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)}
+          className="px-3 py-2 rounded-xl border-2 border-purple-200 text-sm focus:outline-none focus:border-purple-400" />
+      </div>
+      <button onClick={generate} className="bg-purple-600 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-purple-700">تطبيق</button>
     </div>
   );
 }
@@ -16483,6 +17148,7 @@ export default function SchoolWebsite() {
   const pages = [
     { id: "home",            label: "الرئيسية",        icon: "🏠" },
     { id: "attendance",      label: "غياب المعلمين",  icon: "📋" },
+    { id: "admin-attendance",label: "دوام الإداريين", icon: "🏢" },
     { id: "student-absence", label: "غياب الطلاب",   icon: "🎒" },
     { id: "students",        label: "تقييم الطلاب",  icon: "👨‍🎓" },
     { id: "announcements", label: "الإعلانات",       icon: "📢" },
@@ -16816,6 +17482,7 @@ export default function SchoolWebsite() {
       <main className="w-full py-3">
         {page === "home"          && <HomePage teachers={teachers} announcements={announcements} activities={activities} navigate={navigate} attendance={attendance} week={week} messages={messages} classList={classList} weekArchive={weekArchive} />}
         {page === "student-absence" && <StudentAbsencePage />}
+        {page === "admin-attendance" && <AdminAttendancePage />}
         {page === "attendance"    && <AttendancePage teachers={teachers} setTeachers={setTeachers} saveTeachers={saveTeachers} week={week} setWeek={setWeek} saveWeek={saveWeek} attendance={attendance} setAttendance={setAttendance} saveAttendance={saveAttendance} />}
         {page === "students"      && <StudentsPage classList={classList} setClassList={setClassList} saveClass={saveClass} deleteClass={deleteClass} onSendNote={handleSendNote} messages={messages} />}
         {page === "announcements" && <AnnouncementsPage announcements={announcements} setAnnouncements={setAnnouncements} saveAnnouncements={saveAnnouncements} />}
