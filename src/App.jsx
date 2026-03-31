@@ -757,29 +757,6 @@ function HomePage({ teachers, announcements, activities, navigate, attendance, w
         </div>
       </div>
 
-      {/* - نشرات وإعلانات المدير - */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-6">
-        <h3 className="font-black text-gray-800 mb-3 flex items-center gap-2 text-sm">
-          📄 نشرات وإعلانات المدير
-        </h3>
-        <div className="space-y-2">
-          <a href="https://school-website1.vercel.app/جدول-نافس.html" target="_blank" rel="noopener noreferrer"
-            className="flex items-center gap-3 bg-blue-50 hover:bg-blue-100 border border-blue-100 rounded-xl px-4 py-3 transition-colors"
-            style={{textDecoration:"none"}}>
-            <span className="text-xl">📋</span>
-            <span className="text-sm font-bold text-blue-800">جدول تدريب نافس — الصف الثالث المتوسط</span>
-            <span className="text-xs text-blue-400 mr-auto">فتح ←</span>
-          </a>
-          <a href="https://school-website1.vercel.app/رسالة-اولياء.html" target="_blank" rel="noopener noreferrer"
-            className="flex items-center gap-3 bg-amber-50 hover:bg-amber-100 border border-amber-100 rounded-xl px-4 py-3 transition-colors"
-            style={{textDecoration:"none"}}>
-            <span className="text-xl">✉️</span>
-            <span className="text-sm font-bold text-amber-800">رسالة عتب لأولياء الأمور</span>
-            <span className="text-xs text-amber-400 mr-auto">فتح ←</span>
-          </a>
-        </div>
-      </div>
-
       {/* - رؤية المدرسة ورسالتها (مُعادة) - */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
         <div className="text-center mb-6">
@@ -1050,6 +1027,10 @@ function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, sa
     if (r.status === "متأخر" && r.lateType === "حصص") return sum + (parseInt(r.lateMinutes) || 0);
     return sum;
   }, 0);
+  // طابور الصباح — غاب عن الطابور (morningAssembly === false صراحةً)
+  const countMissedAssembly = (di) => teachers.filter((_, ti) => attendance[ti]?.[di]?.morningAssembly === false).length;
+  const countAttendedAssembly = (di) => teachers.filter((_, ti) => attendance[ti]?.[di]?.morningAssembly !== false).length;
+
   const filtered = teachers.map((t, i) => ({ name: t, idx: i })).filter(t => t.name.includes(searchQuery));
 
   // استيراد المعلمين من إكسل
@@ -1213,6 +1194,10 @@ function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, sa
             <div className="text-3xl font-black text-red-700">{countAbsent(selectedDay)}</div>
             <div className="text-xs font-bold text-red-600 mt-1">❌ غائب</div>
           </div>
+          <div className="bg-purple-50 border-2 border-purple-200 rounded-2xl p-3 text-center">
+            <div className="text-3xl font-black text-purple-700">{countMissedAssembly(selectedDay)}</div>
+            <div className="text-xs font-bold text-purple-600 mt-1">🚩 غاب عن الطابور</div>
+          </div>
         </div>
       )}
 
@@ -1348,6 +1333,7 @@ function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, sa
                   <th className="p-2 text-center font-bold text-amber-600">📚 حصص</th>
                   <th className="p-2 text-center font-bold text-amber-500">دقائق حصص</th>
                   <th className="p-2 text-center font-bold text-red-700">❌ غياب</th>
+                  <th className="p-2 text-center font-bold text-purple-700">🚩 غاب طابور</th>
                 </tr>
               </thead>
               <tbody>
@@ -1357,9 +1343,10 @@ function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, sa
                   const absCount = week.days.filter((_, di) => (attendance[ti]?.[di]?.status||"حاضر")==="غائب").length;
                   const morningMins = week.days.reduce((s,_,di)=>{ const r=attendance[ti]?.[di]||{}; return r.status==="متأخر"&&(r.lateType==="صباحي"||!r.lateType)?s+(parseInt(r.lateMinutes)||0):s; },0);
                   const periodMins = week.days.reduce((s,_,di)=>{ const r=attendance[ti]?.[di]||{}; return r.status==="متأخر"&&r.lateType==="حصص"?s+(parseInt(r.lateMinutes)||0):s; },0);
+                  const missedAssembly = week.days.filter((_, di) => attendance[ti]?.[di]?.morningAssembly === false).length;
                   const anyLate = morningLate + periodLate;
                   return (
-                    <tr key={ti} className={`border-t border-gray-100 ${absCount>0?"bg-red-50":anyLate>0?"bg-amber-50":"hover:bg-gray-50"}`}>
+                    <tr key={ti} className={`border-t border-gray-100 ${absCount>0?"bg-red-50":anyLate>0?"bg-amber-50":missedAssembly>0?"bg-purple-50":"hover:bg-gray-50"}`}>
                       <td className="p-2 text-center text-gray-400 font-bold">{ti+1}</td>
                       <td className="p-2 font-medium text-gray-800">{teacher}</td>
                       {week.days.map((_, di) => {
@@ -1382,6 +1369,7 @@ function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, sa
                       <td className="p-2 text-center font-black text-amber-600">{periodLate||"—"}</td>
                       <td className="p-2 text-center font-black text-amber-500">{periodMins>0?`${periodMins}د`:"—"}</td>
                       <td className="p-2 text-center font-black text-red-700">{absCount||"—"}</td>
+                      <td className="p-2 text-center font-black text-purple-700">{missedAssembly||"—"}</td>
                     </tr>
                   );
                 })}
@@ -1406,6 +1394,7 @@ function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, sa
                   <th className="p-3 text-right text-xs font-bold text-gray-500 w-8">م</th>
                   <th className="p-3 text-right text-xs font-bold text-gray-500">اسم المعلم / الإداري</th>
                   <th className="p-3 text-center text-xs font-bold text-gray-500 w-28">الحالة</th>
+                  <th className="p-3 text-center text-xs font-bold text-purple-600">🚩 طابور الصباح</th>
                   <th className="p-3 text-center text-xs font-bold text-amber-700">الحصة</th>
                   <th className="p-3 text-center text-xs font-bold text-amber-700">مدة التأخر</th>
                   <th className="p-3 text-center text-xs font-bold text-red-600">نوع الغياب</th>
@@ -1445,6 +1434,20 @@ function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, sa
                             </button>
                           ))}
                         </div>
+                      </td>
+
+                      {/* طابور الصباح */}
+                      <td className="p-1.5 text-center">
+                        <button
+                          onClick={() => updateField(ti, selectedDay, "morningAssembly", r.morningAssembly === false ? true : false)}
+                          className="px-3 py-1.5 rounded-lg text-xs font-bold border-2 transition-all"
+                          style={{
+                            background: r.morningAssembly === false ? "#fdf2f8" : "#f0fdf4",
+                            borderColor: r.morningAssembly === false ? "#c026d3" : "#16a34a",
+                            color: r.morningAssembly === false ? "#86198f" : "#15803d",
+                          }}>
+                          {r.morningAssembly === false ? "🚩 غاب" : "✅ حضر"}
+                        </button>
                       </td>
 
                       {/* الحصة المتأخر عنها */}
