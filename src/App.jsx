@@ -926,7 +926,7 @@ function HomePage({ teachers, announcements, activities, navigate, attendance, w
               alignItems:"center",justifyContent:"center",fontSize:22,position:"relative",zIndex:1,
               boxShadow:`0 4px 14px ${p.glow}`,transition:"transform .25s"}}
               className="group-hover:scale-110">
-              <span className="icon-3d-lg">{p.icon}</span>
+              {p.icon}
             </div>
             <span style={{fontSize:10,fontWeight:900,fontFamily:"Cairo,sans-serif",
               position:"relative",zIndex:1,transition:"color .25s",color:"#374151"}}
@@ -1063,7 +1063,7 @@ function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, sa
       return `<tr style="background:${color}"><td>${ti+1}</td><td style="text-align:right;padding:6px 10px">${t}</td><td>${st === "حاضر" ? "✅ حاضر" : st === "متأخر" ? "🕐 متأخر" : "❌ غائب"}</td><td>${details}</td></tr>`;
     }).join("");
 
-    w.document.write(`<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8">
+    printWindow(`<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8">
     <title>سجل الحضور — ${day.name}</title>
     <style>
       *{margin:0;padding:0;box-sizing:border-box}
@@ -1097,6 +1097,7 @@ function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, sa
       <tbody>${rows}</tbody>
     </table>
     <div class="footer">تم الإصدار بتاريخ ${new Date().toLocaleDateString('ar-SA')} — بوابة مدرسة عبيدة بن الحارث الإلكترونية</div>
+    <script>window.onload=()=>window.print()</script>
     </body></html>`);
   };
 
@@ -5491,6 +5492,36 @@ function AnnouncementsPage({ announcements, setAnnouncements, saveAnnouncements 
     setAnnouncements(u); saveAnnouncements(u); setEditId(null); setEditAnn(null);
   };
 
+  const printAnn = (ann) => {
+    const prioColor = ann.priority === "عاجل" ? "#dc2626" : ann.priority === "مهم" ? "#d97706" : "#0d9488";
+    printWindow(`<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8"><title>${ann.title}</title>
+    <style>
+      *{margin:0;padding:0;box-sizing:border-box}
+      body{font-family:'Noto Sans Arabic',Arial,sans-serif;direction:rtl;background:#fff;color:#111;padding:32px}
+      .header{text-align:center;margin-bottom:24px;padding-bottom:14px;border-bottom:3px solid ${prioColor}}
+      .school{font-size:13px;color:#555;margin-bottom:6px}
+      .title{font-size:22px;font-weight:900;color:${ann.titleColor||"#1f2937"};margin-bottom:8px}
+      .meta{display:flex;gap:12px;justify-content:center;font-size:11px;color:#888;flex-wrap:wrap}
+      .badge{background:${prioColor}22;color:${prioColor};border-radius:20px;padding:2px 10px;font-weight:700}
+      .body{font-size:15px;line-height:2;color:#222;margin-top:20px;background:${ann.bgColor||"#fff"};padding:16px;border-radius:8px;border:1px solid #eee}
+      .footer{text-align:center;margin-top:28px;font-size:10px;color:#aaa;border-top:1px solid #eee;padding-top:12px}
+      @media print{@page{size:A4;margin:2cm}body{padding:0}}
+    </style></head><body>
+    <div class="header">
+      <div class="school">مدرسة عبيدة بن الحارث المتوسطة</div>
+      <div class="title">${cIcons[ann.category]||"📌"} ${ann.title}</div>
+      <div class="meta">
+        <span class="badge">${ann.priority}</span>
+        <span>${ann.category}</span>
+        <span>${ann.date}</span>
+      </div>
+    </div>
+    <div class="body">${ann.content}</div>
+    <div class="footer">مدرسة عبيدة بن الحارث المتوسطة — ${new Date().toLocaleDateString('ar-SA')}</div>
+    <script>window.onload=()=>window.print()</script>
+    </body></html>`);
+  };
+
   return (
     <div>
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
@@ -5613,6 +5644,7 @@ function AnnouncementsPage({ announcements, setAnnouncements, saveAnnouncements 
                   </div>
                   <div className="flex gap-1 flex-shrink-0 flex-wrap justify-end">
                     <button onClick={() => { const url = window.location.origin + window.location.pathname + "#ann-" + ann.id; navigator.clipboard.writeText(url).then(() => alert("✅ تم نسخ الرابط!\n" + url)); }} className="text-xs px-2 py-1.5 rounded-lg hover:bg-green-50 text-green-600 font-bold border border-green-100">🔗 رابط</button>
+                    <button onClick={() => printAnn(ann)} className="text-xs px-2 py-1.5 rounded-lg hover:bg-purple-50 text-purple-600 font-bold border border-purple-100">🖨️ طباعة</button>
                     <button onClick={() => startEdit(ann)} className="text-xs px-2 py-1.5 rounded-lg hover:bg-blue-50 text-blue-500 font-bold border border-blue-100">✏️ تعديل</button>
                     <button onClick={() => pin(ann.id)} className="text-xs px-2 py-1.5 rounded-lg hover:bg-yellow-50 font-bold border border-gray-100">{ann.pinned ? "📌 إلغاء" : "📌"}</button>
                     <button onClick={() => del(ann.id)} className="text-xs px-2 py-1.5 rounded-lg hover:bg-red-50 text-red-500 font-bold border border-red-100">🗑️</button>
@@ -5656,6 +5688,39 @@ function ActivitiesPage({ activities, setActivities, saveActivities }) {
   const saveEdit = () => {
     const u = activities.map(a => a.id === editId ? { ...editAct } : a);
     setActivities(u); saveActivities(u); setEditId(null); setEditAct(null);
+  };
+
+  const printAct = (act) => {
+    const statusColor = act.status === "قادم" ? "#2563eb" : act.status === "جاري" ? "#16a34a" : "#6b7280";
+    printWindow(`<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8"><title>${act.title}</title>
+    <style>
+      *{margin:0;padding:0;box-sizing:border-box}
+      body{font-family:'Noto Sans Arabic',Arial,sans-serif;direction:rtl;background:#fff;color:#111;padding:32px}
+      .header{text-align:center;margin-bottom:24px;padding-bottom:14px;border-bottom:3px solid #0d9488}
+      .school{font-size:13px;color:#555;margin-bottom:4px}
+      .icon{font-size:48px;margin:8px 0}
+      .title{font-size:22px;font-weight:900;color:#0d9488;margin-bottom:8px}
+      .meta{display:flex;gap:16px;justify-content:center;font-size:12px;color:#555;flex-wrap:wrap;margin-top:8px}
+      .badge{border-radius:20px;padding:2px 12px;font-weight:700;background:${statusColor}22;color:${statusColor}}
+      .body{font-size:15px;line-height:2;color:#222;margin-top:20px;padding:16px;border-radius:8px;border:1px solid #eee;background:#f9fafb}
+      .footer{text-align:center;margin-top:28px;font-size:10px;color:#aaa;border-top:1px solid #eee;padding-top:12px}
+      @media print{@page{size:A4;margin:2cm}body{padding:0}}
+    </style></head><body>
+    <div class="header">
+      <div class="school">مدرسة عبيدة بن الحارث المتوسطة</div>
+      <div class="icon">${act.image||"🎯"}</div>
+      <div class="title">${act.title}</div>
+      <div class="meta">
+        <span class="badge">${act.status}</span>
+        <span>📅 ${act.date||"—"}</span>
+        <span>👤 ${act.responsible||"—"}</span>
+        <span>🏷️ ${act.type}</span>
+      </div>
+    </div>
+    <div class="body">${act.description||"لا يوجد وصف"}</div>
+    <div class="footer">مدرسة عبيدة بن الحارث المتوسطة — ${new Date().toLocaleDateString('ar-SA')}</div>
+    <script>window.onload=()=>window.print()</script>
+    </body></html>`);
   };
 
   const ActForm = ({ data, setData, onSave, onCancel, saveLabel }) => (
@@ -5763,6 +5828,7 @@ function ActivitiesPage({ activities, setActivities, saveActivities }) {
                 <div className="bg-gradient-to-l from-teal-500 to-emerald-600 p-6 text-center relative">
                   <span className="text-5xl">{act.image}</span>
                   <div className="absolute top-2 left-2 flex gap-1">
+                    <button onClick={() => printAct(act)} className="bg-white bg-opacity-20 hover:bg-opacity-40 text-white text-xs px-2 py-1 rounded-lg font-bold">🖨️</button>
                     <button onClick={() => startEdit(act)} className="bg-white bg-opacity-20 hover:bg-opacity-40 text-white text-xs px-2 py-1 rounded-lg font-bold">✏️</button>
                     <button onClick={() => del(act.id)} className="bg-red-500 bg-opacity-80 hover:bg-opacity-100 text-white text-xs px-2 py-1 rounded-lg font-bold">🗑️</button>
                   </div>
@@ -16507,26 +16573,6 @@ export default function SchoolWebsite() {
         background: #ede9fe; border-color: #c4b5fd;
       }
       .nav-pill-icon { font-size: 16px; }
-      .icon-3d {
-        display: inline-block;
-        filter: drop-shadow(1px 2px 3px rgba(0,0,0,0.30));
-        transform: perspective(80px) rotateX(6deg) rotateY(-2deg);
-        transition: transform 0.2s, filter 0.2s;
-      }
-      .icon-3d:hover, button:hover .icon-3d {
-        transform: perspective(80px) rotateX(2deg) rotateY(0deg) scale(1.18);
-        filter: drop-shadow(2px 4px 6px rgba(0,0,0,0.25));
-      }
-      .icon-3d-lg {
-        display: inline-block;
-        filter: drop-shadow(2px 4px 6px rgba(0,0,0,0.30));
-        transform: perspective(100px) rotateX(8deg) rotateY(-3deg);
-        transition: transform 0.25s, filter 0.25s;
-      }
-      button:hover .icon-3d-lg, a:hover .icon-3d-lg {
-        transform: perspective(100px) rotateX(2deg) rotateY(0deg) scale(1.15);
-        filter: drop-shadow(3px 6px 10px rgba(0,0,0,0.22));
-      }
     `}</style>
     <div dir="rtl" className="min-h-screen relative overflow-x-hidden" style={{ fontFamily: siteFont, background: "linear-gradient(160deg, #f0fdfa 0%, #ecfdf5 25%, #f5f5f4 60%, #fefce8 100%)" }}>
 
@@ -16689,7 +16735,7 @@ export default function SchoolWebsite() {
               {pages.map(p => (
                 <button key={p.id} onClick={() => { navigate(p.id); setShowExtra(false); }}
                   className={`nav-pill-main ${page === p.id ? "active" : ""}`}>
-                  <span className="nav-pill-icon icon-3d">{p.icon}</span>
+                  <span className="nav-pill-icon">{p.icon}</span>
                   {p.label}
                 </button>
               ))}
@@ -16700,7 +16746,7 @@ export default function SchoolWebsite() {
               {extraPages.slice(0,9).map(p => (
                 <button key={p.id} onClick={() => { navigate(p.id); setShowExtra(false); }}
                   className={`nav-pill-extra ${page === p.id ? "active" : ""}`}>
-                  <span className="nav-pill-icon icon-3d">{p.icon}</span>
+                  <span className="nav-pill-icon">{p.icon}</span>
                   {p.label}
                 </button>
               ))}
@@ -16711,16 +16757,14 @@ export default function SchoolWebsite() {
                     ✨ المزيد {showExtra ? "▴" : "▾"}
                   </button>
                   {showExtra && (
-                    <div className="absolute top-full right-0 mt-2 bg-white rounded-2xl shadow-xl border border-gray-100 py-2 z-50" style={{minWidth:"360px"}}>
-                      <div className="grid grid-cols-2">
+                    <div className="absolute top-full right-0 mt-2 bg-white rounded-2xl shadow-xl border border-gray-100 py-2 z-50 min-w-48">
                       {extraPages.slice(9).map(p => (
                         <button key={p.id} onClick={() => { navigate(p.id); setShowExtra(false); }}
-                          className={`text-right px-4 py-2.5 text-sm font-bold hover:bg-purple-50 transition-all flex items-center gap-2 ${page === p.id ? "text-purple-700 bg-purple-50" : "text-gray-700"}`}
+                          className={`w-full text-right px-4 py-2.5 text-sm font-bold hover:bg-purple-50 transition-all flex items-center gap-2 ${page === p.id ? "text-purple-700 bg-purple-50" : "text-gray-700"}`}
                           style={{fontFamily:"'Cairo', sans-serif"}}>
-                          <span className="icon-3d">{p.icon}</span>{p.label}
+                          <span>{p.icon}</span>{p.label}
                         </button>
                       ))}
-                      </div>
                     </div>
                   )}
                 </div>
@@ -16742,7 +16786,7 @@ export default function SchoolWebsite() {
                       border: page===p.id ? "none" : "1.5px solid #e2e8f0",
                       boxShadow: page===p.id ? "0 4px 12px rgba(13,148,136,0.3)" : "none",
                     }}>
-                    <span style={{marginLeft:"5px"}} className="icon-3d">{p.icon}</span>{p.label}
+                    <span style={{marginLeft:"5px"}}>{p.icon}</span>{p.label}
                   </button>
                 ))}
               </div>
@@ -16757,7 +16801,7 @@ export default function SchoolWebsite() {
                       color: page===p.id ? "#fff" : "#7c3aed",
                       border: "1.5px solid #e9d5ff",
                     }}>
-                    <span style={{marginLeft:"4px"}} className="icon-3d">{p.icon}</span>{p.label}
+                    <span style={{marginLeft:"4px"}}>{p.icon}</span>{p.label}
                   </button>
                 ))}
               </div>
