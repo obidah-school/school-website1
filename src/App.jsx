@@ -926,7 +926,7 @@ function HomePage({ teachers, announcements, activities, navigate, attendance, w
               alignItems:"center",justifyContent:"center",fontSize:22,position:"relative",zIndex:1,
               boxShadow:`0 4px 14px ${p.glow}`,transition:"transform .25s"}}
               className="group-hover:scale-110">
-              {p.icon}
+              <span className="icon-3d-lg">{p.icon}</span>
             </div>
             <span style={{fontSize:10,fontWeight:900,fontFamily:"Cairo,sans-serif",
               position:"relative",zIndex:1,transition:"color .25s",color:"#374151"}}
@@ -1027,10 +1027,6 @@ function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, sa
     if (r.status === "متأخر" && r.lateType === "حصص") return sum + (parseInt(r.lateMinutes) || 0);
     return sum;
   }, 0);
-  // طابور الصباح — غاب عن الطابور (morningAssembly === false صراحةً)
-  const countMissedAssembly = (di) => teachers.filter((_, ti) => attendance[ti]?.[di]?.morningAssembly === false).length;
-  const countAttendedAssembly = (di) => teachers.filter((_, ti) => attendance[ti]?.[di]?.morningAssembly !== false).length;
-
   const filtered = teachers.map((t, i) => ({ name: t, idx: i })).filter(t => t.name.includes(searchQuery));
 
   // استيراد المعلمين من إكسل
@@ -1194,10 +1190,6 @@ function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, sa
             <div className="text-3xl font-black text-red-700">{countAbsent(selectedDay)}</div>
             <div className="text-xs font-bold text-red-600 mt-1">❌ غائب</div>
           </div>
-          <div className="bg-purple-50 border-2 border-purple-200 rounded-2xl p-3 text-center">
-            <div className="text-3xl font-black text-purple-700">{countMissedAssembly(selectedDay)}</div>
-            <div className="text-xs font-bold text-purple-600 mt-1">🚩 غاب عن الطابور</div>
-          </div>
         </div>
       )}
 
@@ -1333,7 +1325,6 @@ function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, sa
                   <th className="p-2 text-center font-bold text-amber-600">📚 حصص</th>
                   <th className="p-2 text-center font-bold text-amber-500">دقائق حصص</th>
                   <th className="p-2 text-center font-bold text-red-700">❌ غياب</th>
-                  <th className="p-2 text-center font-bold text-purple-700">🚩 غاب طابور</th>
                 </tr>
               </thead>
               <tbody>
@@ -1343,10 +1334,9 @@ function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, sa
                   const absCount = week.days.filter((_, di) => (attendance[ti]?.[di]?.status||"حاضر")==="غائب").length;
                   const morningMins = week.days.reduce((s,_,di)=>{ const r=attendance[ti]?.[di]||{}; return r.status==="متأخر"&&(r.lateType==="صباحي"||!r.lateType)?s+(parseInt(r.lateMinutes)||0):s; },0);
                   const periodMins = week.days.reduce((s,_,di)=>{ const r=attendance[ti]?.[di]||{}; return r.status==="متأخر"&&r.lateType==="حصص"?s+(parseInt(r.lateMinutes)||0):s; },0);
-                  const missedAssembly = week.days.filter((_, di) => attendance[ti]?.[di]?.morningAssembly === false).length;
                   const anyLate = morningLate + periodLate;
                   return (
-                    <tr key={ti} className={`border-t border-gray-100 ${absCount>0?"bg-red-50":anyLate>0?"bg-amber-50":missedAssembly>0?"bg-purple-50":"hover:bg-gray-50"}`}>
+                    <tr key={ti} className={`border-t border-gray-100 ${absCount>0?"bg-red-50":anyLate>0?"bg-amber-50":"hover:bg-gray-50"}`}>
                       <td className="p-2 text-center text-gray-400 font-bold">{ti+1}</td>
                       <td className="p-2 font-medium text-gray-800">{teacher}</td>
                       {week.days.map((_, di) => {
@@ -1369,7 +1359,6 @@ function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, sa
                       <td className="p-2 text-center font-black text-amber-600">{periodLate||"—"}</td>
                       <td className="p-2 text-center font-black text-amber-500">{periodMins>0?`${periodMins}د`:"—"}</td>
                       <td className="p-2 text-center font-black text-red-700">{absCount||"—"}</td>
-                      <td className="p-2 text-center font-black text-purple-700">{missedAssembly||"—"}</td>
                     </tr>
                   );
                 })}
@@ -1394,7 +1383,6 @@ function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, sa
                   <th className="p-3 text-right text-xs font-bold text-gray-500 w-8">م</th>
                   <th className="p-3 text-right text-xs font-bold text-gray-500">اسم المعلم / الإداري</th>
                   <th className="p-3 text-center text-xs font-bold text-gray-500 w-28">الحالة</th>
-                  <th className="p-3 text-center text-xs font-bold text-purple-600">🚩 طابور الصباح</th>
                   <th className="p-3 text-center text-xs font-bold text-amber-700">الحصة</th>
                   <th className="p-3 text-center text-xs font-bold text-amber-700">مدة التأخر</th>
                   <th className="p-3 text-center text-xs font-bold text-red-600">نوع الغياب</th>
@@ -1434,20 +1422,6 @@ function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, sa
                             </button>
                           ))}
                         </div>
-                      </td>
-
-                      {/* طابور الصباح */}
-                      <td className="p-1.5 text-center">
-                        <button
-                          onClick={() => updateField(ti, selectedDay, "morningAssembly", r.morningAssembly === false ? true : false)}
-                          className="px-3 py-1.5 rounded-lg text-xs font-bold border-2 transition-all"
-                          style={{
-                            background: r.morningAssembly === false ? "#fdf2f8" : "#f0fdf4",
-                            borderColor: r.morningAssembly === false ? "#c026d3" : "#16a34a",
-                            color: r.morningAssembly === false ? "#86198f" : "#15803d",
-                          }}>
-                          {r.morningAssembly === false ? "🚩 غاب" : "✅ حضر"}
-                        </button>
                       </td>
 
                       {/* الحصة المتأخر عنها */}
@@ -16533,6 +16507,26 @@ export default function SchoolWebsite() {
         background: #ede9fe; border-color: #c4b5fd;
       }
       .nav-pill-icon { font-size: 16px; }
+      .icon-3d {
+        display: inline-block;
+        filter: drop-shadow(1px 2px 3px rgba(0,0,0,0.30));
+        transform: perspective(80px) rotateX(6deg) rotateY(-2deg);
+        transition: transform 0.2s, filter 0.2s;
+      }
+      .icon-3d:hover, button:hover .icon-3d {
+        transform: perspective(80px) rotateX(2deg) rotateY(0deg) scale(1.18);
+        filter: drop-shadow(2px 4px 6px rgba(0,0,0,0.25));
+      }
+      .icon-3d-lg {
+        display: inline-block;
+        filter: drop-shadow(2px 4px 6px rgba(0,0,0,0.30));
+        transform: perspective(100px) rotateX(8deg) rotateY(-3deg);
+        transition: transform 0.25s, filter 0.25s;
+      }
+      button:hover .icon-3d-lg, a:hover .icon-3d-lg {
+        transform: perspective(100px) rotateX(2deg) rotateY(0deg) scale(1.15);
+        filter: drop-shadow(3px 6px 10px rgba(0,0,0,0.22));
+      }
     `}</style>
     <div dir="rtl" className="min-h-screen relative overflow-x-hidden" style={{ fontFamily: siteFont, background: "linear-gradient(160deg, #f0fdfa 0%, #ecfdf5 25%, #f5f5f4 60%, #fefce8 100%)" }}>
 
@@ -16695,7 +16689,7 @@ export default function SchoolWebsite() {
               {pages.map(p => (
                 <button key={p.id} onClick={() => { navigate(p.id); setShowExtra(false); }}
                   className={`nav-pill-main ${page === p.id ? "active" : ""}`}>
-                  <span className="nav-pill-icon">{p.icon}</span>
+                  <span className="nav-pill-icon icon-3d">{p.icon}</span>
                   {p.label}
                 </button>
               ))}
@@ -16706,7 +16700,7 @@ export default function SchoolWebsite() {
               {extraPages.slice(0,9).map(p => (
                 <button key={p.id} onClick={() => { navigate(p.id); setShowExtra(false); }}
                   className={`nav-pill-extra ${page === p.id ? "active" : ""}`}>
-                  <span className="nav-pill-icon">{p.icon}</span>
+                  <span className="nav-pill-icon icon-3d">{p.icon}</span>
                   {p.label}
                 </button>
               ))}
@@ -16717,14 +16711,16 @@ export default function SchoolWebsite() {
                     ✨ المزيد {showExtra ? "▴" : "▾"}
                   </button>
                   {showExtra && (
-                    <div className="absolute top-full right-0 mt-2 bg-white rounded-2xl shadow-xl border border-gray-100 py-2 z-50 min-w-48">
+                    <div className="absolute top-full right-0 mt-2 bg-white rounded-2xl shadow-xl border border-gray-100 py-2 z-50" style={{minWidth:"360px"}}>
+                      <div className="grid grid-cols-2">
                       {extraPages.slice(9).map(p => (
                         <button key={p.id} onClick={() => { navigate(p.id); setShowExtra(false); }}
-                          className={`w-full text-right px-4 py-2.5 text-sm font-bold hover:bg-purple-50 transition-all flex items-center gap-2 ${page === p.id ? "text-purple-700 bg-purple-50" : "text-gray-700"}`}
+                          className={`text-right px-4 py-2.5 text-sm font-bold hover:bg-purple-50 transition-all flex items-center gap-2 ${page === p.id ? "text-purple-700 bg-purple-50" : "text-gray-700"}`}
                           style={{fontFamily:"'Cairo', sans-serif"}}>
-                          <span>{p.icon}</span>{p.label}
+                          <span className="icon-3d">{p.icon}</span>{p.label}
                         </button>
                       ))}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -16746,7 +16742,7 @@ export default function SchoolWebsite() {
                       border: page===p.id ? "none" : "1.5px solid #e2e8f0",
                       boxShadow: page===p.id ? "0 4px 12px rgba(13,148,136,0.3)" : "none",
                     }}>
-                    <span style={{marginLeft:"5px"}}>{p.icon}</span>{p.label}
+                    <span style={{marginLeft:"5px"}} className="icon-3d">{p.icon}</span>{p.label}
                   </button>
                 ))}
               </div>
@@ -16761,7 +16757,7 @@ export default function SchoolWebsite() {
                       color: page===p.id ? "#fff" : "#7c3aed",
                       border: "1.5px solid #e9d5ff",
                     }}>
-                    <span style={{marginLeft:"4px"}}>{p.icon}</span>{p.label}
+                    <span style={{marginLeft:"4px"}} className="icon-3d">{p.icon}</span>{p.label}
                   </button>
                 ))}
               </div>
