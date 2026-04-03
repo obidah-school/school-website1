@@ -389,13 +389,6 @@ function RichEditor({ value, onChange }) {
     </button>
   );
 
-  const ToolBtn = ({ onClick, title, children }) => (
-    <button type="button" onClick={onClick} title={title}
-      className="h-8 px-2 rounded-lg flex items-center justify-center text-xs hover:bg-teal-100 bg-gray-50 text-gray-700 font-medium transition-all whitespace-nowrap">
-      {children}
-    </button>
-  );
-
   return (
     <div ref={wrapRef} className="border-2 border-gray-200 rounded-xl overflow-visible focus-within:border-teal-400 transition-all" style={{ position:"relative" }}>
       {/* ─── Image Resize Overlay ─── */}
