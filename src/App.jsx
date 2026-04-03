@@ -258,14 +258,19 @@ function StatCard({ icon, label, value, color }) {
 }
 
 function RichEditor({ value, onChange }) {
-  const editorRef = useRef(null);
-  const fileRef = useRef(null);
+  const editorRef  = useRef(null);
+  const wrapRef    = useRef(null);
+  const fileRef    = useRef(null);
+  const selImgRef  = useRef(null);
+  const dragRef    = useRef(null);
   const [showEmoji, setShowEmoji] = useState(false);
   const [showStickers, setShowStickers] = useState(false);
   const [showColors, setShowColors] = useState(false);
   const [showBgColors, setShowBgColors] = useState(false);
   const [showFonts, setShowFonts] = useState(false);
-  const [imgSize, setImgSize] = useState("medium"); // small | medium | above | large | full
+  const [imgSize, setImgSize] = useState("medium");
+  const [overlay, setOverlay] = useState(null);
+  const [customW, setCustomW] = useState("");
 
   const emojis = ["⭐","🎉","📢","📌","🔔","✅","❌","❗","⚠️","💡","📅","🏫","👨‍🏫","👨‍🎓","📖","🖋️","🎓","🏆","🥇","⚽","🔬","🎨","🎵","💪","👏","🤝","💐","🌟","✨","🔥","💯","❤️","💚","💙","🇸🇦","🌙","☀️","🌈","🎯","📝","🏅","🌺","🍀","🦁","🦅","🕌","🤲","🫶","😊","😄","👍","🙏"];
   const stickers = ["🏆 تهانينا!","⭐ ممتاز!","✅ تم بنجاح","📢 تنبيه مهم","🎉 مبروك!","💡 تذكير","⚠️ عاجل","📌 ملاحظة","🏫 من إدارة المدرسة","👨‍🏫 للمعلمين الكرام","👨‍🎓 للطلاب الأعزاء","🤝 بالتوفيق للجميع","🌟 إعلان هام","🎯 للاهتمام"];
@@ -274,17 +279,102 @@ function RichEditor({ value, onChange }) {
 
   const exec = (cmd, val = null) => { document.execCommand(cmd, false, val); editorRef.current?.focus(); };
   const IMG_SIZES = {
-    small:  { w: "200px",  label: "صغير",         icon: "🔹" },
-    medium: { w: "50%",    label: "متوسط",         icon: "🔸" },
-    above:  { w: "70%",    label: "فوق المتوسط",   icon: "🔶" },
-    large:  { w: "90%",    label: "كبير",           icon: "🟧" },
-    full:   { w: "100%",   label: "كامل العرض",    icon: "🟥" },
+    tiny:   { w: "150px", label: "صغير جداً",    icon: "⬛" },
+    small:  { w: "30%",   label: "صغير",          icon: "🔹" },
+    medium: { w: "50%",   label: "متوسط",          icon: "🔸" },
+    large:  { w: "75%",   label: "كبير",            icon: "🟧" },
+    full:   { w: "100%",  label: "كامل العرض",     icon: "🟥" },
   };
+
+  // ─── حساب موضع الـ overlay فوق الصورة ───
+  const calcOverlay = (img) => {
+    if (!img || !wrapRef.current) return null;
+    const wr = wrapRef.current.getBoundingClientRect();
+    const ir = img.getBoundingClientRect();
+    return { top: ir.top - wr.top + wrapRef.current.scrollTop,
+             left: ir.left - wr.left, w: ir.width, h: ir.height };
+  };
+
+  // ─── الاستماع لنقرات داخل المحرر ───
+  useEffect(() => {
+    const ed = editorRef.current; if (!ed) return;
+    const onClick = (e) => {
+      if (e.target.tagName === "IMG") {
+        selImgRef.current = e.target;
+        setOverlay(calcOverlay(e.target));
+        setCustomW(Math.round(e.target.getBoundingClientRect().width) + "");
+      } else {
+        selImgRef.current = null; setOverlay(null);
+      }
+    };
+    ed.addEventListener("click", onClick);
+    return () => ed.removeEventListener("click", onClick);
+  }, []);
+
+  // ─── تطبيق حجم على الصورة المحددة ───
+  const applySize = (w) => {
+    const img = selImgRef.current; if (!img) return;
+    img.style.width = w; img.style.height = "auto";
+    onChange(editorRef.current.innerHTML);
+    setTimeout(() => setOverlay(calcOverlay(img)), 30);
+  };
+
+  // ─── سحب الحافة اليمنى أو اليسرى لتغيير الحجم ───
+  const startDrag = (e, side) => {
+    e.preventDefault(); e.stopPropagation();
+    const img = selImgRef.current; if (!img) return;
+    const startX = e.clientX;
+    const startW = img.getBoundingClientRect().width;
+    const isRtl  = side === "left"; // RTL: سحب اليسار = توسيع
+    dragRef.current = true;
+    const onMove = (ev) => {
+      const dx = ev.clientX - startX;
+      const newW = Math.max(60, startW + (isRtl ? -dx : dx));
+      img.style.width = newW + "px"; img.style.height = "auto";
+      setOverlay(calcOverlay(img));
+    };
+    const onUp = () => {
+      onChange(editorRef.current.innerHTML);
+      dragRef.current = false;
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup",   onUp);
+    };
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup",   onUp);
+  };
+
+  // ─── سحب الزاوية (ركن) ───
+  const startCornerDrag = (e, corner) => {
+    e.preventDefault(); e.stopPropagation();
+    const img = selImgRef.current; if (!img) return;
+    const r = img.getBoundingClientRect();
+    const startX = e.clientX, startY = e.clientY;
+    const startW = r.width, startH = r.height;
+    const onMove = (ev) => {
+      const dx = ev.clientX - startX, dy = ev.clientY - startY;
+      let nw, nh;
+      if (corner === "se")      { nw = startW + dx; nh = startH + dy; }
+      else if (corner === "sw") { nw = startW - dx; nh = startH + dy; }
+      else if (corner === "ne") { nw = startW + dx; nh = startH - dy; }
+      else                      { nw = startW - dx; nh = startH - dy; }
+      nw = Math.max(60, nw); nh = Math.max(40, nh);
+      img.style.width = nw + "px"; img.style.height = nh + "px";
+      setOverlay(calcOverlay(img));
+    };
+    const onUp = () => {
+      onChange(editorRef.current.innerHTML);
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup",   onUp);
+    };
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup",   onUp);
+  };
+
   const handleImage = (e) => {
     const file = e.target.files?.[0]; if (!file) return;
     const sz = IMG_SIZES[imgSize] || IMG_SIZES.medium;
     readFileAsync(file, "dataurl").then(dataUrl => {
-      exec("insertHTML", `<img src="${dataUrl}" style="width:${sz.w};max-width:100%;border-radius:12px;margin:8px auto;display:block;" />`);
+      exec("insertHTML", `<img src="${dataUrl}" style="width:${sz.w};max-width:100%;height:auto;border-radius:12px;margin:8px auto;display:block;cursor:pointer;" />`);
     });
     e.target.value = "";
   };
@@ -299,8 +389,105 @@ function RichEditor({ value, onChange }) {
     </button>
   );
 
+  const ToolBtn = ({ onClick, title, children }) => (
+    <button type="button" onClick={onClick} title={title}
+      className="h-8 px-2 rounded-lg flex items-center justify-center text-xs hover:bg-teal-100 bg-gray-50 text-gray-700 font-medium transition-all whitespace-nowrap">
+      {children}
+    </button>
+  );
+
   return (
-    <div className="border-2 border-gray-200 rounded-xl overflow-visible focus-within:border-teal-400 transition-all">
+    <div ref={wrapRef} className="border-2 border-gray-200 rounded-xl overflow-visible focus-within:border-teal-400 transition-all" style={{ position:"relative" }}>
+      {/* ─── Image Resize Overlay ─── */}
+      {overlay && selImgRef.current && (
+        <div style={{
+          position:"absolute", top:overlay.top, left:overlay.left,
+          width:overlay.w, height:overlay.h, zIndex:100,
+          pointerEvents:"none",
+        }}>
+          {/* حد الاختيار */}
+          <div style={{ position:"absolute", inset:0, border:"2px dashed #0ea5e9", borderRadius:8, boxShadow:"0 0 0 1px rgba(14,165,233,0.3)" }} />
+          {/* شريط أدوات الحجم يظهر فوق الصورة */}
+          <div style={{
+            position:"absolute", top:-44, left:"50%", transform:"translateX(-50%)",
+            background:"#1e293b", borderRadius:10, padding:"4px 8px",
+            display:"flex", alignItems:"center", gap:4, whiteSpace:"nowrap",
+            boxShadow:"0 4px 20px rgba(0,0,0,0.4)", pointerEvents:"all",
+          }}>
+            {Object.entries(IMG_SIZES).map(([k,v]) => (
+              <button key={k} onMouseDown={(e)=>{e.preventDefault();applySize(v.w);}}
+                title={v.label}
+                style={{ background:"#334155", border:"1px solid #475569", borderRadius:6,
+                         padding:"2px 7px", fontSize:11, color:"#e2e8f0", cursor:"pointer",
+                         fontFamily:"inherit" }}>
+                {v.icon} {v.label}
+              </button>
+            ))}
+            <div style={{ width:1, background:"#475569", height:18, margin:"0 2px" }} />
+            <input
+              type="number" min="50" max="2000"
+              value={customW}
+              onChange={e => setCustomW(e.target.value)}
+              onKeyDown={e => { if (e.key==="Enter") { applySize(customW+"px"); e.preventDefault(); } }}
+              onMouseDown={e => e.stopPropagation()}
+              style={{ width:58, background:"#0f172a", border:"1px solid #475569",
+                       borderRadius:6, padding:"2px 5px", fontSize:11, color:"#94a3b8",
+                       textAlign:"center", fontFamily:"inherit" }}
+              placeholder="px"
+            />
+            <button onMouseDown={(e)=>{e.preventDefault();applySize(customW+"px");}}
+              style={{ background:"#0ea5e9", border:"none", borderRadius:6,
+                       padding:"2px 8px", fontSize:11, color:"#fff", cursor:"pointer" }}>✓</button>
+            <button onMouseDown={(e)=>{e.preventDefault();if(selImgRef.current){selImgRef.current.remove();onChange(editorRef.current.innerHTML);selImgRef.current=null;setOverlay(null);}}}
+              style={{ background:"#ef4444", border:"none", borderRadius:6,
+                       padding:"2px 7px", fontSize:11, color:"#fff", cursor:"pointer" }}>🗑️</button>
+          </div>
+          {/* ─── مقابض تغيير الحجم ─── */}
+          {/* حافة يمين */}
+          <div onMouseDown={e=>startDrag(e,"right")} style={{
+            position:"absolute", top:"50%", right:-6, width:12, height:26,
+            background:"#0ea5e9", borderRadius:4, cursor:"ew-resize", transform:"translateY(-50%)",
+            pointerEvents:"all", boxShadow:"0 2px 6px rgba(0,0,0,0.4)",
+          }} />
+          {/* حافة يسار */}
+          <div onMouseDown={e=>startDrag(e,"left")} style={{
+            position:"absolute", top:"50%", left:-6, width:12, height:26,
+            background:"#0ea5e9", borderRadius:4, cursor:"ew-resize", transform:"translateY(-50%)",
+            pointerEvents:"all", boxShadow:"0 2px 6px rgba(0,0,0,0.4)",
+          }} />
+          {/* حافة أسفل */}
+          <div onMouseDown={e=>{ e.preventDefault(); const img=selImgRef.current; if(!img) return; const sY=e.clientY; const sH=img.getBoundingClientRect().height; const mv=ev=>{img.style.height=Math.max(40,sH+(ev.clientY-sY))+"px";setOverlay(calcOverlay(img));}; const up=()=>{onChange(editorRef.current.innerHTML);document.removeEventListener("mousemove",mv);document.removeEventListener("mouseup",up);}; document.addEventListener("mousemove",mv);document.addEventListener("mouseup",up); }} style={{
+            position:"absolute", bottom:-6, left:"50%", width:26, height:12,
+            background:"#0ea5e9", borderRadius:4, cursor:"ns-resize", transform:"translateX(-50%)",
+            pointerEvents:"all", boxShadow:"0 2px 6px rgba(0,0,0,0.4)",
+          }} />
+          {/* ركن أسفل يمين */}
+          <div onMouseDown={e=>startCornerDrag(e,"se")} style={{
+            position:"absolute", bottom:-6, right:-6, width:14, height:14,
+            background:"#7c3aed", borderRadius:3, cursor:"se-resize",
+            pointerEvents:"all", boxShadow:"0 2px 6px rgba(0,0,0,0.4)",
+          }} />
+          {/* ركن أسفل يسار */}
+          <div onMouseDown={e=>startCornerDrag(e,"sw")} style={{
+            position:"absolute", bottom:-6, left:-6, width:14, height:14,
+            background:"#7c3aed", borderRadius:3, cursor:"sw-resize",
+            pointerEvents:"all", boxShadow:"0 2px 6px rgba(0,0,0,0.4)",
+          }} />
+          {/* ركن أعلى يمين */}
+          <div onMouseDown={e=>startCornerDrag(e,"ne")} style={{
+            position:"absolute", top:-6, right:-6, width:14, height:14,
+            background:"#7c3aed", borderRadius:3, cursor:"ne-resize",
+            pointerEvents:"all", boxShadow:"0 2px 6px rgba(0,0,0,0.4)",
+          }} />
+          {/* ركن أعلى يسار */}
+          <div onMouseDown={e=>startCornerDrag(e,"nw")} style={{
+            position:"absolute", top:-6, left:-6, width:14, height:14,
+            background:"#7c3aed", borderRadius:3, cursor:"nw-resize",
+            pointerEvents:"all", boxShadow:"0 2px 6px rgba(0,0,0,0.4)",
+          }} />
+        </div>
+      )}
+
       <div className="bg-gray-50 p-2 flex flex-wrap gap-1 border-b border-gray-200">
         <ToolBtn onClick={() => exec("bold")} title="غامق"><b>غامق</b></ToolBtn>
         <ToolBtn onClick={() => exec("italic")} title="مائل"><i>مائل</i></ToolBtn>
@@ -351,15 +538,16 @@ function RichEditor({ value, onChange }) {
           )}
         </div>
         <div className="w-px bg-gray-300 mx-1"></div>
+        {/* حجم الصورة عند الإضافة */}
         <div className="flex items-center gap-1">
-          <span className="text-xs text-gray-400 font-bold">📏</span>
+          <span className="text-xs text-gray-400 font-bold">📷</span>
           <select value={imgSize} onChange={e => setImgSize(e.target.value)}
             className="h-8 px-1 rounded-lg bg-gray-50 border border-gray-200 text-xs cursor-pointer focus:outline-none"
             title="حجم الصورة عند الإضافة">
             {Object.entries(IMG_SIZES).map(([k,v]) => <option key={k} value={k}>{v.icon} {v.label}</option>)}
           </select>
         </div>
-        <ToolBtn onClick={() => fileRef.current?.click()} title={`إضافة صورة — ${IMG_SIZES[imgSize]?.label}`}>📷 صورة</ToolBtn>
+        <ToolBtn onClick={() => fileRef.current?.click()} title="إضافة صورة">📷 صورة</ToolBtn>
         <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleImage} />
         <div className="relative">
           <ToolBtn onClick={() => { closeAll(); setShowEmoji(!showEmoji); }} title="إيموجي">😊 إيموجي</ToolBtn>
