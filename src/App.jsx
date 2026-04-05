@@ -6306,14 +6306,17 @@ function SurveysPage({ surveys, setSurveys, saveSurveys, isParent }) {
   );
 }
 
-function AnnouncementsPage({ announcements, setAnnouncements, saveAnnouncements }) {
+function AnnouncementsPage({ announcements, setAnnouncements, saveAnnouncements, viewMode = "desktop" }) {
   const [showForm, setShowForm] = useState(false);
   const [newAnn, setNewAnn] = useState({ title: "", content: "", category: "إعلانات", priority: "عادي", bgColor: "", titleColor: "#1f2937", titleSize: "text-xl" });
   const [filter, setFilter] = useState("الكل");
   const [editId, setEditId] = useState(null);
   const [editAnn, setEditAnn] = useState(null);
+  const [expandedId, setExpandedId] = useState(null); // for mobile card expand
   const categories = ["الكل", "تعاميم", "إعلانات", "تدريب", "اجتماعات"];
   const pColors = { "عاجل": "red", "مهم": "amber", "عادي": "teal" };
+  const pBg    = { "عاجل": "#fef2f2", "مهم": "#fffbeb", "عادي": "#f0fdfa" };
+  const pBorder= { "عاجل": "#ef4444", "مهم": "#f59e0b", "عادي": "#0d9488" };
   const cIcons = { "تعاميم": "📜", "إعلانات": "📢", "تدريب": "🎓", "اجتماعات": "🤝" };
   const annBgColors = [
     { label: "بدون", value: "" }, { label: "أخضر", value: "#DCFCE7" },
@@ -6368,6 +6371,210 @@ function AnnouncementsPage({ announcements, setAnnouncements, saveAnnouncements 
     </body></html>`);
   };
 
+  /* ══════════════════════════════════════════
+     📱 وضع الجوال
+  ══════════════════════════════════════════ */
+  if (viewMode === "mobile") {
+    return (
+      <div dir="rtl" style={{ fontFamily:"'Cairo','Noto Naskh Arabic',sans-serif", minHeight:"100%", background:"#f8fafc" }}>
+
+        {/* رأس الصفحة */}
+        <div style={{
+          background:"linear-gradient(135deg,#0d9488,#0f766e)",
+          padding:"14px 14px 10px",
+          display:"flex", alignItems:"center", justifyContent:"space-between",
+        }}>
+          <div>
+            <div style={{ color:"#fff", fontWeight:900, fontSize:16 }}>📢 الإعلانات والتعاميم</div>
+            <div style={{ color:"rgba(255,255,255,0.75)", fontSize:11, marginTop:2 }}>{announcements.length} إعلان مسجّل</div>
+          </div>
+          <button onClick={() => setShowForm(!showForm)} style={{
+            background: showForm ? "#ef4444" : "#fff",
+            color: showForm ? "#fff" : "#0d9488",
+            border:"none", borderRadius:20, padding:"8px 16px",
+            fontWeight:900, fontSize:13, cursor:"pointer",
+            boxShadow:"0 2px 8px rgba(0,0,0,0.15)",
+          }}>
+            {showForm ? "✕ إلغاء" : "+ جديد"}
+          </button>
+        </div>
+
+        {/* نموذج إضافة إعلان — جوال */}
+        {showForm && (
+          <div style={{ background:"#fff", margin:"10px 10px 0", borderRadius:16, padding:14, boxShadow:"0 4px 20px rgba(0,0,0,0.08)", border:"1px solid #e2e8f0" }}>
+            <div style={{ fontSize:13, fontWeight:800, color:"#0d9488", marginBottom:10 }}>✏️ إعلان جديد</div>
+
+            {/* العنوان */}
+            <input type="text" placeholder="عنوان الإعلان..." value={newAnn.title}
+              onChange={e => setNewAnn(p=>({...p,title:e.target.value}))}
+              style={{ width:"100%", padding:"10px 12px", borderRadius:10, border:"2px solid #e2e8f0",
+                       fontSize:15, fontWeight:800, color: newAnn.titleColor, marginBottom:8,
+                       fontFamily:"'Cairo',sans-serif", boxSizing:"border-box",
+                       outline:"none" }} />
+
+            {/* ألوان العنوان */}
+            <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:8, flexWrap:"wrap" }}>
+              <span style={{ fontSize:11, color:"#94a3b8", fontWeight:700 }}>🎨 لون العنوان:</span>
+              {["#1f2937","#0d9488","#dc2626","#7c3aed","#d97706","#2563eb","#db2777"].map(c => (
+                <button key={c} onClick={() => setNewAnn(p=>({...p,titleColor:c}))}
+                  style={{ width:22, height:22, borderRadius:"50%", background:c, border: newAnn.titleColor===c?"3px solid #1e293b":"2px solid #e2e8f0", cursor:"pointer" }} />
+              ))}
+            </div>
+
+            {/* المحتوى — textarea بسيط في الجوال */}
+            <textarea placeholder="محتوى الإعلان..." value={newAnn.content.replace(/<[^>]*>/g,'')}
+              onChange={e => setNewAnn(p=>({...p,content:e.target.value}))}
+              rows={4}
+              style={{ width:"100%", padding:"10px 12px", borderRadius:10, border:"2px solid #e2e8f0",
+                       fontSize:13, lineHeight:1.8, resize:"vertical", fontFamily:"'Cairo',sans-serif",
+                       boxSizing:"border-box", outline:"none", marginBottom:8 }} />
+
+            {/* التصنيف والأولوية */}
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:10 }}>
+              <select value={newAnn.category} onChange={e=>setNewAnn(p=>({...p,category:e.target.value}))}
+                style={{ padding:"8px 10px", borderRadius:10, border:"1.5px solid #e2e8f0", fontSize:12, fontFamily:"'Cairo',sans-serif", outline:"none" }}>
+                {categories.filter(c=>c!=="الكل").map(c=><option key={c}>{c}</option>)}
+              </select>
+              <select value={newAnn.priority} onChange={e=>setNewAnn(p=>({...p,priority:e.target.value}))}
+                style={{ padding:"8px 10px", borderRadius:10, border:"1.5px solid #e2e8f0", fontSize:12, fontFamily:"'Cairo',sans-serif", outline:"none" }}>
+                <option>عادي</option><option>مهم</option><option>عاجل</option>
+              </select>
+            </div>
+
+            {/* لون الخلفية */}
+            <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:12, flexWrap:"wrap" }}>
+              <span style={{ fontSize:11, color:"#94a3b8", fontWeight:700 }}>🖼️ خلفية البطاقة:</span>
+              {annBgColors.map(c => (
+                <button key={c.value} onClick={()=>setNewAnn(p=>({...p,bgColor:c.value}))}
+                  style={{ width:22, height:22, borderRadius:"50%", background:c.value||"#fff",
+                           border: newAnn.bgColor===c.value?"3px solid #0d9488":"2px solid #e2e8f0", cursor:"pointer",
+                           boxShadow:!c.value?"inset 0 0 0 1px #e2e8f0":"none",
+                           display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,color:"#ccc" }}>
+                  {!c.value?"✕":""}
+                </button>
+              ))}
+            </div>
+
+            <button onClick={add} style={{
+              width:"100%", padding:"12px", borderRadius:12, border:"none",
+              background:"linear-gradient(135deg,#0d9488,#0f766e)",
+              color:"#fff", fontWeight:900, fontSize:14, cursor:"pointer",
+              fontFamily:"'Cairo',sans-serif",
+            }}>📢 نشر الإعلان</button>
+          </div>
+        )}
+
+        {/* فلاتر التصنيف */}
+        <div style={{ display:"flex", gap:6, padding:"10px 10px 0", overflowX:"auto", WebkitOverflowScrolling:"touch", scrollbarWidth:"none" }}>
+          {categories.map(cat => (
+            <button key={cat} onClick={() => setFilter(cat)} style={{
+              padding:"6px 14px", borderRadius:20, fontSize:12, fontWeight:700, whiteSpace:"nowrap",
+              border:"none", cursor:"pointer", flexShrink:0, fontFamily:"'Cairo',sans-serif",
+              background: filter===cat ? "#0d9488" : "#fff",
+              color: filter===cat ? "#fff" : "#64748b",
+              boxShadow: filter===cat ? "0 2px 8px rgba(13,148,136,0.3)" : "0 1px 4px rgba(0,0,0,0.06)",
+            }}>
+              {cat==="الكل" ? "📋 الكل" : `${cIcons[cat]} ${cat}`}
+            </button>
+          ))}
+        </div>
+
+        {/* قائمة الإعلانات */}
+        <div style={{ padding:"8px 10px 16px", display:"flex", flexDirection:"column", gap:8 }}>
+          {filtered.length === 0 && (
+            <div style={{ textAlign:"center", padding:"40px 20px", color:"#94a3b8" }}>
+              <div style={{ fontSize:36, marginBottom:8 }}>📭</div>
+              <div style={{ fontWeight:700, fontSize:13 }}>لا توجد إعلانات</div>
+            </div>
+          )}
+          {filtered.sort((a,b)=>(b.pinned?1:0)-(a.pinned?1:0)).map(ann => {
+            const isExpanded = expandedId === ann.id;
+            const isEditing  = editId === ann.id;
+            const borderClr  = pBorder[ann.priority] || "#0d9488";
+            return (
+              <div key={ann.id} style={{
+                background: ann.bgColor || "#fff",
+                borderRadius:14, overflow:"hidden",
+                boxShadow:"0 2px 12px rgba(0,0,0,0.06)",
+                borderRight:`4px solid ${borderClr}`,
+              }}>
+                {isEditing ? (
+                  /* وضع التعديل — جوال */
+                  <div style={{ padding:12 }}>
+                    <div style={{ fontSize:12, fontWeight:800, color:"#0d9488", marginBottom:8 }}>✏️ تعديل الإعلان</div>
+                    <input value={editAnn.title} onChange={e=>setEditAnn(p=>({...p,title:e.target.value}))}
+                      style={{ width:"100%", padding:"8px 10px", borderRadius:10, border:"2px solid #0d9488", fontSize:14, fontWeight:800, color:editAnn.titleColor||"#1f2937", fontFamily:"'Cairo',sans-serif", boxSizing:"border-box", outline:"none", marginBottom:8 }} />
+                    <textarea value={editAnn.content.replace(/<[^>]*>/g,'')}
+                      onChange={e=>setEditAnn(p=>({...p,content:e.target.value}))} rows={3}
+                      style={{ width:"100%", padding:"8px 10px", borderRadius:10, border:"1.5px solid #e2e8f0", fontSize:12, resize:"vertical", fontFamily:"'Cairo',sans-serif", boxSizing:"border-box", outline:"none", marginBottom:8, lineHeight:1.8 }} />
+                    <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:6, marginBottom:8 }}>
+                      <select value={editAnn.category} onChange={e=>setEditAnn(p=>({...p,category:e.target.value}))}
+                        style={{ padding:"7px 8px", borderRadius:8, border:"1.5px solid #e2e8f0", fontSize:12, fontFamily:"'Cairo',sans-serif", outline:"none" }}>
+                        {categories.filter(c=>c!=="الكل").map(c=><option key={c}>{c}</option>)}
+                      </select>
+                      <select value={editAnn.priority} onChange={e=>setEditAnn(p=>({...p,priority:e.target.value}))}
+                        style={{ padding:"7px 8px", borderRadius:8, border:"1.5px solid #e2e8f0", fontSize:12, fontFamily:"'Cairo',sans-serif", outline:"none" }}>
+                        <option>عادي</option><option>مهم</option><option>عاجل</option>
+                      </select>
+                    </div>
+                    <div style={{ display:"flex", gap:8 }}>
+                      <button onClick={saveEdit} style={{ flex:1, padding:"9px", borderRadius:10, border:"none", background:"#0d9488", color:"#fff", fontWeight:800, fontSize:13, cursor:"pointer", fontFamily:"'Cairo',sans-serif" }}>💾 حفظ</button>
+                      <button onClick={()=>{setEditId(null);setEditAnn(null);}} style={{ padding:"9px 14px", borderRadius:10, border:"1.5px solid #e2e8f0", background:"#fff", color:"#64748b", fontWeight:700, fontSize:12, cursor:"pointer", fontFamily:"'Cairo',sans-serif" }}>إلغاء</button>
+                    </div>
+                  </div>
+                ) : (
+                  /* وضع العرض — جوال */
+                  <>
+                    {/* رأس البطاقة — قابل للنقر للتوسيع */}
+                    <div onClick={() => setExpandedId(isExpanded ? null : ann.id)}
+                      style={{ padding:"12px 12px 8px", cursor:"pointer" }}>
+                      <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", gap:8 }}>
+                        <div style={{ flex:1, minWidth:0 }}>
+                          <div style={{ display:"flex", alignItems:"center", gap:6, flexWrap:"wrap", marginBottom:4 }}>
+                            {ann.pinned && <span style={{ fontSize:10, background:"#fef3c7", color:"#92400e", borderRadius:10, padding:"1px 7px", fontWeight:800 }}>📌 مثبّت</span>}
+                            <span style={{ fontSize:10, background: pBg[ann.priority]||"#f0fdfa", color:borderClr, borderRadius:10, padding:"1px 7px", fontWeight:800, border:`1px solid ${borderClr}33` }}>{ann.priority}</span>
+                            <span style={{ fontSize:10, color:"#94a3b8", fontWeight:600 }}>{cIcons[ann.category]} {ann.category}</span>
+                          </div>
+                          <div style={{ fontSize:14, fontWeight:900, color:ann.titleColor||"#1f2937", lineHeight:1.3 }}>
+                            {ann.title}
+                          </div>
+                          <div style={{ fontSize:10, color:"#94a3b8", marginTop:3 }}>{ann.date}</div>
+                        </div>
+                        <div style={{ fontSize:18, color:"#cbd5e1", flexShrink:0, marginTop:2 }}>
+                          {isExpanded ? "▴" : "▾"}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* المحتوى — يظهر عند التوسيع */}
+                    {isExpanded && (
+                      <>
+                        <div style={{ borderTop:"1px solid rgba(0,0,0,0.05)", margin:"0 12px" }} />
+                        <div style={{ padding:"10px 12px" }}
+                          className="text-sm leading-loose text-gray-700"
+                          dangerouslySetInnerHTML={{ __html: ann.content }} />
+                        {/* أزرار الإجراءات */}
+                        <div style={{ display:"flex", gap:6, padding:"0 12px 12px", flexWrap:"wrap" }}>
+                          <button onClick={()=>startEdit(ann)} style={{ flex:"1 1 auto", padding:"8px 6px", borderRadius:10, border:"1.5px solid #dbeafe", background:"#eff6ff", color:"#2563eb", fontWeight:700, fontSize:12, cursor:"pointer", fontFamily:"'Cairo',sans-serif" }}>✏️ تعديل</button>
+                          <button onClick={()=>pin(ann.id)} style={{ flex:"1 1 auto", padding:"8px 6px", borderRadius:10, border:"1.5px solid #fef3c7", background:"#fffbeb", color:"#92400e", fontWeight:700, fontSize:12, cursor:"pointer", fontFamily:"'Cairo',sans-serif" }}>{ann.pinned?"📌 إلغاء":"📌 تثبيت"}</button>
+                          <button onClick={()=>printAnn(ann)} style={{ flex:"1 1 auto", padding:"8px 6px", borderRadius:10, border:"1.5px solid #f3e8ff", background:"#faf5ff", color:"#7c3aed", fontWeight:700, fontSize:12, cursor:"pointer", fontFamily:"'Cairo',sans-serif" }}>🖨️</button>
+                          <button onClick={()=>{if(confirm("حذف هذا الإعلان؟"))del(ann.id);}} style={{ flex:"1 1 auto", padding:"8px 6px", borderRadius:10, border:"1.5px solid #fee2e2", background:"#fff5f5", color:"#dc2626", fontWeight:700, fontSize:12, cursor:"pointer", fontFamily:"'Cairo',sans-serif" }}>🗑️ حذف</button>
+                        </div>
+                      </>
+                    )}
+                  </>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  /* ══════════════════════════════════════════
+     🖥️ وضع الكمبيوتر — التصميم الأصلي
+  ══════════════════════════════════════════ */
   return (
     <div>
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
@@ -6433,7 +6640,6 @@ function AnnouncementsPage({ announcements, setAnnouncements, saveAnnouncements 
                 <div className="flex items-center gap-2 mb-1">
                   <span className="text-sm font-black text-teal-700">✏️ تعديل الإعلان</span>
                 </div>
-                {/* تعديل العنوان */}
                 <input value={editAnn.title} onChange={e => setEditAnn(p => ({...p, title: e.target.value}))}
                   className={"w-full px-4 py-2.5 rounded-xl border-2 border-teal-300 focus:outline-none font-black " + (editAnn.titleSize||"text-xl")}
                   style={{color: editAnn.titleColor||"#1f2937"}} placeholder="العنوان" />
@@ -6452,9 +6658,7 @@ function AnnouncementsPage({ announcements, setAnnouncements, saveAnnouncements 
                     </button>
                   ))}
                 </div>
-                {/* تعديل المحتوى */}
                 <RichEditor value={editAnn.content} onChange={v => setEditAnn(p => ({...p, content: v}))} />
-                {/* تعديل الخيارات */}
                 <div className="flex gap-2 flex-wrap items-center">
                   <select value={editAnn.category} onChange={e => setEditAnn(p => ({...p, category: e.target.value}))}
                     className="px-3 py-2 rounded-xl border border-gray-200 text-xs bg-white">
@@ -6462,7 +6666,6 @@ function AnnouncementsPage({ announcements, setAnnouncements, saveAnnouncements 
                   <select value={editAnn.priority} onChange={e => setEditAnn(p => ({...p, priority: e.target.value}))}
                     className="px-3 py-2 rounded-xl border border-gray-200 text-xs bg-white">
                     <option>عادي</option><option>مهم</option><option>عاجل</option></select>
-                  {/* لون خلفية البطاقة */}
                   <div className="flex items-center gap-1 flex-wrap">
                     <span className="text-xs text-gray-500 font-bold">🎨 خلفية البطاقة:</span>
                     {annBgColors.map(c => (
@@ -17134,6 +17337,7 @@ export default function SchoolWebsite() {
   const [page, setPage] = useState("home");
   const [menuOpen, setMenuOpen] = useState(false);
   const [showExtra, setShowExtra] = useState(false);
+  const [viewMode, setViewMode] = useState(() => localStorage.getItem("school-view-mode") || "desktop");
   const [teachers, setTeachers] = useState(DEFAULT_TEACHERS);
   const [week, setWeek] = useState(DEFAULT_WEEK);
   const [attendance, setAttendance] = useState({});
@@ -17163,6 +17367,7 @@ export default function SchoolWebsite() {
   }, []);
 
   const navigate = (p) => { setPage(p); window.location.hash = p; setMenuOpen(false); };
+  const toggleViewMode = (m) => { setViewMode(m); localStorage.setItem("school-view-mode", m); };
 
   useEffect(() => {
     (async () => {
@@ -17551,7 +17756,211 @@ export default function SchoolWebsite() {
         </svg>
       </div>
       <div className="relative z-10">
-      <nav className="bg-white shadow-lg sticky top-0 z-50 border-b border-teal-100" style={{fontFamily:"'Cairo', 'Noto Naskh Arabic', sans-serif"}}>
+      {/* ══════════════════════════════════════════
+          شريط تبديل الوضع — جوال / كمبيوتر
+      ══════════════════════════════════════════ */}
+      <div dir="rtl" style={{
+        background: "linear-gradient(90deg,#0f172a 0%,#1e293b 100%)",
+        borderBottom: "1px solid rgba(255,255,255,0.06)",
+        padding: "5px 16px",
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        fontFamily: "'Cairo','Noto Naskh Arabic',sans-serif",
+        position: "sticky", top: 0, zIndex: 60,
+      }}>
+        {/* اسم المدرسة مختصر */}
+        <div style={{ color:"#94a3b8", fontSize:11, fontWeight:700, display:"flex", alignItems:"center", gap:6 }}>
+          <span style={{ color:"#2dd4bf" }}>🏫</span>
+          <span>مدرسة عبيدة بن الحارث — بوابة الإدارة</span>
+        </div>
+        {/* مفتاح الوضع */}
+        <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+          <span style={{ color:"#64748b", fontSize:10, fontWeight:600 }}>وضع العرض:</span>
+          <div style={{
+            display:"flex", background:"#0f172a", borderRadius:20,
+            border:"1px solid #334155", padding:2, gap:2,
+          }}>
+            <button onClick={() => toggleViewMode("mobile")} style={{
+              padding:"3px 10px", borderRadius:16, fontSize:11, fontWeight:700,
+              cursor:"pointer", border:"none", transition:"all .2s",
+              background: viewMode==="mobile" ? "linear-gradient(135deg,#7c3aed,#6d28d9)" : "transparent",
+              color: viewMode==="mobile" ? "#fff" : "#64748b",
+              boxShadow: viewMode==="mobile" ? "0 2px 8px rgba(124,58,237,0.4)" : "none",
+            }}>📱 جوال</button>
+            <button onClick={() => toggleViewMode("desktop")} style={{
+              padding:"3px 10px", borderRadius:16, fontSize:11, fontWeight:700,
+              cursor:"pointer", border:"none", transition:"all .2s",
+              background: viewMode==="desktop" ? "linear-gradient(135deg,#0d9488,#0f766e)" : "transparent",
+              color: viewMode==="desktop" ? "#fff" : "#64748b",
+              boxShadow: viewMode==="desktop" ? "0 2px 8px rgba(13,148,136,0.4)" : "none",
+            }}>🖥️ كمبيوتر</button>
+          </div>
+        </div>
+      </div>
+
+      {/* ══════════════════════════════════════════
+          وضع الجوال — إطار هاتف
+      ══════════════════════════════════════════ */}
+      {viewMode === "mobile" ? (
+        <div style={{
+          display:"flex", justifyContent:"center", alignItems:"flex-start",
+          minHeight:"calc(100vh - 32px)",
+          background:"linear-gradient(135deg,#1e293b 0%,#0f172a 50%,#1e1b4b 100%)",
+          padding:"20px 16px 40px",
+        }}>
+          {/* إطار الهاتف */}
+          <div style={{
+            width:"100%", maxWidth:430,
+            background:"#fff",
+            borderRadius:36,
+            boxShadow:"0 0 0 8px #1e293b, 0 0 0 10px #334155, 0 30px 80px rgba(0,0,0,0.7)",
+            overflow:"hidden",
+            minHeight:"80vh",
+            position:"relative",
+            fontFamily:"'Cairo','Noto Naskh Arabic',sans-serif",
+          }}>
+            {/* شريط الهاتف العلوي */}
+            <div style={{
+              background:"linear-gradient(135deg,#0d9488,#0f766e)",
+              padding:"10px 16px 8px",
+              display:"flex", alignItems:"center", justifyContent:"space-between",
+              position:"sticky", top:0, zIndex:50,
+            }}>
+              <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                <div style={{ width:32, height:32, borderRadius:"50%", background:"rgba(255,255,255,0.2)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:16 }}>🏫</div>
+                <div>
+                  <div style={{ color:"#fff", fontWeight:900, fontSize:13, lineHeight:1.1 }}>مدرسة عبيدة بن الحارث</div>
+                  <div style={{ color:"rgba(255,255,255,0.7)", fontSize:9.5, fontWeight:600 }}>المتوسطة • ١٤٤٧ هـ</div>
+                </div>
+              </div>
+              <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                <div style={{ background:"rgba(255,255,255,0.15)", borderRadius:999, padding:"3px 8px", display:"flex", alignItems:"center", gap:5 }}>
+                  <div style={{ width:22, height:22, borderRadius:"50%", background:"#fff", display:"flex", alignItems:"center", justifyContent:"center", color:"#0d9488", fontWeight:900, fontSize:10 }}>{user.name.charAt(0)}</div>
+                  <span style={{ color:"#fff", fontSize:10, fontWeight:700 }}>{user.name}</span>
+                </div>
+                <button onClick={() => setUser(null)} style={{ background:"rgba(239,68,68,0.25)", border:"none", borderRadius:999, color:"#fca5a5", fontSize:9, fontWeight:700, padding:"3px 7px", cursor:"pointer" }}>خروج</button>
+              </div>
+            </div>
+
+            {/* محتوى الصفحة */}
+            <div style={{ overflowY:"auto", maxHeight:"calc(80vh - 110px)", padding:"0 0 8px" }}>
+              <div style={{ padding:"8px 8px 0", direction:"rtl" }}>
+                {page === "home"           && <HomePage teachers={teachers} announcements={announcements} activities={activities} navigate={navigate} attendance={attendance} week={week} messages={messages} classList={classList} weekArchive={weekArchive} />}
+                {page === "student-absence" && <StudentAbsencePage />}
+                {page === "admin-attendance"&& <AdminAttendancePage />}
+                {page === "attendance"     && <AttendancePage teachers={teachers} setTeachers={setTeachers} saveTeachers={saveTeachers} week={week} setWeek={setWeek} saveWeek={saveWeek} attendance={attendance} setAttendance={setAttendance} saveAttendance={saveAttendance} />}
+                {page === "students"       && <StudentsPage classList={classList} setClassList={setClassList} saveClass={saveClass} deleteClass={deleteClass} onSendNote={handleSendNote} messages={messages} />}
+                {page === "announcements"  && <AnnouncementsPage announcements={announcements} setAnnouncements={setAnnouncements} saveAnnouncements={saveAnnouncements} viewMode="mobile" />}
+                {page === "activities"     && <ActivitiesPage activities={activities} setActivities={setActivities} saveActivities={saveActivities} />}
+                {page === "messages"       && <MessagesPage messages={messages} setMessages={setMessages} saveMessages={saveMessages} isParent={false} />}
+                {page === "surveys"        && <SurveysPage surveys={surveys} setSurveys={setSurveys} saveSurveys={saveSurveys} isParent={false} />}
+                {page === "sms"            && <SMSPage teachers={teachers} attendance={attendance} week={week} classList={classList} />}
+                {page === "report"         && <ProgramReportPage />}
+                {page === "strategies"     && <StrategiesPage />}
+                {page === "calendar"       && <CalendarPage />}
+                {page === "gallery"        && <GalleryPage />}
+                {page === "certificates"   && <CertificatesPage teachers={teachers} attendance={attendance} week={week} classList={classList} />}
+                {page === "poll"           && <PollPage teachers={teachers} />}
+                {page === "raffle"         && <RafflePage />}
+                {page === "broadcast"      && <BroadcastPage />}
+                {page === "groupdivider"   && <GroupDividerPage />}
+                {page === "quiz"           && <QuizPage />}
+                {page === "classtimer"     && <ClassTimerPage />}
+                {page === "luckywheel"     && <LuckyWheelPage />}
+                {page === "exitticket"     && <ExitTicketPage />}
+                {page === "timetable"      && <TimetablePage teachers={teachers} />}
+                {page === "classvisits"    && <ClassVisitsPage teachers={teachers} classList={classList} />}
+                {page === "honorboard"     && <HonorBoardPage classList={classList} />}
+                {page === "tasks"          && <TasksPage teachers={teachers} />}
+                {page === "absencestats"   && <AbsenceStatsPage teachers={teachers} attendance={attendance} week={week} weekArchive={weekArchive} />}
+                {page === "monthlyreport"  && <MonthlyReportPage teachers={teachers} attendance={attendance} week={week} weekArchive={weekArchive} classList={classList} announcements={announcements} activities={activities} />}
+                {page === "gradeanalysis"  && <GradeAnalysisPage />}
+                {page === "teacherprofile" && <TeacherProfilePage teachers={teachers} attendance={attendance} week={week} weekArchive={weekArchive} classList={classList} />}
+                {page === "attendancereport"&& <AttendanceAnalysisPage />}
+                {page === "dailyquiz"      && <DailyQuizPage classList={classList} />}
+                {page === "officialforms"  && <OfficialFormsPage teachers={teachers} attendance={attendance} week={week} />}
+                {page === "portfolio"      && <StudentPortfolioPage classList={classList} weekArchive={weekArchive} attendance={attendance} week={week} teachers={teachers} />}
+                {page === "earlywarning"   && <EarlyWarningPage classList={classList} />}
+                {page === "meetings"       && <MeetingsPage teachers={teachers} />}
+                {page === "heatmap"        && <HeatmapPage teachers={teachers} attendance={attendance} week={week} weekArchive={weekArchive} announcements={announcements} activities={activities} />}
+                {page === "committeemeeting"&& <CommitteeMeetingPage teachers={teachers} />}
+                {page === "aiteacher"      && <AITeacherPage />}
+                {page === "lessonprep"     && <LessonPrepPage />}
+                {page === "lessonrecommend"&& <LessonRecommendPage classList={classList} />}
+                {page === "settings"       && <SettingsPage teachers={teachers} setTeachers={setTeachers} saveTeachers={saveTeachers} week={week} setWeek={setWeek} saveWeek={saveWeek} users={users} siteFont={siteFont} setSiteFont={setSiteFont} saveSiteFont={saveSiteFont} weekArchive={weekArchive} archiveCurrentWeek={archiveCurrentWeek} />}
+              </div>
+            </div>
+
+            {/* شريط التنقل السفلي — جوال */}
+            <div style={{
+              position:"sticky", bottom:0,
+              background:"#fff",
+              borderTop:"1px solid #e2e8f0",
+              display:"grid",
+              gridTemplateColumns: `repeat(${Math.min(pages.length + 1, 5)}, 1fr)`,
+              boxShadow:"0 -4px 20px rgba(0,0,0,0.08)",
+            }}>
+              {/* الصفحات الرئيسية الأولى 4 */}
+              {pages.slice(0,4).map(p => (
+                <button key={p.id} onClick={() => navigate(p.id)} style={{
+                  display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center",
+                  padding:"8px 4px 6px", border:"none", cursor:"pointer", transition:"all .15s",
+                  background: page===p.id ? "#f0fdfa" : "#fff",
+                  borderTop: page===p.id ? "2px solid #0d9488" : "2px solid transparent",
+                }}>
+                  <span style={{ fontSize:19, lineHeight:1 }}>{p.icon}</span>
+                  <span style={{ fontSize:9.5, fontWeight:700, color: page===p.id ? "#0d9488" : "#94a3b8", marginTop:2, fontFamily:"'Cairo',sans-serif" }}>{p.label}</span>
+                </button>
+              ))}
+              {/* زر "المزيد" */}
+              <div style={{ position:"relative" }}>
+                <button onClick={() => setMenuOpen(!menuOpen)} style={{
+                  width:"100%", height:"100%", display:"flex", flexDirection:"column",
+                  alignItems:"center", justifyContent:"center",
+                  padding:"8px 4px 6px", border:"none", cursor:"pointer",
+                  background: menuOpen ? "#faf5ff" : "#fff",
+                  borderTop: menuOpen ? "2px solid #7c3aed" : "2px solid transparent",
+                }}>
+                  <span style={{ fontSize:19, lineHeight:1 }}>{menuOpen ? "✕" : "☰"}</span>
+                  <span style={{ fontSize:9.5, fontWeight:700, color: menuOpen ? "#7c3aed" : "#94a3b8", marginTop:2, fontFamily:"'Cairo',sans-serif" }}>المزيد</span>
+                </button>
+                {/* قائمة المزيد تظهر لأعلى */}
+                {menuOpen && (
+                  <div style={{
+                    position:"absolute", bottom:"100%", left:0, right:0,
+                    background:"#fff", borderRadius:"20px 20px 0 0",
+                    boxShadow:"0 -8px 32px rgba(0,0,0,0.15)",
+                    border:"1px solid #e2e8f0", borderBottom:"none",
+                    maxHeight:320, overflowY:"auto", zIndex:100,
+                    width:280, right:0,
+                  }}>
+                    <div style={{ padding:"10px 12px 6px", borderBottom:"1px solid #f1f5f9" }}>
+                      <span style={{ fontSize:10, fontWeight:800, color:"#94a3b8", fontFamily:"'Cairo',sans-serif" }}>📑 الصفحات الرئيسية</span>
+                    </div>
+                    <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:4, padding:8 }}>
+                      {pages.slice(4).concat(extraPages).map(p => (
+                        <button key={p.id} onClick={() => { navigate(p.id); setMenuOpen(false); }} style={{
+                          display:"flex", alignItems:"center", gap:6, padding:"7px 10px",
+                          borderRadius:10, border:"1px solid #f1f5f9", cursor:"pointer",
+                          background: page===p.id ? "#f0fdfa" : "#fafafa",
+                          fontSize:11, fontWeight:700, color: page===p.id ? "#0d9488" : "#374151",
+                          fontFamily:"'Cairo',sans-serif", textAlign:"right",
+                        }}>
+                          <span style={{ fontSize:15 }}>{p.icon}</span>{p.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        /* ══════════════════════════════════════════
+            وضع الكمبيوتر — التخطيط الكامل
+        ══════════════════════════════════════════ */
+        <>
+      <nav className="bg-white shadow-lg sticky top-8 z-50 border-b border-teal-100" style={{fontFamily:"'Cairo', 'Noto Naskh Arabic', sans-serif"}}>
         <div className="w-full px-3">
 
           {/* - صف أول: الشعار + اسم المدرسة + بيانات المستخدم - */}
@@ -17705,12 +18114,14 @@ export default function SchoolWebsite() {
         {page === "lessonrecommend"&& <LessonRecommendPage classList={classList} />}
         {page === "settings"      && <SettingsPage teachers={teachers} setTeachers={setTeachers} saveTeachers={saveTeachers} week={week} setWeek={setWeek} saveWeek={saveWeek} users={users} siteFont={siteFont} setSiteFont={setSiteFont} saveSiteFont={saveSiteFont} weekArchive={weekArchive} archiveCurrentWeek={archiveCurrentWeek} />}
       </main>
-      </div>{/* end relative z-10 */}
       <footer className="relative text-center py-6 text-xs border-t bg-white mt-8 overflow-hidden" style={{borderColor:"rgba(13,148,136,.15)"}}>
         <div className="absolute inset-0 opacity-5" style={{background:"linear-gradient(135deg,#0d9488,transparent)"}} />
         <div className="relative flex items-center justify-center gap-4 flex-wrap"><p className="text-teal-700 font-bold opacity-60">مدرسة عبيدة بن الحارث المتوسطة — بوابة الإدارة المدرسية الإلكترونية</p><VisitorCounter /></div>
         <p className="relative text-gray-400 mt-1">© ١٤٤٧ هـ — جميع الحقوق محفوظة</p>
       </footer>
+      </>
+      )}{/* end viewMode conditional */}
+      </div>{/* end relative z-10 */}
     </div>
     </>
   );
