@@ -11602,6 +11602,668 @@ function LessonPrepPage() {
 }
 
 
+// ═══════════════════════════════════════════════════════════
+//  🎯 صفحة قياس أداء المعلمين — التطوير المهني
+// ═══════════════════════════════════════════════════════════
+function TeacherEvalPage({ teachers = [] }) {
+  const LS_KEY = "teacher_eval_records_v1";
+  const loadLS = () => { try { const v = localStorage.getItem(LS_KEY); return v ? JSON.parse(v) : []; } catch { return []; } };
+  const saveLS = (d) => { try { localStorage.setItem(LS_KEY, JSON.stringify(d)); } catch {} };
+
+  const [records, setRecords] = useState(loadLS);
+  const [view,    setView]    = useState("list");   // list | form | result | compare
+  const [current, setCurrent] = useState(null);
+  const [formData, setFormData] = useState({});
+  const [step,    setStep]    = useState(0);
+
+  useEffect(() => saveLS(records), [records]);
+
+  /* ─── خيارات الإجابة ─── */
+  const OPT4 = ["دائماً","غالباً","أحياناً","لا"];
+  const OPT_YN = ["نعم","لا"];
+  const DEGREES = ["دبلوم","بكالوريوس","ماجستير","دكتوراه","أخرى"];
+  const SPEC_YEARS = ["أقل من سنة","1-3 سنوات","4-7 سنوات","8-15 سنة","أكثر من 15 سنة"];
+  const SCHOOL_LEVELS = ["ابتدائي","متوسط","ثانوي"];
+  const SUBJECTS_LIST = ["رياضيات","علوم","عربي","إنجليزي","تربية إسلامية","اجتماعيات","حاسب","تربية بدنية","فنون","أخرى"];
+
+  /* ─── محاور التقييم ─── */
+  const SECTIONS = [
+    {
+      id:"identity", icon:"👤", title:"الهوية المهنية", color:"#0d9488", bg:"#f0fdfa", brd:"#99f6e4",
+      fields:[
+        { id:"name",      label:"اسم المعلم",          type:"text",   placeholder:"الاسم الرباعي" },
+        { id:"empId",     label:"رقم الموظف",          type:"text",   placeholder:"رقم الهوية أو الوظيفة" },
+        { id:"subject",   label:"المادة الدراسية",     type:"select", options:SUBJECTS_LIST },
+        { id:"schoolLevel",label:"المرحلة",            type:"select", options:SCHOOL_LEVELS },
+        { id:"degree",    label:"آخر مؤهل علمي",      type:"select", options:DEGREES },
+        { id:"degreeSpec",label:"تخصص المؤهل",        type:"text",   placeholder:"مثال: رياضيات تطبيقية" },
+        { id:"totalExp",  label:"سنوات الخبرة الكلية", type:"select", options:SPEC_YEARS },
+        { id:"schoolExp", label:"سنوات الخدمة بالمدرسة الحالية", type:"select", options:SPEC_YEARS },
+        { id:"pdCourses", label:"عدد الدورات التدريبية (آخر 3 سنوات)", type:"select", options:["لم أحضر أي دورة","1-2 دورة","3-5 دورات","أكثر من 5 دورات"] },
+      ]
+    },
+    {
+      id:"motivation", icon:"🔥", title:"الدافعية والطموح", color:"#d97706", bg:"#fffbeb", brd:"#fde68a",
+      fields:[
+        { id:"m1",  label:"أشعر بالحماس عند الذهاب إلى المدرسة",       type:"opt4" },
+        { id:"m2",  label:"لديّ رغبة حقيقية في إحداث فرق إيجابي في حياة طلابي", type:"opt4" },
+        { id:"m3",  label:"أسعى إلى تطوير نفسي مهنياً بشكل مستمر",     type:"opt4" },
+        { id:"m4",  label:"أشعر بالرضا الوظيفي عن مهنة التدريس",       type:"opt4" },
+        { id:"m5",  label:"أرى التدريس مهنة مقدسة وليست مجرد وظيفة",   type:"opt4" },
+        { id:"m6",  label:"لديّ أهداف مهنية واضحة أسعى لتحقيقها",      type:"opt4" },
+        { id:"m7",  label:"أفكر في التقاعد المبكر أو تغيير المهنة",     type:"opt4" },
+        { id:"m8",  label:"لديّ طموح لتولي مناصب قيادية مستقبلاً (مشرف، مدير، مدرب)", type:"opt4" },
+        { id:"m9",  label:"هل سبق وتقدّمت لفرص قيادية أو تدريبية؟",    type:"opyn" },
+        { id:"m10", label:"أسعى لنشر تجاربي التعليمية مع زملائي",      type:"opt4" },
+      ]
+    },
+    {
+      id:"frustration", icon:"😔", title:"الإحباط الوظيفي وأسبابه", color:"#dc2626", bg:"#fef2f2", brd:"#fca5a5",
+      fields:[
+        { id:"f1",  label:"أشعر بإحباط وظيفي بشكل عام",                type:"opt4" },
+        { id:"f2",  label:"【السبب】 ضعف مستوى الطلاب وسلوكهم يؤثر سلباً عليّ", type:"opt4" },
+        { id:"f3",  label:"【السبب】 البيئة المدرسية (المرافق، التجهيزات) غير ملائمة", type:"opt4" },
+        { id:"f4",  label:"【السبب】 الأنظمة والتعليمات الجديدة تشكّل ضغطاً عليّ", type:"opt4" },
+        { id:"f5",  label:"【السبب】 العلاقة مع إدارة المدرسة تؤثر على أدائي", type:"opt4" },
+        { id:"f6",  label:"【السبب】 أعباء العمل الإداري والأوراق تستنزفني", type:"opt4" },
+        { id:"f7",  label:"【السبب】 ظروف اجتماعية وأسرية خاصة تؤثر على أدائي", type:"opt4" },
+        { id:"f8",  label:"【السبب】 وضع صحي يؤثر على قدرتي على العطاء",  type:"opt4" },
+        { id:"f9",  label:"【السبب】 غياب التقدير والحوافز الكافية",       type:"opt4" },
+        { id:"f10", label:"【السبب】 علاقات العمل مع الزملاء غير داعمة",  type:"opt4" },
+        { id:"f11", label:"هل سبق وطلبت الدعم أو التوجيه من المشرف أو المدير؟", type:"opyn" },
+      ]
+    },
+    {
+      id:"innovation", icon:"💡", title:"الابتكار والإبداع في التدريس", color:"#7c3aed", bg:"#faf5ff", brd:"#ddd6fe",
+      fields:[
+        { id:"i1",  label:"أستخدم استراتيجيات تدريس متنوعة في حصصي",    type:"opt4" },
+        { id:"i2",  label:"أُدخل التقنية والأدوات الرقمية في شرح المادة", type:"opt4" },
+        { id:"i3",  label:"أُصمّم نشاطات وألعاب تعليمية تناسب طلابي",   type:"opt4" },
+        { id:"i4",  label:"أبتكر مواد ووسائل تعليمية من إعدادي الخاص",  type:"opt4" },
+        { id:"i5",  label:"أُعدّ دروساً تفاعلية تجعل الطالب محور التعلم", type:"opt4" },
+        { id:"i6",  label:"أُخصّص التدريس بحسب مستويات الطلاب المختلفة", type:"opt4" },
+        { id:"i7",  label:"أُصمّم خططاً تعليمية لطلاب صعوبات التعلم",   type:"opt4" },
+        { id:"i8",  label:"أُطوّع مناهج وأُعدّل عليها لتناسب سياق الفصل", type:"opt4" },
+        { id:"i9",  label:"أشارك في تطوير المحتوى والمشاريع المدرسية",  type:"opt4" },
+        { id:"i10", label:"أستثمر نتائج التقييمات لتعديل طريقة تدريسي", type:"opt4" },
+        { id:"i11", label:"أُنوّع في أدوات التقييم (مشاريع، عروض، تقييم الأقران)", type:"opt4" },
+        { id:"i12", label:"أُدمج مهارات القرن الحادي والعشرين في حصصي", type:"opt4" },
+      ]
+    },
+    {
+      id:"development", icon:"📈", title:"التطوير المهني والطموح المستقبلي", color:"#0284c7", bg:"#eff6ff", brd:"#bfdbfe",
+      fields:[
+        { id:"d1",  label:"أحضر ورش عمل ودورات تدريبية بشكل منتظم",     type:"opt4" },
+        { id:"d2",  label:"أطّلع على الأبحاث والمستجدات التربوية",       type:"opt4" },
+        { id:"d3",  label:"أُشارك في مجتمعات التعلم المهني مع الزملاء", type:"opt4" },
+        { id:"d4",  label:"لديّ ملف إنجاز مهني أُحدّثه باستمرار",      type:"opt4" },
+        { id:"d5",  label:"أُطبّق ما أتعلمه من الدورات في حصصي الفعلية", type:"opt4" },
+        { id:"d6",  label:"أسعى للحصول على شهادات احترافية معترف بها",  type:"opt4" },
+        { id:"d7",  label:"لديّ خطة تطوير مهنية شخصية مكتوبة",         type:"opt4" },
+        { id:"d8",  label:"أُقيّم نفسي وأطلب تغذية راجعة من زملائي",  type:"opt4" },
+        { id:"d9",  label:"أطمح لاستكمال دراسات عليا مستقبلاً",        type:"opyn" },
+        { id:"d10", label:"هل تودّ المشاركة في برنامج تطوير مهني مخصص لك؟", type:"opyn" },
+      ]
+    },
+    {
+      id:"relations", icon:"🤝", title:"بيئة العمل والعلاقات المهنية", color:"#059669", bg:"#f0fdf4", brd:"#a7f3d0",
+      fields:[
+        { id:"r1",  label:"علاقتي مع إدارة المدرسة إيجابية وداعمة",     type:"opt4" },
+        { id:"r2",  label:"أتلقى دعماً ومساندة من زملائي المعلمين",     type:"opt4" },
+        { id:"r3",  label:"أجد التغذية الراجعة من المشرف مفيدة وبنّاءة", type:"opt4" },
+        { id:"r4",  label:"أُشارك في اجتماعات المدرسة بفاعلية وأُسهم برأيي", type:"opt4" },
+        { id:"r5",  label:"علاقتي مع أولياء الأمور إيجابية وتعاونية",  type:"opt4" },
+        { id:"r6",  label:"أشعر بأن جهودي معترف بها من الإدارة",        type:"opt4" },
+        { id:"r7",  label:"أُساعد الزملاء الجدد وأتشارك معهم الخبرات", type:"opt4" },
+      ]
+    },
+  ];
+
+  const ALL_SCORE_FIELDS = SECTIONS.flatMap(s => s.fields.filter(f => f.type === "opt4"));
+  const OPT4_VAL = { "دائماً":4, "غالباً":3, "أحياناً":2, "لا":1 };
+
+  /* ─── حساب النتائج ─── */
+  const calcResults = (data) => {
+    return SECTIONS.map(sec => {
+      const scored = sec.fields.filter(f => f.type === "opt4");
+      const total = scored.reduce((s,f) => s + (OPT4_VAL[data[f.id]] || 0), 0);
+      const max   = scored.length * 4;
+      const pct   = max > 0 ? Math.round((total / max) * 100) : 0;
+      return { ...sec, total, max, pct };
+    });
+  };
+
+  const globalPct = (data) => {
+    const all = ALL_SCORE_FIELDS;
+    const total = all.reduce((s,f) => s + (OPT4_VAL[data[f.id]] || 0), 0);
+    const max   = all.length * 4;
+    return max > 0 ? Math.round((total/max)*100) : 0;
+  };
+
+  const levelLabel = (pct) => {
+    if (pct >= 85) return { label:"ممتاز 🌟",    color:"#059669", bg:"#d1fae5" };
+    if (pct >= 70) return { label:"جيد جداً 👍",  color:"#0d9488", bg:"#ccfbf1" };
+    if (pct >= 55) return { label:"جيد 👌",        color:"#d97706", bg:"#fef3c7" };
+    if (pct >= 40) return { label:"مقبول 📌",      color:"#f97316", bg:"#ffedd5" };
+    return              { label:"يحتاج دعماً 🆘",  color:"#dc2626", bg:"#fee2e2" };
+  };
+
+  /* ─── توليد خطة التطوير ─── */
+  const buildPlan = (data) => {
+    const results = calcResults(data);
+    const plan = [];
+    results.forEach(sec => {
+      if (sec.pct < 60) {
+        const tips = {
+          motivation:   ["حضور برامج التحفيز المهني","جلسات إرشاد مع المشرف التربوي","تحديد هدف قصير المدى ملهم"],
+          frustration:  ["اجتماع داعم مع الإدارة لمعرفة مصدر الإحباط","برنامج الصحة النفسية للمعلم","ورشة إدارة الضغوط المهنية"],
+          innovation:   ["دورة استراتيجيات التدريس الحديثة","برنامج التعلم النشط","التخطيط التعاوني مع معلمين مبدعين"],
+          development:  ["خطة تطوير مهني فردية مكتوبة","تسجيل في دورة معتمدة","مجتمع تعلم مهني أسبوعي"],
+          relations:    ["جلسة تواصل مع إدارة المدرسة","برنامج بناء الفريق","زيارة تبادلية مع زميل"],
+        };
+        plan.push({ sec: sec.title, icon: sec.icon, color: sec.color, bg: sec.bg, pct: sec.pct, tips: tips[sec.id] || ["دعم عام"] });
+      }
+    });
+    return plan;
+  };
+
+  /* ─── فتح نموذج جديد ─── */
+  const startNew = () => {
+    setFormData({});
+    setStep(0);
+    setCurrent(null);
+    setView("form");
+  };
+
+  const openRecord = (rec) => {
+    setFormData(rec.data);
+    setCurrent(rec);
+    setView("result");
+  };
+
+  const field = (id) => formData[id] || "";
+  const setField = (id, val) => setFormData(p => ({...p, [id]: val}));
+
+  const totalSteps = SECTIONS.length;
+  const curSection = SECTIONS[step];
+
+  const saveRecord = () => {
+    const rec = {
+      id: current?.id || Date.now(),
+      date: new Date().toLocaleDateString("ar-SA-u-nu-latn",{year:"numeric",month:"2-digit",day:"2-digit"}),
+      data: formData,
+      name: formData.name || "معلم غير مسمّى",
+      subject: formData.subject || "—",
+      pct: globalPct(formData),
+    };
+    setRecords(prev => {
+      const idx = prev.findIndex(r => r.id === rec.id);
+      if (idx >= 0) { const n=[...prev]; n[idx]=rec; return n; }
+      return [rec, ...prev];
+    });
+    setCurrent(rec);
+    setView("result");
+  };
+
+  const deleteRecord = (id) => {
+    if (!confirm("حذف هذا التقييم؟")) return;
+    setRecords(prev => prev.filter(r => r.id !== id));
+  };
+
+  const printResult = (rec) => {
+    const results = calcResults(rec.data);
+    const plan    = buildPlan(rec.data);
+    const gPct    = rec.pct;
+    const lvl     = levelLabel(gPct);
+    const rows = results.map(s => `
+      <div class="sec-card" style="border-color:${s.color};background:${s.bg}">
+        <div class="sec-header"><span>${s.icon} ${s.title}</span><span class="pct-badge" style="background:${s.color}">${s.pct}%</span></div>
+        <div class="bar-wrap"><div class="bar-fill" style="width:${s.pct}%;background:${s.color}"></div></div>
+      </div>`).join("");
+    const planRows = plan.map(p => `
+      <div class="plan-card" style="border-color:${p.color};background:${p.bg}">
+        <div class="plan-title">${p.icon} ${p.sec} — ${p.pct}%</div>
+        ${p.tips.map(t=>`<div class="plan-tip">• ${t}</div>`).join("")}
+      </div>`).join("");
+    printWindow(`<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8"><title>تقرير قياس الأداء</title>
+    <style>
+    *{margin:0;padding:0;box-sizing:border-box}body{font-family:'Noto Sans Arabic',Arial,sans-serif;direction:rtl;padding:30px;color:#111}
+    .hdr{text-align:center;margin-bottom:24px;padding-bottom:14px;border-bottom:3px solid #7c3aed}
+    .hdr h1{font-size:20px;font-weight:900;color:#7c3aed}.hdr p{font-size:12px;color:#666;margin-top:4px}
+    .score-box{display:flex;align-items:center;justify-content:center;gap:20px;margin:16px 0;padding:16px;background:#f5f3ff;border-radius:12px}
+    .score-num{font-size:52px;font-weight:900;color:#7c3aed}.score-lbl{font-size:16px;font-weight:800;color:${lvl.color};background:${lvl.bg};padding:4px 14px;border-radius:20px}
+    .info-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:20px}
+    .info-item{background:#f9fafb;padding:8px 12px;border-radius:8px;font-size:11px}
+    .info-item strong{display:block;font-size:12px;margin-bottom:2px;color:#374151}
+    .sec-title{font-size:14px;font-weight:900;color:#374151;margin:16px 0 8px}
+    .sec-card{border-right:4px solid;border-radius:10px;padding:10px 14px;margin-bottom:8px}
+    .sec-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;font-size:12px;font-weight:800}
+    .pct-badge{color:#fff;padding:2px 10px;border-radius:20px;font-size:11px}
+    .bar-wrap{background:#e5e7eb;border-radius:99px;height:8px;overflow:hidden}
+    .bar-fill{height:100%;border-radius:99px;transition:none}
+    .plan-title{font-size:12px;font-weight:900;margin-bottom:6px}
+    .plan-tip{font-size:11px;color:#555;padding:2px 0}
+    .plan-card{border-right:4px solid;border-radius:10px;padding:10px 14px;margin-bottom:8px}
+    .footer{text-align:center;margin-top:24px;font-size:10px;color:#aaa;border-top:1px solid #eee;padding-top:10px}
+    @media print{@page{size:A4;margin:1.5cm}body{padding:0}}
+    </style></head><body>
+    <div class="hdr"><h1>🎯 تقرير قياس أداء المعلم</h1><p>مدرسة عبيدة بن الحارث المتوسطة — ${rec.date}</p></div>
+    <div class="score-box">
+      <div style="text-align:center"><div class="score-num">${gPct}%</div><div style="font-size:12px;color:#888;margin-top:4px">النتيجة الإجمالية</div></div>
+      <div><div class="score-lbl">${lvl.label}</div><div style="font-size:11px;color:#555;margin-top:8px">التقييم الكلي لجميع المحاور</div></div>
+    </div>
+    <div class="info-grid">
+      <div class="info-item"><strong>الاسم</strong>${rec.data.name||"—"}</div>
+      <div class="info-item"><strong>المادة</strong>${rec.data.subject||"—"}</div>
+      <div class="info-item"><strong>المؤهل</strong>${rec.data.degree||"—"}</div>
+      <div class="info-item"><strong>الخبرة الكلية</strong>${rec.data.totalExp||"—"}</div>
+      <div class="info-item"><strong>الخدمة بالمدرسة</strong>${rec.data.schoolExp||"—"}</div>
+      <div class="info-item"><strong>التخصص</strong>${rec.data.degreeSpec||"—"}</div>
+    </div>
+    <div class="sec-title">📊 نتائج المحاور</div>${rows}
+    ${plan.length>0?`<div class="sec-title">🗺️ خطة التطوير المهني المقترحة</div>${planRows}`:"<div style='background:#d1fae5;padding:12px;border-radius:10px;font-size:12px;font-weight:800;color:#065f46;text-align:center'>🎉 ممتاز! لا توجد محاور تحتاج تدخلاً عاجلاً</div>"}
+    <div class="footer">مدرسة عبيدة بن الحارث المتوسطة — ${new Date().toLocaleDateString("ar-SA")}</div>
+    <script>window.onload=()=>window.print()</script></body></html>`);
+  };
+
+  /* ════════════════════════════════
+     عرض القائمة
+  ════════════════════════════════ */
+  if (view === "list") return (
+    <div dir="rtl">
+      {/* Header */}
+      <div className="rounded-b-2xl p-6 mb-6 text-white shadow-xl" style={{background:"linear-gradient(135deg,#7c3aed,#5b21b6)"}}>
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="text-center sm:text-right">
+            <div className="text-4xl mb-1">🎯</div>
+            <h2 className="text-2xl font-black">قياس الأداء المهني للمعلمين</h2>
+            <p className="opacity-75 text-sm mt-1">تقييم شامل — دافعية · إبداع · تطوير · بيئة عمل</p>
+          </div>
+          <div className="flex gap-3 flex-wrap justify-center">
+            <button onClick={startNew} className="bg-white text-purple-700 px-5 py-2.5 rounded-xl font-black text-sm hover:bg-purple-50 shadow-lg">
+              ➕ تقييم معلم جديد
+            </button>
+            {records.length > 1 && (
+              <button onClick={() => setView("compare")} className="bg-purple-800 bg-opacity-60 text-white px-4 py-2.5 rounded-xl font-bold text-sm hover:bg-opacity-80 border border-white border-opacity-20">
+                📊 مقارنة التقييمات
+              </button>
+            )}
+          </div>
+        </div>
+        {/* إحصائيات سريعة */}
+        {records.length > 0 && (
+          <div className="grid grid-cols-3 gap-3 mt-5">
+            {[
+              { label:"إجمالي التقييمات", val: records.length, icon:"📋" },
+              { label:"متوسط الأداء العام", val: Math.round(records.reduce((s,r)=>s+r.pct,0)/records.length)+"%", icon:"📊" },
+              { label:"أعلى أداء", val: Math.max(...records.map(r=>r.pct))+"%", icon:"🏆" },
+            ].map((s,i) => (
+              <div key={i} className="bg-white bg-opacity-15 rounded-2xl p-3 text-center">
+                <div className="text-xl">{s.icon}</div>
+                <div className="text-xl font-black mt-1">{s.val}</div>
+                <div className="text-xs opacity-75 mt-0.5">{s.label}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* قائمة التقييمات */}
+      {records.length === 0 ? (
+        <div className="text-center py-16 text-gray-400">
+          <div className="text-6xl mb-4">📋</div>
+          <div className="font-bold text-lg">لا توجد تقييمات بعد</div>
+          <div className="text-sm mt-2">اضغط "تقييم معلم جديد" للبدء</div>
+        </div>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {records.map(rec => {
+            const lvl = levelLabel(rec.pct);
+            const results = calcResults(rec.data);
+            return (
+              <div key={rec.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-all">
+                {/* شريط العلوي */}
+                <div className="px-5 pt-5 pb-3">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <div className="font-black text-gray-800 text-base">{rec.name}</div>
+                      <div className="text-xs text-gray-400 mt-0.5">{rec.data.subject} · {rec.date}</div>
+                    </div>
+                    <div className="text-center flex-shrink-0">
+                      <div className="text-2xl font-black" style={{color:lvl.color}}>{rec.pct}%</div>
+                      <div className="text-xs font-bold px-2 py-0.5 rounded-full mt-1" style={{background:lvl.bg,color:lvl.color}}>{lvl.label}</div>
+                    </div>
+                  </div>
+                  {/* شريط تقدم عام */}
+                  <div className="mt-3 bg-gray-100 rounded-full h-2 overflow-hidden">
+                    <div className="h-full rounded-full transition-all" style={{width:rec.pct+"%",background:`linear-gradient(90deg,${lvl.color},${lvl.color}88)`}} />
+                  </div>
+                </div>
+                {/* محاور صغيرة */}
+                <div className="px-5 pb-4 grid grid-cols-3 gap-1.5">
+                  {results.map(s => (
+                    <div key={s.id} className="text-center p-1.5 rounded-xl" style={{background:s.bg}}>
+                      <div className="text-sm">{s.icon}</div>
+                      <div className="text-xs font-bold" style={{color:s.color}}>{s.pct}%</div>
+                    </div>
+                  ))}
+                </div>
+                {/* أزرار */}
+                <div className="border-t border-gray-100 flex">
+                  <button onClick={() => openRecord(rec)} className="flex-1 py-2.5 text-xs font-bold text-purple-600 hover:bg-purple-50 transition-all">📊 النتائج</button>
+                  <div className="w-px bg-gray-100" />
+                  <button onClick={() => { setFormData(rec.data); setCurrent(rec); setStep(0); setView("form"); }} className="flex-1 py-2.5 text-xs font-bold text-blue-600 hover:bg-blue-50 transition-all">✏️ تعديل</button>
+                  <div className="w-px bg-gray-100" />
+                  <button onClick={() => printResult(rec)} className="flex-1 py-2.5 text-xs font-bold text-teal-600 hover:bg-teal-50 transition-all">🖨️ طباعة</button>
+                  <div className="w-px bg-gray-100" />
+                  <button onClick={() => deleteRecord(rec.id)} className="flex-1 py-2.5 text-xs font-bold text-red-500 hover:bg-red-50 transition-all">🗑️</button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+
+  /* ════════════════════════════════
+     مقارنة التقييمات
+  ════════════════════════════════ */
+  if (view === "compare") return (
+    <div dir="rtl">
+      <div className="flex items-center gap-3 mb-6">
+        <button onClick={() => setView("list")} className="px-4 py-2 rounded-xl bg-gray-100 text-gray-600 font-bold text-sm hover:bg-gray-200">← رجوع</button>
+        <h2 className="text-xl font-black text-purple-800">📊 مقارنة أداء المعلمين</h2>
+      </div>
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr style={{background:"linear-gradient(135deg,#7c3aed,#5b21b6)"}}>
+              <th className="text-right px-4 py-3 text-white text-xs font-bold">المعلم</th>
+              <th className="text-center px-3 py-3 text-white text-xs font-bold">المادة</th>
+              {SECTIONS.map(s => <th key={s.id} className="text-center px-3 py-3 text-white text-xs font-bold">{s.icon}</th>)}
+              <th className="text-center px-3 py-3 text-white text-xs font-bold">الإجمالي</th>
+            </tr>
+          </thead>
+          <tbody>
+            {records.map((rec,i) => {
+              const results = calcResults(rec.data);
+              const lvl = levelLabel(rec.pct);
+              return (
+                <tr key={rec.id} className="border-t border-gray-100 hover:bg-gray-50">
+                  <td className="px-4 py-3">
+                    <div className="font-bold text-gray-800">{rec.name}</div>
+                    <div className="text-xs text-gray-400">{rec.date}</div>
+                  </td>
+                  <td className="px-3 py-3 text-center text-xs text-gray-600">{rec.subject}</td>
+                  {results.map(s => (
+                    <td key={s.id} className="px-3 py-3 text-center">
+                      <div className="text-xs font-bold" style={{color:s.color}}>{s.pct}%</div>
+                      <div className="w-12 h-1.5 bg-gray-100 rounded-full mx-auto mt-1 overflow-hidden">
+                        <div className="h-full rounded-full" style={{width:s.pct+"%",background:s.color}} />
+                      </div>
+                    </td>
+                  ))}
+                  <td className="px-3 py-3 text-center">
+                    <div className="text-base font-black" style={{color:lvl.color}}>{rec.pct}%</div>
+                    <div className="text-xs px-2 py-0.5 rounded-full font-bold mt-1 inline-block" style={{background:lvl.bg,color:lvl.color}}>{lvl.label}</div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+
+  /* ════════════════════════════════
+     نموذج التقييم — خطوة بخطوة
+  ════════════════════════════════ */
+  if (view === "form") {
+    const sec = SECTIONS[step];
+    const allFilled = sec.fields.every(f => {
+      if (f.type === "text") return true; // not required
+      return !!formData[f.id];
+    });
+    // Check if identity section has the name at minimum
+    const canNext = step === 0 ? !!formData.name : allFilled;
+
+    const SelectField = ({ f }) => {
+      const opts = f.type === "opt4" ? OPT4 : f.type === "opyn" ? OPT_YN : f.options || [];
+      const val  = formData[f.id] || "";
+      const colors = f.type === "opt4"
+        ? { "دائماً":"#059669","غالباً":"#0d9488","أحياناً":"#d97706","لا":"#dc2626" }
+        : { "نعم":"#059669","لا":"#dc2626" };
+      return (
+        <div className="mb-4">
+          <label className="block text-sm font-bold text-gray-700 mb-2 leading-relaxed">{f.label}</label>
+          {f.type === "text" ? (
+            <input type="text" value={val} placeholder={f.placeholder || ""} onChange={e => setField(f.id, e.target.value)}
+              className="w-full px-4 py-2.5 rounded-xl border-2 border-gray-200 focus:border-purple-400 focus:outline-none text-sm"
+              dir="rtl" />
+          ) : f.type === "select" ? (
+            <select value={val} onChange={e => setField(f.id, e.target.value)}
+              className="w-full px-4 py-2.5 rounded-xl border-2 border-gray-200 focus:border-purple-400 focus:outline-none text-sm bg-white"
+              style={{color: val ? "#1f2937":"#9ca3af"}}>
+              <option value="">— اختر —</option>
+              {opts.map(o => <option key={o} value={o}>{o}</option>)}
+            </select>
+          ) : (
+            /* opt4 / opyn — أزرار مرئية */
+            <div className={`flex gap-2 ${f.type==="opt4"?"flex-wrap":""}`}>
+              {opts.map(opt => {
+                const active = val === opt;
+                const clr = colors[opt] || "#7c3aed";
+                return (
+                  <button key={opt} onClick={() => setField(f.id, opt)}
+                    className="flex-1 py-2 px-3 rounded-xl text-xs font-bold border-2 transition-all cursor-pointer"
+                    style={{
+                      background: active ? clr : "#f9fafb",
+                      borderColor: active ? clr : "#e5e7eb",
+                      color: active ? "#fff" : "#6b7280",
+                      boxShadow: active ? `0 4px 12px ${clr}44` : "none",
+                      minWidth: f.type==="opt4" ? "calc(25% - 6px)" : "auto",
+                    }}>
+                    {f.type === "opt4" ? opt : (opt === "نعم" ? "✅ نعم" : "❌ لا")}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      );
+    };
+
+    return (
+      <div dir="rtl">
+        {/* رأس النموذج */}
+        <div className="rounded-b-2xl p-5 mb-5 text-white shadow-lg" style={{background:`linear-gradient(135deg,${sec.color},${sec.color}cc)`}}>
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-white bg-opacity-20 flex items-center justify-center text-2xl">{sec.icon}</div>
+              <div>
+                <div className="font-black text-lg">{sec.title}</div>
+                <div className="text-xs opacity-80">المحور {step+1} من {totalSteps}</div>
+              </div>
+            </div>
+            <button onClick={() => { if(confirm("إلغاء التقييم؟")) setView("list"); }} className="text-white opacity-60 hover:opacity-100 text-2xl font-bold">✕</button>
+          </div>
+          {/* شريط التقدم */}
+          <div className="flex gap-1.5">
+            {SECTIONS.map((s,i) => (
+              <div key={i} className="flex-1 h-2 rounded-full overflow-hidden" style={{background:"rgba(255,255,255,0.2)"}}>
+                <div className="h-full rounded-full transition-all" style={{width: i<=step?"100%":"0%", background:"#fff"}} />
+              </div>
+            ))}
+          </div>
+          <div className="flex justify-between text-xs opacity-70 mt-1.5">
+            {SECTIONS.map((s,i) => <span key={i} className="text-center" style={{flex:1,fontSize:"9px"}}>{s.icon}</span>)}
+          </div>
+        </div>
+
+        {/* الحقول */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 mb-4">
+          {sec.fields.map(f => <SelectField key={f.id} f={f} />)}
+        </div>
+
+        {/* التنقل */}
+        <div className="flex gap-3">
+          {step > 0 && (
+            <button onClick={() => setStep(s=>s-1)}
+              className="px-5 py-3 rounded-2xl bg-gray-100 text-gray-600 font-bold text-sm hover:bg-gray-200">
+              ← السابق
+            </button>
+          )}
+          {step < totalSteps - 1 ? (
+            <button onClick={() => setStep(s=>s+1)} disabled={!canNext}
+              className="flex-1 py-3 rounded-2xl font-black text-sm text-white transition-all"
+              style={{background:canNext?`linear-gradient(135deg,${sec.color},${sec.color}cc)`:"#e5e7eb",color:canNext?"#fff":"#9ca3af",boxShadow:canNext?`0 4px 16px ${sec.color}44`:"none"}}>
+              التالي ← {SECTIONS[step+1]?.icon}
+            </button>
+          ) : (
+            <button onClick={saveRecord}
+              className="flex-1 py-3 rounded-2xl font-black text-sm text-white shadow-lg"
+              style={{background:"linear-gradient(135deg,#7c3aed,#5b21b6)"}}>
+              🎯 احفظ وعرض النتائج
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  /* ════════════════════════════════
+     صفحة النتائج
+  ════════════════════════════════ */
+  if (view === "result" && (current || formData.name)) {
+    const rec  = current || { data: formData, name: formData.name, pct: globalPct(formData) };
+    const results = calcResults(rec.data);
+    const gPct    = rec.pct || globalPct(rec.data);
+    const lvl     = levelLabel(gPct);
+    const plan    = buildPlan(rec.data);
+
+    return (
+      <div dir="rtl">
+        {/* شريط التنقل */}
+        <div className="flex items-center gap-3 mb-5 flex-wrap">
+          <button onClick={() => setView("list")} className="px-4 py-2 rounded-xl bg-gray-100 text-gray-600 font-bold text-sm hover:bg-gray-200">← قائمة التقييمات</button>
+          <button onClick={() => { setStep(0); setView("form"); }} className="px-4 py-2 rounded-xl bg-blue-50 text-blue-600 font-bold text-sm hover:bg-blue-100">✏️ تعديل</button>
+          <button onClick={() => rec.id && printResult(rec)} className="px-4 py-2 rounded-xl bg-purple-50 text-purple-600 font-bold text-sm hover:bg-purple-100">🖨️ طباعة التقرير</button>
+        </div>
+
+        {/* بطاقة النتيجة الرئيسية */}
+        <div className="rounded-2xl p-6 mb-5 text-white shadow-xl" style={{background:`linear-gradient(135deg,${lvl.color},${lvl.color}99)`}}>
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            <div>
+              <div className="text-3xl font-black">{rec.name || rec.data?.name}</div>
+              <div className="opacity-80 text-sm mt-1">{rec.data?.subject} · {rec.data?.degree} · {rec.data?.totalExp}</div>
+            </div>
+            <div className="text-center">
+              <div className="text-6xl font-black leading-none">{gPct}%</div>
+              <div className="text-lg font-bold mt-1 bg-white bg-opacity-20 px-4 py-1 rounded-full">{lvl.label}</div>
+            </div>
+          </div>
+          {/* شريط تقدم */}
+          <div className="mt-4 bg-white bg-opacity-20 rounded-full h-3 overflow-hidden">
+            <div className="h-full rounded-full bg-white transition-all" style={{width:gPct+"%"}} />
+          </div>
+        </div>
+
+        {/* معلومات الهوية */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 mb-4">
+          <h3 className="font-black text-gray-800 mb-4 text-base flex items-center gap-2">👤 الهوية المهنية</h3>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            {[
+              {l:"المادة",v:rec.data?.subject},{l:"المرحلة",v:rec.data?.schoolLevel},
+              {l:"آخر مؤهل",v:rec.data?.degree},{l:"التخصص",v:rec.data?.degreeSpec},
+              {l:"سنوات الخبرة",v:rec.data?.totalExp},{l:"الخدمة بالمدرسة",v:rec.data?.schoolExp},
+              {l:"رقم الموظف",v:rec.data?.empId},{l:"الدورات (3 سنوات)",v:rec.data?.pdCourses},
+            ].filter(x=>x.v).map((x,i) => (
+              <div key={i} className="bg-gray-50 rounded-xl p-3">
+                <div className="text-xs text-gray-400 font-bold">{x.l}</div>
+                <div className="text-sm font-black text-gray-800 mt-0.5">{x.v}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* نتائج المحاور */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 mb-4">
+          <h3 className="font-black text-gray-800 mb-4 text-base">📊 نتائج المحاور الستة</h3>
+          <div className="space-y-3">
+            {results.map(s => (
+              <div key={s.id} className="rounded-2xl p-4" style={{background:s.bg, border:`1.5px solid ${s.brd}`}}>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2 font-black text-sm" style={{color:s.color}}>
+                    <span className="text-xl">{s.icon}</span> {s.title}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="text-xl font-black" style={{color:s.color}}>{s.pct}%</div>
+                    <div className="text-xs px-2 py-0.5 rounded-full font-bold" style={{background:levelLabel(s.pct).bg,color:levelLabel(s.pct).color}}>{levelLabel(s.pct).label}</div>
+                  </div>
+                </div>
+                <div className="bg-white bg-opacity-60 rounded-full h-3 overflow-hidden">
+                  <div className="h-full rounded-full transition-all" style={{width:s.pct+"%",background:`linear-gradient(90deg,${s.color},${s.color}99)`}} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* خطة التطوير المهني */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 mb-4">
+          <h3 className="font-black text-gray-800 mb-4 text-base flex items-center gap-2">
+            🗺️ خطة التطوير المهني المقترحة
+          </h3>
+          {plan.length === 0 ? (
+            <div className="rounded-2xl p-5 text-center" style={{background:"#d1fae5",border:"1.5px solid #6ee7b7"}}>
+              <div className="text-3xl mb-2">🎉</div>
+              <div className="font-black text-green-800 text-base">أداء ممتاز في جميع المحاور!</div>
+              <div className="text-sm text-green-700 mt-1">لا توجد محاور تحتاج تدخلاً عاجلاً — استمر في هذا المستوى الرائع</div>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {plan.map((p,i) => (
+                <div key={i} className="rounded-2xl p-4" style={{background:p.bg,border:`1.5px solid ${p.color}44`}}>
+                  <div className="flex items-center gap-2 font-black text-sm mb-3" style={{color:p.color}}>
+                    <span className="text-lg">{p.icon}</span>
+                    <span>{p.sec}</span>
+                    <span className="mr-auto text-xs px-2 py-0.5 rounded-full" style={{background:p.color,color:"#fff"}}>{p.pct}%</span>
+                  </div>
+                  <div className="space-y-1.5">
+                    {p.tips.map((t,j) => (
+                      <div key={j} className="flex items-start gap-2 text-sm" style={{color:p.color}}>
+                        <span className="mt-0.5 flex-shrink-0">📌</span>
+                        <span className="font-medium">{t}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* ملاحظات إضافية */}
+        {rec.data?.f1 === "دائماً" && (
+          <div className="rounded-2xl p-4 mb-4" style={{background:"#fef2f2",border:"1.5px solid #fca5a5"}}>
+            <div className="font-black text-red-700 mb-2 flex items-center gap-2">⚠️ تنبيه: مستوى إحباط مرتفع</div>
+            <div className="text-sm text-red-600">
+              {["f2","f3","f4","f5","f6","f7","f8","f9","f10"].filter(k=>rec.data[k]==="دائماً"||rec.data[k]==="غالباً").length > 3
+                ? "يُنصح بجلسة دعم نفسي فوري مع المرشد التربوي ومناقشة الوضع مع إدارة المدرسة لإيجاد حلول عاجلة."
+                : "يُنصح بالتحدث مع المشرف التربوي أو مدير المدرسة لمناقشة مسببات الإحباط وإيجاد الدعم المناسب."}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return null;
+}
+
+
 function LessonRecommendPage({ classList }) {
   const [selClass,   setSelClass]   = useState("");
   const [selStudent, setSelStudent] = useState("");
@@ -17360,7 +18022,7 @@ export default function SchoolWebsite() {
       const hash = window.location.hash.replace("#","") || "home";
       if (hash.startsWith("ann-")) { setDirectAnnId(hash.replace("ann-","")); return; }
       setDirectAnnId(null);
-      if (["home","attendance","announcements","activities","settings","students","messages","surveys","sms","report","gradeanalysis","monthlyreport","teacherprofile","absencestats","attendancereport","student-absence","strategies","calendar","gallery","certificates","poll","raffle","broadcast","groupdivider","quiz","classtimer","luckywheel","exitticket","timetable","classvisits","honorboard","tasks","dailyquiz","aiteacher","lessonprep","lessonrecommend","officialforms","portfolio","earlywarning","meetings","heatmap","committeemeeting"].includes(hash)) setPage(hash);
+      if (["home","attendance","announcements","activities","settings","students","messages","surveys","sms","report","gradeanalysis","monthlyreport","teacherprofile","absencestats","attendancereport","student-absence","strategies","calendar","gallery","certificates","poll","raffle","broadcast","groupdivider","quiz","classtimer","luckywheel","exitticket","timetable","classvisits","honorboard","tasks","dailyquiz","aiteacher","lessonprep","lessonrecommend","officialforms","portfolio","earlywarning","meetings","heatmap","committeemeeting","teachereval"].includes(hash)) setPage(hash);
     };
     window.addEventListener("hashchange", h); h();
     return () => window.removeEventListener("hashchange", h);
@@ -17578,6 +18240,7 @@ export default function SchoolWebsite() {
     { id: "aiteacher",     label: "مساعد المعلم الذكي",  icon: "🤖" },
     { id: "lessonprep",    label: "تحضير الدرس الذكي",   icon: "📚" },
     { id: "lessonrecommend",label: "الخطط العلاجية",     icon: "🩺" },
+    { id: "teachereval",   label: "قياس أداء المعلم",    icon: "🎯" },
   ];
 
   return (
@@ -17886,6 +18549,7 @@ export default function SchoolWebsite() {
                 {page === "aiteacher"      && <AITeacherPage />}
                 {page === "lessonprep"     && <LessonPrepPage />}
                 {page === "lessonrecommend"&& <LessonRecommendPage classList={classList} />}
+                {page === "teachereval"    && <TeacherEvalPage teachers={teachers} />}
                 {page === "settings"       && <SettingsPage teachers={teachers} setTeachers={setTeachers} saveTeachers={saveTeachers} week={week} setWeek={setWeek} saveWeek={saveWeek} users={users} siteFont={siteFont} setSiteFont={setSiteFont} saveSiteFont={saveSiteFont} weekArchive={weekArchive} archiveCurrentWeek={archiveCurrentWeek} />}
               </div>
             </div>
@@ -18105,6 +18769,7 @@ export default function SchoolWebsite() {
         {page === "aiteacher"      && <AITeacherPage />}
         {page === "lessonprep"     && <LessonPrepPage />}
         {page === "lessonrecommend"&& <LessonRecommendPage classList={classList} />}
+        {page === "teachereval"    && <TeacherEvalPage teachers={teachers} />}
         {page === "settings"      && <SettingsPage teachers={teachers} setTeachers={setTeachers} saveTeachers={saveTeachers} week={week} setWeek={setWeek} saveWeek={saveWeek} users={users} siteFont={siteFont} setSiteFont={setSiteFont} saveSiteFont={saveSiteFont} weekArchive={weekArchive} archiveCurrentWeek={archiveCurrentWeek} />}
       </main>
       <footer className="relative text-center py-6 text-xs border-t bg-white mt-8 overflow-hidden" style={{borderColor:"rgba(13,148,136,.15)"}}>
