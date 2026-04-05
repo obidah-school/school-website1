@@ -17810,40 +17810,40 @@ export default function SchoolWebsite() {
           {/* إطار الهاتف */}
           <div style={{
             width:"100%", maxWidth:430,
-            background:"#fff",
+            background:"#f1f5f9",
             borderRadius:36,
             boxShadow:"0 0 0 8px #1e293b, 0 0 0 10px #334155, 0 30px 80px rgba(0,0,0,0.7)",
             overflow:"hidden",
-            minHeight:"80vh",
-            position:"relative",
+            display:"flex", flexDirection:"column",
+            height:"88vh",
             fontFamily:"'Cairo','Noto Naskh Arabic',sans-serif",
           }}>
-            {/* شريط الهاتف العلوي */}
+            {/* ── رأس الهاتف ── */}
             <div style={{
               background:"linear-gradient(135deg,#0d9488,#0f766e)",
-              padding:"10px 16px 8px",
+              padding:"10px 14px 8px",
               display:"flex", alignItems:"center", justifyContent:"space-between",
-              position:"sticky", top:0, zIndex:50,
+              flexShrink:0,
             }}>
               <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-                <div style={{ width:32, height:32, borderRadius:"50%", background:"rgba(255,255,255,0.2)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:16 }}>🏫</div>
+                <div style={{ width:30, height:30, borderRadius:"50%", background:"rgba(255,255,255,0.2)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:15 }}>🏫</div>
                 <div>
-                  <div style={{ color:"#fff", fontWeight:900, fontSize:13, lineHeight:1.1 }}>مدرسة عبيدة بن الحارث</div>
-                  <div style={{ color:"rgba(255,255,255,0.7)", fontSize:9.5, fontWeight:600 }}>المتوسطة • ١٤٤٧ هـ</div>
+                  <div style={{ color:"#fff", fontWeight:900, fontSize:12.5, lineHeight:1.1 }}>مدرسة عبيدة بن الحارث</div>
+                  <div style={{ color:"rgba(255,255,255,0.7)", fontSize:9, fontWeight:600 }}>المتوسطة • ١٤٤٧ هـ</div>
                 </div>
               </div>
-              <div style={{ display:"flex", alignItems:"center", gap:6 }}>
-                <div style={{ background:"rgba(255,255,255,0.15)", borderRadius:999, padding:"3px 8px", display:"flex", alignItems:"center", gap:5 }}>
-                  <div style={{ width:22, height:22, borderRadius:"50%", background:"#fff", display:"flex", alignItems:"center", justifyContent:"center", color:"#0d9488", fontWeight:900, fontSize:10 }}>{user.name.charAt(0)}</div>
-                  <span style={{ color:"#fff", fontSize:10, fontWeight:700 }}>{user.name}</span>
+              <div style={{ display:"flex", alignItems:"center", gap:5 }}>
+                <div style={{ background:"rgba(255,255,255,0.15)", borderRadius:999, padding:"3px 8px", display:"flex", alignItems:"center", gap:4 }}>
+                  <div style={{ width:20, height:20, borderRadius:"50%", background:"#fff", display:"flex", alignItems:"center", justifyContent:"center", color:"#0d9488", fontWeight:900, fontSize:9 }}>{user.name.charAt(0)}</div>
+                  <span style={{ color:"#fff", fontSize:9.5, fontWeight:700 }}>{user.name}</span>
                 </div>
-                <button onClick={() => setUser(null)} style={{ background:"rgba(239,68,68,0.25)", border:"none", borderRadius:999, color:"#fca5a5", fontSize:9, fontWeight:700, padding:"3px 7px", cursor:"pointer" }}>خروج</button>
+                <button onClick={() => setUser(null)} style={{ background:"rgba(239,68,68,0.25)", border:"none", borderRadius:999, color:"#fca5a5", fontSize:8.5, fontWeight:700, padding:"3px 6px", cursor:"pointer" }}>خروج</button>
               </div>
             </div>
 
-            {/* محتوى الصفحة */}
-            <div style={{ overflowY:"auto", maxHeight:"calc(80vh - 110px)", padding:"0 0 8px" }}>
-              <div style={{ padding:"8px 8px 0", direction:"rtl" }}>
+            {/* ── محتوى الصفحة (قابل للتمرير) ── */}
+            <div style={{ flex:1, overflowY:"auto", overflowX:"hidden", WebkitOverflowScrolling:"touch", background:"#f8fafc" }}>
+              <div style={{ direction:"rtl" }}>
                 {page === "home"           && <HomePage teachers={teachers} announcements={announcements} activities={activities} navigate={navigate} attendance={attendance} week={week} messages={messages} classList={classList} weekArchive={weekArchive} />}
                 {page === "student-absence" && <StudentAbsencePage />}
                 {page === "admin-attendance"&& <AdminAttendancePage />}
@@ -17890,71 +17890,63 @@ export default function SchoolWebsite() {
               </div>
             </div>
 
-            {/* شريط التنقل السفلي — جوال */}
-            <div style={{
-              position:"sticky", bottom:0,
-              background:"#fff",
-              borderTop:"1px solid #e2e8f0",
-              display:"grid",
-              gridTemplateColumns: `repeat(${Math.min(pages.length + 1, 5)}, 1fr)`,
-              boxShadow:"0 -4px 20px rgba(0,0,0,0.08)",
-            }}>
-              {/* الصفحات الرئيسية الأولى 4 */}
-              {pages.slice(0,4).map(p => (
-                <button key={p.id} onClick={() => navigate(p.id)} style={{
-                  display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center",
-                  padding:"8px 4px 6px", border:"none", cursor:"pointer", transition:"all .15s",
-                  background: page===p.id ? "#f0fdfa" : "#fff",
-                  borderTop: page===p.id ? "2px solid #0d9488" : "2px solid transparent",
-                }}>
-                  <span style={{ fontSize:19, lineHeight:1 }}>{p.icon}</span>
-                  <span style={{ fontSize:9.5, fontWeight:700, color: page===p.id ? "#0d9488" : "#94a3b8", marginTop:2, fontFamily:"'Cairo',sans-serif" }}>{p.label}</span>
-                </button>
-              ))}
-              {/* زر "المزيد" */}
-              <div style={{ position:"relative" }}>
-                <button onClick={() => setMenuOpen(!menuOpen)} style={{
-                  width:"100%", height:"100%", display:"flex", flexDirection:"column",
-                  alignItems:"center", justifyContent:"center",
-                  padding:"8px 4px 6px", border:"none", cursor:"pointer",
-                  background: menuOpen ? "#faf5ff" : "#fff",
-                  borderTop: menuOpen ? "2px solid #7c3aed" : "2px solid transparent",
-                }}>
-                  <span style={{ fontSize:19, lineHeight:1 }}>{menuOpen ? "✕" : "☰"}</span>
-                  <span style={{ fontSize:9.5, fontWeight:700, color: menuOpen ? "#7c3aed" : "#94a3b8", marginTop:2, fontFamily:"'Cairo',sans-serif" }}>المزيد</span>
-                </button>
-                {/* قائمة المزيد تظهر لأعلى */}
-                {menuOpen && (
-                  <div style={{
-                    position:"absolute", bottom:"100%", left:0, right:0,
-                    background:"#fff", borderRadius:"20px 20px 0 0",
-                    boxShadow:"0 -8px 32px rgba(0,0,0,0.15)",
-                    border:"1px solid #e2e8f0", borderBottom:"none",
-                    maxHeight:320, overflowY:"auto", zIndex:100,
-                    width:280, right:0,
-                  }}>
-                    <div style={{ padding:"10px 12px 6px", borderBottom:"1px solid #f1f5f9" }}>
-                      <span style={{ fontSize:10, fontWeight:800, color:"#94a3b8", fontFamily:"'Cairo',sans-serif" }}>📑 الصفحات الرئيسية</span>
-                    </div>
-                    <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:4, padding:8 }}>
-                      {pages.slice(4).concat(extraPages).map(p => (
-                        <button key={p.id} onClick={() => { navigate(p.id); setMenuOpen(false); }} style={{
-                          display:"flex", alignItems:"center", gap:6, padding:"7px 10px",
-                          borderRadius:10, border:"1px solid #f1f5f9", cursor:"pointer",
-                          background: page===p.id ? "#f0fdfa" : "#fafafa",
-                          fontSize:11, fontWeight:700, color: page===p.id ? "#0d9488" : "#374151",
-                          fontFamily:"'Cairo',sans-serif", textAlign:"right",
-                        }}>
-                          <span style={{ fontSize:15 }}>{p.icon}</span>{p.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
+            {/* ══ شريط التنقل — صفّان ══ */}
+            <div style={{ flexShrink:0, background:"#fff", borderTop:"1px solid #e2e8f0", boxShadow:"0 -4px 24px rgba(0,0,0,0.10)" }}>
+
+              {/* ─ الصف الأول: الصفحات الرئيسية ─ */}
+              <div style={{
+                display:"flex", overflowX:"auto", WebkitOverflowScrolling:"touch",
+                scrollbarWidth:"none", borderBottom:"1px solid #f1f5f9",
+                background:"#fff", padding:"3px 2px 0",
+              }}>
+                <style>{`.mno-scroll::-webkit-scrollbar{display:none}`}</style>
+                {pages.map(p => {
+                  const active = page === p.id;
+                  return (
+                    <button key={p.id} onClick={() => navigate(p.id)} style={{
+                      display:"flex", flexDirection:"column", alignItems:"center",
+                      justifyContent:"center", padding:"5px 10px 4px",
+                      border:"none", cursor:"pointer", background:"transparent",
+                      flexShrink:0, minWidth:52,
+                      borderBottom: active ? "2.5px solid #0d9488" : "2.5px solid transparent",
+                      transition:"all .15s",
+                    }}>
+                      <span style={{ fontSize:17, lineHeight:1 }}>{p.icon}</span>
+                      <span style={{ fontSize:8, fontWeight:800, marginTop:2, whiteSpace:"nowrap",
+                        color: active ? "#0d9488" : "#9ca3af",
+                        fontFamily:"'Cairo',sans-serif" }}>{p.label}</span>
+                    </button>
+                  );
+                })}
               </div>
+
+              {/* ─ الصف الثاني: الأدوات الإضافية ─ */}
+              <div style={{
+                display:"flex", overflowX:"auto", WebkitOverflowScrolling:"touch",
+                scrollbarWidth:"none", background:"#fafbfc", padding:"3px 2px 5px",
+              }}>
+                {extraPages.map(p => {
+                  const active = page === p.id;
+                  return (
+                    <button key={p.id} onClick={() => navigate(p.id)} style={{
+                      display:"flex", flexDirection:"column", alignItems:"center",
+                      justifyContent:"center", padding:"4px 9px 3px",
+                      border:"none", cursor:"pointer", flexShrink:0, minWidth:48,
+                      background: active ? "#f0fdfa" : "transparent",
+                      borderRadius:8, margin:"0 1px",
+                      transition:"all .15s",
+                    }}>
+                      <span style={{ fontSize:14, lineHeight:1 }}>{p.icon}</span>
+                      <span style={{ fontSize:7.5, fontWeight:700, marginTop:2, whiteSpace:"nowrap",
+                        color: active ? "#0d9488" : "#b0bec5",
+                        fontFamily:"'Cairo',sans-serif" }}>{p.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
             </div>
           </div>
-        </div>
       ) : (
         /* ══════════════════════════════════════════
             وضع الكمبيوتر — التخطيط الكامل
