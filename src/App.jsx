@@ -1165,6 +1165,134 @@ function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, sa
   const [dpPreview, setDpPreview] = useState(null);
   const GREG_M_ATT = ["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"];
 
+  // ── مساءلة ──
+  const [showMosala, setShowMosala] = useState(false);
+  const [mosalaData, setMosalaData] = useState(null); // {ti, name, status, r, dayIdx}
+  const [mosalaList, setMosalaList] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("mosala_records_v1") || "[]"); } catch { return []; }
+  });
+  const saveMosalaList = (list) => {
+    setMosalaList(list);
+    try { localStorage.setItem("mosala_records_v1", JSON.stringify(list)); } catch {}
+  };
+
+  const MOSALA_LATE_REASONS = [
+    "تأخر بدون عذر مقبول",
+    "تأخر ناتج عن ازدحام مروري",
+    "تأخر بسبب ظرف طارئ",
+    "تأخر متكرر",
+    "التأخر عن حصة دراسية",
+    "التأخر عن الإشراف على الفسحة",
+    "التأخر عن الدوام الصباحي",
+  ];
+  const MOSALA_ABS_REASONS = [
+    "الغياب بدون عذر مقبول",
+    "الغياب بدون إشعار مسبق",
+    "الغياب المتكرر",
+    "الغياب أثناء الاختبارات",
+    "الغياب عن الدوام دون إخطار المدرسة",
+    "الغياب المتعمد",
+  ];
+  const MOSALA_ACTIONS = [
+    "التنبيه الشفهي",
+    "التنبيه الكتابي",
+    "الإنذار",
+    "الخصم من الراتب",
+    "الإحالة للمشرف التربوي",
+    "تحرير تقرير للإدارة",
+  ];
+
+  // طباعة نموذج المساءلة الرسمي
+  const printMosala = (rec) => {
+    const isLate = rec.status === "متأخر";
+    const day = week.days[rec.dayIdx] || week.days[0];
+    printWindow(`<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8">
+    <title>نموذج مساءلة</title>
+    <style>
+      *{margin:0;padding:0;box-sizing:border-box}
+      body{font-family:'Traditional Arabic','Noto Naskh Arabic',Arial,sans-serif;direction:rtl;padding:30px;font-size:13px;color:#111}
+      .header{text-align:center;margin-bottom:20px;border-bottom:2px solid #1e3a5f;padding-bottom:14px}
+      .header h1{font-size:17px;font-weight:900;color:#1e3a5f;margin-bottom:4px}
+      .header p{font-size:11px;color:#555}
+      .badge{display:inline-block;background:${isLate?"#fef3c7":"#fee2e2"};color:${isLate?"#92400e":"#991b1b"};
+        border:1.5px solid ${isLate?"#f59e0b":"#ef4444"};border-radius:20px;padding:3px 14px;font-size:12px;font-weight:900;margin-bottom:12px}
+      .section{margin-bottom:14px}
+      .section-title{font-size:13px;font-weight:900;color:#1e3a5f;border-bottom:1px dashed #cbd5e1;padding-bottom:4px;margin-bottom:8px}
+      .row{display:flex;margin-bottom:7px;gap:8px}
+      .row label{color:#64748b;font-size:11px;min-width:130px;flex-shrink:0;padding-top:2px}
+      .row .val{flex:1;border-bottom:1px solid #cbd5e1;padding-bottom:2px;font-size:12px;font-weight:700;min-height:18px}
+      .notes-box{border:1px solid #cbd5e1;border-radius:6px;padding:10px;min-height:50px;font-size:12px;line-height:2}
+      .sigs{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-top:24px}
+      .sig-box{border-top:1.5px solid #374151;padding-top:6px;text-align:center;font-size:11px;color:#555}
+      .sig-name{font-size:10px;color:#94a3b8;margin-top:20px}
+      .official-border{border:2px solid #1e3a5f;border-radius:8px;padding:20px;position:relative}
+      .ref-line{display:flex;justify-content:space-between;margin-bottom:16px;font-size:11px;color:#64748b}
+      @media print{@page{size:A4;margin:1.5cm}body{padding:0}}
+    </style></head><body>
+    <div class="official-border">
+      <div class="ref-line">
+        <span>رقم المساءلة: ${rec.id || "—"}</span>
+        <span>التاريخ: ${day.dateH} هـ / ${day.dateM} م</span>
+      </div>
+      <div class="header">
+        <h1>المملكة العربية السعودية — وزارة التعليم</h1>
+        <p>مدرسة عبيدة بن الحارث المتوسطة — إدارة تعليم جدة</p>
+        <p style="margin-top:6px;font-size:14px;font-weight:900;color:#1e3a5f">نموذج مساءلة ${isLate?"تأخر":"غياب"} — ${day.name}</p>
+      </div>
+      <div style="text-align:center;margin-bottom:14px">
+        <span class="badge">${isLate?"🕐 تأخر":"❌ غياب"} — ${day.name} ${day.dateH} هـ</span>
+      </div>
+      <div class="section">
+        <div class="section-title">أولاً: بيانات المعلم</div>
+        <div class="row"><label>اسم المعلم:</label><div class="val">${rec.teacherName}</div></div>
+        <div class="row">
+          <label>اليوم والتاريخ:</label><div class="val">${day.name} — ${day.dateH} هـ — ${day.dateM} م</div>
+        </div>
+        ${isLate ? `
+        <div class="row"><label>نوع التأخر:</label><div class="val">${rec.lateType === "حصص" ? "تأخر عن حصة دراسية" : "تأخر صباحي عن الدوام"}</div></div>
+        <div class="row"><label>مدة التأخر:</label><div class="val">${rec.lateMinutes ? rec.lateMinutes + " دقيقة" : "—"}</div></div>
+        <div class="row"><label>وقت الحضور الفعلي:</label><div class="val">${rec.arrivalTime || "—"}</div></div>
+        ` : `
+        <div class="row"><label>نوع الغياب:</label><div class="val">${rec.absType || "غياب بدون عذر"}</div></div>
+        `}
+      </div>
+      <div class="section">
+        <div class="section-title">ثانياً: سبب المساءلة</div>
+        <div class="row"><label>السبب:</label><div class="val">${rec.reason || "—"}</div></div>
+        <div class="row"><label>الإجراء المتخذ:</label><div class="val">${rec.action || "—"}</div></div>
+        ${rec.notes ? `<div style="margin-top:8px"><div class="section-title">ملاحظات</div><div class="notes-box">${rec.notes}</div></div>` : ""}
+      </div>
+      <div class="section">
+        <div class="section-title">ثالثاً: موقف المعلم من المساءلة</div>
+        <div class="notes-box" style="min-height:60px">${rec.teacherResponse || ""}</div>
+      </div>
+      <div class="sigs">
+        <div class="sig-box">توقيع المعلم<div class="sig-name">${rec.teacherName}</div></div>
+        <div class="sig-box">توقيع مدير المدرسة<div class="sig-name">_______________</div></div>
+        <div class="sig-box">تأكيد الاستلام<div class="sig-name">_______________</div></div>
+      </div>
+    </div>
+    <script>window.onload=()=>window.print()</script></body></html>`);
+  };
+
+  // تصدير المساءلات Excel
+  const exportMosalaXLSX = async () => {
+    await loadXLSX();
+    const wb = window.XLSX.utils.book_new();
+    const data = [
+      ["م","اسم المعلم","اليوم","التاريخ هـ","التاريخ م","الحالة","نوع التأخر / الغياب","المدة (دقيقة)","السبب","الإجراء","ملاحظات"],
+      ...mosalaList.map((r,i) => [
+        i+1, r.teacherName, r.dayName, r.dateH, r.dateM,
+        r.status, r.lateType || r.absType || "—",
+        r.lateMinutes || "—", r.reason || "—", r.action || "—", r.notes || "—"
+      ])
+    ];
+    const ws = window.XLSX.utils.aoa_to_sheet(data);
+    ws["!cols"] = [4,20,8,12,12,8,14,8,22,18,20].map(w=>({wch:w}));
+    window.XLSX.utils.book_append_sheet(wb, ws, "المساءلات");
+    window.XLSX.writeFile(wb, `مساءلات_${new Date().toLocaleDateString("ar-SA-u-nu-latn")}.xlsx`);
+  };
+
   const handleDpGenerate = () => {
     try {
       const gen = dpCalType === "hijri"
@@ -1362,6 +1490,12 @@ function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, sa
               className="bg-white text-green-700 px-4 py-2 rounded-xl text-sm font-bold hover:bg-green-50 flex items-center gap-1 shadow">
               📥 إضافة من إكسل
             </button>
+            {mosalaList.length > 0 && (
+              <button onClick={exportMosalaXLSX}
+                className="bg-white text-purple-700 px-4 py-2 rounded-xl text-sm font-bold hover:bg-purple-50 flex items-center gap-1 shadow">
+                📋 تصدير المساءلات ({mosalaList.length})
+              </button>
+            )}
             <div className="bg-white bg-opacity-20 px-3 py-2 rounded-xl text-xs font-bold">💾 حفظ تلقائي</div>
           </div>
         </div>
@@ -1589,6 +1723,7 @@ function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, sa
                   <th className="p-3 text-center text-xs font-bold text-amber-700">مدة التأخر</th>
                   <th className="p-3 text-center text-xs font-bold text-red-600">نوع الغياب</th>
                   <th className="p-3 text-center text-xs font-bold text-gray-500">ملاحظات</th>
+                  <th className="p-3 text-center text-xs font-bold text-red-700">مساءلة</th>
                 </tr>
               </thead>
               <tbody>
@@ -1702,6 +1837,40 @@ function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, sa
                           className="w-full px-2 py-1.5 rounded-lg border-2 border-gray-200 text-xs focus:outline-none focus:border-teal-400 text-center"
                           style={{ fontFamily: "inherit", minWidth: "90px" }} />
                       </td>
+
+                      {/* زر المساءلة */}
+                      <td className="p-1.5 text-center">
+                        {(isLate || isAbsent) ? (
+                          <button
+                            onClick={() => {
+                              const day = week.days[selectedDay];
+                              setMosalaData({
+                                ti, name, status,
+                                r, dayIdx: selectedDay,
+                                dayName: day.name, dateH: day.dateH, dateM: day.dateM,
+                                // اجلب مساءلة موجودة إن وجدت
+                                existing: mosalaList.find(m => m.teacherIdx === ti && m.dayIdx === selectedDay)
+                              });
+                              setShowMosala(true);
+                            }}
+                            title="فتح نموذج المساءلة"
+                            style={{
+                              background: mosalaList.find(m => m.teacherIdx === ti && m.dayIdx === selectedDay)
+                                ? "linear-gradient(135deg,#7c3aed,#5b21b6)"
+                                : isAbsent ? "linear-gradient(135deg,#dc2626,#b91c1c)"
+                                : "linear-gradient(135deg,#d97706,#b45309)",
+                              border:"none", borderRadius:10, padding:"6px 10px",
+                              color:"#fff", fontWeight:900, fontSize:11, cursor:"pointer",
+                              boxShadow:"0 2px 8px rgba(0,0,0,0.2)", fontFamily:"'Cairo',sans-serif",
+                              whiteSpace:"nowrap",
+                            }}>
+                            {mosalaList.find(m => m.teacherIdx === ti && m.dayIdx === selectedDay)
+                              ? "✅ تمت" : "📋 مساءلة"}
+                          </button>
+                        ) : (
+                          <span style={{ color:"#e5e7eb", fontSize:18 }}>—</span>
+                        )}
+                      </td>
                     </tr>
                   );
                 })}
@@ -1710,6 +1879,195 @@ function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, sa
           </div>
         </div>
       )}
+
+      {/* ════════ نافذة المساءلة الرسمية ════════ */}
+      {showMosala && mosalaData && (() => {
+        const isLate = mosalaData.status === "متأخر";
+        const reasons = isLate ? MOSALA_LATE_REASONS : MOSALA_ABS_REASONS;
+        const ex = mosalaData.existing;
+        const [form, setForm] = useState(ex || {
+          reason: reasons[0],
+          action: MOSALA_ACTIONS[0],
+          arrivalTime: "",
+          notes: "",
+          teacherResponse: "",
+        });
+        const setF = (k,v) => setForm(p=>({...p,[k]:v}));
+
+        const saveMosala = () => {
+          const rec = {
+            id: ex?.id || `M-${Date.now()}`,
+            teacherIdx: mosalaData.ti,
+            teacherName: mosalaData.name,
+            dayIdx: mosalaData.dayIdx,
+            dayName: mosalaData.dayName,
+            dateH: mosalaData.dateH,
+            dateM: mosalaData.dateM,
+            status: mosalaData.status,
+            lateType: mosalaData.r.lateType,
+            lateMinutes: mosalaData.r.lateMinutes,
+            absType: mosalaData.r.absType,
+            ...form,
+            savedAt: new Date().toLocaleDateString("ar-SA"),
+          };
+          const filtered = mosalaList.filter(m => !(m.teacherIdx === mosalaData.ti && m.dayIdx === mosalaData.dayIdx));
+          saveMosalaList([rec, ...filtered]);
+          setShowMosala(false);
+          return rec;
+        };
+
+        const saveAndPrint = () => { const rec = saveMosala(); setTimeout(() => printMosala(rec), 100); };
+
+        const accentColor = isLate ? "#d97706" : "#dc2626";
+        const accentBg    = isLate ? "#fffbeb" : "#fef2f2";
+
+        return (
+          <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-3"
+            style={{ fontFamily:"'Cairo','Noto Naskh Arabic',sans-serif" }}>
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-screen overflow-y-auto" dir="rtl">
+
+              {/* رأس النافذة */}
+              <div style={{ background:`linear-gradient(135deg,${accentColor},${isLate?"#b45309":"#b91c1c"})`,
+                borderRadius:"16px 16px 0 0", padding:"16px 20px" }}>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                  <div>
+                    <div style={{ color:"#fff", fontWeight:900, fontSize:16 }}>
+                      📋 نموذج مساءلة {isLate?"تأخر":"غياب"}
+                    </div>
+                    <div style={{ color:"rgba(255,255,255,0.8)", fontSize:11, marginTop:3 }}>
+                      {mosalaData.name} — {mosalaData.dayName} {mosalaData.dateH} هـ
+                    </div>
+                  </div>
+                  <button onClick={() => setShowMosala(false)}
+                    style={{ background:"rgba(255,255,255,0.2)", border:"none", borderRadius:8,
+                             color:"#fff", fontSize:18, fontWeight:900, cursor:"pointer", padding:"4px 10px" }}>✕</button>
+                </div>
+              </div>
+
+              <div style={{ padding:"18px 20px" }}>
+                {/* بيانات المعلم */}
+                <div style={{ background:accentBg, borderRadius:12, padding:12, marginBottom:14,
+                  border:`1.5px solid ${accentColor}44` }}>
+                  <div style={{ fontWeight:900, fontSize:12, color:accentColor, marginBottom:8 }}>📌 بيانات المخالفة</div>
+                  <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:6 }}>
+                    {[
+                      ["اسم المعلم", mosalaData.name],
+                      ["الحالة", mosalaData.status],
+                      ...(isLate ? [
+                        ["نوع التأخر", mosalaData.r.lateType === "حصص" ? "تأخر عن حصة" : "تأخر صباحي"],
+                        ["المدة", mosalaData.r.lateMinutes ? mosalaData.r.lateMinutes + " دقيقة" : "—"],
+                      ] : [
+                        ["نوع الغياب", mosalaData.r.absType || "—"],
+                        ["اليوم", mosalaData.dayName],
+                      ]),
+                    ].map(([l,v]) => (
+                      <div key={l} style={{ background:"rgba(255,255,255,0.7)", borderRadius:8, padding:"6px 10px" }}>
+                        <div style={{ fontSize:9.5, color:"#94a3b8", fontWeight:600 }}>{l}</div>
+                        <div style={{ fontSize:12, fontWeight:800, color:"#374151", marginTop:1 }}>{v}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* وقت الحضور الفعلي — للتأخر فقط */}
+                {isLate && (
+                  <div style={{ marginBottom:12 }}>
+                    <label style={{ fontSize:12, fontWeight:700, color:"#374151", display:"block", marginBottom:5 }}>
+                      🕐 وقت الحضور الفعلي
+                    </label>
+                    <input type="time" value={form.arrivalTime || ""}
+                      onChange={e => setF("arrivalTime", e.target.value)}
+                      style={{ width:"100%", padding:"9px 12px", borderRadius:10, border:"2px solid #e2e8f0",
+                               fontSize:13, outline:"none", fontFamily:"'Cairo',sans-serif", boxSizing:"border-box" }} />
+                  </div>
+                )}
+
+                {/* سبب المساءلة */}
+                <div style={{ marginBottom:12 }}>
+                  <label style={{ fontSize:12, fontWeight:700, color:"#374151", display:"block", marginBottom:5 }}>
+                    📋 سبب المساءلة
+                  </label>
+                  <select value={form.reason}
+                    onChange={e => setF("reason", e.target.value)}
+                    style={{ width:"100%", padding:"9px 12px", borderRadius:10, border:`2px solid ${accentColor}66`,
+                             fontSize:12, fontFamily:"'Cairo',sans-serif", outline:"none", background:accentBg,
+                             color:"#374151", boxSizing:"border-box" }}>
+                    {reasons.map(r => <option key={r} value={r}>{r}</option>)}
+                  </select>
+                </div>
+
+                {/* الإجراء المتخذ */}
+                <div style={{ marginBottom:12 }}>
+                  <label style={{ fontSize:12, fontWeight:700, color:"#374151", display:"block", marginBottom:5 }}>
+                    ⚖️ الإجراء المتخذ
+                  </label>
+                  <select value={form.action}
+                    onChange={e => setF("action", e.target.value)}
+                    style={{ width:"100%", padding:"9px 12px", borderRadius:10, border:"2px solid #ddd6fe",
+                             fontSize:12, fontFamily:"'Cairo',sans-serif", outline:"none", background:"#faf5ff",
+                             color:"#374151", boxSizing:"border-box" }}>
+                    {MOSALA_ACTIONS.map(a => <option key={a} value={a}>{a}</option>)}
+                  </select>
+                </div>
+
+                {/* ملاحظات المدير */}
+                <div style={{ marginBottom:12 }}>
+                  <label style={{ fontSize:12, fontWeight:700, color:"#374151", display:"block", marginBottom:5 }}>
+                    📝 ملاحظات مدير المدرسة
+                  </label>
+                  <textarea value={form.notes} onChange={e => setF("notes", e.target.value)}
+                    rows={2} placeholder="أي ملاحظات إضافية..."
+                    style={{ width:"100%", padding:"9px 12px", borderRadius:10, border:"2px solid #e2e8f0",
+                             fontSize:12, fontFamily:"'Cairo',sans-serif", outline:"none", resize:"vertical",
+                             boxSizing:"border-box", lineHeight:1.8 }} />
+                </div>
+
+                {/* رد المعلم */}
+                <div style={{ marginBottom:16 }}>
+                  <label style={{ fontSize:12, fontWeight:700, color:"#374151", display:"block", marginBottom:5 }}>
+                    💬 موقف المعلم / رده (اختياري)
+                  </label>
+                  <textarea value={form.teacherResponse} onChange={e => setF("teacherResponse", e.target.value)}
+                    rows={2} placeholder="يُكتب بعد سماع المعلم..."
+                    style={{ width:"100%", padding:"9px 12px", borderRadius:10, border:"2px solid #e2e8f0",
+                             fontSize:12, fontFamily:"'Cairo',sans-serif", outline:"none", resize:"vertical",
+                             boxSizing:"border-box", lineHeight:1.8 }} />
+                </div>
+
+                {/* أزرار */}
+                <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
+                  <button onClick={saveAndPrint}
+                    style={{ flex:"2 1 140px", padding:"11px", borderRadius:12, border:"none",
+                             background:`linear-gradient(135deg,${accentColor},${isLate?"#b45309":"#b91c1c"})`,
+                             color:"#fff", fontWeight:900, fontSize:13, cursor:"pointer",
+                             fontFamily:"'Cairo',sans-serif", boxShadow:`0 4px 14px ${accentColor}44` }}>
+                    🖨️ حفظ وطباعة النموذج
+                  </button>
+                  <button onClick={saveMosala}
+                    style={{ flex:"1 1 80px", padding:"11px", borderRadius:12,
+                             border:"1.5px solid #e2e8f0", background:"#f8fafc",
+                             color:"#374151", fontWeight:700, fontSize:12, cursor:"pointer",
+                             fontFamily:"'Cairo',sans-serif" }}>
+                    💾 حفظ فقط
+                  </button>
+                  {ex && (
+                    <button onClick={() => {
+                      saveMosalaList(mosalaList.filter(m => m.id !== ex.id));
+                      setShowMosala(false);
+                    }}
+                      style={{ flex:"1 1 60px", padding:"11px", borderRadius:12,
+                               border:"1.5px solid #fee2e2", background:"#fff5f5",
+                               color:"#dc2626", fontWeight:700, fontSize:12, cursor:"pointer",
+                               fontFamily:"'Cairo',sans-serif" }}>
+                      🗑️ حذف
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* نافذة استيراد إكسل للمعلمين */}
       {showExcelImport && (
