@@ -1152,7 +1152,7 @@ function HomePage({ teachers, announcements, activities, navigate, attendance, w
 
 
 
-function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, saveWeek, attendance, setAttendance, saveAttendance }) {
+function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, saveWeek, attendance, setAttendance, saveAttendance, navigate }) {
   const [selectedDay, setSelectedDay] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
   const [showSummary, setShowSummary] = useState(false);
@@ -1844,28 +1844,35 @@ function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, sa
                           <button
                             onClick={() => {
                               const day = week.days[selectedDay];
-                              setMosalaData({
-                                ti, name, status,
-                                r, dayIdx: selectedDay,
-                                dayName: day.name, dateH: day.dateH, dateM: day.dateM,
-                                // اجلب مساءلة موجودة إن وجدت
-                                existing: mosalaList.find(m => m.teacherIdx === ti && m.dayIdx === selectedDay)
-                              });
-                              setShowMosala(true);
+                              // حفظ بيانات المساءلة مؤقتاً لاستخدامها في صفحة النماذج
+                              try {
+                                localStorage.setItem("mosala_prefill", JSON.stringify({
+                                  teacherName: name,
+                                  status,
+                                  lateType: r.lateType,
+                                  lateMinutes: r.lateMinutes,
+                                  absType: r.absType,
+                                  dayName: day.name,
+                                  dateH: day.dateH,
+                                  dateM: day.dateM,
+                                  notes: r.notes || "",
+                                  latePeriods: r.latePeriods || [],
+                                  timestamp: Date.now(),
+                                }));
+                              } catch {}
+                              if (navigate) navigate("officialforms");
                             }}
-                            title="فتح نموذج المساءلة"
+                            title="فتح نموذج المساءلة الرسمي"
                             style={{
-                              background: mosalaList.find(m => m.teacherIdx === ti && m.dayIdx === selectedDay)
-                                ? "linear-gradient(135deg,#7c3aed,#5b21b6)"
-                                : isAbsent ? "linear-gradient(135deg,#dc2626,#b91c1c)"
+                              background: isAbsent
+                                ? "linear-gradient(135deg,#dc2626,#b91c1c)"
                                 : "linear-gradient(135deg,#d97706,#b45309)",
                               border:"none", borderRadius:10, padding:"6px 10px",
                               color:"#fff", fontWeight:900, fontSize:11, cursor:"pointer",
                               boxShadow:"0 2px 8px rgba(0,0,0,0.2)", fontFamily:"'Cairo',sans-serif",
                               whiteSpace:"nowrap",
                             }}>
-                            {mosalaList.find(m => m.teacherIdx === ti && m.dayIdx === selectedDay)
-                              ? "✅ تمت" : "📋 مساءلة"}
+                            📋 مساءلة
                           </button>
                         ) : (
                           <span style={{ color:"#e5e7eb", fontSize:18 }}>—</span>
@@ -13506,6 +13513,10 @@ const FORM_LIGHT = "#d8f3dc";
 
 function OfficialFormsPage({ teachers, attendance, week }) {
   const [accounts,         setAccounts]        = useState([]);
+  const [localAccounts,    setLocalAccounts]   = useState(() => {
+    try { return JSON.parse(localStorage.getItem("official_form_teachers_v1") || "[]"); } catch { return []; }
+  });
+  const [showImportXlsx,   setShowImportXlsx]  = useState(false);
   const [selectedTeacher,  setSelectedTeacher]  = useState("");
   const [formType,         setFormType]         = useState("warning");
   const [formData,         setFormData]         = useState({
@@ -13523,9 +13534,89 @@ function OfficialFormsPage({ teachers, attendance, week }) {
   useEffect(() => {
     DB.get("school-teacher-accounts", []).then(d => setAccounts(Array.isArray(d)?d:[]));
     DB.get("school-late-records", {}).then(d => setLateRecords(typeof d==="object"&&d?d:{}));
+
+    // قراءة بيانات المساءلة المُمررة من صفحة الحضور
+    try {
+      const raw = localStorage.getItem("mosala_prefill");
+      if (raw) {
+        const pre = JSON.parse(raw);
+        // تجاهل البيانات القديمة (أكثر من 5 دقائق)
+        if (Date.now() - (pre.timestamp || 0) < 5 * 60 * 1000) {
+          localStorage.removeItem("mosala_prefill");
+          const isLate = pre.status === "متأخر";
+          setFormType(isLate ? "warning" : "deduction");
+          // تحويل التاريخ الهجري من الشكل dd/mm/yyyy هـ
+          let dH = "", mH = "", yH = "1447", dM = "", mM = "", yM = "";
+          if (pre.dateH) {
+            const parts = pre.dateH.replace(" هـ","").split("/");
+            if (parts.length === 3) { dH = parts[0]; mH = parts[1]; yH = parts[2]; }
+          }
+          if (pre.dateM) {
+            const parts = pre.dateM.replace(" م","").split("/");
+            if (parts.length === 3) { dM = parts[0]; mM = parts[1]; yM = parts[2]; }
+          }
+          setTimeout(() => {
+            setSelectedTeacher(pre.teacherName || "");
+            setFormData(p => ({
+              ...p,
+              type: isLate ? "تأخر" : "غياب",
+              dateDay: dH, dateMonth: mH, dateYear: yH,
+              lateHours: pre.lateMinutes ? String(Math.ceil(pre.lateMinutes / 60)) : "",
+              days: !isLate ? "1" : "",
+              spec: pre.dayName || "",
+            }));
+          }, 300);
+        }
+      }
+    } catch {}
   }, []);
 
   const saveLateRecords = (rec) => { setLateRecords(rec); DB.set("school-late-records", rec); };
+
+  // دمج المعلمين من الحسابات + المستوردين محلياً + قائمة المعلمين الرئيسية
+  const allTeacherList = (() => {
+    const map = new Map();
+    // 1) من قائمة المعلمين الرئيسية
+    teachers.forEach(name => { if (!map.has(name)) map.set(name, { name, id: "" }); });
+    // 2) من حسابات بوابة المعلمين
+    accounts.forEach(a => { if (a.name) map.set(a.name, { name: a.name, id: a.id || "" }); });
+    // 3) من استيراد Excel المحلي (يأخذ الأولوية في الهوية)
+    localAccounts.forEach(a => { if (a.name) map.set(a.name, { name: a.name, id: a.id || map.get(a.name)?.id || "" }); });
+    return Array.from(map.values()).sort((a,b) => a.name.localeCompare(b.name, "ar"));
+  })();
+
+  // استيراد Excel
+  const handleImportXlsx = async (file) => {
+    await loadXLSX();
+    const buf = await file.arrayBuffer();
+    const wb  = window.XLSX.read(buf);
+    const ws  = wb.Sheets[wb.SheetNames[0]];
+    const rows = window.XLSX.utils.sheet_to_json(ws, { header:1, defval:"" });
+    if (!rows.length) { alert("الملف فارغ"); return; }
+    // محاولة اكتشاف عمود الاسم والهوية تلقائياً
+    const header = rows[0].map(c => String(c||"").trim());
+    const nameIdx = header.findIndex(h => /اسم|معلم|الاسم/i.test(h));
+    const idIdx   = header.findIndex(h => /هوي|رقم|هوية|الهوية|id/i.test(h));
+    const dataRows = rows.slice(nameIdx >= 0 ? 1 : 0);
+    const imported = [];
+    dataRows.forEach(row => {
+      const name = String(row[nameIdx >= 0 ? nameIdx : 0] || "").trim();
+      const id   = String(row[idIdx   >= 0 ? idIdx   : 1] || "").trim();
+      if (name.length > 2) imported.push({ name, id });
+    });
+    if (!imported.length) { alert("لم يُعثر على بيانات. تأكد من وجود عمود الاسم."); return; }
+    const merged = [...localAccounts];
+    let added = 0;
+    imported.forEach(imp => {
+      const idx = merged.findIndex(a => a.name === imp.name);
+      if (idx >= 0) { if (imp.id) merged[idx].id = imp.id; }
+      else { merged.push(imp); added++; }
+    });
+    setLocalAccounts(merged);
+    try { localStorage.setItem("official_form_teachers_v1", JSON.stringify(merged)); } catch {}
+    setShowImportXlsx(false);
+    alert(`✅ تم الاستيراد بنجاح\n${added} معلم جديد أُضيف\n${imported.length - added} تم تحديثه`);
+  };
 
   // احتساب مدة التأخير من القوائم المنسدلة
   const calcLateMins = () => {
@@ -13583,10 +13674,11 @@ function OfficialFormsPage({ teachers, attendance, week }) {
   const handleSelectTeacher = (name) => {
     setSelectedTeacher(name);
     setAlertShown(false);
-    const acc = accounts.find(a => a.name === name) || {};
+    // ابحث عن الهوية في allTeacherList أولاً ثم accounts
+    const found = allTeacherList.find(a => a.name === name) || accounts.find(a => a.name === name) || {};
     const ti = teachers.indexOf(name);
     const absDays = ti >= 0 ? week.days.filter((_,di) => (attendance[ti]?.[di]?.status||"حاضر")==="غائب").length : 0;
-    setFormData(p => ({ ...p, nationalId: acc.id || "", days: absDays > 0 ? String(absDays) : "" }));
+    setFormData(p => ({ ...p, nationalId: found.id || "", days: absDays > 0 ? String(absDays) : "" }));
     // تنبيه تلقائي إذا تجاوز ٧ ساعات
     const total = totalLateMins(name);
     if (total >= 7*60) {
@@ -13840,6 +13932,34 @@ function OfficialFormsPage({ teachers, attendance, week }) {
         </div>
       </div>
 
+      {/* بانر المساءلة المُحوَّلة */}
+      {selectedTeacher && (() => {
+        const isFromAttendance = !!formData.spec;
+        if (!isFromAttendance) return null;
+        return (
+          <div style={{
+            background:"linear-gradient(135deg,#1e3a5f,#2563eb)", borderRadius:14,
+            padding:"12px 16px", display:"flex", alignItems:"center", gap:10,
+            fontFamily:"'Cairo','Noto Naskh Arabic',sans-serif",
+          }}>
+            <span style={{ fontSize:22 }}>📋</span>
+            <div>
+              <div style={{ color:"#fff", fontWeight:900, fontSize:13 }}>
+                تم التحويل من سجل الحضور
+              </div>
+              <div style={{ color:"rgba(255,255,255,0.75)", fontSize:11, marginTop:1 }}>
+                المعلم: <strong>{selectedTeacher}</strong>
+                {" — "}{formData.type === "تأخر" ? "🕐 تأخر" : "❌ غياب"}
+                {formData.spec ? ` — ${formData.spec}` : ""}
+              </div>
+            </div>
+            <div style={{ marginRight:"auto", color:"rgba(255,255,255,0.6)", fontSize:10, fontWeight:700 }}>
+              تم ملء البيانات تلقائياً ↓
+            </div>
+          </div>
+        );
+      })()}
+
       {/* اختيار النموذج */}
       <div className="grid grid-cols-2 gap-3">
         {FORM_TYPES.map(ft=>(
@@ -13861,13 +13981,32 @@ function OfficialFormsPage({ teachers, attendance, week }) {
 
         {/* اختيار المعلم */}
         <div>
-          <label className="text-xs font-bold text-gray-500 block mb-1">اسم المعلم *</label>
+          <div className="flex items-center justify-between mb-1">
+            <label className="text-xs font-bold text-gray-500">اسم المعلم *</label>
+            <button onClick={() => setShowImportXlsx(true)}
+              className="flex items-center gap-1 text-xs font-bold px-3 py-1 rounded-lg border-2 transition-all"
+              style={{ borderColor: FORM_GREEN, color: FORM_GREEN, background: FORM_LIGHT }}>
+              📥 استيراد من Excel
+              {localAccounts.length > 0 && (
+                <span className="bg-green-600 text-white rounded-full px-1.5 text-xs">{localAccounts.length}</span>
+              )}
+            </button>
+          </div>
           <select value={selectedTeacher} onChange={e=>handleSelectTeacher(e.target.value)}
-            className="w-full px-3 py-2.5 rounded-xl border-2 border-gray-200 text-sm font-bold focus:outline-none"
+            className="w-full px-3 py-2.5 rounded-xl border-2 text-sm font-bold focus:outline-none"
             style={{fontFamily:"inherit", borderColor:selectedTeacher?FORM_GREEN:"#e5e7eb"}}>
-            <option value="">— اختر المعلم —</option>
-            {teachers.map(t=><option key={t} value={t}>{t}</option>)}
+            <option value="">— اختر المعلم ({allTeacherList.length}) —</option>
+            {allTeacherList.map(t=>(
+              <option key={t.name} value={t.name}>
+                {t.name}{t.id ? ` — ${t.id}` : ""}
+              </option>
+            ))}
           </select>
+          {allTeacherList.length === 0 && (
+            <div className="text-xs text-amber-600 font-bold mt-1.5 flex items-center gap-1">
+              ⚠️ لا يوجد معلمون — اضغط "استيراد من Excel" لإضافة الأسماء والهويات
+            </div>
+          )}
         </div>
 
         {selectedTeacher && (
@@ -14120,6 +14259,88 @@ function OfficialFormsPage({ teachers, attendance, week }) {
           </button>
         </div>
       </div>
+
+      {/* ═══ نافذة استيراد Excel ═══ */}
+      {showImportXlsx && (
+        <div className="fixed inset-0 bg-black bg-opacity-55 flex items-center justify-center z-50 p-4"
+          style={{ fontFamily:"'Cairo','Noto Naskh Arabic',sans-serif" }}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md" dir="rtl">
+            <div style={{ background:`linear-gradient(135deg,${FORM_GREEN},#40916c)`, borderRadius:"16px 16px 0 0", padding:"16px 20px" }}>
+              <div className="flex items-center justify-between">
+                <div className="text-white font-black text-base">📥 استيراد المعلمين من Excel</div>
+                <button onClick={() => setShowImportXlsx(false)}
+                  style={{ background:"rgba(255,255,255,0.2)", border:"none", borderRadius:8,
+                           color:"#fff", fontSize:18, fontWeight:900, cursor:"pointer", padding:"2px 10px" }}>✕</button>
+              </div>
+            </div>
+            <div style={{ padding:"20px" }}>
+              <div style={{ background:"#f0fdf4", borderRadius:12, padding:14, marginBottom:16,
+                border:"1.5px solid #86efac", fontSize:12, lineHeight:1.9, color:"#166534" }}>
+                <div className="font-black mb-1">📋 تنسيق الملف المطلوب:</div>
+                <div>• عمود <strong>الاسم</strong> — يحتوي على اسم المعلم</div>
+                <div>• عمود <strong>الهوية</strong> — يحتوي على رقم الهوية الوطنية</div>
+                <div className="mt-1 text-xs text-green-700">يدعم .xlsx و .xls — يكتشف الأعمدة تلقائياً</div>
+              </div>
+
+              {localAccounts.length > 0 && (
+                <div style={{ background:"#fffbeb", borderRadius:12, padding:12, marginBottom:14,
+                  border:"1.5px solid #fde68a", fontSize:12 }}>
+                  <div style={{ fontWeight:800, color:"#92400e", marginBottom:6 }}>
+                    📊 المعلمون المستوردون حالياً ({localAccounts.length})
+                  </div>
+                  <div style={{ maxHeight:120, overflowY:"auto", display:"flex", flexDirection:"column", gap:4 }}>
+                    {localAccounts.map((a,i) => (
+                      <div key={i} style={{ display:"flex", justifyContent:"space-between", alignItems:"center",
+                        background:"rgba(255,255,255,0.7)", borderRadius:8, padding:"4px 10px" }}>
+                        <span style={{ fontSize:11, fontWeight:700, color:"#374151" }}>{a.name}</span>
+                        <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                          <span style={{ fontSize:10, color:"#94a3b8" }}>{a.id || "—"}</span>
+                          <button onClick={() => {
+                            const updated = localAccounts.filter((_,j) => j !== i);
+                            setLocalAccounts(updated);
+                            try { localStorage.setItem("official_form_teachers_v1", JSON.stringify(updated)); } catch {}
+                          }}
+                            style={{ background:"#fee2e2", border:"none", borderRadius:6, color:"#dc2626",
+                                     fontSize:10, fontWeight:800, padding:"1px 6px", cursor:"pointer" }}>حذف</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <button onClick={() => {
+                    if (!confirm("حذف جميع المعلمين المستوردين؟")) return;
+                    setLocalAccounts([]);
+                    try { localStorage.removeItem("official_form_teachers_v1"); } catch {}
+                  }}
+                    style={{ marginTop:8, width:"100%", padding:"6px", borderRadius:8, border:"1.5px solid #fca5a5",
+                             background:"#fff5f5", color:"#dc2626", fontWeight:700, fontSize:11, cursor:"pointer",
+                             fontFamily:"'Cairo',sans-serif" }}>
+                    🗑️ حذف الكل
+                  </button>
+                </div>
+              )}
+
+              <label style={{
+                display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center",
+                border:`2px dashed ${FORM_GREEN}`, borderRadius:14, padding:"28px 20px",
+                cursor:"pointer", background:FORM_LIGHT, transition:"all .2s",
+              }}>
+                <div style={{ fontSize:40, marginBottom:8 }}>📂</div>
+                <div style={{ fontWeight:900, fontSize:14, color:FORM_GREEN }}>اضغط لاختيار ملف Excel</div>
+                <div style={{ fontSize:11, color:"#6b7280", marginTop:4 }}>يدعم .xlsx و .xls</div>
+                <input type="file" accept=".xlsx,.xls" style={{ display:"none" }}
+                  onChange={e => { const f = e.target.files?.[0]; if (f) handleImportXlsx(f); }} />
+              </label>
+
+              <button onClick={() => setShowImportXlsx(false)}
+                style={{ width:"100%", marginTop:12, padding:"10px", borderRadius:12,
+                         border:"1.5px solid #e2e8f0", background:"#f8fafc", color:"#64748b",
+                         fontWeight:700, fontSize:13, cursor:"pointer", fontFamily:"'Cairo',sans-serif" }}>
+                إغلاق
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -19371,7 +19592,7 @@ export default function SchoolWebsite() {
                 {page === "home"           && <HomePage teachers={teachers} announcements={announcements} activities={activities} navigate={navigate} attendance={attendance} week={week} messages={messages} classList={classList} weekArchive={weekArchive} />}
                 {page === "student-absence" && <StudentAbsencePage />}
                 {page === "admin-attendance"&& <AdminAttendancePage />}
-                {page === "attendance"     && <AttendancePage teachers={teachers} setTeachers={setTeachers} saveTeachers={saveTeachers} week={week} setWeek={setWeek} saveWeek={saveWeek} attendance={attendance} setAttendance={setAttendance} saveAttendance={saveAttendance} />}
+                {page === "attendance"     && <AttendancePage teachers={teachers} setTeachers={setTeachers} saveTeachers={saveTeachers} week={week} setWeek={setWeek} saveWeek={saveWeek} attendance={attendance} setAttendance={setAttendance} saveAttendance={saveAttendance} navigate={navigate} />}
                 {page === "students"       && <StudentsPage classList={classList} setClassList={setClassList} saveClass={saveClass} deleteClass={deleteClass} onSendNote={handleSendNote} messages={messages} />}
                 {page === "announcements"  && <AnnouncementsPage announcements={announcements} setAnnouncements={setAnnouncements} saveAnnouncements={saveAnnouncements} viewMode="mobile" />}
                 {page === "activities"     && <ActivitiesPage activities={activities} setActivities={setActivities} saveActivities={saveActivities} />}
@@ -19591,7 +19812,7 @@ export default function SchoolWebsite() {
         {page === "home"          && <HomePage teachers={teachers} announcements={announcements} activities={activities} navigate={navigate} attendance={attendance} week={week} messages={messages} classList={classList} weekArchive={weekArchive} />}
         {page === "student-absence" && <StudentAbsencePage />}
         {page === "admin-attendance" && <AdminAttendancePage />}
-        {page === "attendance"    && <AttendancePage teachers={teachers} setTeachers={setTeachers} saveTeachers={saveTeachers} week={week} setWeek={setWeek} saveWeek={saveWeek} attendance={attendance} setAttendance={setAttendance} saveAttendance={saveAttendance} />}
+        {page === "attendance"    && <AttendancePage teachers={teachers} setTeachers={setTeachers} saveTeachers={saveTeachers} week={week} setWeek={setWeek} saveWeek={saveWeek} attendance={attendance} setAttendance={setAttendance} saveAttendance={saveAttendance} navigate={navigate} />}
         {page === "students"      && <StudentsPage classList={classList} setClassList={setClassList} saveClass={saveClass} deleteClass={deleteClass} onSendNote={handleSendNote} messages={messages} />}
         {page === "announcements" && <AnnouncementsPage announcements={announcements} setAnnouncements={setAnnouncements} saveAnnouncements={saveAnnouncements} />}
         {page === "activities"    && <ActivitiesPage activities={activities} setActivities={setActivities} saveActivities={saveActivities} />}
