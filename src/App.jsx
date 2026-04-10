@@ -1308,6 +1308,44 @@ function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, sa
     saveAssembly({ ...assembly, [key]: val });
   };
 
+  // ── الطابور الصباحي لكل معلم ──
+  const [teacherAssembly, setTeacherAssembly] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("teacher_assembly_v1") || "{}"); } catch { return {}; }
+  });
+  const saveTeacherAssembly = (data) => {
+    setTeacherAssembly(data);
+    try { localStorage.setItem("teacher_assembly_v1", JSON.stringify(data)); } catch {}
+  };
+  const getTeacherAssembly = (ti, di) => {
+    const key = `${week.days[di]?.dateH}_${di}_${ti}`;
+    return teacherAssembly[key] ?? null;
+  };
+  const setTeacherAssemblyVal = (ti, di, val) => {
+    const key = `${week.days[di]?.dateH}_${di}_${ti}`;
+    saveTeacherAssembly({ ...teacherAssembly, [key]: val });
+  };
+
+  // ── إضافة معلم يدوياً ──
+  const [showAddTeacher, setShowAddTeacher] = useState(false);
+  const [newTeacherName, setNewTeacherName] = useState("");
+  const [newTeacherId,   setNewTeacherId]   = useState("");
+
+  const addTeacherManually = () => {
+    if (!newTeacherName.trim()) return;
+    const updated = [...teachers, newTeacherName.trim()];
+    setTeachers(updated); saveTeachers(updated);
+    // حفظ الهوية في حسابات المعلمين إذا أُدخلت
+    if (newTeacherId.trim()) {
+      DB.get("school-teacher-accounts", []).then(accs => {
+        const list = Array.isArray(accs) ? accs : [];
+        if (!list.find(a => a.id === newTeacherId.trim())) {
+          DB.set("school-teacher-accounts", [...list, { name: newTeacherName.trim(), id: newTeacherId.trim() }]);
+        }
+      });
+    }
+    setNewTeacherName(""); setNewTeacherId(""); setShowAddTeacher(false);
+  };
+
   const handleDpGenerate = () => {
     try {
       const gen = dpCalType === "hijri"
@@ -1519,10 +1557,40 @@ function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, sa
                 📋 تصدير المساءلات ({mosalaList.length})
               </button>
             )}
+            <button onClick={() => setShowAddTeacher(p=>!p)}
+              className="bg-white text-blue-700 px-4 py-2 rounded-xl text-sm font-bold hover:bg-blue-50 flex items-center gap-1 shadow">
+              ➕ إضافة معلم
+            </button>
             <div className="bg-white bg-opacity-20 px-3 py-2 rounded-xl text-xs font-bold">💾 حفظ تلقائي</div>
           </div>
         </div>
       </div>
+
+      {/* ── إضافة معلم يدوياً ── */}
+      {showAddTeacher && (
+        <div className="bg-white rounded-2xl shadow-sm border-2 border-blue-200 p-4 mb-3 flex flex-wrap gap-3 items-end">
+          <div className="flex-1 min-w-48">
+            <label className="text-xs font-bold text-gray-500 block mb-1">اسم المعلم *</label>
+            <input value={newTeacherName} onChange={e=>setNewTeacherName(e.target.value)}
+              placeholder="الاسم الرباعي"
+              className="w-full px-3 py-2.5 rounded-xl border-2 border-gray-200 focus:border-blue-400 text-sm focus:outline-none"
+              style={{fontFamily:"inherit"}} />
+          </div>
+          <div className="flex-1 min-w-40">
+            <label className="text-xs font-bold text-gray-500 block mb-1">رقم الهوية (اختياري)</label>
+            <input value={newTeacherId} onChange={e=>setNewTeacherId(e.target.value)}
+              placeholder="1xxxxxxxxx"
+              className="w-full px-3 py-2.5 rounded-xl border-2 border-gray-200 focus:border-blue-400 text-sm focus:outline-none"
+              style={{fontFamily:"inherit"}} />
+          </div>
+          <div className="flex gap-2">
+            <button onClick={addTeacherManually}
+              className="bg-blue-600 text-white px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-blue-700">✅ إضافة</button>
+            <button onClick={()=>{ setShowAddTeacher(false); setNewTeacherName(""); setNewTeacherId(""); }}
+              className="bg-gray-100 text-gray-600 px-4 py-2.5 rounded-xl text-sm font-bold">إلغاء</button>
+          </div>
+        </div>
+      )}
 
       {/* إحصائيات اليوم */}
       {!showSummary && (
@@ -1822,6 +1890,7 @@ function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, sa
                   <th className="p-3 text-center text-xs font-bold text-amber-700">مدة التأخر</th>
                   <th className="p-3 text-center text-xs font-bold text-red-600">نوع الغياب</th>
                   <th className="p-3 text-center text-xs font-bold text-gray-500">ملاحظات</th>
+                  <th className="p-3 text-center text-xs font-bold text-teal-700">🎺 طابور</th>
                   <th className="p-3 text-center text-xs font-bold text-red-700">مساءلة</th>
                 </tr>
               </thead>
@@ -1935,6 +2004,45 @@ function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, sa
                           onChange={e => updateField(ti, selectedDay, "notes", e.target.value)}
                           className="w-full px-2 py-1.5 rounded-lg border-2 border-gray-200 text-xs focus:outline-none focus:border-teal-400 text-center"
                           style={{ fontFamily: "inherit", minWidth: "90px" }} />
+                      </td>
+
+                      {/* الطابور الصباحي */}
+                      <td className="p-1.5 text-center">
+                        {(() => {
+                          const asmVal = getTeacherAssembly(ti, selectedDay);
+                          const MADAR  = "https://app.mobile.net.sa";
+                          return (
+                            <div style={{ display:"flex", flexDirection:"column", gap:4, alignItems:"center" }}>
+                              <div style={{ display:"flex", gap:4 }}>
+                                <button onClick={() => setTeacherAssemblyVal(ti, selectedDay, true)}
+                                  title="حضر الطابور"
+                                  style={{
+                                    padding:"4px 8px", borderRadius:8, border:"1.5px solid",
+                                    borderColor: asmVal === true ? "#059669" : "#e5e7eb",
+                                    background:  asmVal === true ? "#059669" : "#f0fdf4",
+                                    color:       asmVal === true ? "#fff"    : "#9ca3af",
+                                    fontWeight:800, fontSize:11, cursor:"pointer",
+                                  }}>✅</button>
+                                <button onClick={() => setTeacherAssemblyVal(ti, selectedDay, false)}
+                                  title="لم يحضر الطابور"
+                                  style={{
+                                    padding:"4px 8px", borderRadius:8, border:"1.5px solid",
+                                    borderColor: asmVal === false ? "#dc2626" : "#e5e7eb",
+                                    background:  asmVal === false ? "#dc2626" : "#fef2f2",
+                                    color:       asmVal === false ? "#fff"    : "#9ca3af",
+                                    fontWeight:800, fontSize:11, cursor:"pointer",
+                                  }}>❌</button>
+                              </div>
+                              {asmVal === false && (
+                                <a href={MADAR} target="_blank" rel="noopener noreferrer"
+                                  style={{ fontSize:9, color:"#2563eb", fontWeight:700, textDecoration:"none",
+                                           background:"#eff6ff", borderRadius:6, padding:"2px 5px", whiteSpace:"nowrap" }}>
+                                  📲 المدار
+                                </a>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </td>
 
                       {/* زر المساءلة */}
@@ -5120,6 +5228,305 @@ function TeacherSelfEval({ teacherInfo, onDone }) {
   );
 }
 
+// ═══════════════════════════════════════════
+// 🎨 مكوّن بوربوينت AI — بوابة المعلم
+// ═══════════════════════════════════════════
+function TeacherPPTAI({ teacherInfo }) {
+  const [subject,   setSubject]   = useState("");
+  const [grade,     setGrade]     = useState("");
+  const [topic,     setTopic]     = useState("");
+  const [slides,    setSlides]    = useState("8");
+  const [lang,      setLang]      = useState("ar");
+  const [loading,   setLoading]   = useState(false);
+  const [result,    setResult]    = useState(null);  // { title, slides: [{title,points[],notes}] }
+  const [error,     setError]     = useState("");
+  const [activeSlide, setActiveSlide] = useState(0);
+
+  const SUBJECTS = ["رياضيات","علوم","عربي","إنجليزي","تربية إسلامية","اجتماعيات","حاسب","تربية بدنية","فنون","أخرى"];
+  const GRADES   = ["الأول متوسط","الثاني متوسط","الثالث متوسط","الأول ثانوي","الثاني ثانوي","الثالث ثانوي"];
+
+  const generate = async () => {
+    if (!topic.trim()) { setError("أدخل موضوع الدرس أولاً"); return; }
+    setLoading(true); setError(""); setResult(null); setActiveSlide(0);
+    try {
+      const prompt = lang === "ar"
+        ? `أنت مصمم عروض تقديمية تعليمية محترف. أنشئ عرضاً بوربوينت تعليمياً باللغة العربية بالمواصفات التالية:
+المادة: ${subject || "عامة"}
+الصف: ${grade || "متوسط"}
+الموضوع: ${topic}
+عدد الشرائح المطلوب: ${slides}
+المعلم: ${teacherInfo?.name || ""}
+
+أنشئ محتوى احترافياً ومنظماً. أجب بـ JSON فقط بالشكل التالي بدون أي نص آخر:
+{
+  "title": "عنوان العرض",
+  "objective": "هدف الدرس",
+  "slides": [
+    {
+      "title": "عنوان الشريحة",
+      "type": "intro|content|activity|summary",
+      "points": ["نقطة 1","نقطة 2","نقطة 3"],
+      "notes": "ملاحظات المعلم لهذه الشريحة"
+    }
+  ]
+}`
+        : `You are a professional educational presentation designer. Create a PowerPoint presentation with:
+Subject: ${subject || "General"}
+Grade: ${grade || "Middle School"}
+Topic: ${topic}
+Slides count: ${slides}
+Teacher: ${teacherInfo?.name || ""}
+
+Respond with JSON only, no other text:
+{
+  "title": "Presentation title",
+  "objective": "Lesson objective",
+  "slides": [
+    {
+      "title": "Slide title",
+      "type": "intro|content|activity|summary",
+      "points": ["Point 1","Point 2","Point 3"],
+      "notes": "Teacher notes for this slide"
+    }
+  ]
+}`;
+
+      const resp = await fetch("https://api.anthropic.com/v1/messages", {
+        method:"POST",
+        headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({
+          model:"claude-sonnet-4-20250514",
+          max_tokens:2000,
+          messages:[{ role:"user", content: prompt }]
+        })
+      });
+      const data = await resp.json();
+      const text = (data.content||[]).map(b=>b.text||"").join("").replace(/```json|```/g,"").trim();
+      const parsed = JSON.parse(text);
+      setResult(parsed);
+    } catch(e) {
+      setError("حدث خطأ في التوليد — تأكد من الاتصال وحاول مجدداً");
+    }
+    setLoading(false);
+  };
+
+  const slideColors = {
+    intro:    { bg:"#1e3a5f", accent:"#3b82f6", text:"#fff" },
+    content:  { bg:"#0d9488", accent:"#14b8a6", text:"#fff" },
+    activity: { bg:"#7c3aed", accent:"#a855f7", text:"#fff" },
+    summary:  { bg:"#059669", accent:"#34d399", text:"#fff" },
+  };
+  const getColor = (type) => slideColors[type] || slideColors.content;
+
+  const printPPT = () => {
+    if (!result) return;
+    const slides = result.slides.map((s,i) => {
+      const c = getColor(s.type);
+      return `
+        <div style="page-break-after:always;width:25cm;height:14cm;background:${c.bg};
+          display:flex;flex-direction:column;justify-content:center;align-items:center;
+          padding:40px;box-sizing:border-box;font-family:'Noto Naskh Arabic',Arial,sans-serif;direction:rtl;position:relative;overflow:hidden">
+          <div style="position:absolute;top:0;left:0;width:8px;height:100%;background:${c.accent}"></div>
+          <div style="position:absolute;bottom:20px;right:30px;font-size:11px;color:rgba(255,255,255,0.4)">${i+1}/${result.slides.length}</div>
+          <div style="font-size:26px;font-weight:900;color:${c.text};margin-bottom:20px;text-align:center;line-height:1.3">${s.title}</div>
+          <div style="width:100%;max-width:600px">
+            ${(s.points||[]).map(p=>`
+              <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:10px">
+                <div style="width:8px;height:8px;border-radius:50%;background:${c.accent};flex-shrink:0;margin-top:7px"></div>
+                <div style="font-size:16px;color:${c.text};opacity:0.9;line-height:1.6">${p}</div>
+              </div>`).join("")}
+          </div>
+          ${s.notes?`<div style="position:absolute;bottom:30px;left:30px;font-size:10px;color:rgba(255,255,255,0.4)">💡 ${s.notes}</div>`:""}
+        </div>`;
+    }).join("");
+    printWindow(`<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8"><title>${result.title}</title>
+    <style>*{margin:0;padding:0;box-sizing:border-box}@media print{@page{size:A4 landscape;margin:0}}</style>
+    </head><body>${slides}<script>window.onload=()=>window.print()</script></body></html>`);
+  };
+
+  return (
+    <div dir="rtl" style={{ fontFamily:"'Cairo','Noto Naskh Arabic',sans-serif" }}>
+      {/* رأس */}
+      <div style={{ background:"linear-gradient(135deg,#ea580c,#c2410c)", borderRadius:20,
+        padding:"18px 20px", marginBottom:16, color:"#fff" }}>
+        <div style={{ fontSize:32, marginBottom:4 }}>🎨</div>
+        <div style={{ fontWeight:900, fontSize:18 }}>مولّد العروض التقديمية بالذكاء الاصطناعي</div>
+        <div style={{ opacity:.8, fontSize:12, marginTop:3 }}>أدخل بيانات الدرس ويُنشئ لك العرض كاملاً</div>
+      </div>
+
+      {/* نموذج الإدخال */}
+      {!result && (
+        <div style={{ background:"#fff", borderRadius:20, padding:20,
+          boxShadow:"0 2px 12px rgba(0,0,0,0.06)", border:"1px solid #f1f5f9", marginBottom:14 }}>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:10 }}>
+            <div>
+              <label style={{ fontSize:11, fontWeight:700, color:"#64748b", display:"block", marginBottom:4 }}>المادة</label>
+              <select value={subject} onChange={e=>setSubject(e.target.value)}
+                style={{ width:"100%", padding:"9px 12px", borderRadius:10, border:"2px solid #e2e8f0",
+                         fontSize:12, fontFamily:"'Cairo',sans-serif", outline:"none" }}>
+                <option value="">— اختر —</option>
+                {SUBJECTS.map(s=><option key={s}>{s}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={{ fontSize:11, fontWeight:700, color:"#64748b", display:"block", marginBottom:4 }}>الصف</label>
+              <select value={grade} onChange={e=>setGrade(e.target.value)}
+                style={{ width:"100%", padding:"9px 12px", borderRadius:10, border:"2px solid #e2e8f0",
+                         fontSize:12, fontFamily:"'Cairo',sans-serif", outline:"none" }}>
+                <option value="">— اختر —</option>
+                {GRADES.map(g=><option key={g}>{g}</option>)}
+              </select>
+            </div>
+          </div>
+          <div style={{ marginBottom:10 }}>
+            <label style={{ fontSize:11, fontWeight:700, color:"#64748b", display:"block", marginBottom:4 }}>موضوع الدرس *</label>
+            <input type="text" value={topic} onChange={e=>setTopic(e.target.value)}
+              placeholder="مثال: الكسور العشرية، الجملة الشرطية، فتح مكة..."
+              style={{ width:"100%", padding:"10px 12px", borderRadius:10, border:"2px solid #e2e8f0",
+                       fontSize:13, fontFamily:"'Cairo',sans-serif", outline:"none", boxSizing:"border-box" }} />
+          </div>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:14 }}>
+            <div>
+              <label style={{ fontSize:11, fontWeight:700, color:"#64748b", display:"block", marginBottom:4 }}>عدد الشرائح</label>
+              <select value={slides} onChange={e=>setSlides(e.target.value)}
+                style={{ width:"100%", padding:"9px 12px", borderRadius:10, border:"2px solid #e2e8f0",
+                         fontSize:12, fontFamily:"'Cairo',sans-serif", outline:"none" }}>
+                {["5","6","8","10","12","15"].map(n=><option key={n} value={n}>{n} شرائح</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={{ fontSize:11, fontWeight:700, color:"#64748b", display:"block", marginBottom:4 }}>اللغة</label>
+              <select value={lang} onChange={e=>setLang(e.target.value)}
+                style={{ width:"100%", padding:"9px 12px", borderRadius:10, border:"2px solid #e2e8f0",
+                         fontSize:12, fontFamily:"'Cairo',sans-serif", outline:"none" }}>
+                <option value="ar">العربية</option>
+                <option value="en">English</option>
+              </select>
+            </div>
+          </div>
+          {error && <div style={{ background:"#fee2e2", color:"#dc2626", borderRadius:10, padding:"8px 12px",
+            fontSize:12, fontWeight:700, marginBottom:10 }}>{error}</div>}
+          <button onClick={generate} disabled={loading}
+            style={{ width:"100%", padding:"13px", borderRadius:14, border:"none",
+                     background: loading ? "#e5e7eb" : "linear-gradient(135deg,#ea580c,#c2410c)",
+                     color: loading ? "#9ca3af" : "#fff", fontWeight:900, fontSize:14,
+                     cursor: loading ? "not-allowed" : "pointer", fontFamily:"'Cairo',sans-serif",
+                     boxShadow: loading ? "none" : "0 4px 16px rgba(234,88,12,0.4)" }}>
+            {loading ? "⏳ جاري التوليد..." : "🚀 توليد العرض بالذكاء الاصطناعي"}
+          </button>
+        </div>
+      )}
+
+      {/* النتيجة */}
+      {result && (
+        <>
+          {/* شريط العنوان */}
+          <div style={{ background:"#fff", borderRadius:16, padding:"14px 18px", marginBottom:12,
+            boxShadow:"0 2px 10px rgba(0,0,0,0.06)", border:"1px solid #f1f5f9",
+            display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:10 }}>
+            <div>
+              <div style={{ fontWeight:900, fontSize:16, color:"#1e293b" }}>{result.title}</div>
+              {result.objective && <div style={{ fontSize:11, color:"#64748b", marginTop:2 }}>🎯 {result.objective}</div>}
+              <div style={{ fontSize:10, color:"#94a3b8", marginTop:2 }}>{result.slides?.length} شريحة</div>
+            </div>
+            <div style={{ display:"flex", gap:8 }}>
+              <button onClick={printPPT}
+                style={{ padding:"9px 16px", borderRadius:12, border:"none",
+                         background:"linear-gradient(135deg,#7c3aed,#5b21b6)",
+                         color:"#fff", fontWeight:800, fontSize:12, cursor:"pointer",
+                         fontFamily:"'Cairo',sans-serif" }}>
+                🖨️ طباعة / تصدير
+              </button>
+              <button onClick={() => { setResult(null); setActiveSlide(0); }}
+                style={{ padding:"9px 14px", borderRadius:12, border:"1.5px solid #e2e8f0",
+                         background:"#f8fafc", color:"#64748b", fontWeight:700, fontSize:12,
+                         cursor:"pointer", fontFamily:"'Cairo',sans-serif" }}>
+                🔄 جديد
+              </button>
+            </div>
+          </div>
+
+          {/* معاينة الشرائح */}
+          <div style={{ display:"flex", gap:8, overflowX:"auto", WebkitOverflowScrolling:"touch",
+            scrollbarWidth:"none", paddingBottom:4, marginBottom:12 }}>
+            {result.slides?.map((s,i) => {
+              const c = getColor(s.type);
+              return (
+                <button key={i} onClick={() => setActiveSlide(i)}
+                  style={{ flexShrink:0, width:80, height:50, borderRadius:8,
+                           background:c.bg, border:`2px solid ${activeSlide===i?c.accent:"transparent"}`,
+                           cursor:"pointer", position:"relative", overflow:"hidden",
+                           boxShadow: activeSlide===i?"0 4px 12px rgba(0,0,0,0.2)":"none",
+                           transition:"all .15s" }}>
+                  <div style={{ position:"absolute", top:0, left:0, width:4, height:"100%", background:c.accent }} />
+                  <div style={{ fontSize:8, color:"rgba(255,255,255,0.9)", padding:"4px 6px 4px 10px",
+                                fontWeight:700, textAlign:"right", lineHeight:1.3 }}>
+                    {i+1}. {s.title?.substring(0,18)}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* الشريحة النشطة */}
+          {result.slides?.[activeSlide] && (() => {
+            const s = result.slides[activeSlide];
+            const c = getColor(s.type);
+            return (
+              <div style={{ borderRadius:20, overflow:"hidden", boxShadow:"0 8px 32px rgba(0,0,0,0.15)",
+                            marginBottom:12 }}>
+                <div style={{ background:c.bg, padding:"32px 36px", minHeight:220,
+                  display:"flex", flexDirection:"column", justifyContent:"center", position:"relative" }}>
+                  <div style={{ position:"absolute", top:0, right:0, width:6, height:"100%", background:c.accent }} />
+                  <div style={{ position:"absolute", top:14, left:18, fontSize:11,
+                    color:"rgba(255,255,255,0.45)", fontWeight:700 }}>
+                    {activeSlide+1} / {result.slides.length}
+                  </div>
+                  <div style={{ fontWeight:900, fontSize:22, color:"#fff", marginBottom:20,
+                    lineHeight:1.3, paddingLeft:12 }}>{s.title}</div>
+                  <div style={{ display:"flex", flexDirection:"column", gap:10, paddingLeft:12 }}>
+                    {(s.points||[]).map((p,j) => (
+                      <div key={j} style={{ display:"flex", alignItems:"flex-start", gap:10 }}>
+                        <div style={{ width:8, height:8, borderRadius:"50%", background:c.accent,
+                          flexShrink:0, marginTop:7 }} />
+                        <div style={{ fontSize:15, color:"rgba(255,255,255,0.92)", lineHeight:1.6 }}>{p}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                {s.notes && (
+                  <div style={{ background:"#f8fafc", padding:"10px 18px", fontSize:11,
+                    color:"#64748b", fontWeight:600, borderTop:"1px solid #e2e8f0" }}>
+                    💡 ملاحظة للمعلم: {s.notes}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
+          {/* تنقل بين الشرائح */}
+          <div style={{ display:"flex", gap:10, justifyContent:"center" }}>
+            <button onClick={() => setActiveSlide(p => Math.max(0,p-1))} disabled={activeSlide===0}
+              style={{ padding:"9px 20px", borderRadius:12, border:"1.5px solid #e2e8f0",
+                       background:activeSlide===0?"#f1f5f9":"#fff", color:activeSlide===0?"#cbd5e1":"#374151",
+                       fontWeight:800, fontSize:13, cursor:activeSlide===0?"not-allowed":"pointer",
+                       fontFamily:"'Cairo',sans-serif" }}>← السابق</button>
+            <span style={{ alignSelf:"center", fontSize:12, fontWeight:700, color:"#94a3b8" }}>
+              {activeSlide+1} / {result.slides?.length}
+            </span>
+            <button onClick={() => setActiveSlide(p => Math.min((result.slides?.length||1)-1,p+1))}
+              disabled={activeSlide===(result.slides?.length||1)-1}
+              style={{ padding:"9px 20px", borderRadius:12, border:"1.5px solid #e2e8f0",
+                       background:activeSlide===(result.slides?.length||1)-1?"#f1f5f9":"#fff",
+                       color:activeSlide===(result.slides?.length||1)-1?"#cbd5e1":"#374151",
+                       fontWeight:800, fontSize:13, cursor:"pointer", fontFamily:"'Cairo',sans-serif" }}>التالي →</button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function TeacherPortal({ classList, setClassList, saveClass, siteFont, onBack, attendance, teachers, week, onSendNote, messages }) {
   const [step, setStep] = useState("login"); // login | dashboard | attendance
   const [activeTab, setActiveTab] = useState("grades"); // grades | attendance
@@ -5270,6 +5677,10 @@ function TeacherPortal({ classList, setClassList, saveClass, siteFont, onBack, a
             className={`flex-1 py-3 rounded-2xl font-black text-sm transition-all ${activeTab === "selfeval" ? "bg-purple-600 text-white shadow-md" : "bg-white text-gray-600 hover:bg-purple-50 border border-gray-200"}`}>
             🎯 تقييمي الذاتي
           </button>
+          <button onClick={() => setActiveTab("pptai")}
+            className={`flex-1 py-3 rounded-2xl font-black text-sm transition-all ${activeTab === "pptai" ? "bg-orange-600 text-white shadow-md" : "bg-white text-gray-600 hover:bg-orange-50 border border-gray-200"}`}>
+            🎨 بوربوينت AI
+          </button>
         </div>
 
         {/* محتوى التبويبات */}
@@ -5288,6 +5699,10 @@ function TeacherPortal({ classList, setClassList, saveClass, siteFont, onBack, a
 
         {activeTab === "selfeval" && (
           <TeacherSelfEval teacherInfo={currentTeacher} onDone={() => setActiveTab("grades")} />
+        )}
+
+        {activeTab === "pptai" && (
+          <TeacherPPTAI teacherInfo={currentTeacher} />
         )}
 
         {activeTab === "attendance" && (
