@@ -1293,6 +1293,21 @@ function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, sa
     window.XLSX.writeFile(wb, `مساءلات_${new Date().toLocaleDateString("ar-SA-u-nu-latn")}.xlsx`);
   };
 
+  // ── الطابور الصباحي ──
+  const [assembly, setAssembly] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("morning_assembly_v1") || "{}"); } catch { return {}; }
+  });
+  const saveAssembly = (data) => {
+    setAssembly(data);
+    try { localStorage.setItem("morning_assembly_v1", JSON.stringify(data)); } catch {}
+  };
+  // key: weekDay index → مثل "0" للأحد
+  const getAssembly = (di) => assembly[`${week.days[di]?.dateH}_${di}`] ?? null; // null = لم يُسجَّل
+  const setAssemblyDay = (di, val) => {
+    const key = `${week.days[di]?.dateH}_${di}`;
+    saveAssembly({ ...assembly, [key]: val });
+  };
+
   const handleDpGenerate = () => {
     try {
       const gen = dpCalType === "hijri"
@@ -1378,6 +1393,13 @@ function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, sa
   // طباعة اليومي
   const handlePrint = () => {
     const day = week.days[selectedDay];
+    const assemblyVal = getAssembly(selectedDay);
+    const assemblyLine = assemblyVal !== null
+      ? `<div style="margin-bottom:12px;padding:8px 16px;border-radius:8px;font-size:12px;font-weight:bold;
+          background:${assemblyVal?"#d1fae5":"#fee2e2"};color:${assemblyVal?"#065f46":"#991b1b"};display:inline-block">
+          🎺 الطابور الصباحي: ${assemblyVal?"✅ نُفِّذ":"❌ لم يُنفَّذ"}
+         </div>`
+      : `<div style="color:#94a3b8;font-size:11px;margin-bottom:10px">🎺 الطابور الصباحي: لم يُسجَّل</div>`;
     const rows = teachers.map((t, ti) => {
       const r = attendance[ti]?.[selectedDay] || {};
       const st = r.status || "حاضر";
@@ -1416,6 +1438,7 @@ function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, sa
       <h1>مدرسة عبيدة بن الحارث المتوسطة</h1>
       <p>سجل الحضور والغياب — ${day.name} | ${day.dateH} هـ | ${day.dateM} م</p>
     </div>
+    ${assemblyLine}
     <div class="stats">
       <div class="stat"><span>${countPresent(selectedDay)}</span><small>✅ حاضر</small></div>
       <div class="stat late"><span>${countLate(selectedDay)}</span><small>🕐 متأخر</small></div>
@@ -1459,7 +1482,7 @@ function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, sa
     <div class="header"><h1>مدرسة عبيدة بن الحارث المتوسطة</h1>
     <p>ملخص الحضور والغياب الأسبوعي — ${week.days[0]?.dateH} إلى ${week.days[week.days.length-1]?.dateH} هـ</p></div>
     <table><thead><tr><th>م</th><th>اسم المعلم</th>
-    ${week.days.map(d=>`<th>${d.name}</th>`).join("")}
+    ${week.days.map((d,di)=>`<th>${d.name}<br/><span style="font-weight:normal;font-size:10px">${(() => { const a = getAssembly(di); return a !== null ? (a ? "🎺✅":"🎺❌") : "🎺—"; })()}</span></th>`).join("")}
     <th>🌅 تأخر صباحي</th><th>دقائق صباحي</th><th>📚 تأخر حصص</th><th>دقائق حصص</th><th>❌ غياب</th></tr></thead>
     <tbody>${rows}</tbody></table>
     <div style="text-align:center;margin-top:16px;font-size:10px;color:#999">تم الإصدار بتاريخ ${new Date().toLocaleDateString('ar-SA')}</div>
@@ -1503,7 +1526,8 @@ function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, sa
 
       {/* إحصائيات اليوم */}
       {!showSummary && (
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-5">
+        <>
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-3">
           <div className="bg-emerald-50 border-2 border-emerald-200 rounded-2xl p-3 text-center">
             <div className="text-3xl font-black text-emerald-700">{countPresent(selectedDay)}</div>
             <div className="text-xs font-bold text-emerald-600 mt-1">✅ حاضر</div>
@@ -1527,6 +1551,60 @@ function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, sa
             <div className="text-xs font-bold text-red-600 mt-1">❌ غائب</div>
           </div>
         </div>
+
+        {/* ── بطاقة الطابور الصباحي ── */}
+        <div className="mb-4">
+          {(() => {
+            const val = getAssembly(selectedDay);
+            const day = week.days[selectedDay];
+            return (
+              <div className="flex items-center gap-3 bg-white rounded-2xl px-5 py-3 shadow-sm border-2 flex-wrap"
+                style={{ borderColor: val === true ? "#059669" : val === false ? "#dc2626" : "#e2e8f0" }}>
+                <div className="text-2xl">🎺</div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-black text-sm text-gray-800">الطابور الصباحي</div>
+                  <div className="text-xs text-gray-400 mt-0.5">{day?.name} — {day?.dateH} هـ</div>
+                </div>
+                <div className="flex gap-2 flex-shrink-0">
+                  <button onClick={() => setAssemblyDay(selectedDay, true)}
+                    style={{
+                      padding:"7px 18px", borderRadius:12, border:"2px solid",
+                      borderColor: val === true ? "#059669" : "#e2e8f0",
+                      background:  val === true ? "#059669" : "#f0fdf4",
+                      color:       val === true ? "#fff"    : "#6b7280",
+                      fontWeight:900, fontSize:13, cursor:"pointer", fontFamily:"'Cairo',sans-serif",
+                      boxShadow: val === true ? "0 3px 10px rgba(5,150,105,0.3)" : "none",
+                      transition:"all .15s",
+                    }}>✅ نعم</button>
+                  <button onClick={() => setAssemblyDay(selectedDay, false)}
+                    style={{
+                      padding:"7px 18px", borderRadius:12, border:"2px solid",
+                      borderColor: val === false ? "#dc2626" : "#e2e8f0",
+                      background:  val === false ? "#dc2626" : "#fef2f2",
+                      color:       val === false ? "#fff"    : "#6b7280",
+                      fontWeight:900, fontSize:13, cursor:"pointer", fontFamily:"'Cairo',sans-serif",
+                      boxShadow: val === false ? "0 3px 10px rgba(220,38,38,0.3)" : "none",
+                      transition:"all .15s",
+                    }}>❌ لا</button>
+                  {val !== null && (
+                    <button onClick={() => setAssemblyDay(selectedDay, null)}
+                      style={{ padding:"7px 10px", borderRadius:12, border:"2px solid #e2e8f0",
+                               background:"#f8fafc", color:"#9ca3af", fontSize:12, cursor:"pointer" }}>
+                      ↩
+                    </button>
+                  )}
+                </div>
+                {val !== null && (
+                  <div className="w-full text-xs font-bold mt-1"
+                    style={{ color: val ? "#059669" : "#dc2626" }}>
+                    {val ? "🎺 تم تنفيذ الطابور الصباحي بنجاح" : "⚠️ لم يُنفَّذ الطابور الصباحي هذا اليوم"}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+        </div>
+        </>
       )}
 
       {/* أيام الأسبوع + تغيير التاريخ */}
@@ -1543,6 +1621,7 @@ function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, sa
                 {countLate(i) > 0 && <span className="text-amber-500 font-bold">{countLate(i)}ت</span>}
               </div>
             )}
+            {(() => { const a = getAssembly(i); return a !== null ? <div className="text-xs mt-0.5 font-bold">{a ? "🎺✅" : "🎺❌"}</div> : null; })()}
           </button>
         ))}
         {/* زر تغيير الأسبوع */}
@@ -1649,6 +1728,26 @@ function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, sa
               <button onClick={() => setShowSummary(false)} className="bg-white bg-opacity-20 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-opacity-30">✕ إغلاق</button>
             </div>
           </div>
+
+          {/* ── ملخص الطابور الأسبوعي ── */}
+          <div className="flex gap-3 px-4 py-3 overflow-x-auto border-b border-purple-100 bg-purple-50">
+            <span className="text-xs font-black text-purple-700 flex-shrink-0 self-center">🎺 الطابور:</span>
+            {week.days.map((d, di) => {
+              const val = getAssembly(di);
+              return (
+                <div key={di} className="flex-shrink-0 text-center px-3 py-1.5 rounded-xl text-xs font-bold"
+                  style={{
+                    background: val === true ? "#d1fae5" : val === false ? "#fee2e2" : "#f3f4f6",
+                    color: val === true ? "#065f46" : val === false ? "#991b1b" : "#9ca3af",
+                    border: `1.5px solid ${val === true ? "#6ee7b7" : val === false ? "#fca5a5" : "#e5e7eb"}`,
+                  }}>
+                  <div>{d.name}</div>
+                  <div className="mt-0.5">{val === true ? "✅ نُفِّذ" : val === false ? "❌ لم يُنفَّذ" : "— لم يُسجَّل"}</div>
+                </div>
+              );
+            })}
+          </div>
+
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
@@ -8103,6 +8202,17 @@ function StudentAbsencePage() {
   const MADAR_URL = "https://app.mobile.net.sa";
   const FB_KEY    = "student-absence";
   const PERIODS_T   = ["الأولى","الثانية","الثالثة","الرابعة","الخامسة","السادسة","السابعة"];
+  const LATE_REASONS = [
+    "لم يُحدَّد السبب",
+    "بُعد السكن",
+    "تأخر الأسرة في إيصاله",
+    "تأخر الباص المدرسي",
+    "الذهاب للمحلات القريبة",
+    "الاستيقاظ المتأخر",
+    "ازدحام مروري",
+    "عذر صحي",
+    "سبب آخر",
+  ];
   const STATUSES  = [
     { key:"حاضر",       label:"حاضر",        icon:"✅", color:"emerald" },
     { key:"غائب",       label:"غائب",         icon:"❌", color:"red"    },
@@ -8161,6 +8271,13 @@ function StudentAbsencePage() {
     const cur = getAtt(sid);
     const ps  = cur.periods || [];
     const upd = { ...attendance, [sid]: { ...cur, status:"تأخر حصص", periods: ps.includes(pi) ? ps.filter(x=>x!==pi) : [...ps,pi] }};
+    setAttendance(upd);
+    persist(students, upd);
+  };
+
+  const setLateReason = (sid, reason) => {
+    const cur = getAtt(sid);
+    const upd = { ...attendance, [sid]: { ...cur, lateReason: reason }};
     setAttendance(upd);
     persist(students, upd);
   };
@@ -8226,7 +8343,7 @@ function StudentAbsencePage() {
     if (att.status === "غائب")
       msg = `السلام عليكم ورحمة الله وبركاته\nنُفيدكم بأن ابنكم الطالب / ${stu.name}\nغاب عن المدرسة بتاريخ ${dateAr}\nنرجو التواصل مع الإدارة لمعرفة السبب.\nمع تحيات إدارة مدرسة عبيدة بن الحارث المتوسطة`;
     else if (att.status === "تأخر صباحي")
-      msg = `السلام عليكم ورحمة الله وبركاته\nنُفيدكم بأن ابنكم الطالب / ${stu.name}\nتأخّر عن الحضور الصباحي بتاريخ ${dateAr}\nنرجو الحرص على الالتزام بالحضور في وقته.\nمع تحيات إدارة مدرسة عبيدة بن الحارث المتوسطة`;
+      msg = `السلام عليكم ورحمة الله وبركاته\nنُفيدكم بأن ابنكم الطالب / ${stu.name}\nتأخّر عن الحضور الصباحي بتاريخ ${dateAr}${att.lateReason && att.lateReason !== "لم يُحدَّد السبب" ? `\nالسبب المُسجَّل: ${att.lateReason}` : ""}\nنرجو الحرص على الالتزام بالحضور في وقته.\nمع تحيات إدارة مدرسة عبيدة بن الحارث المتوسطة`;
     else if (att.status === "تأخر حصص") {
       const perNames = (att.periods||[]).sort((a,b)=>a-b).map(p => "الحصة " + PERIODS_T[p]).join("، ");
       msg = `السلام عليكم ورحمة الله وبركاته\nنُفيدكم بأن ابنكم الطالب / ${stu.name}\nتأخّر عن ${perNames} بتاريخ ${dateAr}\nنرجو متابعة الأمر.\nمع تحيات إدارة مدرسة عبيدة بن الحارث المتوسطة`;
@@ -8254,6 +8371,7 @@ function StudentAbsencePage() {
         <td style="padding:8px 12px; color:#6b7280; font-size:12px">${s.nationalId||"—"}</td>
         <td style="padding:8px 12px; text-align:center; font-weight:bold; color:${statusColor}; font-size:12px">${att.status}</td>
         <td style="padding:8px 12px; text-align:center; color:#6b7280; font-size:12px">${perTxt}</td>
+        <td style="padding:8px 12px; text-align:center; color:#92400e; font-size:11px; font-weight:600">${att.lateReason && att.lateReason !== "لم يُحدَّد السبب" ? att.lateReason : "—"}</td>
       </tr>`;
     }).join("");
     const stats = STATUSES.map(s => `<span style="background:${{"emerald":"#d1fae5","red":"#fee2e2","amber":"#fef3c7","orange":"#ffedd5"}[s.color]||"#f3f4f6"}; padding:6px 14px; border-radius:20px; font-weight:bold; font-size:13px; color:${{"emerald":"#065f46","red":"#991b1b","amber":"#92400e","orange":"#9a3412"}[s.color]||"#374151"}; margin:3px">${s.icon} ${s.label}: ${students.filter(st=>getAtt(st.id).status===s.key).length}</span>`).join("");
@@ -8275,6 +8393,7 @@ function StudentAbsencePage() {
           <th style="padding:10px 12px;text-align:center">رقم الهوية</th>
           <th style="padding:10px 12px;text-align:center">الحالة</th>
           <th style="padding:10px 12px;text-align:center">الحصص</th>
+          <th style="padding:10px 12px;text-align:center">سبب التأخر</th>
         </tr></thead>
         <tbody>${rows}</tbody>
       </table>
@@ -8405,6 +8524,7 @@ function StudentAbsencePage() {
                   <th className="px-3 py-3 text-right min-w-48">الطالب</th>
                   <th className="px-3 py-3 text-center min-w-64">الحالة</th>
                   <th className="px-3 py-3 text-center min-w-64">الحصص المتأخر عنها</th>
+                  <th className="px-3 py-3 text-center min-w-40">سبب التأخر</th>
                   <th className="px-3 py-3 text-center w-24">المدار / إبلاغ</th>
                   <th className="px-3 py-3 text-center w-20">إجراءات</th>
                 </tr>
@@ -8478,6 +8598,26 @@ function StudentAbsencePage() {
                           <div className="text-center text-xs text-orange-600 font-bold mt-1.5">
                             {(att.periods||[]).sort((a,b)=>a-b).map(p=>PERIODS_T[p]).join(" ، ")}
                           </div>
+                        )}
+                      </td>
+
+                      {/* سبب التأخر */}
+                      <td className="px-3 py-3 text-center">
+                        {(att.status === "تأخر صباحي" || att.status === "تأخر حصص") ? (
+                          <select
+                            value={att.lateReason || "لم يُحدَّد السبب"}
+                            onChange={e => setLateReason(stu.id, e.target.value)}
+                            className="w-full px-2 py-1.5 rounded-xl border-2 text-xs font-bold focus:outline-none text-center"
+                            style={{
+                              borderColor: att.lateReason && att.lateReason !== "لم يُحدَّد السبب" ? "#d97706" : "#e5e7eb",
+                              background:  att.lateReason && att.lateReason !== "لم يُحدَّد السبب" ? "#fffbeb" : "#f9fafb",
+                              color:       att.lateReason && att.lateReason !== "لم يُحدَّد السبب" ? "#92400e" : "#9ca3af",
+                              fontFamily:"inherit",
+                            }}>
+                            {LATE_REASONS.map(r => <option key={r} value={r}>{r}</option>)}
+                          </select>
+                        ) : (
+                          <span className="text-gray-200 text-lg">—</span>
                         )}
                       </td>
 
@@ -8573,6 +8713,24 @@ function StudentAbsencePage() {
                           {(att.periods||[]).sort((a,b)=>a-b).map(p=>PERIODS_T[p]).join(" ، ")}
                         </div>
                       )}
+                    </div>
+                  )}
+                  {/* سبب التأخر */}
+                  {(att.status === "تأخر صباحي" || att.status === "تأخر حصص") && (
+                    <div>
+                      <div className="text-xs text-amber-700 font-bold mb-1.5">🕐 سبب التأخر:</div>
+                      <select
+                        value={att.lateReason || "لم يُحدَّد السبب"}
+                        onChange={e => setLateReason(stu.id, e.target.value)}
+                        className="w-full px-3 py-2 rounded-xl border-2 text-xs font-bold focus:outline-none"
+                        style={{
+                          borderColor: att.lateReason && att.lateReason !== "لم يُحدَّد السبب" ? "#d97706" : "#e5e7eb",
+                          background:  att.lateReason && att.lateReason !== "لم يُحدَّد السبب" ? "#fffbeb" : "#f9fafb",
+                          color:       att.lateReason && att.lateReason !== "لم يُحدَّد السبب" ? "#92400e" : "#9ca3af",
+                          fontFamily:"inherit",
+                        }}>
+                        {LATE_REASONS.map(r => <option key={r} value={r}>{r}</option>)}
+                      </select>
                     </div>
                   )}
                 </div>
