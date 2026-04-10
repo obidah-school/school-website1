@@ -5232,80 +5232,66 @@ function TeacherSelfEval({ teacherInfo, onDone }) {
 // 🎨 مكوّن بوربوينت AI — بوابة المعلم
 // ═══════════════════════════════════════════
 function TeacherPPTAI({ teacherInfo }) {
+  const CLAUDE_API_KEY = import.meta.env.VITE_CLAUDE_API_KEY || "";
   const [subject,   setSubject]   = useState("");
   const [grade,     setGrade]     = useState("");
   const [topic,     setTopic]     = useState("");
   const [slides,    setSlides]    = useState("8");
   const [lang,      setLang]      = useState("ar");
   const [loading,   setLoading]   = useState(false);
-  const [result,    setResult]    = useState(null);  // { title, slides: [{title,points[],notes}] }
+  const [result,    setResult]    = useState(null);
   const [error,     setError]     = useState("");
   const [activeSlide, setActiveSlide] = useState(0);
 
   const SUBJECTS = ["رياضيات","علوم","عربي","إنجليزي","تربية إسلامية","اجتماعيات","حاسب","تربية بدنية","فنون","أخرى"];
   const GRADES   = ["الأول متوسط","الثاني متوسط","الثالث متوسط","الأول ثانوي","الثاني ثانوي","الثالث ثانوي"];
 
+  const callAI = async (prompt) => {
+    if (!CLAUDE_API_KEY) {
+      setError("⚠️ يجب إضافة VITE_CLAUDE_API_KEY في إعدادات Vercel ← Environment Variables");
+      return null;
+    }
+    const resp = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": CLAUDE_API_KEY,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 2000,
+        messages: [{ role: "user", content: prompt }],
+      }),
+    });
+    const data = await resp.json();
+    if (data.error) throw new Error(data.error.message);
+    return data.content?.[0]?.text || "";
+  };
+
   const generate = async () => {
     if (!topic.trim()) { setError("أدخل موضوع الدرس أولاً"); return; }
     setLoading(true); setError(""); setResult(null); setActiveSlide(0);
     try {
       const prompt = lang === "ar"
-        ? `أنت مصمم عروض تقديمية تعليمية محترف. أنشئ عرضاً بوربوينت تعليمياً باللغة العربية بالمواصفات التالية:
-المادة: ${subject || "عامة"}
-الصف: ${grade || "متوسط"}
-الموضوع: ${topic}
-عدد الشرائح المطلوب: ${slides}
+        ? `أنت مصمم عروض تقديمية تعليمية محترف. أنشئ عرضاً تعليمياً باللغة العربية:
+المادة: ${subject || "عامة"} | الصف: ${grade || "متوسط"} | الموضوع: ${topic} | الشرائح: ${slides}
 المعلم: ${teacherInfo?.name || ""}
 
-أنشئ محتوى احترافياً ومنظماً. أجب بـ JSON فقط بالشكل التالي بدون أي نص آخر:
-{
-  "title": "عنوان العرض",
-  "objective": "هدف الدرس",
-  "slides": [
-    {
-      "title": "عنوان الشريحة",
-      "type": "intro|content|activity|summary",
-      "points": ["نقطة 1","نقطة 2","نقطة 3"],
-      "notes": "ملاحظات المعلم لهذه الشريحة"
-    }
-  ]
-}`
-        : `You are a professional educational presentation designer. Create a PowerPoint presentation with:
-Subject: ${subject || "General"}
-Grade: ${grade || "Middle School"}
-Topic: ${topic}
-Slides count: ${slides}
-Teacher: ${teacherInfo?.name || ""}
+أجب بـ JSON فقط بدون أي نص إضافي أو markdown:
+{"title":"عنوان العرض","objective":"هدف الدرس","slides":[{"title":"عنوان الشريحة","type":"intro","points":["نقطة 1","نقطة 2"],"notes":"ملاحظة للمعلم"}]}`
+        : `Create an educational PowerPoint in English.
+Subject: ${subject||"General"} | Grade: ${grade||"Middle School"} | Topic: ${topic} | Slides: ${slides}
+Respond with JSON only, no markdown:
+{"title":"Title","objective":"Objective","slides":[{"title":"Slide title","type":"intro","points":["Point 1"],"notes":"Teacher note"}]}`;
 
-Respond with JSON only, no other text:
-{
-  "title": "Presentation title",
-  "objective": "Lesson objective",
-  "slides": [
-    {
-      "title": "Slide title",
-      "type": "intro|content|activity|summary",
-      "points": ["Point 1","Point 2","Point 3"],
-      "notes": "Teacher notes for this slide"
-    }
-  ]
-}`;
-
-      const resp = await fetch("https://api.anthropic.com/v1/messages", {
-        method:"POST",
-        headers:{ "Content-Type":"application/json" },
-        body: JSON.stringify({
-          model:"claude-sonnet-4-20250514",
-          max_tokens:2000,
-          messages:[{ role:"user", content: prompt }]
-        })
-      });
-      const data = await resp.json();
-      const text = (data.content||[]).map(b=>b.text||"").join("").replace(/```json|```/g,"").trim();
-      const parsed = JSON.parse(text);
+      const text = await callAI(prompt);
+      if (!text) { setLoading(false); return; }
+      const clean = text.replace(/```json|```/g,"").trim();
+      const parsed = JSON.parse(clean);
       setResult(parsed);
     } catch(e) {
-      setError("حدث خطأ في التوليد — تأكد من الاتصال وحاول مجدداً");
+      setError("خطأ في التوليد: " + e.message + " — حاول مجدداً");
     }
     setLoading(false);
   };
@@ -5353,6 +5339,14 @@ Respond with JSON only, no other text:
         <div style={{ fontWeight:900, fontSize:18 }}>مولّد العروض التقديمية بالذكاء الاصطناعي</div>
         <div style={{ opacity:.8, fontSize:12, marginTop:3 }}>أدخل بيانات الدرس ويُنشئ لك العرض كاملاً</div>
       </div>
+
+      {/* تحذير مفتاح API */}
+      {!CLAUDE_API_KEY && (
+        <div style={{ background:"#fef3c7", border:"1.5px solid #fde68a", borderRadius:12,
+          padding:"10px 14px", marginBottom:14, fontSize:12, color:"#92400e", fontWeight:700 }}>
+          ⚠️ لتفعيل هذه الميزة أضف <strong>VITE_CLAUDE_API_KEY</strong> في إعدادات Vercel ← Environment Variables
+        </div>
+      )}
 
       {/* نموذج الإدخال */}
       {!result && (
@@ -14090,6 +14084,9 @@ function OfficialFormsPage({ teachers, attendance, week }) {
     try { return JSON.parse(localStorage.getItem("official_form_teachers_v1") || "[]"); } catch { return []; }
   });
   const [showImportXlsx,   setShowImportXlsx]  = useState(false);
+  const [showAddManual,    setShowAddManual]    = useState(false);
+  const [manualName,       setManualName]       = useState("");
+  const [manualId,         setManualId]         = useState("");
   const [selectedTeacher,  setSelectedTeacher]  = useState("");
   const [formType,         setFormType]         = useState("warning");
   const [formData,         setFormData]         = useState({
@@ -14241,6 +14238,19 @@ function OfficialFormsPage({ teachers, attendance, week }) {
 
 يستوجب إصدار قرار الحسم وفق النظام.`), 300);
     }
+  };
+
+  const addManualTeacher = () => {
+    if (!manualName.trim()) return;
+    if (allTeacherList.find(a => a.name === manualName.trim())) {
+      alert("هذا الاسم موجود بالفعل في القائمة"); return;
+    }
+    const newEntry = { name: manualName.trim(), id: manualId.trim() };
+    const updated  = [...localAccounts, newEntry];
+    setLocalAccounts(updated);
+    try { localStorage.setItem("official_form_teachers_v1", JSON.stringify(updated)); } catch {}
+    handleSelectTeacher(newEntry.name);
+    setManualName(""); setManualId(""); setShowAddManual(false);
   };
 
   // اختيار معلم — يملأ بياناته تلقائياً
@@ -14554,17 +14564,58 @@ function OfficialFormsPage({ teachers, attendance, week }) {
 
         {/* اختيار المعلم */}
         <div>
-          <div className="flex items-center justify-between mb-1">
+          <div className="flex items-center justify-between mb-1 flex-wrap gap-2">
             <label className="text-xs font-bold text-gray-500">اسم المعلم *</label>
-            <button onClick={() => setShowImportXlsx(true)}
-              className="flex items-center gap-1 text-xs font-bold px-3 py-1 rounded-lg border-2 transition-all"
-              style={{ borderColor: FORM_GREEN, color: FORM_GREEN, background: FORM_LIGHT }}>
-              📥 استيراد من Excel
-              {localAccounts.length > 0 && (
-                <span className="bg-green-600 text-white rounded-full px-1.5 text-xs">{localAccounts.length}</span>
-              )}
-            </button>
+            <div className="flex gap-2">
+              <button onClick={() => setShowAddManual(p=>!p)}
+                className="flex items-center gap-1 text-xs font-bold px-3 py-1 rounded-lg border-2 transition-all"
+                style={{ borderColor:"#2563eb", color:"#2563eb", background:"#eff6ff" }}>
+                ➕ إضافة يدوي
+              </button>
+              <button onClick={() => setShowImportXlsx(true)}
+                className="flex items-center gap-1 text-xs font-bold px-3 py-1 rounded-lg border-2 transition-all"
+                style={{ borderColor: FORM_GREEN, color: FORM_GREEN, background: FORM_LIGHT }}>
+                📥 استيراد من Excel
+                {localAccounts.length > 0 && (
+                  <span className="bg-green-600 text-white rounded-full px-1.5 text-xs">{localAccounts.length}</span>
+                )}
+              </button>
+            </div>
           </div>
+
+          {/* نموذج الإضافة اليدوية */}
+          {showAddManual && (
+            <div style={{ background:"#eff6ff", border:"1.5px solid #bfdbfe", borderRadius:12,
+              padding:"12px 14px", marginBottom:10, display:"flex", flexWrap:"wrap", gap:8, alignItems:"flex-end" }}>
+              <div style={{ flex:"1 1 160px" }}>
+                <label style={{ fontSize:10, fontWeight:700, color:"#64748b", display:"block", marginBottom:3 }}>اسم المعلم *</label>
+                <input value={manualName} onChange={e=>setManualName(e.target.value)}
+                  placeholder="الاسم الرباعي"
+                  className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 focus:border-blue-400 text-xs focus:outline-none"
+                  style={{fontFamily:"inherit"}} />
+              </div>
+              <div style={{ flex:"1 1 120px" }}>
+                <label style={{ fontSize:10, fontWeight:700, color:"#64748b", display:"block", marginBottom:3 }}>رقم الهوية</label>
+                <input value={manualId} onChange={e=>setManualId(e.target.value)}
+                  placeholder="1xxxxxxxxx"
+                  className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 focus:border-blue-400 text-xs focus:outline-none"
+                  style={{fontFamily:"inherit"}} />
+              </div>
+              <div style={{ display:"flex", gap:6 }}>
+                <button onClick={addManualTeacher}
+                  style={{ padding:"7px 16px", borderRadius:10, border:"none", background:"#2563eb",
+                           color:"#fff", fontWeight:800, fontSize:12, cursor:"pointer", fontFamily:"'Cairo',sans-serif" }}>
+                  ✅ إضافة
+                </button>
+                <button onClick={()=>{ setShowAddManual(false); setManualName(""); setManualId(""); }}
+                  style={{ padding:"7px 12px", borderRadius:10, border:"1.5px solid #e2e8f0",
+                           background:"#f8fafc", color:"#64748b", fontWeight:700, fontSize:11, cursor:"pointer" }}>
+                  إلغاء
+                </button>
+              </div>
+            </div>
+          )}
+
           <select value={selectedTeacher} onChange={e=>handleSelectTeacher(e.target.value)}
             className="w-full px-3 py-2.5 rounded-xl border-2 text-sm font-bold focus:outline-none"
             style={{fontFamily:"inherit", borderColor:selectedTeacher?FORM_GREEN:"#e5e7eb"}}>
@@ -14577,7 +14628,7 @@ function OfficialFormsPage({ teachers, attendance, week }) {
           </select>
           {allTeacherList.length === 0 && (
             <div className="text-xs text-amber-600 font-bold mt-1.5 flex items-center gap-1">
-              ⚠️ لا يوجد معلمون — اضغط "استيراد من Excel" لإضافة الأسماء والهويات
+              ⚠️ لا يوجد معلمون — اضغط "إضافة يدوي" أو "استيراد من Excel"
             </div>
           )}
         </div>
