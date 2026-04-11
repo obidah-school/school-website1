@@ -1165,14 +1165,31 @@ function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, sa
   const [dpPreview, setDpPreview] = useState(null);
   const GREG_M_ATT = ["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"];
 
-  // ── مساءلة ──
+  // ── مساءلة ── (Firebase + localStorage cache)
   const [showMosala, setShowMosala] = useState(false);
-  const [mosalaData, setMosalaData] = useState(null); // {ti, name, status, r, dayIdx}
-  const [mosalaList, setMosalaList] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("mosala_records_v1") || "[]"); } catch { return []; }
-  });
+  const [mosalaData, setMosalaData] = useState(null);
+  const [mosalaList, setMosalaList] = useState([]);
+
+  useEffect(() => {
+    // تحميل من Firebase أولاً، مع localStorage كاش احتياطي
+    DB.get("school-mosala", null).then(data => {
+      if (Array.isArray(data)) {
+        setMosalaList(data);
+        try { localStorage.setItem("mosala_records_v1", JSON.stringify(data)); } catch {}
+      } else {
+        // fallback للـ localStorage
+        try {
+          const cached = JSON.parse(localStorage.getItem("mosala_records_v1") || "[]");
+          setMosalaList(cached);
+          if (cached.length > 0) DB.set("school-mosala", cached); // ترحيل البيانات القديمة
+        } catch { setMosalaList([]); }
+      }
+    });
+  }, []);
+
   const saveMosalaList = (list) => {
     setMosalaList(list);
+    DB.set("school-mosala", list);
     try { localStorage.setItem("mosala_records_v1", JSON.stringify(list)); } catch {}
   };
 
@@ -1293,27 +1310,52 @@ function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, sa
     window.XLSX.writeFile(wb, `مساءلات_${new Date().toLocaleDateString("ar-SA-u-nu-latn")}.xlsx`);
   };
 
-  // ── الطابور الصباحي ──
-  const [assembly, setAssembly] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("morning_assembly_v1") || "{}"); } catch { return {}; }
-  });
+  // ── الطابور الصباحي (Firebase + localStorage cache) ──
+  const [assembly, setAssembly] = useState({});
+  useEffect(() => {
+    DB.get("school-assembly", null).then(data => {
+      if (data && typeof data === "object" && !Array.isArray(data)) {
+        setAssembly(data);
+        try { localStorage.setItem("morning_assembly_v1", JSON.stringify(data)); } catch {}
+      } else {
+        try {
+          const cached = JSON.parse(localStorage.getItem("morning_assembly_v1") || "{}");
+          setAssembly(cached);
+          if (Object.keys(cached).length > 0) DB.set("school-assembly", cached);
+        } catch {}
+      }
+    });
+  }, []);
   const saveAssembly = (data) => {
     setAssembly(data);
+    DB.set("school-assembly", data);
     try { localStorage.setItem("morning_assembly_v1", JSON.stringify(data)); } catch {}
   };
-  // key: weekDay index → مثل "0" للأحد
-  const getAssembly = (di) => assembly[`${week.days[di]?.dateH}_${di}`] ?? null; // null = لم يُسجَّل
+  const getAssembly = (di) => assembly[`${week.days[di]?.dateH}_${di}`] ?? null;
   const setAssemblyDay = (di, val) => {
     const key = `${week.days[di]?.dateH}_${di}`;
     saveAssembly({ ...assembly, [key]: val });
   };
 
-  // ── الطابور الصباحي لكل معلم ──
-  const [teacherAssembly, setTeacherAssembly] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("teacher_assembly_v1") || "{}"); } catch { return {}; }
-  });
+  // ── الطابور الصباحي لكل معلم (Firebase + localStorage cache) ──
+  const [teacherAssembly, setTeacherAssembly] = useState({});
+  useEffect(() => {
+    DB.get("school-teacher-assembly", null).then(data => {
+      if (data && typeof data === "object" && !Array.isArray(data)) {
+        setTeacherAssembly(data);
+        try { localStorage.setItem("teacher_assembly_v1", JSON.stringify(data)); } catch {}
+      } else {
+        try {
+          const cached = JSON.parse(localStorage.getItem("teacher_assembly_v1") || "{}");
+          setTeacherAssembly(cached);
+          if (Object.keys(cached).length > 0) DB.set("school-teacher-assembly", cached);
+        } catch {}
+      }
+    });
+  }, []);
   const saveTeacherAssembly = (data) => {
     setTeacherAssembly(data);
+    DB.set("school-teacher-assembly", data);
     try { localStorage.setItem("teacher_assembly_v1", JSON.stringify(data)); } catch {}
   };
   const getTeacherAssembly = (ti, di) => {
@@ -2401,11 +2443,31 @@ function AdminAttendancePage() {
   const [att,      setAtt]      = useState(() => loadLS(LS_ATT,     {}));
   const [week,     setWeek]     = useState(() => loadLS(LS_WEEK,    defaultWeek()));
   const [archive,  setArchive]  = useState(() => loadLS(LS_ARCHIVE, []));
+  const [loaded,   setLoaded]   = useState(false);
 
-  useEffect(() => saveLS(LS_ADMINS,  admins),  [admins]);
-  useEffect(() => saveLS(LS_ATT,     att),     [att]);
-  useEffect(() => saveLS(LS_WEEK,    week),    [week]);
-  useEffect(() => saveLS(LS_ARCHIVE, archive), [archive]);
+  // تحميل من Firebase عند الفتح ودمج مع localStorage
+  useEffect(() => {
+    Promise.all([
+      DB.get("school-admin-staff",   null),
+      DB.get("school-admin-att",     null),
+      DB.get("school-admin-week",    null),
+      DB.get("school-admin-archive", null),
+    ]).then(([fbStaff, fbAtt, fbWeek, fbArchive]) => {
+      if (Array.isArray(fbStaff) && fbStaff.length > 0)        { setAdmins(fbStaff);    saveLS(LS_ADMINS,  fbStaff);    }
+      else if (loadLS(LS_ADMINS,[]).length > 0)                 { DB.set("school-admin-staff",   loadLS(LS_ADMINS,[]));    }
+      if (fbAtt && typeof fbAtt==="object" && Object.keys(fbAtt).length) { setAtt(fbAtt); saveLS(LS_ATT, fbAtt); }
+      else if (Object.keys(loadLS(LS_ATT,{})).length)           { DB.set("school-admin-att",     loadLS(LS_ATT,{}));       }
+      if (fbWeek && fbWeek.days)                                { setWeek(fbWeek);        saveLS(LS_WEEK,    fbWeek);      }
+      if (Array.isArray(fbArchive))                             { setArchive(fbArchive);  saveLS(LS_ARCHIVE, fbArchive);   }
+      setLoaded(true);
+    });
+  }, []);
+
+  // حفظ في Firebase + localStorage عند كل تغيير
+  useEffect(() => { if (!loaded) return; DB.set("school-admin-staff",   admins);  saveLS(LS_ADMINS,  admins);  }, [admins,  loaded]);
+  useEffect(() => { if (!loaded) return; DB.set("school-admin-att",     att);     saveLS(LS_ATT,     att);     }, [att,     loaded]);
+  useEffect(() => { if (!loaded) return; DB.set("school-admin-week",    week);    saveLS(LS_WEEK,    week);    }, [week,    loaded]);
+  useEffect(() => { if (!loaded) return; DB.set("school-admin-archive", archive); saveLS(LS_ARCHIVE, archive); }, [archive, loaded]);
 
   /* ─── UI state ─── */
   const [selDay,       setSelDay]       = useState(0);
@@ -5033,7 +5095,10 @@ function TeacherAttendanceView({ currentTeacher, teachers, attendance, week, abs
 function TeacherSelfEval({ teacherInfo, onDone }) {
   const LS_KEY = "teacher_eval_records_v2";
   const loadLS = () => { try { const v = localStorage.getItem(LS_KEY); return v ? JSON.parse(v) : []; } catch { return []; } };
-  const saveLS = (d) => { try { localStorage.setItem(LS_KEY, JSON.stringify(d)); } catch {} };
+  const saveLS = (d) => {
+    try { localStorage.setItem(LS_KEY, JSON.stringify(d)); } catch {}
+    DB.set("school-teacher-eval", d); // Firebase backup
+  };
 
   const OPT4    = ["دائماً","غالباً","أحياناً","لا"];
   const OPT_YN  = ["نعم","لا"];
@@ -9334,7 +9399,7 @@ function ProgramReportPage() {
   useEffect(() => {
     try {
       const toSave = { ...report, witnesses: report.witnesses.map(w => w ? w.dataUrl || null : null) };
-      localStorage.setItem("prog_report", JSON.stringify(toSave));
+      localStorage.setItem("prog_report", JSON.stringify(toSave)); DB.set("school-prog-report", toSave);
     } catch {}
     setSaved(true);
     const t = setTimeout(() => setSaved(false), 1500);
@@ -9920,7 +9985,7 @@ function TeacherProfilePage({ teachers, attendance, week, weekArchive, classList
   const [selectedTeacher, setSelectedTeacher] = useState(teachers[0] || "");
   const [tab, setTab] = useState("profile"); // profile | leaves | performance
   const [leaves, setLeaves] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("teacher-leaves")||"{}"); } catch(e){ return {}; }
+    (() => { try { return JSON.parse(localStorage.getItem("teacher-leaves")||"{}"); } catch { return {}; } })()
   });
   const [showLeaveForm, setShowLeaveForm] = useState(false);
   const [leaveForm, setLeaveForm] = useState({ type:"اضطراري", dateH:"", dateM:"", reason:"", days:1, status:"بانتظار الموافقة" });
@@ -12875,9 +12940,25 @@ function LessonPrepPage() {
 function TeacherEvalPage({ teachers = [] }) {
   const LS_KEY  = "teacher_eval_records_v2";
   const loadLS  = () => { try { const v = localStorage.getItem(LS_KEY); return v ? JSON.parse(v) : []; } catch { return []; } };
-  const saveLS  = (d) => { try { localStorage.setItem(LS_KEY, JSON.stringify(d)); } catch {} };
+  const saveLS  = (d) => {
+    try { localStorage.setItem(LS_KEY, JSON.stringify(d)); } catch {}
+    DB.set("school-teacher-eval", d);
+  };
 
-  const [records,  setRecords]  = useState(loadLS);
+  const [records,  setRecords]  = useState([]);
+
+  useEffect(() => {
+    DB.get("school-teacher-eval", null).then(fb => {
+      if (Array.isArray(fb) && fb.length > 0) {
+        setRecords(fb);
+        try { localStorage.setItem(LS_KEY, JSON.stringify(fb)); } catch {}
+      } else {
+        const cached = loadLS();
+        setRecords(cached);
+        if (cached.length > 0) DB.set("school-teacher-eval", cached);
+      }
+    });
+  }, []);
   const [view,     setView]     = useState("admin");    // admin | teacherLogin | teacherForm | teacherDone
   const [step,     setStep]     = useState(0);
   const [formData, setFormData] = useState({});
@@ -14119,9 +14200,21 @@ const FORM_LIGHT = "#d8f3dc";
 
 function OfficialFormsPage({ teachers, attendance, week }) {
   const [accounts,         setAccounts]        = useState([]);
-  const [localAccounts,    setLocalAccounts]   = useState(() => {
-    try { return JSON.parse(localStorage.getItem("official_form_teachers_v1") || "[]"); } catch { return []; }
-  });
+  const [localAccounts,    setLocalAccounts]   = useState([]);
+  useEffect(() => {
+    DB.get("school-official-teachers", null).then(fb => {
+      if (Array.isArray(fb) && fb.length > 0) {
+        setLocalAccounts(fb);
+        try { localStorage.setItem("official_form_teachers_v1", JSON.stringify(fb)); } catch {}
+      } else {
+        try {
+          const cached = JSON.parse(localStorage.getItem("official_form_teachers_v1") || "[]");
+          setLocalAccounts(cached);
+          if (cached.length > 0) DB.set("school-official-teachers", cached);
+        } catch {}
+      }
+    });
+  }, []);
   const [showImportXlsx,   setShowImportXlsx]  = useState(false);
   const [showAddManual,    setShowAddManual]    = useState(false);
   const [manualName,       setManualName]       = useState("");
@@ -14223,6 +14316,7 @@ function OfficialFormsPage({ teachers, attendance, week }) {
     });
     setLocalAccounts(merged);
     try { localStorage.setItem("official_form_teachers_v1", JSON.stringify(merged)); } catch {}
+    DB.set("school-official-teachers", merged);
     setShowImportXlsx(false);
     alert(`✅ تم الاستيراد بنجاح\n${added} معلم جديد أُضيف\n${imported.length - added} تم تحديثه`);
   };
@@ -14288,6 +14382,7 @@ function OfficialFormsPage({ teachers, attendance, week }) {
     const updated  = [...localAccounts, newEntry];
     setLocalAccounts(updated);
     try { localStorage.setItem("official_form_teachers_v1", JSON.stringify(updated)); } catch {}
+                    DB.set("school-official-teachers", updated);
     handleSelectTeacher(newEntry.name);
     setManualName(""); setManualId(""); setShowAddManual(false);
   };
@@ -14962,6 +15057,7 @@ function OfficialFormsPage({ teachers, attendance, week }) {
                             const updated = localAccounts.filter((_,j) => j !== i);
                             setLocalAccounts(updated);
                             try { localStorage.setItem("official_form_teachers_v1", JSON.stringify(updated)); } catch {}
+                    DB.set("school-official-teachers", updated);
                           }}
                             style={{ background:"#fee2e2", border:"none", borderRadius:6, color:"#dc2626",
                                      fontSize:10, fontWeight:800, padding:"1px 6px", cursor:"pointer" }}>حذف</button>
