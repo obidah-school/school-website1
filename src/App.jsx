@@ -49,7 +49,7 @@ const DEFAULT_WEEK = {
   ]
 };
 
-const ATTENDANCE_STATUS = ["حاضر", "متأخر", "غائب"];
+const ATTENDANCE_STATUS = ["حاضر", "متأخر", "غائب", "مستأذن"];
 const PERIODS = ["الأولى","الثانية","الثالثة","الرابعة","الخامسة","السادسة","السابعة"];
 const ABSENCE_TYPES = ["حاضر", "اضطراري", "مرضي", "اعتيادي"];
 const FARES_OPTIONS = ["—", "نعم ✓", "لا ✗"];
@@ -1368,13 +1368,14 @@ function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, sa
   const updateField = (ti, di, field, value) => {
     setAttendance(prev => {
       const next = { ...prev, [ti]: { ...prev[ti], [di]: { ...(prev[ti]?.[di] || {}), [field]: value } } };
-      // إذا تغير الحالة لـ"حاضر" امسح البيانات الأخرى
       if (field === "status" && value === "حاضر") {
         next[ti][di] = { status: "حاضر" };
       }
-      // إذا تغير لـ"غائب" امسح بيانات التأخر
       if (field === "status" && value === "غائب") {
         next[ti][di] = { status: "غائب", absType: next[ti][di]?.absType || "اضطراري", notes: next[ti][di]?.notes || "" };
+      }
+      if (field === "status" && value === "مستأذن") {
+        next[ti][di] = { status: "مستأذن", excuseFrom: "", excuseTo: "", excuseReason: "", notes: next[ti][di]?.notes || "" };
       }
       return next;
     });
@@ -1386,7 +1387,8 @@ function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, sa
   const countStatus = (di, st) => teachers.filter((_, ti) => (attendance[ti]?.[di]?.status || "حاضر") === st).length;
   const countLate = (di) => countStatus(di, "متأخر");
   const countAbsent = (di) => countStatus(di, "غائب");
-  const countPresent = (di) => teachers.length - countLate(di) - countAbsent(di);
+  const countExcused = (di) => countStatus(di, "مستأذن");
+  const countPresent = (di) => teachers.length - countLate(di) - countAbsent(di) - countExcused(di);
   // تأخر صباحي = متأخر بدون حصص محددة أو lateType = "صباحي"
   const countMorningLate = (di) => teachers.filter((_, ti) => {
     const r = attendance[ti]?.[di] || {};
@@ -1447,9 +1449,11 @@ function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, sa
         details = `تأخر ${r.lateMinutes || "—"} دقيقة — من الحصة: ${periods || "—"}`;
       } else if (st === "غائب") {
         details = `${r.absType || "اضطراري"} — ${r.notes || ""}`;
+      } else if (st === "مستأذن") {
+        details = `من ${r.excuseFrom||"—"} إلى ${r.excuseTo||"—"}${r.excuseReason?" — "+r.excuseReason:""}`;
       }
-      const color = st === "حاضر" ? "#f0fdf4" : st === "متأخر" ? "#fffbeb" : "#fef2f2";
-      return `<tr style="background:${color}"><td>${ti+1}</td><td style="text-align:right;padding:6px 10px">${t}</td><td>${st === "حاضر" ? "✅ حاضر" : st === "متأخر" ? "🕐 متأخر" : "❌ غائب"}</td><td>${details}</td></tr>`;
+      const color = st === "حاضر" ? "#f0fdf4" : st === "متأخر" ? "#fffbeb" : st === "مستأذن" ? "#eff6ff" : "#fef2f2";
+      return `<tr style="background:${color}"><td>${ti+1}</td><td style="text-align:right;padding:6px 10px">${t}</td><td>${st === "حاضر" ? "✅ حاضر" : st === "متأخر" ? "🕐 متأخر" : st === "مستأذن" ? "📋 مستأذن" : "❌ غائب"}</td><td>${details}</td></tr>`;
     }).join("");
 
     printWindow(`<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8">
@@ -1561,6 +1565,14 @@ function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, sa
               className="bg-white text-blue-700 px-4 py-2 rounded-xl text-sm font-bold hover:bg-blue-50 flex items-center gap-1 shadow">
               ➕ إضافة معلم
             </button>
+            <button onClick={() => {
+              if (!window.confirm("⚠️ سيتم مسح جميع بيانات الحضور للأسبوع الحالي. هل أنت متأكد؟")) return;
+              setAttendance({}); saveAttendance({});
+              alert("✅ تم مسح بيانات الحضور");
+            }}
+              className="bg-red-700 bg-opacity-70 hover:bg-opacity-90 text-white rounded-xl px-3 py-2 text-sm font-bold border border-red-400 border-opacity-50 shadow">
+              🗑️ مسح الحضور
+            </button>
             <div className="bg-white bg-opacity-20 px-3 py-2 rounded-xl text-xs font-bold">💾 حفظ تلقائي</div>
           </div>
         </div>
@@ -1595,7 +1607,7 @@ function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, sa
       {/* إحصائيات اليوم */}
       {!showSummary && (
         <>
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-3">
+        <div className="grid grid-cols-2 sm:grid-cols-6 gap-3 mb-3">
           <div className="bg-emerald-50 border-2 border-emerald-200 rounded-2xl p-3 text-center">
             <div className="text-3xl font-black text-emerald-700">{countPresent(selectedDay)}</div>
             <div className="text-xs font-bold text-emerald-600 mt-1">✅ حاضر</div>
@@ -1613,6 +1625,10 @@ function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, sa
           <div className="bg-amber-50 border-2 border-amber-100 rounded-2xl p-3 text-center">
             <div className="text-3xl font-black text-amber-600">{countLate(selectedDay)}</div>
             <div className="text-xs font-bold text-amber-500 mt-1">🕐 إجمالي التأخر</div>
+          </div>
+          <div className="bg-blue-50 border-2 border-blue-200 rounded-2xl p-3 text-center">
+            <div className="text-3xl font-black text-blue-700">{countExcused(selectedDay)}</div>
+            <div className="text-xs font-bold text-blue-600 mt-1">📋 مستأذن</div>
           </div>
           <div className="bg-red-50 border-2 border-red-200 rounded-2xl p-3 text-center">
             <div className="text-3xl font-black text-red-700">{countAbsent(selectedDay)}</div>
@@ -1914,18 +1930,24 @@ function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, sa
 
                       {/* الحالة */}
                       <td className="p-1.5 text-center">
-                        <div className="flex gap-1 justify-center">
-                          {ATTENDANCE_STATUS.map(st => (
-                            <button key={st} onClick={() => updateField(ti, selectedDay, "status", st)}
-                              className="px-2 py-1.5 rounded-lg text-xs font-bold transition-all border-2"
-                              style={{
-                                background: status === st ? (st === "حاضر" ? "#dcfce7" : st === "متأخر" ? "#fef3c7" : "#fee2e2") : "#f9fafb",
-                                borderColor: status === st ? (st === "حاضر" ? "#16a34a" : st === "متأخر" ? "#d97706" : "#dc2626") : "#e5e7eb",
-                                color: status === st ? (st === "حاضر" ? "#15803d" : st === "متأخر" ? "#92400e" : "#991b1b") : "#9ca3af",
-                              }}>
-                              {st === "حاضر" ? "✅" : st === "متأخر" ? "🕐" : "❌"} {st}
-                            </button>
-                          ))}
+                        <div className="flex gap-1 justify-center flex-wrap">
+                          {ATTENDANCE_STATUS.map(st => {
+                            const stBg  = st==="حاضر"?"#dcfce7":st==="متأخر"?"#fef3c7":st==="مستأذن"?"#dbeafe":"#fee2e2";
+                            const stBrd = st==="حاضر"?"#16a34a":st==="متأخر"?"#d97706":st==="مستأذن"?"#2563eb":"#dc2626";
+                            const stClr = st==="حاضر"?"#15803d":st==="متأخر"?"#92400e":st==="مستأذن"?"#1d4ed8":"#991b1b";
+                            const stIco = st==="حاضر"?"✅":st==="متأخر"?"🕐":st==="مستأذن"?"📋":"❌";
+                            return (
+                              <button key={st} onClick={() => updateField(ti, selectedDay, "status", st)}
+                                className="px-2 py-1.5 rounded-lg text-xs font-bold transition-all border-2"
+                                style={{
+                                  background:   status === st ? stBg  : "#f9fafb",
+                                  borderColor:  status === st ? stBrd : "#e5e7eb",
+                                  color:        status === st ? stClr : "#9ca3af",
+                                }}>
+                                {stIco} {st}
+                              </button>
+                            );
+                          })}
                         </div>
                       </td>
 
@@ -1985,7 +2007,34 @@ function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, sa
 
                       {/* نوع الغياب */}
                       <td className="p-1.5 text-center">
-                        {isAbsent ? (
+                        {status === "مستأذن" ? (
+                          <div className="space-y-1">
+                            <div className="flex gap-1 items-center justify-center">
+                              <span className="text-xs text-blue-600 font-bold">من</span>
+                              <input type="time" value={r.excuseFrom || ""}
+                                onChange={e => updateField(ti, selectedDay, "excuseFrom", e.target.value)}
+                                className="w-24 px-1.5 py-1 rounded-lg border-2 border-blue-200 text-xs font-bold focus:outline-none bg-blue-50 text-blue-700"
+                                style={{ fontFamily:"inherit" }} />
+                            </div>
+                            <div className="flex gap-1 items-center justify-center">
+                              <span className="text-xs text-blue-600 font-bold">إلى</span>
+                              <input type="time" value={r.excuseTo || ""}
+                                onChange={e => updateField(ti, selectedDay, "excuseTo", e.target.value)}
+                                className="w-24 px-1.5 py-1 rounded-lg border-2 border-blue-200 text-xs font-bold focus:outline-none bg-blue-50 text-blue-700"
+                                style={{ fontFamily:"inherit" }} />
+                            </div>
+                            <select value={r.excuseReason || ""}
+                              onChange={e => updateField(ti, selectedDay, "excuseReason", e.target.value)}
+                              className="w-full px-1.5 py-1 rounded-lg border-2 border-blue-200 text-xs font-bold focus:outline-none bg-blue-50 text-blue-700">
+                              <option value="">— السبب —</option>
+                              <option>موعد مستشفى</option>
+                              <option>مرض</option>
+                              <option>حالة طارئة</option>
+                              <option>إجراءات رسمية</option>
+                              <option>أخرى</option>
+                            </select>
+                          </div>
+                        ) : status === "غائب" ? (
                           <select value={r.absType || "اضطراري"}
                             onChange={e => updateField(ti, selectedDay, "absType", e.target.value)}
                             className="px-2 py-1.5 rounded-lg border-2 border-red-200 text-xs font-bold focus:outline-none bg-red-50 text-red-700">
@@ -2377,9 +2426,10 @@ function AdminAttendancePage() {
         [di]: {
           ...(prev[ai]?.[di] || {}),
           [field]: val,
-          ...(field === "status" && val === "حاضر"   ? { lateMin:"", excuseReason:"", excuseOther:"", exitTime:"", notes:"" } : {}),
-          ...(field === "status" && val === "غائب"   ? { lateMin:"", exitTime:"" } : {}),
-          ...(field === "status" && val === "انسحاب" ? { lateMin:"", excuseReason:"" } : {}),
+          ...(field === "status" && val === "حاضر"   ? { lateMin:"", excuseReason:"", excuseOther:"", excuseFrom:"", excuseTo:"", exitTime:"", notes:"" } : {}),
+          ...(field === "status" && val === "غائب"   ? { lateMin:"", excuseFrom:"", excuseTo:"", exitTime:"" } : {}),
+          ...(field === "status" && val === "انسحاب" ? { lateMin:"", excuseReason:"", excuseFrom:"", excuseTo:"" } : {}),
+          ...(field === "status" && val === "مستأذن" ? { lateMin:"", exitTime:"" } : {}),
         }
       }
     }));
@@ -2454,7 +2504,7 @@ function AdminAttendancePage() {
       const stOpt = STATUS_OPTS.find(o => o.val === st) || STATUS_OPTS[0];
       let detail = "—";
       if (st === "متأخر")   detail = `تأخر صباحي — ${r.lateMin||"—"} دقيقة`;
-      if (st === "مستأذن")  detail = `${r.excuseReason||"—"}${r.excuseReason==="أخرى"?` (${r.excuseOther||""})`:""} ${r.exitTime ? "| خروج "+r.exitTime:""}`;
+      if (st === "مستأذن")  detail = `من ${r.excuseFrom||"—"} إلى ${r.excuseTo||"—"}${r.excuseReason?" | "+r.excuseReason:""}${r.excuseReason==="أخرى"&&r.excuseOther?" ("+r.excuseOther+")":""}`;
       if (st === "غائب")    detail = r.notes || "—";
       if (st === "انسحاب")  detail = `انسحاب الساعة ${r.exitTime||"—"}`;
       return `<tr style="background:${stOpt.bg}"><td>${ai+1}</td><td style="text-align:right;padding:6px 10px">${a.name}${a.id?` <small style="color:#888">(${a.id})</small>`:""}</td><td>${stOpt.icon} ${stOpt.label}</td><td>${detail}</td><td>${r.notes||"—"}</td></tr>`;
@@ -2499,7 +2549,9 @@ function AdminAttendancePage() {
       const daysCells = wk.days.map((_,di)=>{
         const st=getWSt(ai,di); const r=getWR(ai,di);
         const ic = st==="حاضر"?"✅":st==="متأخر"?"🌅":st==="مستأذن"?"📋":st==="انسحاب"?"🚶":"❌";
-        return `<td>${ic}${st==="متأخر"&&r.lateMin?`<br><small>${r.lateMin}د</small>`:""}</td>`;
+        const subTxt = st==="متأخر"&&r.lateMin?`<br><small>${r.lateMin}د</small>`
+          : st==="مستأذن"&&(r.excuseFrom||r.excuseTo)?`<br><small>${r.excuseFrom||""}${r.excuseTo?"→"+r.excuseTo:""}</small>`:"";
+        return `<td>${ic}${subTxt}</td>`;
       }).join("");
       return `<tr style="background:${color}"><td>${ai+1}</td><td style="text-align:right;padding:5px 8px">${a.name}${a.id?` <small>(${a.id})</small>`:""}</td>
         ${daysCells}
@@ -2823,10 +2875,26 @@ function AdminAttendancePage() {
                           )}
                           {st === "مستأذن" && (
                             <div className="space-y-1">
+                              {/* وقت الاستئذان */}
+                              <div className="flex items-center gap-1 justify-center">
+                                <span className="text-xs text-blue-600 font-bold flex-shrink-0">من</span>
+                                <input type="time"
+                                  value={r.excuseFrom || ""}
+                                  onChange={e => upd(ai, selDay, "excuseFrom", e.target.value)}
+                                  className="flex-1 px-1.5 py-1 rounded-lg border-2 border-blue-200 text-xs font-bold focus:outline-none focus:border-blue-400 bg-blue-50 text-blue-700" />
+                              </div>
+                              <div className="flex items-center gap-1 justify-center">
+                                <span className="text-xs text-blue-600 font-bold flex-shrink-0">إلى</span>
+                                <input type="time"
+                                  value={r.excuseTo || ""}
+                                  onChange={e => upd(ai, selDay, "excuseTo", e.target.value)}
+                                  className="flex-1 px-1.5 py-1 rounded-lg border-2 border-blue-200 text-xs font-bold focus:outline-none focus:border-blue-400 bg-blue-50 text-blue-700" />
+                              </div>
+                              {/* سبب الاستئذان */}
                               <select value={r.excuseReason || ""}
                                 onChange={e => upd(ai, selDay, "excuseReason", e.target.value)}
                                 className="px-2 py-1 rounded-lg border-2 border-blue-200 text-xs font-bold focus:outline-none bg-blue-50 text-blue-700 w-full">
-                                <option value="">— سبب الاستئذان —</option>
+                                <option value="">— السبب —</option>
                                 {EXCUSE_REASONS.map(r => <option key={r}>{r}</option>)}
                               </select>
                               {r.excuseReason === "أخرى" && (
@@ -6465,6 +6533,20 @@ function StudentsPage({ classList, setClassList, saveClass, deleteClass, teacher
           <span>📚 {classList.length} فصل</span>
           <span>👨‍🎓 {totalStudents} طالب</span>
         </div>
+        {!teacherMode && classList.length > 0 && (
+          <div className="flex justify-center mt-3">
+            <button onClick={() => {
+              if (!window.confirm("⚠️ سيتم مسح جميع الفصول والطلاب والمستويات بشكل نهائي. هل أنت متأكد؟")) return;
+              setClassList([]);
+              if (saveClass) saveClass(null);
+              if (deleteClass) classList.forEach(c => deleteClass(c.id));
+              alert("✅ تم مسح جميع بيانات الطلاب");
+            }}
+              className="bg-red-700 bg-opacity-60 hover:bg-opacity-80 text-white rounded-xl px-4 py-2 text-sm font-bold border border-red-400 border-opacity-50">
+              🗑️ مسح جميع البيانات
+            </button>
+          </div>
+        )}
       </div>
 
       {/* زر تحميل الفصل الجاهز */}
@@ -8860,6 +8942,16 @@ function StudentAbsencePage() {
             <button onClick={() => setShowAdd(v => !v)}
               className="bg-white text-rose-800 hover:bg-rose-50 rounded-xl px-4 py-2 text-sm font-bold shadow-sm">
               ➕ إضافة طالب
+            </button>
+            <button onClick={() => {
+              if (!window.confirm("⚠️ سيتم مسح جميع بيانات الطلاب وسجلات الغياب بشكل نهائي. هل أنت متأكد؟")) return;
+              DB.set(FB_KEY + "-students", []);
+              DB.set(FB_KEY + "-" + date, {});
+              setStudents([]); setAttendance({});
+              alert("✅ تم مسح جميع البيانات");
+            }}
+              className="bg-red-700 bg-opacity-70 hover:bg-opacity-90 text-white rounded-xl px-3 py-2 text-sm font-bold border border-red-400 border-opacity-50">
+              🗑️ مسح البيانات
             </button>
           </div>
         </div>
