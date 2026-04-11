@@ -5313,168 +5313,174 @@ function TeacherSelfEval({ teacherInfo, onDone }) {
 }
 
 // ═══════════════════════════════════════════
-// 🎨 مكوّن بوربوينت AI — بوابة المعلم
+// 📚 بطاقة المورد التعليمي
 // ═══════════════════════════════════════════
+const EDU_RESOURCES = {
+  ai: {
+    label:"🤖 الذكاء الاصطناعي", color:"#7c3aed", bg:"#faf5ff", brd:"#ddd6fe",
+    items:[
+      { id:"chatgpt",    name:"ChatGPT",           desc:"مساعد AI متعدد الاستخدامات — توليد دروس وأسئلة وشرح",         url:"https://chatgpt.com",               icon:"🤖", tag:"مجاني" },
+      { id:"claude",     name:"Claude",             desc:"ذكاء اصطناعي متقدم — ممتاز للمحتوى التعليمي العربي",         url:"https://claude.ai",                 icon:"🧠", tag:"مجاني" },
+      { id:"gemini",     name:"Google Gemini",      desc:"ذكاء اصطناعي من جوجل — يدعم العربية بشكل ممتاز",            url:"https://gemini.google.com",         icon:"✨", tag:"مجاني" },
+      { id:"gamma",      name:"Gamma.app",           desc:"توليد عروض بوربوينت احترافية من نص تلقائياً",               url:"https://gamma.app",                 icon:"📊", tag:"مجاني" },
+      { id:"magicschool",name:"MagicSchool AI",     desc:"منصة AI مخصصة للمعلمين — خطط دروس وأسئلة ومزيد",           url:"https://www.magicschool.ai",        icon:"🏫", tag:"مجاني" },
+      { id:"curipod",    name:"Curipod",             desc:"إنشاء دروس تفاعلية بالذكاء الاصطناعي بسهولة",              url:"https://curipod.com",               icon:"💡", tag:"مجاني" },
+      { id:"eduaide",    name:"Eduaide.Ai",          desc:"أدوات AI لإعداد المحتوى التعليمي والتقييمات",               url:"https://www.eduaide.ai",            icon:"📝", tag:"مجاني" },
+      { id:"canvaai",    name:"Canva AI",            desc:"تصميم عروض وملصقات تعليمية بالذكاء الاصطناعي",             url:"https://www.canva.com",             icon:"🎨", tag:"مجاني/مدفوع" },
+    ]
+  },
+  educational: {
+    label:"🌐 منصات تعليمية", color:"#0d9488", bg:"#f0fdfa", brd:"#99f6e4",
+    items:[
+      { id:"moe",        name:"منصة مدرستي",        desc:"المنصة الرسمية لوزارة التعليم السعودية",                    url:"https://www.madrasati.com",         icon:"🏫", tag:"رسمي" },
+      { id:"noor",       name:"نظام نور",            desc:"نظام المعلومات التعليمية الرسمي",                          url:"https://noor.moe.gov.sa",           icon:"💡", tag:"رسمي" },
+      { id:"edraak",     name:"إدراك",               desc:"منصة MOOCs عربية — دورات مجانية معتمدة",                  url:"https://www.edraak.org",            icon:"📚", tag:"مجاني" },
+      { id:"rwaq",       name:"رواق",                desc:"دورات أكاديمية ومهنية باللغة العربية",                    url:"https://www.rwaq.org",              icon:"🎓", tag:"مجاني" },
+      { id:"khan",       name:"Khan Academy",        desc:"دروس مجانية في جميع المواد — يدعم العربية",               url:"https://ar.khanacademy.org",        icon:"🧮", tag:"مجاني" },
+      { id:"classdojo",  name:"ClassDojo",           desc:"تواصل مع الأهالي وإدارة السلوك الصفي",                   url:"https://www.classdojo.com",         icon:"👨‍👩‍👧", tag:"مجاني" },
+      { id:"nearpod",    name:"Nearpod",             desc:"عروض تفاعلية وتقييمات في الوقت الفعلي",                   url:"https://nearpod.com",               icon:"📱", tag:"مجاني" },
+      { id:"flipgrid",   name:"Flip (Flipgrid)",     desc:"مقاطع فيديو قصيرة للطلاب — تعلم نشط",                    url:"https://flip.com",                  icon:"🎬", tag:"مجاني" },
+    ]
+  },
+  design: {
+    label:"🎨 تصميم وعروض", color:"#d97706", bg:"#fffbeb", brd:"#fde68a",
+    items:[
+      { id:"canva2",     name:"Canva",              desc:"أفضل أداة لتصميم العروض والملصقات التعليمية",               url:"https://www.canva.com",             icon:"🎨", tag:"مجاني" },
+      { id:"slides",     name:"Google Slides",      desc:"عروض تقديمية مجانية قابلة للمشاركة",                       url:"https://slides.google.com",         icon:"📊", tag:"مجاني" },
+      { id:"genially",   name:"Genially",           desc:"محتوى تفاعلي — إنفوجرافيك وعروض وألعاب",                  url:"https://genially.com",              icon:"🎯", tag:"مجاني" },
+      { id:"beautiful",  name:"Beautiful.ai",       desc:"عروض بوربوينت ذكية تتصمم نفسها تلقائياً",                 url:"https://www.beautiful.ai",          icon:"✨", tag:"مجاني" },
+      { id:"freepik",    name:"Freepik",            desc:"صور وأيقونات وقوالب مجانية للمعلمين",                     url:"https://www.freepik.com",           icon:"🖼️", tag:"مجاني" },
+      { id:"flaticon",   name:"Flaticon",           desc:"ملايين الأيقونات المجانية لتزيين العروض",                  url:"https://www.flaticon.com",          icon:"🔷", tag:"مجاني" },
+    ]
+  },
+  quiz: {
+    label:"📝 اختبارات وتقييم", color:"#dc2626", bg:"#fef2f2", brd:"#fca5a5",
+    items:[
+      { id:"kahoot",     name:"Kahoot!",            desc:"ألعاب تعليمية وتقييمات تنافسية ممتعة للطلاب",              url:"https://kahoot.com",                icon:"🎮", tag:"مجاني" },
+      { id:"quizizz",    name:"Quizizz",            desc:"اختبارات ذاتية ومسابقات تفاعلية للطلاب",                  url:"https://quizizz.com",               icon:"🧠", tag:"مجاني" },
+      { id:"mentimeter", name:"Mentimeter",         desc:"استطلاعات وتصويت مباشر في الفصل",                        url:"https://www.mentimeter.com",        icon:"📊", tag:"مجاني" },
+      { id:"padlet",     name:"Padlet",             desc:"لوح تفاعلي مشترك للأفكار والمشاريع الجماعية",             url:"https://padlet.com",                icon:"📌", tag:"مجاني" },
+      { id:"socrative",  name:"Socrative",          desc:"اختبارات سريعة وتقييم فوري للفهم",                       url:"https://socrative.com",             icon:"⚡", tag:"مجاني" },
+      { id:"formative",  name:"Formative",          desc:"تقييمات لحظية مع تغذية راجعة فورية",                     url:"https://app.formative.com",         icon:"✅", tag:"مجاني" },
+    ]
+  },
+  video: {
+    label:"🎥 فيديو وصوت", color:"#2563eb", bg:"#eff6ff", brd:"#bfdbfe",
+    items:[
+      { id:"youtube",    name:"YouTube EDU",        desc:"قناة التعليم على يوتيوب — دروس لجميع المراحل",             url:"https://www.youtube.com/education", icon:"▶️", tag:"مجاني" },
+      { id:"loom",       name:"Loom",               desc:"تسجيل شروحات فيديو وإرسالها للطلاب بسهولة",              url:"https://www.loom.com",              icon:"🎬", tag:"مجاني" },
+      { id:"edpuzzle",   name:"EdPuzzle",           desc:"تضمين أسئلة داخل مقاطع الفيديو التعليمية",               url:"https://edpuzzle.com",              icon:"🎯", tag:"مجاني" },
+      { id:"screencastify",name:"Screencastify",    desc:"تسجيل الشاشة بسهولة مباشرة من المتصفح",                  url:"https://www.screencastify.com",     icon:"📹", tag:"مجاني" },
+    ]
+  },
+};
+
+function EduResourceCard({ item, color, bg, brd, isFav, onToggleFav }) {
+  return (
+    <div style={{
+      background:"#fff", borderRadius:14, padding:"14px 16px",
+      border: isFav ? "1.5px solid #fbbf24" : `1.5px solid ${brd||"#e2e8f0"}`,
+      boxShadow:"0 2px 8px rgba(0,0,0,0.05)",
+      display:"flex", flexDirection:"column", gap:8,
+    }}>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
+        <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+          <div style={{ width:38, height:38, borderRadius:10, background:bg||"#f0fdf4",
+            display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, flexShrink:0 }}>
+            {item.icon}
+          </div>
+          <div>
+            <div style={{ fontWeight:900, fontSize:13, color:"#1e293b" }}>{item.name}</div>
+            <span style={{ fontSize:9.5, padding:"1px 7px", borderRadius:20, fontWeight:700,
+              background:bg||"#f0fdf4", color:color||"#0d9488" }}>{item.tag}</span>
+          </div>
+        </div>
+        <button onClick={() => onToggleFav(item.id)}
+          style={{ background:"none", border:"none", cursor:"pointer", fontSize:16, padding:4,
+                   color: isFav ? "#f59e0b" : "#d1d5db" }}>
+          {isFav ? "⭐" : "☆"}
+        </button>
+      </div>
+      <div style={{ fontSize:11.5, color:"#64748b", lineHeight:1.7 }}>{item.desc}</div>
+      <a href={item.url} target="_blank" rel="noopener noreferrer"
+        style={{ display:"block", textAlign:"center", padding:"8px 12px", borderRadius:10,
+                 background:`linear-gradient(135deg,${color||"#0d9488"},${color||"#0d9488"}bb)`,
+                 color:"#fff", fontWeight:700, fontSize:12, textDecoration:"none",
+                 fontFamily:"'Cairo',sans-serif" }}>
+        🔗 فتح الموقع
+      </a>
+    </div>
+  );
+}
+
 function TeacherPPTAI({ teacherInfo }) {
-  // ═══ أدلة ومصادر تعليمية ═══
-  const [activeTab, setActiveTab] = useState("ai");
+  const [tab,       setTab]       = useState("ai");
   const [search,    setSearch]    = useState("");
   const [favorites, setFavorites] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("teacher_fav_resources_v1") || "[]"); } catch { return []; }
+    try { return JSON.parse(localStorage.getItem("teacher_fav_v1") || "[]"); } catch { return []; }
   });
+
   const toggleFav = (id) => {
-    const upd = favorites.includes(id) ? favorites.filter(f=>f!==id) : [...favorites, id];
+    const upd = favorites.includes(id)
+      ? favorites.filter(f => f !== id)
+      : [...favorites, id];
     setFavorites(upd);
-    try { localStorage.setItem("teacher_fav_resources_v1", JSON.stringify(upd)); } catch {}
+    try { localStorage.setItem("teacher_fav_v1", JSON.stringify(upd)); } catch {}
   };
 
-  const RESOURCES = {
-    ai: {
-      label:"🤖 الذكاء الاصطناعي", color:"#7c3aed", bg:"#faf5ff",
-      items:[
-        { id:"chatgpt",   name:"ChatGPT",          desc:"مساعد ذكاء اصطناعي متعدد الاستخدامات — توليد دروس وأسئلة وشرح",     url:"https://chatgpt.com",            icon:"🤖", tag:"مجاني" },
-        { id:"claude",    name:"Claude (Anthropic)",desc:"ذكاء اصطناعي متقدم — ممتاز للمحتوى التعليمي العربي",               url:"https://claude.ai",              icon:"🧠", tag:"مجاني" },
-        { id:"gemini",    name:"Google Gemini",     desc:"ذكاء اصطناعي من جوجل — يدعم اللغة العربية بشكل ممتاز",            url:"https://gemini.google.com",      icon:"✨", tag:"مجاني" },
-        { id:"canvaai",   name:"Canva AI",          desc:"تصميم عروض وملصقات تعليمية بالذكاء الاصطناعي",                    url:"https://www.canva.com",          icon:"🎨", tag:"مجاني/مدفوع" },
-        { id:"gamma",     name:"Gamma.app",         desc:"توليد عروض بوربوينت احترافية تلقائياً من نص",                      url:"https://gamma.app",              icon:"📊", tag:"مجاني" },
-        { id:"curipod",   name:"Curipod",           desc:"إنشاء دروس تفاعلية بالذكاء الاصطناعي",                            url:"https://curipod.com",            icon:"💡", tag:"مجاني" },
-        { id:"magicschool",name:"MagicSchool AI",   desc:"منصة AI مخصصة للمعلمين — خطط دروس وأسئلة ومزيد",                 url:"https://www.magicschool.ai",     icon:"🏫", tag:"مجاني" },
-        { id:"eduaide",   name:"Eduaide.Ai",        desc:"أدوات AI لإعداد المحتوى التعليمي والتقييمات",                      url:"https://www.eduaide.ai",         icon:"📝", tag:"مجاني" },
-      ]
-    },
-    educational: {
-      label:"🌐 منصات تعليمية", color:"#0d9488", bg:"#f0fdfa",
-      items:[
-        { id:"moe",       name:"منصة مدرستي",       desc:"المنصة الرسمية لوزارة التعليم السعودية",                           url:"https://www.madrasati.com",      icon:"🏫", tag:"وزارة التعليم" },
-        { id:"noor",      name:"نور — الأنظمة",     desc:"نظام نور للمعلومات التعليمية",                                     url:"https://noor.moe.gov.sa",        icon:"💡", tag:"رسمي" },
-        { id:"edraak",    name:"إدراك",              desc:"منصة MOOCs عربية — دورات مجانية معتمدة",                          url:"https://www.edraak.org",         icon:"📚", tag:"مجاني" },
-        { id:"rwaq",      name:"رواق",               desc:"دورات أكاديمية ومهنية باللغة العربية",                            url:"https://www.rwaq.org",           icon:"🎓", tag:"مجاني" },
-        { id:"khan",      name:"Khan Academy",       desc:"دروس مجانية في جميع المواد — يدعم العربية",                       url:"https://ar.khanacademy.org",     icon:"🧮", tag:"مجاني" },
-        { id:"teachers",  name:"Teachers Pay Teachers",desc:"موارد تعليمية جاهزة من معلمين حول العالم",                     url:"https://www.teacherspayteachers.com",icon:"💼",tag:"مدفوع" },
-        { id:"classdojo", name:"ClassDojo",          desc:"تواصل مع الأهالي وإدارة السلوك",                                  url:"https://www.classdojo.com",      icon:"👨‍👩‍👧", tag:"مجاني" },
-        { id:"nearpod",   name:"Nearpod",            desc:"عروض تفاعلية وتقييمات في الوقت الفعلي",                          url:"https://nearpod.com",            icon:"📱", tag:"مجاني/مدفوع" },
-      ]
-    },
-    ppt: {
-      label:"🎨 تصميم وعروض", color:"#d97706", bg:"#fffbeb",
-      items:[
-        { id:"canva",     name:"Canva",              desc:"أفضل أداة لتصميم العروض والملصقات التعليمية",                     url:"https://www.canva.com",          icon:"🎨", tag:"مجاني" },
-        { id:"slides",    name:"Google Slides",      desc:"عروض تقديمية مجانية وقابلة للمشاركة",                            url:"https://slides.google.com",      icon:"📊", tag:"مجاني" },
-        { id:"prezi",     name:"Prezi",              desc:"عروض تقديمية غير تقليدية وحركية",                                url:"https://prezi.com",              icon:"🌀", tag:"مدفوع" },
-        { id:"beautiful", name:"Beautiful.ai",       desc:"عروض بوربوينت ذكية تتصمم نفسها",                                 url:"https://www.beautiful.ai",       icon:"✨", tag:"مجاني" },
-        { id:"genially",  name:"Genially",           desc:"محتوى تفاعلي — إنفوجرافيك وعروض وألعاب",                         url:"https://genially.com",           icon:"🎯", tag:"مجاني" },
-        { id:"freepik",   name:"Freepik",            desc:"صور وأيقونات وقوالب مجانية للمعلمين",                            url:"https://www.freepik.com",        icon:"🖼️", tag:"مجاني" },
-      ]
-    },
-    quiz: {
-      label:"📝 اختبارات وتقييم", color:"#dc2626", bg:"#fef2f2",
-      items:[
-        { id:"kahoot",    name:"Kahoot!",            desc:"ألعاب تعليمية وتقييمات تنافسية ممتعة",                           url:"https://kahoot.com",             icon:"🎮", tag:"مجاني" },
-        { id:"quizizz",   name:"Quizizz",            desc:"اختبارات ذاتية ومسابقات للطلاب",                                 url:"https://quizizz.com",            icon:"🧠", tag:"مجاني" },
-        { id:"mentimeter",name:"Mentimeter",         desc:"استطلاعات وتصويت مباشر مع الطلاب",                              url:"https://www.mentimeter.com",     icon:"📊", tag:"مجاني" },
-        { id:"padlet",    name:"Padlet",             desc:"لوح تفاعلي مشترك للأفكار والمشاريع",                            url:"https://padlet.com",             icon:"📌", tag:"مجاني" },
-        { id:"formative", name:"Formative",          desc:"تقييمات لحظية مع تغذية راجعة فورية",                            url:"https://app.formative.com",      icon:"✅", tag:"مجاني" },
-        { id:"socrative", name:"Socrative",          desc:"اختبارات سريعة وتقييم فوري",                                    url:"https://socrative.com",          icon:"⚡", tag:"مجاني" },
-      ]
-    },
-    video: {
-      label:"🎥 فيديو وصوت", color:"#2563eb", bg:"#eff6ff",
-      items:[
-        { id:"youtube",   name:"YouTube EDU",        desc:"قناة التعليم على يوتيوب — دروس معتمدة",                          url:"https://www.youtube.com/education",icon:"▶️",tag:"مجاني" },
-        { id:"loom",      name:"Loom",               desc:"تسجيل شروحات فيديو وإرسالها للطلاب",                            url:"https://www.loom.com",           icon:"🎬", tag:"مجاني" },
-        { id:"screencastify",name:"Screencastify",  desc:"تسجيل الشاشة بسهولة من المتصفح",                                url:"https://www.screencastify.com",  icon:"📹", tag:"مجاني" },
-        { id:"edpuzzle",  name:"EdPuzzle",           desc:"تضمين أسئلة داخل مقاطع الفيديو التعليمية",                      url:"https://edpuzzle.com",           icon:"🎯", tag:"مجاني" },
-      ]
-    },
-  };
+  const allItems = Object.values(EDU_RESOURCES).flatMap(c => c.items);
+  const currentCat = EDU_RESOURCES[tab] || EDU_RESOURCES.ai;
 
-  const TABS = Object.keys(RESOURCES);
-  const currentItems = RESOURCES[activeTab]?.items || [];
-  const filtered = search
-    ? Object.values(RESOURCES).flatMap(cat => cat.items).filter(i =>
+  const displayItems = search.trim()
+    ? allItems.filter(i =>
         i.name.toLowerCase().includes(search.toLowerCase()) ||
         i.desc.includes(search)
       )
-    : currentItems;
+    : currentCat.items;
 
-  const favItems = Object.values(RESOURCES).flatMap(c=>c.items).filter(i=>favorites.includes(i.id));
+  const favItems = allItems.filter(i => favorites.includes(i.id));
 
-  const ResourceCard = ({ item, catColor, catBg }) => {
-    const isFav = favorites.includes(item.id);
-    return (
-      <div style={{
-        background:"#fff", borderRadius:14, padding:"14px 16px",
-        border:`1.5px solid ${isFav?"#fbbf24":"#f1f5f9"}`,
-        boxShadow:"0 2px 8px rgba(0,0,0,0.05)",
-        display:"flex", flexDirection:"column", gap:8,
-        transition:"all .15s",
-      }}>
-        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
-          <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-            <div style={{ width:36, height:36, borderRadius:10, background:catBg||"#f0fdf4",
-              display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, flexShrink:0 }}>
-              {item.icon}
-            </div>
-            <div>
-              <div style={{ fontWeight:900, fontSize:13, color:"#1e293b" }}>{item.name}</div>
-              <span style={{ fontSize:9.5, padding:"1px 7px", borderRadius:20, fontWeight:700,
-                background:catBg||"#f0fdf4", color:catColor||"#0d9488" }}>{item.tag}</span>
-            </div>
-          </div>
-          <button onClick={() => toggleFav(item.id)}
-            style={{ background:"none", border:"none", cursor:"pointer", fontSize:18, padding:4,
-                     opacity: isFav?1:0.3, transition:"opacity .2s" }}>
-            ⭐
-          </button>
-        </div>
-        <div style={{ fontSize:12, color:"#64748b", lineHeight:1.6 }}>{item.desc}</div>
-        <a href={item.url} target="_blank" rel="noopener noreferrer"
-          style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:6,
-                   padding:"8px 12px", borderRadius:10, border:"none",
-                   background:`linear-gradient(135deg,${catColor||"#0d9488"},${catColor||"#0d9488"}cc)`,
-                   color:"#fff", fontWeight:700, fontSize:12, cursor:"pointer",
-                   textDecoration:"none", fontFamily:"'Cairo',sans-serif" }}>
-          🔗 فتح الموقع
-        </a>
-      </div>
-    );
-  };
+  const getCatForItem = (item) =>
+    Object.values(EDU_RESOURCES).find(c => c.items.some(i => i.id === item.id)) || currentCat;
 
   return (
     <div dir="rtl" style={{ fontFamily:"'Cairo','Noto Naskh Arabic',sans-serif" }}>
+
       {/* رأس */}
       <div style={{ background:"linear-gradient(135deg,#1e3a5f,#2563eb)", borderRadius:20,
-        padding:"18px 20px", marginBottom:16, color:"#fff" }}>
-        <div style={{ fontSize:32, marginBottom:4 }}>📚</div>
-        <div style={{ fontWeight:900, fontSize:18 }}>أدلة ومصادر تعليمية</div>
-        <div style={{ opacity:.8, fontSize:12, marginTop:3 }}>
-          مواقع ذكاء اصطناعي • منصات تعليمية • أدوات تصميم • اختبارات
+        padding:"18px 20px", marginBottom:14, color:"#fff" }}>
+        <div style={{ fontSize:30, marginBottom:4 }}>📚</div>
+        <div style={{ fontWeight:900, fontSize:17 }}>أدلة ومصادر تعليمية</div>
+        <div style={{ opacity:.8, fontSize:11.5, marginTop:3 }}>
+          مواقع ذكاء اصطناعي · منصات تعليمية · تصميم · اختبارات · فيديو
         </div>
-        {/* بحث */}
-        <input value={search} onChange={e=>setSearch(e.target.value)}
+        <input value={search} onChange={e => setSearch(e.target.value)}
           placeholder="🔍 ابحث عن موقع أو أداة..."
-          style={{ width:"100%", marginTop:12, padding:"9px 14px", borderRadius:12,
-                   border:"none", fontSize:13, fontFamily:"'Cairo',sans-serif",
-                   outline:"none", background:"rgba(255,255,255,0.15)",
-                   color:"#fff", boxSizing:"border-box" }} />
-        {search && <div style={{ fontSize:11, opacity:.7, marginTop:4 }}>
-          {filtered.length} نتيجة
-        </div>}
+          style={{ width:"100%", marginTop:12, padding:"9px 14px", borderRadius:12, border:"none",
+                   fontSize:12, fontFamily:"'Cairo',sans-serif", outline:"none",
+                   background:"rgba(255,255,255,0.18)", color:"#fff",
+                   boxSizing:"border-box" }} />
+        {search.trim() && (
+          <div style={{ fontSize:10.5, opacity:.7, marginTop:4 }}>
+            {displayItems.length} نتيجة
+          </div>
+        )}
       </div>
 
       {/* المفضلة */}
-      {!search && favItems.length > 0 && (
-        <div style={{ background:"#fffbeb", border:"1.5px solid #fde68a", borderRadius:16,
-          padding:"12px 14px", marginBottom:14 }}>
-          <div style={{ fontWeight:900, fontSize:13, color:"#92400e", marginBottom:10 }}>
-            ⭐ المفضلة لديك ({favItems.length})
+      {!search.trim() && favItems.length > 0 && (
+        <div style={{ background:"#fffbeb", border:"1.5px solid #fde68a", borderRadius:14,
+          padding:"10px 14px", marginBottom:12 }}>
+          <div style={{ fontWeight:900, fontSize:12, color:"#92400e", marginBottom:8 }}>
+            ⭐ المفضلة ({favItems.length})
           </div>
-          <div style={{ display:"flex", flexWrap:"wrap", gap:8 }}>
+          <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
             {favItems.map(item => (
               <a key={item.id} href={item.url} target="_blank" rel="noopener noreferrer"
-                style={{ display:"flex", alignItems:"center", gap:6, padding:"6px 12px",
+                style={{ display:"flex", alignItems:"center", gap:5, padding:"4px 10px",
                          borderRadius:20, background:"#fff", border:"1.5px solid #fde68a",
-                         textDecoration:"none", fontSize:12, fontWeight:700, color:"#92400e" }}>
+                         textDecoration:"none", fontSize:11.5, fontWeight:700, color:"#92400e",
+                         fontFamily:"'Cairo',sans-serif" }}>
                 {item.icon} {item.name}
               </a>
             ))}
@@ -5482,21 +5488,20 @@ function TeacherPPTAI({ teacherInfo }) {
         </div>
       )}
 
-      {/* تبويبات */}
-      {!search && (
-        <div style={{ display:"flex", overflowX:"auto", gap:6, paddingBottom:4,
-          marginBottom:14, scrollbarWidth:"none", WebkitOverflowScrolling:"touch" }}>
-          {TABS.map(tab => {
-            const cat = RESOURCES[tab];
-            const active = activeTab === tab;
+      {/* تبويبات التصنيف */}
+      {!search.trim() && (
+        <div style={{ display:"flex", gap:6, overflowX:"auto", paddingBottom:6,
+          marginBottom:12, scrollbarWidth:"none", WebkitOverflowScrolling:"touch" }}>
+          {Object.entries(EDU_RESOURCES).map(([key, cat]) => {
+            const active = tab === key;
             return (
-              <button key={tab} onClick={() => setActiveTab(tab)}
-                style={{ flexShrink:0, padding:"7px 14px", borderRadius:20,
-                         border:`1.5px solid ${active?cat.color:"#e2e8f0"}`,
+              <button key={key} onClick={() => setTab(key)}
+                style={{ flexShrink:0, padding:"6px 13px", borderRadius:20, cursor:"pointer",
+                         border:`1.5px solid ${active ? cat.color : "#e2e8f0"}`,
                          background: active ? cat.color : "#fff",
                          color: active ? "#fff" : "#64748b",
-                         fontWeight:800, fontSize:12, cursor:"pointer",
-                         fontFamily:"'Cairo',sans-serif", whiteSpace:"nowrap",
+                         fontWeight:800, fontSize:11.5, fontFamily:"'Cairo',sans-serif",
+                         whiteSpace:"nowrap",
                          boxShadow: active ? `0 3px 10px ${cat.color}44` : "none" }}>
                 {cat.label}
               </button>
@@ -5506,22 +5511,22 @@ function TeacherPPTAI({ teacherInfo }) {
       )}
 
       {/* الشبكة */}
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))", gap:12 }}>
-        {filtered.map(item => {
-          const cat = search
-            ? Object.values(RESOURCES).find(c=>c.items.some(i=>i.id===item.id))
-            : RESOURCES[activeTab];
-          return (
-            <ResourceCard key={item.id} item={item}
-              catColor={cat?.color} catBg={cat?.bg} />
-          );
-        })}
-      </div>
-
-      {filtered.length === 0 && (
-        <div style={{ textAlign:"center", padding:"40px 20px", color:"#94a3b8" }}>
+      {displayItems.length === 0 ? (
+        <div style={{ textAlign:"center", padding:"40px 16px", color:"#94a3b8" }}>
           <div style={{ fontSize:36, marginBottom:8 }}>🔍</div>
-          <div style={{ fontWeight:700, fontSize:13 }}>لا توجد نتائج لـ "{search}"</div>
+          <div style={{ fontWeight:700, fontSize:13 }}>لا توجد نتائج</div>
+        </div>
+      ) : (
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(250px,1fr))", gap:10 }}>
+          {displayItems.map(item => {
+            const cat = search.trim() ? getCatForItem(item) : currentCat;
+            return (
+              <EduResourceCard key={item.id} item={item}
+                color={cat.color} bg={cat.bg} brd={cat.brd}
+                isFav={favorites.includes(item.id)}
+                onToggleFav={toggleFav} />
+            );
+          })}
         </div>
       )}
     </div>
