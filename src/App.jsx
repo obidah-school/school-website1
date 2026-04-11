@@ -1925,6 +1925,17 @@ function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, sa
                         <div className="flex items-center gap-2">
                           <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${isAbsent ? "bg-red-400" : isLate ? "bg-amber-400" : "bg-green-400"}`}></div>
                           <span className="font-medium text-gray-800 text-sm">{name}</span>
+                          <button onClick={() => {
+                            if (!window.confirm(`حذف المعلم "${name}" من القائمة؟`)) return;
+                            const updated = teachers.filter((_,i) => i !== ti);
+                            setTeachers(updated); saveTeachers(updated);
+                          }}
+                            style={{ marginRight:"auto", background:"none", border:"none",
+                                     color:"#fca5a5", cursor:"pointer", fontSize:13, padding:"0 2px",
+                                     opacity:0.5, transition:"opacity .15s" }}
+                            onMouseOver={e=>e.target.style.opacity=1}
+                            onMouseOut={e=>e.target.style.opacity=0.5}
+                            title="حذف المعلم">✕</button>
                         </div>
                       </td>
 
@@ -2928,7 +2939,12 @@ function AdminAttendancePage() {
                             style={{ minWidth:"80px" }} />
                         </td>
                         <td className="p-1 text-center">
-                          <button onClick={() => delAdmin(ai)} className="text-red-300 hover:text-red-500 text-lg" title="حذف">✕</button>
+                          <button onClick={() => delAdmin(ai)}
+                            style={{ background:"#fee2e2", border:"1px solid #fca5a5",
+                                     borderRadius:8, color:"#dc2626", cursor:"pointer",
+                                     fontSize:11, fontWeight:800, padding:"3px 8px",
+                                     fontFamily:"'Cairo',sans-serif" }}
+                            title="حذف الإداري">🗑️ حذف</button>
                         </td>
                       </tr>
                     );
@@ -5300,290 +5316,213 @@ function TeacherSelfEval({ teacherInfo, onDone }) {
 // 🎨 مكوّن بوربوينت AI — بوابة المعلم
 // ═══════════════════════════════════════════
 function TeacherPPTAI({ teacherInfo }) {
-  const CLAUDE_API_KEY = import.meta.env.VITE_CLAUDE_API_KEY || "";
-  const [subject,   setSubject]   = useState("");
-  const [grade,     setGrade]     = useState("");
-  const [topic,     setTopic]     = useState("");
-  const [slides,    setSlides]    = useState("8");
-  const [lang,      setLang]      = useState("ar");
-  const [loading,   setLoading]   = useState(false);
-  const [result,    setResult]    = useState(null);
-  const [error,     setError]     = useState("");
-  const [activeSlide, setActiveSlide] = useState(0);
-
-  const SUBJECTS = ["رياضيات","علوم","عربي","إنجليزي","تربية إسلامية","اجتماعيات","حاسب","تربية بدنية","فنون","أخرى"];
-  const GRADES   = ["الأول متوسط","الثاني متوسط","الثالث متوسط","الأول ثانوي","الثاني ثانوي","الثالث ثانوي"];
-
-  const callAI = async (prompt) => {
-    if (!CLAUDE_API_KEY) {
-      setError("⚠️ يجب إضافة VITE_CLAUDE_API_KEY في إعدادات Vercel ← Environment Variables");
-      return null;
-    }
-    const resp = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": CLAUDE_API_KEY,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 2000,
-        messages: [{ role: "user", content: prompt }],
-      }),
-    });
-    const data = await resp.json();
-    if (data.error) throw new Error(data.error.message);
-    return data.content?.[0]?.text || "";
+  // ═══ أدلة ومصادر تعليمية ═══
+  const [activeTab, setActiveTab] = useState("ai");
+  const [search,    setSearch]    = useState("");
+  const [favorites, setFavorites] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("teacher_fav_resources_v1") || "[]"); } catch { return []; }
+  });
+  const toggleFav = (id) => {
+    const upd = favorites.includes(id) ? favorites.filter(f=>f!==id) : [...favorites, id];
+    setFavorites(upd);
+    try { localStorage.setItem("teacher_fav_resources_v1", JSON.stringify(upd)); } catch {}
   };
 
-  const generate = async () => {
-    if (!topic.trim()) { setError("أدخل موضوع الدرس أولاً"); return; }
-    setLoading(true); setError(""); setResult(null); setActiveSlide(0);
-    try {
-      const prompt = lang === "ar"
-        ? `أنت مصمم عروض تقديمية تعليمية محترف. أنشئ عرضاً تعليمياً باللغة العربية:
-المادة: ${subject || "عامة"} | الصف: ${grade || "متوسط"} | الموضوع: ${topic} | الشرائح: ${slides}
-المعلم: ${teacherInfo?.name || ""}
-
-أجب بـ JSON فقط بدون أي نص إضافي أو markdown:
-{"title":"عنوان العرض","objective":"هدف الدرس","slides":[{"title":"عنوان الشريحة","type":"intro","points":["نقطة 1","نقطة 2"],"notes":"ملاحظة للمعلم"}]}`
-        : `Create an educational PowerPoint in English.
-Subject: ${subject||"General"} | Grade: ${grade||"Middle School"} | Topic: ${topic} | Slides: ${slides}
-Respond with JSON only, no markdown:
-{"title":"Title","objective":"Objective","slides":[{"title":"Slide title","type":"intro","points":["Point 1"],"notes":"Teacher note"}]}`;
-
-      const text = await callAI(prompt);
-      if (!text) { setLoading(false); return; }
-      const clean = text.replace(/```json|```/g,"").trim();
-      const parsed = JSON.parse(clean);
-      setResult(parsed);
-    } catch(e) {
-      setError("خطأ في التوليد: " + e.message + " — حاول مجدداً");
-    }
-    setLoading(false);
+  const RESOURCES = {
+    ai: {
+      label:"🤖 الذكاء الاصطناعي", color:"#7c3aed", bg:"#faf5ff",
+      items:[
+        { id:"chatgpt",   name:"ChatGPT",          desc:"مساعد ذكاء اصطناعي متعدد الاستخدامات — توليد دروس وأسئلة وشرح",     url:"https://chatgpt.com",            icon:"🤖", tag:"مجاني" },
+        { id:"claude",    name:"Claude (Anthropic)",desc:"ذكاء اصطناعي متقدم — ممتاز للمحتوى التعليمي العربي",               url:"https://claude.ai",              icon:"🧠", tag:"مجاني" },
+        { id:"gemini",    name:"Google Gemini",     desc:"ذكاء اصطناعي من جوجل — يدعم اللغة العربية بشكل ممتاز",            url:"https://gemini.google.com",      icon:"✨", tag:"مجاني" },
+        { id:"canvaai",   name:"Canva AI",          desc:"تصميم عروض وملصقات تعليمية بالذكاء الاصطناعي",                    url:"https://www.canva.com",          icon:"🎨", tag:"مجاني/مدفوع" },
+        { id:"gamma",     name:"Gamma.app",         desc:"توليد عروض بوربوينت احترافية تلقائياً من نص",                      url:"https://gamma.app",              icon:"📊", tag:"مجاني" },
+        { id:"curipod",   name:"Curipod",           desc:"إنشاء دروس تفاعلية بالذكاء الاصطناعي",                            url:"https://curipod.com",            icon:"💡", tag:"مجاني" },
+        { id:"magicschool",name:"MagicSchool AI",   desc:"منصة AI مخصصة للمعلمين — خطط دروس وأسئلة ومزيد",                 url:"https://www.magicschool.ai",     icon:"🏫", tag:"مجاني" },
+        { id:"eduaide",   name:"Eduaide.Ai",        desc:"أدوات AI لإعداد المحتوى التعليمي والتقييمات",                      url:"https://www.eduaide.ai",         icon:"📝", tag:"مجاني" },
+      ]
+    },
+    educational: {
+      label:"🌐 منصات تعليمية", color:"#0d9488", bg:"#f0fdfa",
+      items:[
+        { id:"moe",       name:"منصة مدرستي",       desc:"المنصة الرسمية لوزارة التعليم السعودية",                           url:"https://www.madrasati.com",      icon:"🏫", tag:"وزارة التعليم" },
+        { id:"noor",      name:"نور — الأنظمة",     desc:"نظام نور للمعلومات التعليمية",                                     url:"https://noor.moe.gov.sa",        icon:"💡", tag:"رسمي" },
+        { id:"edraak",    name:"إدراك",              desc:"منصة MOOCs عربية — دورات مجانية معتمدة",                          url:"https://www.edraak.org",         icon:"📚", tag:"مجاني" },
+        { id:"rwaq",      name:"رواق",               desc:"دورات أكاديمية ومهنية باللغة العربية",                            url:"https://www.rwaq.org",           icon:"🎓", tag:"مجاني" },
+        { id:"khan",      name:"Khan Academy",       desc:"دروس مجانية في جميع المواد — يدعم العربية",                       url:"https://ar.khanacademy.org",     icon:"🧮", tag:"مجاني" },
+        { id:"teachers",  name:"Teachers Pay Teachers",desc:"موارد تعليمية جاهزة من معلمين حول العالم",                     url:"https://www.teacherspayteachers.com",icon:"💼",tag:"مدفوع" },
+        { id:"classdojo", name:"ClassDojo",          desc:"تواصل مع الأهالي وإدارة السلوك",                                  url:"https://www.classdojo.com",      icon:"👨‍👩‍👧", tag:"مجاني" },
+        { id:"nearpod",   name:"Nearpod",            desc:"عروض تفاعلية وتقييمات في الوقت الفعلي",                          url:"https://nearpod.com",            icon:"📱", tag:"مجاني/مدفوع" },
+      ]
+    },
+    ppt: {
+      label:"🎨 تصميم وعروض", color:"#d97706", bg:"#fffbeb",
+      items:[
+        { id:"canva",     name:"Canva",              desc:"أفضل أداة لتصميم العروض والملصقات التعليمية",                     url:"https://www.canva.com",          icon:"🎨", tag:"مجاني" },
+        { id:"slides",    name:"Google Slides",      desc:"عروض تقديمية مجانية وقابلة للمشاركة",                            url:"https://slides.google.com",      icon:"📊", tag:"مجاني" },
+        { id:"prezi",     name:"Prezi",              desc:"عروض تقديمية غير تقليدية وحركية",                                url:"https://prezi.com",              icon:"🌀", tag:"مدفوع" },
+        { id:"beautiful", name:"Beautiful.ai",       desc:"عروض بوربوينت ذكية تتصمم نفسها",                                 url:"https://www.beautiful.ai",       icon:"✨", tag:"مجاني" },
+        { id:"genially",  name:"Genially",           desc:"محتوى تفاعلي — إنفوجرافيك وعروض وألعاب",                         url:"https://genially.com",           icon:"🎯", tag:"مجاني" },
+        { id:"freepik",   name:"Freepik",            desc:"صور وأيقونات وقوالب مجانية للمعلمين",                            url:"https://www.freepik.com",        icon:"🖼️", tag:"مجاني" },
+      ]
+    },
+    quiz: {
+      label:"📝 اختبارات وتقييم", color:"#dc2626", bg:"#fef2f2",
+      items:[
+        { id:"kahoot",    name:"Kahoot!",            desc:"ألعاب تعليمية وتقييمات تنافسية ممتعة",                           url:"https://kahoot.com",             icon:"🎮", tag:"مجاني" },
+        { id:"quizizz",   name:"Quizizz",            desc:"اختبارات ذاتية ومسابقات للطلاب",                                 url:"https://quizizz.com",            icon:"🧠", tag:"مجاني" },
+        { id:"mentimeter",name:"Mentimeter",         desc:"استطلاعات وتصويت مباشر مع الطلاب",                              url:"https://www.mentimeter.com",     icon:"📊", tag:"مجاني" },
+        { id:"padlet",    name:"Padlet",             desc:"لوح تفاعلي مشترك للأفكار والمشاريع",                            url:"https://padlet.com",             icon:"📌", tag:"مجاني" },
+        { id:"formative", name:"Formative",          desc:"تقييمات لحظية مع تغذية راجعة فورية",                            url:"https://app.formative.com",      icon:"✅", tag:"مجاني" },
+        { id:"socrative", name:"Socrative",          desc:"اختبارات سريعة وتقييم فوري",                                    url:"https://socrative.com",          icon:"⚡", tag:"مجاني" },
+      ]
+    },
+    video: {
+      label:"🎥 فيديو وصوت", color:"#2563eb", bg:"#eff6ff",
+      items:[
+        { id:"youtube",   name:"YouTube EDU",        desc:"قناة التعليم على يوتيوب — دروس معتمدة",                          url:"https://www.youtube.com/education",icon:"▶️",tag:"مجاني" },
+        { id:"loom",      name:"Loom",               desc:"تسجيل شروحات فيديو وإرسالها للطلاب",                            url:"https://www.loom.com",           icon:"🎬", tag:"مجاني" },
+        { id:"screencastify",name:"Screencastify",  desc:"تسجيل الشاشة بسهولة من المتصفح",                                url:"https://www.screencastify.com",  icon:"📹", tag:"مجاني" },
+        { id:"edpuzzle",  name:"EdPuzzle",           desc:"تضمين أسئلة داخل مقاطع الفيديو التعليمية",                      url:"https://edpuzzle.com",           icon:"🎯", tag:"مجاني" },
+      ]
+    },
   };
 
-  const slideColors = {
-    intro:    { bg:"#1e3a5f", accent:"#3b82f6", text:"#fff" },
-    content:  { bg:"#0d9488", accent:"#14b8a6", text:"#fff" },
-    activity: { bg:"#7c3aed", accent:"#a855f7", text:"#fff" },
-    summary:  { bg:"#059669", accent:"#34d399", text:"#fff" },
-  };
-  const getColor = (type) => slideColors[type] || slideColors.content;
+  const TABS = Object.keys(RESOURCES);
+  const currentItems = RESOURCES[activeTab]?.items || [];
+  const filtered = search
+    ? Object.values(RESOURCES).flatMap(cat => cat.items).filter(i =>
+        i.name.toLowerCase().includes(search.toLowerCase()) ||
+        i.desc.includes(search)
+      )
+    : currentItems;
 
-  const printPPT = () => {
-    if (!result) return;
-    const slides = result.slides.map((s,i) => {
-      const c = getColor(s.type);
-      return `
-        <div style="page-break-after:always;width:25cm;height:14cm;background:${c.bg};
-          display:flex;flex-direction:column;justify-content:center;align-items:center;
-          padding:40px;box-sizing:border-box;font-family:'Noto Naskh Arabic',Arial,sans-serif;direction:rtl;position:relative;overflow:hidden">
-          <div style="position:absolute;top:0;left:0;width:8px;height:100%;background:${c.accent}"></div>
-          <div style="position:absolute;bottom:20px;right:30px;font-size:11px;color:rgba(255,255,255,0.4)">${i+1}/${result.slides.length}</div>
-          <div style="font-size:26px;font-weight:900;color:${c.text};margin-bottom:20px;text-align:center;line-height:1.3">${s.title}</div>
-          <div style="width:100%;max-width:600px">
-            ${(s.points||[]).map(p=>`
-              <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:10px">
-                <div style="width:8px;height:8px;border-radius:50%;background:${c.accent};flex-shrink:0;margin-top:7px"></div>
-                <div style="font-size:16px;color:${c.text};opacity:0.9;line-height:1.6">${p}</div>
-              </div>`).join("")}
+  const favItems = Object.values(RESOURCES).flatMap(c=>c.items).filter(i=>favorites.includes(i.id));
+
+  const ResourceCard = ({ item, catColor, catBg }) => {
+    const isFav = favorites.includes(item.id);
+    return (
+      <div style={{
+        background:"#fff", borderRadius:14, padding:"14px 16px",
+        border:`1.5px solid ${isFav?"#fbbf24":"#f1f5f9"}`,
+        boxShadow:"0 2px 8px rgba(0,0,0,0.05)",
+        display:"flex", flexDirection:"column", gap:8,
+        transition:"all .15s",
+      }}>
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
+          <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+            <div style={{ width:36, height:36, borderRadius:10, background:catBg||"#f0fdf4",
+              display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, flexShrink:0 }}>
+              {item.icon}
+            </div>
+            <div>
+              <div style={{ fontWeight:900, fontSize:13, color:"#1e293b" }}>{item.name}</div>
+              <span style={{ fontSize:9.5, padding:"1px 7px", borderRadius:20, fontWeight:700,
+                background:catBg||"#f0fdf4", color:catColor||"#0d9488" }}>{item.tag}</span>
+            </div>
           </div>
-          ${s.notes?`<div style="position:absolute;bottom:30px;left:30px;font-size:10px;color:rgba(255,255,255,0.4)">💡 ${s.notes}</div>`:""}
-        </div>`;
-    }).join("");
-    printWindow(`<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8"><title>${result.title}</title>
-    <style>*{margin:0;padding:0;box-sizing:border-box}@media print{@page{size:A4 landscape;margin:0}}</style>
-    </head><body>${slides}<script>window.onload=()=>window.print()</script></body></html>`);
+          <button onClick={() => toggleFav(item.id)}
+            style={{ background:"none", border:"none", cursor:"pointer", fontSize:18, padding:4,
+                     opacity: isFav?1:0.3, transition:"opacity .2s" }}>
+            ⭐
+          </button>
+        </div>
+        <div style={{ fontSize:12, color:"#64748b", lineHeight:1.6 }}>{item.desc}</div>
+        <a href={item.url} target="_blank" rel="noopener noreferrer"
+          style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:6,
+                   padding:"8px 12px", borderRadius:10, border:"none",
+                   background:`linear-gradient(135deg,${catColor||"#0d9488"},${catColor||"#0d9488"}cc)`,
+                   color:"#fff", fontWeight:700, fontSize:12, cursor:"pointer",
+                   textDecoration:"none", fontFamily:"'Cairo',sans-serif" }}>
+          🔗 فتح الموقع
+        </a>
+      </div>
+    );
   };
 
   return (
     <div dir="rtl" style={{ fontFamily:"'Cairo','Noto Naskh Arabic',sans-serif" }}>
       {/* رأس */}
-      <div style={{ background:"linear-gradient(135deg,#ea580c,#c2410c)", borderRadius:20,
+      <div style={{ background:"linear-gradient(135deg,#1e3a5f,#2563eb)", borderRadius:20,
         padding:"18px 20px", marginBottom:16, color:"#fff" }}>
-        <div style={{ fontSize:32, marginBottom:4 }}>🎨</div>
-        <div style={{ fontWeight:900, fontSize:18 }}>مولّد العروض التقديمية بالذكاء الاصطناعي</div>
-        <div style={{ opacity:.8, fontSize:12, marginTop:3 }}>أدخل بيانات الدرس ويُنشئ لك العرض كاملاً</div>
+        <div style={{ fontSize:32, marginBottom:4 }}>📚</div>
+        <div style={{ fontWeight:900, fontSize:18 }}>أدلة ومصادر تعليمية</div>
+        <div style={{ opacity:.8, fontSize:12, marginTop:3 }}>
+          مواقع ذكاء اصطناعي • منصات تعليمية • أدوات تصميم • اختبارات
+        </div>
+        {/* بحث */}
+        <input value={search} onChange={e=>setSearch(e.target.value)}
+          placeholder="🔍 ابحث عن موقع أو أداة..."
+          style={{ width:"100%", marginTop:12, padding:"9px 14px", borderRadius:12,
+                   border:"none", fontSize:13, fontFamily:"'Cairo',sans-serif",
+                   outline:"none", background:"rgba(255,255,255,0.15)",
+                   color:"#fff", boxSizing:"border-box" }} />
+        {search && <div style={{ fontSize:11, opacity:.7, marginTop:4 }}>
+          {filtered.length} نتيجة
+        </div>}
       </div>
 
-      {/* تحذير مفتاح API */}
-      {!CLAUDE_API_KEY && (
-        <div style={{ background:"#fef3c7", border:"1.5px solid #fde68a", borderRadius:12,
-          padding:"10px 14px", marginBottom:14, fontSize:12, color:"#92400e", fontWeight:700 }}>
-          ⚠️ لتفعيل هذه الميزة أضف <strong>VITE_CLAUDE_API_KEY</strong> في إعدادات Vercel ← Environment Variables
+      {/* المفضلة */}
+      {!search && favItems.length > 0 && (
+        <div style={{ background:"#fffbeb", border:"1.5px solid #fde68a", borderRadius:16,
+          padding:"12px 14px", marginBottom:14 }}>
+          <div style={{ fontWeight:900, fontSize:13, color:"#92400e", marginBottom:10 }}>
+            ⭐ المفضلة لديك ({favItems.length})
+          </div>
+          <div style={{ display:"flex", flexWrap:"wrap", gap:8 }}>
+            {favItems.map(item => (
+              <a key={item.id} href={item.url} target="_blank" rel="noopener noreferrer"
+                style={{ display:"flex", alignItems:"center", gap:6, padding:"6px 12px",
+                         borderRadius:20, background:"#fff", border:"1.5px solid #fde68a",
+                         textDecoration:"none", fontSize:12, fontWeight:700, color:"#92400e" }}>
+                {item.icon} {item.name}
+              </a>
+            ))}
+          </div>
         </div>
       )}
 
-      {/* نموذج الإدخال */}
-      {!result && (
-        <div style={{ background:"#fff", borderRadius:20, padding:20,
-          boxShadow:"0 2px 12px rgba(0,0,0,0.06)", border:"1px solid #f1f5f9", marginBottom:14 }}>
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:10 }}>
-            <div>
-              <label style={{ fontSize:11, fontWeight:700, color:"#64748b", display:"block", marginBottom:4 }}>المادة</label>
-              <select value={subject} onChange={e=>setSubject(e.target.value)}
-                style={{ width:"100%", padding:"9px 12px", borderRadius:10, border:"2px solid #e2e8f0",
-                         fontSize:12, fontFamily:"'Cairo',sans-serif", outline:"none" }}>
-                <option value="">— اختر —</option>
-                {SUBJECTS.map(s=><option key={s}>{s}</option>)}
-              </select>
-            </div>
-            <div>
-              <label style={{ fontSize:11, fontWeight:700, color:"#64748b", display:"block", marginBottom:4 }}>الصف</label>
-              <select value={grade} onChange={e=>setGrade(e.target.value)}
-                style={{ width:"100%", padding:"9px 12px", borderRadius:10, border:"2px solid #e2e8f0",
-                         fontSize:12, fontFamily:"'Cairo',sans-serif", outline:"none" }}>
-                <option value="">— اختر —</option>
-                {GRADES.map(g=><option key={g}>{g}</option>)}
-              </select>
-            </div>
-          </div>
-          <div style={{ marginBottom:10 }}>
-            <label style={{ fontSize:11, fontWeight:700, color:"#64748b", display:"block", marginBottom:4 }}>موضوع الدرس *</label>
-            <input type="text" value={topic} onChange={e=>setTopic(e.target.value)}
-              placeholder="مثال: الكسور العشرية، الجملة الشرطية، فتح مكة..."
-              style={{ width:"100%", padding:"10px 12px", borderRadius:10, border:"2px solid #e2e8f0",
-                       fontSize:13, fontFamily:"'Cairo',sans-serif", outline:"none", boxSizing:"border-box" }} />
-          </div>
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:14 }}>
-            <div>
-              <label style={{ fontSize:11, fontWeight:700, color:"#64748b", display:"block", marginBottom:4 }}>عدد الشرائح</label>
-              <select value={slides} onChange={e=>setSlides(e.target.value)}
-                style={{ width:"100%", padding:"9px 12px", borderRadius:10, border:"2px solid #e2e8f0",
-                         fontSize:12, fontFamily:"'Cairo',sans-serif", outline:"none" }}>
-                {["5","6","8","10","12","15"].map(n=><option key={n} value={n}>{n} شرائح</option>)}
-              </select>
-            </div>
-            <div>
-              <label style={{ fontSize:11, fontWeight:700, color:"#64748b", display:"block", marginBottom:4 }}>اللغة</label>
-              <select value={lang} onChange={e=>setLang(e.target.value)}
-                style={{ width:"100%", padding:"9px 12px", borderRadius:10, border:"2px solid #e2e8f0",
-                         fontSize:12, fontFamily:"'Cairo',sans-serif", outline:"none" }}>
-                <option value="ar">العربية</option>
-                <option value="en">English</option>
-              </select>
-            </div>
-          </div>
-          {error && <div style={{ background:"#fee2e2", color:"#dc2626", borderRadius:10, padding:"8px 12px",
-            fontSize:12, fontWeight:700, marginBottom:10 }}>{error}</div>}
-          <button onClick={generate} disabled={loading}
-            style={{ width:"100%", padding:"13px", borderRadius:14, border:"none",
-                     background: loading ? "#e5e7eb" : "linear-gradient(135deg,#ea580c,#c2410c)",
-                     color: loading ? "#9ca3af" : "#fff", fontWeight:900, fontSize:14,
-                     cursor: loading ? "not-allowed" : "pointer", fontFamily:"'Cairo',sans-serif",
-                     boxShadow: loading ? "none" : "0 4px 16px rgba(234,88,12,0.4)" }}>
-            {loading ? "⏳ جاري التوليد..." : "🚀 توليد العرض بالذكاء الاصطناعي"}
-          </button>
-        </div>
-      )}
-
-      {/* النتيجة */}
-      {result && (
-        <>
-          {/* شريط العنوان */}
-          <div style={{ background:"#fff", borderRadius:16, padding:"14px 18px", marginBottom:12,
-            boxShadow:"0 2px 10px rgba(0,0,0,0.06)", border:"1px solid #f1f5f9",
-            display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:10 }}>
-            <div>
-              <div style={{ fontWeight:900, fontSize:16, color:"#1e293b" }}>{result.title}</div>
-              {result.objective && <div style={{ fontSize:11, color:"#64748b", marginTop:2 }}>🎯 {result.objective}</div>}
-              <div style={{ fontSize:10, color:"#94a3b8", marginTop:2 }}>{result.slides?.length} شريحة</div>
-            </div>
-            <div style={{ display:"flex", gap:8 }}>
-              <button onClick={printPPT}
-                style={{ padding:"9px 16px", borderRadius:12, border:"none",
-                         background:"linear-gradient(135deg,#7c3aed,#5b21b6)",
-                         color:"#fff", fontWeight:800, fontSize:12, cursor:"pointer",
-                         fontFamily:"'Cairo',sans-serif" }}>
-                🖨️ طباعة / تصدير
-              </button>
-              <button onClick={() => { setResult(null); setActiveSlide(0); }}
-                style={{ padding:"9px 14px", borderRadius:12, border:"1.5px solid #e2e8f0",
-                         background:"#f8fafc", color:"#64748b", fontWeight:700, fontSize:12,
-                         cursor:"pointer", fontFamily:"'Cairo',sans-serif" }}>
-                🔄 جديد
-              </button>
-            </div>
-          </div>
-
-          {/* معاينة الشرائح */}
-          <div style={{ display:"flex", gap:8, overflowX:"auto", WebkitOverflowScrolling:"touch",
-            scrollbarWidth:"none", paddingBottom:4, marginBottom:12 }}>
-            {result.slides?.map((s,i) => {
-              const c = getColor(s.type);
-              return (
-                <button key={i} onClick={() => setActiveSlide(i)}
-                  style={{ flexShrink:0, width:80, height:50, borderRadius:8,
-                           background:c.bg, border:`2px solid ${activeSlide===i?c.accent:"transparent"}`,
-                           cursor:"pointer", position:"relative", overflow:"hidden",
-                           boxShadow: activeSlide===i?"0 4px 12px rgba(0,0,0,0.2)":"none",
-                           transition:"all .15s" }}>
-                  <div style={{ position:"absolute", top:0, left:0, width:4, height:"100%", background:c.accent }} />
-                  <div style={{ fontSize:8, color:"rgba(255,255,255,0.9)", padding:"4px 6px 4px 10px",
-                                fontWeight:700, textAlign:"right", lineHeight:1.3 }}>
-                    {i+1}. {s.title?.substring(0,18)}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-
-          {/* الشريحة النشطة */}
-          {result.slides?.[activeSlide] && (() => {
-            const s = result.slides[activeSlide];
-            const c = getColor(s.type);
+      {/* تبويبات */}
+      {!search && (
+        <div style={{ display:"flex", overflowX:"auto", gap:6, paddingBottom:4,
+          marginBottom:14, scrollbarWidth:"none", WebkitOverflowScrolling:"touch" }}>
+          {TABS.map(tab => {
+            const cat = RESOURCES[tab];
+            const active = activeTab === tab;
             return (
-              <div style={{ borderRadius:20, overflow:"hidden", boxShadow:"0 8px 32px rgba(0,0,0,0.15)",
-                            marginBottom:12 }}>
-                <div style={{ background:c.bg, padding:"32px 36px", minHeight:220,
-                  display:"flex", flexDirection:"column", justifyContent:"center", position:"relative" }}>
-                  <div style={{ position:"absolute", top:0, right:0, width:6, height:"100%", background:c.accent }} />
-                  <div style={{ position:"absolute", top:14, left:18, fontSize:11,
-                    color:"rgba(255,255,255,0.45)", fontWeight:700 }}>
-                    {activeSlide+1} / {result.slides.length}
-                  </div>
-                  <div style={{ fontWeight:900, fontSize:22, color:"#fff", marginBottom:20,
-                    lineHeight:1.3, paddingLeft:12 }}>{s.title}</div>
-                  <div style={{ display:"flex", flexDirection:"column", gap:10, paddingLeft:12 }}>
-                    {(s.points||[]).map((p,j) => (
-                      <div key={j} style={{ display:"flex", alignItems:"flex-start", gap:10 }}>
-                        <div style={{ width:8, height:8, borderRadius:"50%", background:c.accent,
-                          flexShrink:0, marginTop:7 }} />
-                        <div style={{ fontSize:15, color:"rgba(255,255,255,0.92)", lineHeight:1.6 }}>{p}</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                {s.notes && (
-                  <div style={{ background:"#f8fafc", padding:"10px 18px", fontSize:11,
-                    color:"#64748b", fontWeight:600, borderTop:"1px solid #e2e8f0" }}>
-                    💡 ملاحظة للمعلم: {s.notes}
-                  </div>
-                )}
-              </div>
+              <button key={tab} onClick={() => setActiveTab(tab)}
+                style={{ flexShrink:0, padding:"7px 14px", borderRadius:20,
+                         border:`1.5px solid ${active?cat.color:"#e2e8f0"}`,
+                         background: active ? cat.color : "#fff",
+                         color: active ? "#fff" : "#64748b",
+                         fontWeight:800, fontSize:12, cursor:"pointer",
+                         fontFamily:"'Cairo',sans-serif", whiteSpace:"nowrap",
+                         boxShadow: active ? `0 3px 10px ${cat.color}44` : "none" }}>
+                {cat.label}
+              </button>
             );
-          })()}
+          })}
+        </div>
+      )}
 
-          {/* تنقل بين الشرائح */}
-          <div style={{ display:"flex", gap:10, justifyContent:"center" }}>
-            <button onClick={() => setActiveSlide(p => Math.max(0,p-1))} disabled={activeSlide===0}
-              style={{ padding:"9px 20px", borderRadius:12, border:"1.5px solid #e2e8f0",
-                       background:activeSlide===0?"#f1f5f9":"#fff", color:activeSlide===0?"#cbd5e1":"#374151",
-                       fontWeight:800, fontSize:13, cursor:activeSlide===0?"not-allowed":"pointer",
-                       fontFamily:"'Cairo',sans-serif" }}>← السابق</button>
-            <span style={{ alignSelf:"center", fontSize:12, fontWeight:700, color:"#94a3b8" }}>
-              {activeSlide+1} / {result.slides?.length}
-            </span>
-            <button onClick={() => setActiveSlide(p => Math.min((result.slides?.length||1)-1,p+1))}
-              disabled={activeSlide===(result.slides?.length||1)-1}
-              style={{ padding:"9px 20px", borderRadius:12, border:"1.5px solid #e2e8f0",
-                       background:activeSlide===(result.slides?.length||1)-1?"#f1f5f9":"#fff",
-                       color:activeSlide===(result.slides?.length||1)-1?"#cbd5e1":"#374151",
-                       fontWeight:800, fontSize:13, cursor:"pointer", fontFamily:"'Cairo',sans-serif" }}>التالي →</button>
-          </div>
-        </>
+      {/* الشبكة */}
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))", gap:12 }}>
+        {filtered.map(item => {
+          const cat = search
+            ? Object.values(RESOURCES).find(c=>c.items.some(i=>i.id===item.id))
+            : RESOURCES[activeTab];
+          return (
+            <ResourceCard key={item.id} item={item}
+              catColor={cat?.color} catBg={cat?.bg} />
+          );
+        })}
+      </div>
+
+      {filtered.length === 0 && (
+        <div style={{ textAlign:"center", padding:"40px 20px", color:"#94a3b8" }}>
+          <div style={{ fontSize:36, marginBottom:8 }}>🔍</div>
+          <div style={{ fontWeight:700, fontSize:13 }}>لا توجد نتائج لـ "{search}"</div>
+        </div>
       )}
     </div>
   );
@@ -5740,8 +5679,8 @@ function TeacherPortal({ classList, setClassList, saveClass, siteFont, onBack, a
             🎯 تقييمي الذاتي
           </button>
           <button onClick={() => setActiveTab("pptai")}
-            className={`flex-1 py-3 rounded-2xl font-black text-sm transition-all ${activeTab === "pptai" ? "bg-orange-600 text-white shadow-md" : "bg-white text-gray-600 hover:bg-orange-50 border border-gray-200"}`}>
-            🎨 بوربوينت AI
+            className={`flex-1 py-3 rounded-2xl font-black text-sm transition-all ${activeTab === "pptai" ? "bg-blue-700 text-white shadow-md" : "bg-white text-gray-600 hover:bg-blue-50 border border-gray-200"}`}>
+            📚 مصادر تعليمية
           </button>
         </div>
 
