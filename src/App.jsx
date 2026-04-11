@@ -1900,14 +1900,14 @@ function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, sa
               <thead>
                 <tr style={{ background: "#f0fdfa" }}>
                   <th className="p-3 text-right text-xs font-bold text-gray-500 w-8">م</th>
-                  <th className="p-3 text-right text-xs font-bold text-gray-500">اسم المعلم / الإداري</th>
-                  <th className="p-3 text-center text-xs font-bold text-gray-500 w-28">الحالة</th>
+                  <th className="p-3 text-right text-xs font-bold text-gray-500">اسم المعلم / الإداري</th>                  <th className="p-3 text-center text-xs font-bold text-gray-500 w-28">الحالة</th>
                   <th className="p-3 text-center text-xs font-bold text-amber-700">الحصة</th>
                   <th className="p-3 text-center text-xs font-bold text-amber-700">مدة التأخر</th>
                   <th className="p-3 text-center text-xs font-bold text-red-600">نوع الغياب</th>
                   <th className="p-3 text-center text-xs font-bold text-gray-500">ملاحظات</th>
                   <th className="p-3 text-center text-xs font-bold text-teal-700">🎺 طابور</th>
                   <th className="p-3 text-center text-xs font-bold text-red-700">مساءلة</th>
+                  <th className="p-3 text-center text-xs font-bold text-gray-400">حذف</th>
                 </tr>
               </thead>
               <tbody>
@@ -1923,19 +1923,8 @@ function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, sa
                       <td className="p-2 text-center text-xs text-gray-400 font-bold">{ti + 1}</td>
                       <td className="p-2.5">
                         <div className="flex items-center gap-2">
-                          <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${isAbsent ? "bg-red-400" : isLate ? "bg-amber-400" : "bg-green-400"}`}></div>
+                          <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${isAbsent ? "bg-red-400" : isLate ? "bg-amber-400" : status==="مستأذن" ? "bg-blue-400" : "bg-green-400"}`}></div>
                           <span className="font-medium text-gray-800 text-sm">{name}</span>
-                          <button onClick={() => {
-                            if (!window.confirm(`حذف المعلم "${name}" من القائمة؟`)) return;
-                            const updated = teachers.filter((_,i) => i !== ti);
-                            setTeachers(updated); saveTeachers(updated);
-                          }}
-                            style={{ marginRight:"auto", background:"none", border:"none",
-                                     color:"#fca5a5", cursor:"pointer", fontSize:13, padding:"0 2px",
-                                     opacity:0.5, transition:"opacity .15s" }}
-                            onMouseOver={e=>e.target.style.opacity=1}
-                            onMouseOut={e=>e.target.style.opacity=0.5}
-                            title="حذف المعلم">✕</button>
                         </div>
                       </td>
 
@@ -2144,6 +2133,20 @@ function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, sa
                         ) : (
                           <span style={{ color:"#e5e7eb", fontSize:18 }}>—</span>
                         )}
+                      </td>
+
+                      {/* حذف المعلم */}
+                      <td className="p-1.5 text-center">
+                        <button
+                          onClick={() => {
+                            if (!window.confirm(`⚠️ حذف المعلم "${name}" من القائمة؟`)) return;
+                            const updated = teachers.filter((_, i) => i !== ti);
+                            setTeachers(updated); saveTeachers(updated);
+                          }}
+                          className="text-red-300 hover:text-red-600 hover:bg-red-50 rounded-lg p-1.5 transition-all"
+                          title="حذف المعلم من القائمة">
+                          🗑️
+                        </button>
                       </td>
                     </tr>
                   );
