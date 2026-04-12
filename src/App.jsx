@@ -13011,16 +13011,25 @@ const EVAL_SECTIONS = [
     items:["مستوى تنفيذ التوصيات السابقة","مواطن القوة والتميز","الدعم والخبرات المقدمة من المشرف","التوصيات"] },
 ];
 
+const HIJRI_MONTHS = ["محرم","صفر","ربيع الأول","ربيع الآخر","جمادى الأولى","جمادى الآخرة","رجب","شعبان","رمضان","شوال","ذو القعدة","ذو الحجة"];
+const HIJRI_YEARS  = Array.from({length:7},(_,i)=>1447+i); // 1447-1453 (covers to 2031)
+const GREGORIAN_MONTHS = ["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"];
+const GREGORIAN_YEARS  = Array.from({length:4},(_,i)=>2025+i); // 2025-2028
+
 const emptyForm = () => ({
   visitDate:"", subject:"", grade:"", lesson:"", period:"",
   studentCount:"", presentCount:"", absentCount:"",
   visitNum:"1", visitPurpose:"", visitType:"حضوري", isNew:"لا",
-  methods:[], methodsOther:"",
+  hijriDay:"", hijriMonth:"", hijriYear:"1447",
+  gregDay:"", gregMonth:"", gregYear:"2025",
+  methods:[], methodsOther:"", visitGoals:[],
+  principalName:"فازع عبدالله حسن القرني",
+  supervisorName:"",
   scores: Object.fromEntries(
     EVAL_SECTIONS.flatMap(s => s.fields.map(f => [f, 0]))
   ),
   prevRecs:"", strengths:"", support:"", recommendations:"", benefitFrom:"",
-  needs: Array(6).fill(null).map(() => ({need:"", program:""})),
+  performanceNote:"", needs: Array(6).fill(null).map(() => ({need:"", program:""})),
 });
 
 function AssessmentPage({ teachers: appTeachers = [] }) {
@@ -13086,56 +13095,174 @@ function AssessmentPage({ teachers: appTeachers = [] }) {
 
   const handlePrint = () => {
     if (!selectedTeacher) return;
+    const fmtHijri = [form.hijriDay, form.hijriMonth, form.hijriYear].filter(Boolean).join(" / ") + (form.hijriYear?" هـ":"");
+    const fmtGreg  = [form.gregDay, form.gregMonth, form.gregYear].filter(Boolean).join(" / ") + (form.gregYear?" م":"");
+
     const scoreRows = EVAL_SECTIONS.map(sec => {
       const avg = (() => {
         const vals = sec.fields.map(f=>form.scores[f]||0).filter(v=>v>0);
         return vals.length ? Math.round(vals.reduce((a,b)=>a+b,0)/vals.length*10)/10 : 0;
       })();
-      return `<tr><td style="text-align:right;padding:7px 10px;font-weight:600">${sec.title}</td>
-        ${sec.fields.map(f=>`<td style="text-align:center;padding:7px">${form.scores[f]||"—"}</td>`).join("")}
-        <td style="text-align:center;padding:7px;font-weight:900;color:${scoreColor(avg)}">${avg||"—"}</td></tr>`;
+      const avgColor = avg>=4?"#1a6b3c":avg>=3?"#9a7230":avg>=2?"#e67e22":"#8b1a1a";
+      const itemRows = sec.items.map((item,j)=>{
+        const sc = form.scores[sec.fields[j]]||0;
+        const c = sc>=4?"#1a6b3c":sc>=3?"#9a7230":sc>=2?"#e67e22":sc>=1?"#8b1a1a":"#aaa";
+        return `<tr>
+          <td style="text-align:right;padding:7px 12px;font-size:11.5px;color:#1a2d3e;border:1px solid #dce6f0">${item}</td>
+          ${[1,2,3,4,5].map(n=>`<td style="text-align:center;padding:7px;font-size:13px;background:${sc===n?sec.color:"#fff"};color:${sc===n?"#fff":"#ccc"};border:1px solid #dce6f0;font-weight:900">${sc===n?"●":"○"}</td>`).join("")}
+          <td style="text-align:center;padding:7px;font-weight:900;font-size:14px;color:${c};border:1px solid #dce6f0">${sc||"—"}</td>
+        </tr>`;
+      }).join("");
+      return `
+        <tr>
+          <td colspan="7" style="padding:9px 14px;background:${sec.color};color:#fff;font-weight:900;font-size:12.5px;border:none">${sec.title}</td>
+        </tr>
+        ${itemRows}
+        <tr style="background:#f5f9ff">
+          <td style="text-align:right;padding:5px 12px;font-size:10px;color:#5a7080;font-style:italic;border:1px solid #dce6f0">متوسط المحور</td>
+          <td colspan="5" style="border:1px solid #dce6f0"></td>
+          <td style="text-align:center;padding:5px;font-weight:900;font-size:14px;color:${avgColor};border:1px solid #dce6f0">${avg||"—"}</td>
+        </tr>`;
     }).join("");
-    printWindow(`<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8">
-    <title>بطاقة تشخيص التحصيل</title>
-    <style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Tajawal','Noto Naskh Arabic',Arial,sans-serif;direction:rtl;padding:20px;font-size:12px}
-    .hdr{background:linear-gradient(135deg,#071e34,#0a3d5c,#0e6d6b);color:#fff;padding:18px 20px;border-radius:10px;margin-bottom:16px;text-align:center}
-    .hdr h1{font-size:17px;font-weight:900;margin-bottom:4px}.hdr p{font-size:11px;opacity:.7}
-    .info-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px}
-    .info-item{background:#f0f4f8;border-radius:7px;padding:8px 10px}
-    .info-item label{display:block;font-size:9px;color:#5a7080;margin-bottom:2px}
-    .info-item span{font-size:12px;font-weight:700;color:#1a2d3e}
-    .sec-title{font-size:12px;font-weight:900;color:#fff;padding:8px 12px;border-radius:7px 7px 0 0}
-    table{width:100%;border-collapse:collapse;margin-bottom:12px;font-size:11px}
-    th{background:#f0f5fa;padding:7px;text-align:center;font-weight:700;color:#0a3d5c;border:1px solid #d0dbe8}
-    td{border:1px solid #d0dbe8;padding:6px}
-    .score-total{text-align:center;padding:12px;background:linear-gradient(135deg,#0a3d5c,#0e7c7b);color:#fff;border-radius:10px;margin:14px 0}
-    .obs{background:#f9fbfd;border:1px solid #d0dbe8;border-radius:7px;padding:10px;margin-bottom:10px;min-height:50px}
-    .obs-lbl{font-size:11px;font-weight:700;color:#0a3d5c;margin-bottom:5px}
-    .sigs{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:20px}
-    .sig{border-top:1.5px solid #1a2d3e;padding-top:6px;text-align:center;font-size:11px}
-    @media print{@page{size:A4;margin:1cm}}</style></head><body>
-    <div class="hdr"><h1>بطاقة تشخيص قياس التحصيل الدراسي</h1>
-    <p>مدرسة عبيدة بن الحارث المتوسطة — إدارة تعليم جدة</p></div>
-    <div class="info-grid">
-      <div class="info-item"><label>اسم المعلم</label><span>${selectedTeacher.name}</span></div>
-      <div class="info-item"><label>المادة</label><span>${form.subject||"—"}</span></div>
-      <div class="info-item"><label>الفصل</label><span>${form.grade||"—"}</span></div>
-      <div class="info-item"><label>عنوان الدرس</label><span>${form.lesson||"—"}</span></div>
-      <div class="info-item"><label>تاريخ الزيارة</label><span>${form.visitDate||"—"}</span></div>
-      <div class="info-item"><label>الحصة</label><span>${form.period||"—"}</span></div>
-      <div class="info-item"><label>عدد الطلاب</label><span>${form.studentCount||"—"}</span></div>
-      <div class="info-item"><label>نوع الزيارة</label><span>${form.visitType}</span></div>
+
+    const goals = (form.visitGoals||[]).map(g=>`<span style="display:inline-block;background:#e8f8f8;border:1px solid #0e7c7b;color:#0a4d3c;padding:3px 10px;border-radius:5px;font-size:10.5px;margin:2px 3px">${g}</span>`).join("");
+
+    printWindow(`<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="utf-8">
+    <title>بطاقة تشخيص قياس التحصيل — ${selectedTeacher.name}</title>
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap');
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:'Tajawal',Arial,sans-serif;direction:rtl;background:#fff;color:#1a2d3e;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    .page{width:210mm;min-height:297mm;margin:0 auto;padding:12mm 14mm 14mm;background:#fff}
+    .hdr{background:linear-gradient(135deg,#071e34 0%,#0a3d5c 55%,#0e6d6b 100%);color:#fff;
+         padding:16px 22px;border-radius:10px;margin-bottom:14px;
+         display:grid;grid-template-columns:50px 1fr 150px;align-items:center;gap:14px}
+    .hdr-logo{font-size:40px;opacity:.85;text-align:center}
+    .hdr-center{text-align:center}
+    .hdr h1{font-size:18px;font-weight:900;margin-bottom:4px}
+    .hdr p{font-size:11px;opacity:.8}
+    .hdr-dates{text-align:left;line-height:2.2}
+    .hdr-dates div{font-size:11px;display:flex;gap:4px;align-items:center}
+    .hdr-dates .lbl{opacity:.7;font-size:10px}
+    .hdr-dates .val{font-weight:900;font-size:12px}
+    .info-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-bottom:12px}
+    .info-item{background:#f3f7fb;border-radius:7px;padding:7px 10px;border:1px solid #dce6f0}
+    .info-item label{display:block;font-size:9px;color:#6a86a0;margin-bottom:2px;font-weight:700;text-transform:uppercase;letter-spacing:.3px}
+    .info-item span{font-size:12.5px;font-weight:800;color:#1a2d3e}
+    .goals-box{background:#f0fcfa;border:1px solid #9fd8d3;border-radius:8px;padding:10px 14px;margin-bottom:12px}
+    .goals-title{font-size:11px;font-weight:900;color:#0a4d3c;margin-bottom:7px}
+    table{width:100%;border-collapse:collapse;margin-bottom:12px;font-size:11.5px}
+    .tbl-head th{background:#0a3d5c;color:#fff;padding:9px 10px;text-align:center;font-weight:800;font-size:11.5px}
+    .tbl-head th:first-child{text-align:right;width:44%}
+    .score-total{display:flex;align-items:center;justify-content:center;gap:30px;
+                 background:linear-gradient(135deg,#071e34,#0a3d5c 50%,#0e7c7b);color:#fff;
+                 border-radius:10px;margin:12px 0;padding:16px 24px}
+    .score-big{font-size:46px;font-weight:900;line-height:1}
+    .score-label{font-size:14px;background:rgba(255,255,255,.2);padding:4px 16px;border-radius:20px;margin-top:5px;display:inline-block}
+    .obs{background:#f9fbfd;border:1px solid #dce6f0;border-radius:8px;padding:10px 14px;margin-bottom:9px}
+    .obs-lbl{font-size:11px;font-weight:900;color:#0a3d5c;margin-bottom:5px}
+    .obs-val{font-size:11.5px;color:#1a2d3e;min-height:28px;line-height:1.8;white-space:pre-wrap}
+    .needs-tbl{width:100%;border-collapse:collapse;margin-bottom:14px;font-size:11.5px}
+    .needs-tbl th{background:#4a2080;color:#fff;padding:8px 12px;font-weight:800;border:1px solid #c9b8e8}
+    .needs-tbl td{border:1px solid #dce6f0;padding:9px 12px;background:#fff}
+    .needs-tbl tr:nth-child(even) td{background:#faf8ff}
+    .sigs{display:grid;grid-template-columns:1fr 1fr 1fr;gap:24px;margin-top:22px}
+    .sig{text-align:center}
+    .sig-space{height:50px;border-bottom:2px dashed #9ab0c8;margin-bottom:10px}
+    .sig-name{font-weight:900;color:#0a3d5c;font-size:13px;margin-top:5px}
+    .sig-title{font-size:11px;color:#6a86a0;margin-top:4px;font-weight:700}
+    @media print{
+      @page{size:A4;margin:0}
+      body{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+      .page{padding:8mm 12mm 12mm}
+    }
+    </style></head><body>
+    <div class="page">
+
+      <div class="hdr">
+        <div class="hdr-logo">📊</div>
+        <div class="hdr-center">
+          <h1>بطاقة تشخيص قياس التحصيل الدراسي</h1>
+          <p>مدرسة عبيدة بن الحارث المتوسطة — إدارة تعليم جدة</p>
+        </div>
+        <div class="hdr-dates">
+          <div><span class="lbl">هجري:</span> <span class="val">${fmtHijri||"—"}</span></div>
+          <div><span class="lbl">ميلادي:</span> <span class="val">${fmtGreg||"—"}</span></div>
+        </div>
+      </div>
+
+      <div class="info-grid">
+        <div class="info-item"><label>اسم المعلم</label><span>${selectedTeacher.name}</span></div>
+        <div class="info-item"><label>المادة</label><span>${form.subject||"—"}</span></div>
+        <div class="info-item"><label>الصف والفصل</label><span>${form.grade||"—"}</span></div>
+        <div class="info-item"><label>عنوان الدرس</label><span>${form.lesson||"—"}</span></div>
+        <div class="info-item"><label>الحصة</label><span>${form.period?"الحصة "+form.period:"—"}</span></div>
+        <div class="info-item"><label>عدد الطلاب</label><span>${form.studentCount||"—"}</span></div>
+        <div class="info-item"><label>الحاضرون</label><span>${form.presentCount||"—"}</span></div>
+        <div class="info-item"><label>الغائبون</label><span>${form.absentCount||"—"}</span></div>
+        <div class="info-item"><label>نوع الزيارة</label><span>${form.visitType||"—"}</span></div>
+        <div class="info-item"><label>رقم الزيارة</label><span>${form.visitNum||"—"}</span></div>
+        <div class="info-item"><label>هل المعلم جديد؟</label><span>${form.isNew||"—"}</span></div>
+        <div class="info-item"><label>الغرض من الزيارة</label><span>${form.visitPurpose||"—"}</span></div>
+      </div>
+
+      ${goals?`<div class="goals-box"><div class="goals-title">🎯 الأساليب التي اتبعها المشرف للتعرف على المستوى</div>${goals}${form.methodsOther?`<div style="font-size:10.5px;margin-top:6px;color:#5a7080">أخرى: ${form.methodsOther}</div>`:""}</div>`:""}
+
+      <table>
+        <thead class="tbl-head">
+          <tr>
+            <th>عنصر التقييم</th>
+            <th>1</th><th>2</th><th>3</th><th>4</th><th>5</th>
+            <th>الدرجة</th>
+          </tr>
+        </thead>
+        <tbody>${scoreRows}</tbody>
+      </table>
+
+      <div class="score-total">
+        <div style="text-align:center">
+          <div style="font-size:13px;opacity:.8;margin-bottom:4px">الدرجة الكلية للزيارة</div>
+          <div class="score-big">${totalScore()||"—"}</div>
+          <div class="score-label">${scoreLabel(totalScore())}</div>
+        </div>
+        <div style="font-size:11px;opacity:.75;text-align:right;line-height:2.1">
+          <div>ممتاز ≥ 4.5</div>
+          <div>جيد جداً ≥ 3.5</div>
+          <div>جيد ≥ 2.5</div>
+          <div>مقبول ≥ 1.5</div>
+          <div>يحتاج دعم &lt; 1.5</div>
+        </div>
+      </div>
+
+      ${form.performanceNote?`<div class="obs"><div class="obs-lbl">📝 ملاحظة</div><div class="obs-val">${form.performanceNote}</div></div>`:""}
+      ${form.benefitFrom?`<div class="obs"><div class="obs-lbl">🎓 يستفاد من المعلم في</div><div class="obs-val">${form.benefitFrom}</div></div>`:""}
+      ${form.recommendations?`<div class="obs"><div class="obs-lbl">📋 التوصيات</div><div class="obs-val">${form.recommendations}</div></div>`:""}
+
+      ${form.needs&&form.needs.some(n=>n.need||n.program)?`
+      <table class="needs-tbl">
+        <thead><tr><th style="text-align:center;width:36px">#</th><th style="text-align:right">الاحتياج التدريبي</th><th style="text-align:right">البرنامج المقترح للمتابعة / للتطوير</th></tr></thead>
+        <tbody>${form.needs.filter(n=>n.need||n.program).map((n,i)=>`<tr><td style="text-align:center;font-weight:800;font-size:12px">${i+1}</td><td>${n.need||""}</td><td>${n.program||""}</td></tr>`).join("")}</tbody>
+      </table>`:""}
+
+      <div class="sigs">
+        <div class="sig">
+          <div class="sig-space"></div>
+          <div class="sig-name">${selectedTeacher.name}</div>
+          <div class="sig-title">المعلم</div>
+        </div>
+        <div class="sig">
+          <div class="sig-space"></div>
+          <div class="sig-name">${form.principalName||"فازع عبدالله حسن القرني"}</div>
+          <div class="sig-title">مدير المدرسة</div>
+        </div>
+        <div class="sig">
+          <div class="sig-space"></div>
+          <div class="sig-name">${form.supervisorName||""}</div>
+          <div class="sig-title">المشرف التربوي</div>
+        </div>
+      </div>
+
     </div>
-    <table><thead><tr><th>المعيار</th><th colspan="2">التقييم</th><th>المتوسط</th></tr></thead>
-    <tbody>${scoreRows}</tbody></table>
-    <div class="score-total"><div style="font-size:13px;opacity:.8">الدرجة الكلية</div>
-    <div style="font-size:30px;font-weight:900">${totalScore()}</div>
-    <div style="font-size:13px;margin-top:4px">${scoreLabel(totalScore())}</div></div>
-    ${form.strengths?`<div class="obs"><div class="obs-lbl">نقاط القوة</div>${form.strengths}</div>`:""}
-    ${form.support?`<div class="obs"><div class="obs-lbl">جوانب تحتاج دعماً</div>${form.support}</div>`:""}
-    ${form.recommendations?`<div class="obs"><div class="obs-lbl">التوصيات</div>${form.recommendations}</div>`:""}
-    <div class="sigs"><div class="sig">توقيع المعلم<br><br>${selectedTeacher.name}</div>
-    <div class="sig">توقيع مدير المدرسة<br><br>فازع عبدالله القرني</div></div>
     <script>window.onload=()=>window.print()</script></body></html>`);
   };
 
@@ -13329,7 +13456,67 @@ function AssessmentPage({ teachers: appTeachers = [] }) {
 
         <div style={{ maxWidth:900, margin:"0 auto", padding:"16px 14px 60px" }}>
 
-          {/* البيانات الأساسية */}
+          {/* التاريخ الهجري والميلادي */}
+          <div style={{ background:"linear-gradient(135deg,#071e34,#0a3d5c,#0e6d6b)", borderRadius:12,
+            marginBottom:14, padding:"16px 20px" }}>
+            <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:14 }}>
+              <div style={{ fontSize:22 }}>📅</div>
+              <span style={{ color:"#fff", fontWeight:800, fontSize:15 }}>تاريخ الزيارة</span>
+            </div>
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16 }}>
+              {/* هجري */}
+              <div>
+                <div style={{ fontSize:11, color:"rgba(255,255,255,0.75)", fontWeight:700, marginBottom:6 }}>التاريخ الهجري</div>
+                <div style={{ display:"grid", gridTemplateColumns:"1fr 2fr 1fr", gap:6 }}>
+                  {[
+                    { label:"اليوم", val:form.hijriDay, key:"hijriDay",
+                      opts:["",...Array.from({length:30},(_,i)=>String(i+1))] },
+                    { label:"الشهر", val:form.hijriMonth, key:"hijriMonth",
+                      opts:["",...HIJRI_MONTHS] },
+                    { label:"السنة", val:form.hijriYear, key:"hijriYear",
+                      opts:HIJRI_YEARS.map(String) },
+                  ].map(s=>(
+                    <div key={s.key}>
+                      <div style={{ fontSize:9.5, color:"rgba(255,255,255,0.6)", marginBottom:3 }}>{s.label}</div>
+                      <select value={s.val} onChange={e=>setForm(f=>({...f,[s.key]:e.target.value}))}
+                        style={{ width:"100%", padding:"7px 6px", borderRadius:7,
+                                 border:"1.5px solid rgba(255,255,255,0.3)",
+                                 background:"rgba(255,255,255,0.15)", color:"#fff",
+                                 fontFamily:"'Tajawal',sans-serif", fontSize:12, fontWeight:700, outline:"none" }}>
+                        {s.opts.map(o=><option key={o} value={o} style={{color:"#000",background:"#fff"}}>{o||"--"}{s.key==="hijriYear"&&o?" هـ":""}</option>)}
+                      </select>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              {/* ميلادي */}
+              <div>
+                <div style={{ fontSize:11, color:"rgba(255,255,255,0.75)", fontWeight:700, marginBottom:6 }}>التاريخ الميلادي</div>
+                <div style={{ display:"grid", gridTemplateColumns:"1fr 2fr 1fr", gap:6 }}>
+                  {[
+                    { label:"اليوم", val:form.gregDay, key:"gregDay",
+                      opts:["",...Array.from({length:31},(_,i)=>String(i+1))] },
+                    { label:"الشهر", val:form.gregMonth, key:"gregMonth",
+                      opts:["",...GREGORIAN_MONTHS] },
+                    { label:"السنة", val:form.gregYear, key:"gregYear",
+                      opts:GREGORIAN_YEARS.map(String) },
+                  ].map(s=>(
+                    <div key={s.key}>
+                      <div style={{ fontSize:9.5, color:"rgba(255,255,255,0.6)", marginBottom:3 }}>{s.label}</div>
+                      <select value={s.val} onChange={e=>setForm(f=>({...f,[s.key]:e.target.value}))}
+                        style={{ width:"100%", padding:"7px 6px", borderRadius:7,
+                                 border:"1.5px solid rgba(255,255,255,0.3)",
+                                 background:"rgba(255,255,255,0.15)", color:"#fff",
+                                 fontFamily:"'Tajawal',sans-serif", fontSize:12, fontWeight:700, outline:"none" }}>
+                        {s.opts.map(o=><option key={o} value={o} style={{color:"#000",background:"#fff"}}>{o||"--"}{s.key==="gregYear"&&o?" م":""}</option>)}
+                      </select>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div style={{ background:"#fff", borderRadius:12, marginBottom:14, overflow:"hidden",
             border:"1px solid #d0dbe8", boxShadow:"0 2px 12px rgba(10,61,92,0.07)" }}>
             <div style={{ background:"linear-gradient(135deg,#0a3d5c,#0d5280)", padding:"11px 16px",
@@ -13343,7 +13530,6 @@ function AssessmentPage({ teachers: appTeachers = [] }) {
                 {[
                   {l:"اسم المعلم",    v:selectedTeacher.name,  ro:true},
                   {l:"الجوال",        v:selectedTeacher.mobile, ro:true},
-                  {l:"تاريخ الزيارة", v:form.visitDate,  k:"visitDate"},
                   {l:"الفصل",        v:form.grade,      k:"grade",   ph:"الصف والفصل"},
                   {l:"عنوان الدرس",  v:form.lesson,     k:"lesson",  ph:"موضوع الحصة"},
                   {l:"عدد الطلاب",   v:form.studentCount,k:"studentCount",tp:"number"},
@@ -13503,6 +13689,53 @@ function AssessmentPage({ teachers: appTeachers = [] }) {
                              fontFamily:"'Tajawal',sans-serif", fontSize:12.5, outline:"none" }} />
                 </div>
               ))}
+            </div>
+          </div>
+
+          {/* التوقيعات */}
+          <div style={{ background:"#fff", borderRadius:12, marginBottom:14, overflow:"hidden",
+            border:"1px solid #d0dbe8", boxShadow:"0 2px 12px rgba(10,61,92,0.07)" }}>
+            <div style={{ background:"linear-gradient(135deg,#071e34,#0a3d5c)", padding:"11px 16px",
+              display:"flex", alignItems:"center", gap:10 }}>
+              <span style={{ color:"#fff", fontWeight:800, fontSize:14 }}>✍️ التوقيعات</span>
+            </div>
+            <div style={{ padding:"20px 16px" }}>
+              {/* حقول الأسماء */}
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14, marginBottom:24 }}>
+                <div>
+                  <label style={{ fontSize:11, fontWeight:700, color:"#5a7080", display:"block", marginBottom:5 }}>اسم مدير المدرسة</label>
+                  <input value={form.principalName||""} onChange={e=>setForm(f=>({...f,principalName:e.target.value}))}
+                    placeholder="اسم مدير المدرسة"
+                    style={{ width:"100%", padding:"9px 12px", border:"1.5px solid #d0dbe8", borderRadius:8,
+                             fontFamily:"'Tajawal',sans-serif", fontSize:13, color:"#1a2d3e",
+                             background:"#f9fbfd", direction:"rtl", outline:"none", boxSizing:"border-box" }} />
+                </div>
+                <div>
+                  <label style={{ fontSize:11, fontWeight:700, color:"#5a7080", display:"block", marginBottom:5 }}>اسم المشرف التربوي</label>
+                  <input value={form.supervisorName||""} onChange={e=>setForm(f=>({...f,supervisorName:e.target.value}))}
+                    placeholder="اسم المشرف التربوي"
+                    style={{ width:"100%", padding:"9px 12px", border:"1.5px solid #d0dbe8", borderRadius:8,
+                             fontFamily:"'Tajawal',sans-serif", fontSize:13, color:"#1a2d3e",
+                             background:"#f9fbfd", direction:"rtl", outline:"none", boxSizing:"border-box" }} />
+                </div>
+              </div>
+              {/* خطوط التوقيع */}
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:24 }}>
+                {[
+                  { title:"توقيع المعلم",       name:selectedTeacher?.name||"" },
+                  { title:"مدير المدرسة",        name:form.principalName||"فازع عبدالله حسن القرني" },
+                  { title:"المشرف التربوي",      name:form.supervisorName||"" },
+                ].map((s,i)=>(
+                  <div key={i} style={{ textAlign:"center" }}>
+                    <div style={{ height:52, borderBottom:"1.5px dashed #b0c4d8", marginBottom:8,
+                      display:"flex", alignItems:"flex-end", justifyContent:"center", paddingBottom:6 }}>
+                      <span style={{ fontSize:10, color:"#aaa" }}>التوقيع</span>
+                    </div>
+                    <div style={{ fontWeight:700, color:"#0a3d5c", fontSize:12.5 }}>{s.name||"\u00a0"}</div>
+                    <div style={{ fontSize:11, color:"#5a7080", marginTop:3 }}>{s.title}</div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
 
