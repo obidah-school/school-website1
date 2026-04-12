@@ -12981,24 +12981,34 @@ const TEACHING_METHODS = [
 ];
 
 const EVAL_SECTIONS = [
-  { id:"masooliya",   title:"المسؤولية والالتزام المهني",  color:"#0a3d5c", fields:["r_mas1"],
-    items:["الالتزام بمواعيد الدوام والحضور المبكر"] },
-  { id:"tawasel",     title:"التواصل والعلاقات",            color:"#0d5280", fields:["r_taw1","r_taw2"],
-    items:["التواصل الإيجابي مع الطلاب","التعاون مع الزملاء والإدارة"] },
+  { id:"masooliya",   title:"المسؤولية",                   color:"#0a3d5c", fields:["r_mas1"],
+    items:["تطبيق قواعد السلوك الوظيفي وأخلاقيات مهنة التعليم"] },
+  { id:"tawasel",     title:"التواصل والتعاون",             color:"#0d5280", fields:["r_taw1","r_taw2"],
+    items:["التعاون الإيجابي في بيئة العمل","الالتزام بآداب الحوار شفهياً وكتابياً"] },
   { id:"tatawer",     title:"التطوير المهني",               color:"#0e7c7b", fields:["r_tat1","r_tat2","r_tat3"],
-    items:["المشاركة في التطوير الذاتي","تطبيق مستجدات التربية","الإفادة من التغذية الراجعة"] },
-  { id:"takhtet",     title:"التخطيط والتحضير",            color:"#9a7230", fields:["r_takh1","r_takh2"],
-    items:["جودة التحضير وشموليته","ارتباط الأهداف بالمحتوى"] },
-  { id:"estratijiyat",title:"الاستراتيجيات التعليمية",    color:"#4a2080", fields:["r_str1","r_str2","r_str3","r_str4","r_str5","r_str6","r_str7"],
-    items:["تنويع استراتيجيات التدريس","إدارة الوقت","تفعيل الطلاب","مراعاة الفروق الفردية","استخدام الوسائل","ربط التعلم بالحياة","إثارة الدافعية"] },
-  { id:"tatbiqat",    title:"التطبيقات والتقنية",          color:"#1a6b3c", fields:["r_app1","r_app2"],
-    items:["توظيف التقنية في التدريس","استخدام الموارد الرقمية"] },
-  { id:"taqwem",      title:"التقويم والتقييم",            color:"#7c1d1d", fields:["r_tqm1","r_tqm2","r_tqm3"],
-    items:["تنويع أساليب التقويم","استخدام التغذية الراجعة","ربط التقويم بالأهداف"] },
-  { id:"beea",        title:"البيئة الصفية",               color:"#2a4a80", fields:["r_bee1","r_bee2","r_bee3"],
-    items:["تهيئة بيئة تعلم محفزة","إدارة الصف","النظام والانضباط"] },
+    items:["الالتزام بخطة التطوير المهني","تبادل الخبرات المهنية والتخصصية مع زملائه وتفعيل مجتمعات التعلم المهنية","تقديم إنتاج معرفي"] },
+  { id:"takhtet",     title:"التخطيط والإعداد للدرس",      color:"#9a7230", fields:["r_takh1","r_takh2"],
+    items:["تصميم خطة فصلية للمقرر","التخطيط للدرس وفق منهجية علمية واضحة"] },
+  { id:"estratijiyat",title:"تطبيق إستراتيجيات التعلم",   color:"#4a2080", fields:["r_str1","r_str2","r_str3","r_str4","r_str5","r_str6","r_str7"],
+    items:[
+      "التهيكلة المناسبة لدعم أهداف التعلم",
+      "تنفيذ درس يحقق أهداف التعلم",
+      "توظيف تقنيات ووسائل تعليمية تحقق أهداف التعلم",
+      "استخدام منصات وتطبيقات التعليم عن بعد مع ربطها بأنماط الطلاب واحتياجاتهم",
+      "تقديم مادة علمية صحيحة ترتيباً بأهداف التعلم وتناسب خبرات الطلاب",
+      "تطبيق إستراتيجيات تعليمية متنوعة تحقق أهداف التعلم بما يناسب أنماط الطلاب المختلفة",
+      "ربط الدرس بواقع الحياة وتكاملها مع المواد الأخرى",
+    ] },
+  { id:"tatbiqat",    title:"تطبيقات التعلم",              color:"#1a6b3c", fields:["r_app1","r_app2"],
+    items:["طرح أسئلة صفية مناسبة مع مراعاتها للفروق الفردية","إشراك الطلاب في أنشطة الدرس بما يحقق العدالة بينهم"] },
+  { id:"taqwem",      title:"تقويم التعلم",                color:"#7c1d1d", fields:["r_tqm1","r_tqm2","r_tqm3"],
+    items:["تشخيص مستويات الطالب بأساليب وأدوات متنوعة","بناء خطة متكاملة لتعزيز الطالب وفق احتياجهم مع مراعاة التميز ومعالجة الضعف","توظيف التطبيقات الصفية والمنزلية في تقويم الطالب مع مراعاة مستوياتهم"] },
+  { id:"beea",        title:"بيئة التعلم",                 color:"#2a4a80", fields:["r_bee1","r_bee2","r_bee3"],
+    items:["تهيكل بيئة تعليمية مناسبة ومحفزة وجذابة للتعلم","إدارة مشاركات واستفسارات الطلاب الشفوية والمكتوبة بفاعلية","إدارة واستثمار وقت التعلم بكفاءة عالية"] },
   { id:"tahsel",      title:"التحصيل الدراسي",             color:"#1a5a1a", fields:["r_tah1","r_tah2"],
-    items:["مستوى فهم الطلاب","تحقيق أهداف الدرس"] },
+    items:["مستوى تفاعل الطلاب خلال الدرس","مستوى تحصيل الطلاب العلمي"] },
+  { id:"tawseyat",    title:"التوصيات والدعم",             color:"#5a1a5a", fields:["r_tw1","r_tw2","r_tw3","r_tw4"],
+    items:["مستوى تنفيذ التوصيات السابقة","مواطن القوة والتميز","الدعم والخبرات المقدمة من المشرف","التوصيات"] },
 ];
 
 const emptyForm = () => ({
@@ -13334,15 +13344,13 @@ function AssessmentPage({ teachers: appTeachers = [] }) {
                   {l:"اسم المعلم",    v:selectedTeacher.name,  ro:true},
                   {l:"الجوال",        v:selectedTeacher.mobile, ro:true},
                   {l:"تاريخ الزيارة", v:form.visitDate,  k:"visitDate"},
-                  {l:"المادة",        v:form.subject,    k:"subject", ph:"اسم المادة"},
                   {l:"الفصل",        v:form.grade,      k:"grade",   ph:"الصف والفصل"},
                   {l:"عنوان الدرس",  v:form.lesson,     k:"lesson",  ph:"موضوع الحصة"},
-                  {l:"الحصة",        v:form.period,     k:"period",  ph:"رقم الحصة"},
                   {l:"عدد الطلاب",   v:form.studentCount,k:"studentCount",tp:"number"},
                   {l:"الحاضرون",     v:form.presentCount,k:"presentCount",tp:"number"},
                   {l:"الغائبون",     v:form.absentCount, k:"absentCount",tp:"number"},
                   {l:"رقم الزيارة",  v:form.visitNum,   k:"visitNum"},
-                  {l:"الغرض",        v:form.visitPurpose,k:"visitPurpose",ph:"الغرض من الزيارة"},
+                  {l:"الغرض من الزيارة", v:form.visitPurpose,k:"visitPurpose",ph:"الغرض من الزيارة"},
                 ].map((f,i)=>(
                   <F key={i} label={f.l}>
                     <input type={f.tp||"text"} value={f.v||""} readOnly={f.ro}
@@ -13353,6 +13361,30 @@ function AssessmentPage({ teachers: appTeachers = [] }) {
                                background:f.ro?"#f0f4f8":"#f9fbfd", direction:"rtl", outline:"none" }} />
                   </F>
                 ))}
+                {/* المادة - قائمة منسدلة مواد المرحلة المتوسطة */}
+                <F label="المادة">
+                  <select value={form.subject} onChange={e=>setForm(f=>({...f,subject:e.target.value}))}
+                    style={{ padding:"8px 10px", border:"1.5px solid #d0dbe8", borderRadius:8,
+                             fontFamily:"'Tajawal',sans-serif", fontSize:12.5, color:"#1a2d3e",
+                             background:"#f9fbfd", direction:"rtl", outline:"none", width:"100%" }}>
+                    <option value="">-- اختر المادة --</option>
+                    {["القرآن الكريم","التفسير","التوحيد","الفقه","الحديث","التربية الإسلامية","اللغة العربية","النحو والصرف","الإملاء والخط","الأدب والبلاغة","الرياضيات","العلوم","الفيزياء","الكيمياء","الأحياء","اللغة الإنجليزية","الحاسب الآلي","التقنية الرقمية","الاجتماعيات","التاريخ","الجغرافيا","التربية الوطنية","الاقتصاد المنزلي","التربية الفنية","التربية البدنية"].map(m=>(
+                      <option key={m} value={m}>{m}</option>
+                    ))}
+                  </select>
+                </F>
+                {/* الحصة - من 1 إلى 7 */}
+                <F label="الحصة">
+                  <select value={form.period} onChange={e=>setForm(f=>({...f,period:e.target.value}))}
+                    style={{ padding:"8px 10px", border:"1.5px solid #d0dbe8", borderRadius:8,
+                             fontFamily:"'Tajawal',sans-serif", fontSize:12.5, color:"#1a2d3e",
+                             background:"#f9fbfd", direction:"rtl", outline:"none", width:"100%" }}>
+                    <option value="">-- اختر الحصة --</option>
+                    {[1,2,3,4,5,6,7].map(n=>(
+                      <option key={n} value={n}>الحصة {n}</option>
+                    ))}
+                  </select>
+                </F>
               </div>
               <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16 }}>
                 <div>
@@ -13369,21 +13401,30 @@ function AssessmentPage({ teachers: appTeachers = [] }) {
             </div>
           </div>
 
-          {/* أساليب التعليم */}
+          {/* أهداف الزيارة */}
           <div style={{ background:"#fff", borderRadius:12, marginBottom:14, overflow:"hidden",
             border:"1px solid #d0dbe8", boxShadow:"0 2px 12px rgba(10,61,92,0.07)" }}>
             <div style={{ background:"linear-gradient(135deg,#0e7c7b,#12a09e)", padding:"11px 16px",
               display:"flex", alignItems:"center", gap:10 }}>
               <div style={{ width:32, height:32, background:"rgba(255,255,255,0.2)", borderRadius:8,
-                display:"flex", alignItems:"center", justifyContent:"center", fontSize:16 }}>🎓</div>
-              <span style={{ color:"#fff", fontWeight:800, fontSize:14 }}>أساليب التعليم والتعلم المُستخدمة</span>
+                display:"flex", alignItems:"center", justifyContent:"center", fontSize:16 }}>🎯</div>
+              <span style={{ color:"#fff", fontWeight:800, fontSize:14 }}>الأساليب التي اتبعها المشرف للتعرف على المستوى</span>
             </div>
             <div style={{ padding:"14px 16px" }}>
-              <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))", gap:8 }}>
-                {TEACHING_METHODS.map(m => {
-                  const checked = form.methods.includes(m);
+              <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(240px,1fr))", gap:8 }}>
+                {[
+                  "الزيارة الصفية والاجتماع بالمعلم",
+                  "معرفة مدى مشاركته في الأنشطة الخارجية للمادة",
+                  "الاطلاع على الإعداد الكتابي للدرس",
+                  "مناقشة مدير المدرسة",
+                  "الاطلاع على الواجبات والتطبيقات",
+                  "زيارة الموجه الطلابي",
+                  "الاطلاع على التقويم والاختبارات",
+                  "إجراء اختبار قصير للطلاب",
+                ].map(m => {
+                  const checked = (form.visitGoals||[]).includes(m);
                   return (
-                    <label key={m} onClick={()=>setForm(f=>({...f,methods:checked?f.methods.filter(x=>x!==m):[...f.methods,m]}))}
+                    <label key={m} onClick={()=>setForm(f=>({...f,visitGoals:checked?(f.visitGoals||[]).filter(x=>x!==m):[...(f.visitGoals||[]),m]}))}
                       style={{ display:"flex", alignItems:"flex-start", gap:8, padding:"9px 12px",
                                border:`1.5px solid ${checked?"#0e7c7b":"#d0dbe8"}`,
                                borderRadius:8, cursor:"pointer", background:checked?"#e8f8f8":"#fafcff",
@@ -13398,15 +13439,13 @@ function AssessmentPage({ teachers: appTeachers = [] }) {
                   );
                 })}
               </div>
-              {form.methods.length > 0 && (
-                <div style={{ marginTop:10 }}>
-                  <label style={{ fontSize:11, fontWeight:700, color:"#5a7080", display:"block", marginBottom:4 }}>أساليب أخرى</label>
-                  <input value={form.methodsOther} onChange={e=>setForm(f=>({...f,methodsOther:e.target.value}))}
-                    placeholder="اذكر أي أساليب أخرى..."
-                    style={{ width:"100%", padding:"8px 10px", border:"1.5px solid #d0dbe8", borderRadius:8,
-                             fontFamily:"'Tajawal',sans-serif", fontSize:12.5, outline:"none", boxSizing:"border-box" }} />
-                </div>
-              )}
+              <div style={{ marginTop:10 }}>
+                <label style={{ fontSize:11, fontWeight:700, color:"#5a7080", display:"block", marginBottom:4 }}>أساليب أخرى اتبعها المشرف (اذكر)</label>
+                <input value={form.methodsOther||""} onChange={e=>setForm(f=>({...f,methodsOther:e.target.value}))}
+                  placeholder="اذكر أي أساليب أخرى..."
+                  style={{ width:"100%", padding:"8px 10px", border:"1.5px solid #d0dbe8", borderRadius:8,
+                           fontFamily:"'Tajawal',sans-serif", fontSize:12.5, outline:"none", boxSizing:"border-box" }} />
+              </div>
             </div>
           </div>
 
@@ -13426,17 +13465,15 @@ function AssessmentPage({ teachers: appTeachers = [] }) {
 
           {/* الملاحظات والتوصيات */}
           {[
-            {l:"الملاحظات من الزيارات السابقة", k:"prevRecs"},
-            {l:"✅ نقاط القوة والإيجابيات", k:"strengths"},
-            {l:"🔧 جوانب تحتاج دعماً وتطويراً", k:"support"},
-            {l:"📋 التوصيات والمقترحات", k:"recommendations"},
-            {l:"🎓 الإفادة من زيارة المشرف / المدير", k:"benefitFrom"},
-          ].map(({l,k})=>(
+            {l:"مستوى الأداء * ممتاز (5) جيد جداً (4) جيد (3) جيد جداً (2) مقبول (1) ضعيف *", k:"performanceNote", rows:2},
+            {l:"يستفاد من المعلم في", k:"benefitFrom", rows:2},
+            {l:"توصيات", k:"recommendations", rows:3},
+          ].map(({l,k,rows})=>(
             <div key={k} style={{ background:"#fff", borderRadius:12, marginBottom:10,
               border:"1px solid #d0dbe8", padding:14 }}>
               <label style={{ fontSize:12.5, fontWeight:700, color:"#0a3d5c", display:"block", marginBottom:6 }}>{l}</label>
-              <textarea value={form[k]} onChange={e=>setForm(f=>({...f,[k]:e.target.value}))}
-                rows={3} placeholder="اكتب هنا..."
+              <textarea value={form[k]||""} onChange={e=>setForm(f=>({...f,[k]:e.target.value}))}
+                rows={rows} placeholder="اكتب هنا..."
                 style={{ width:"100%", padding:"9px 12px", border:"1.5px solid #d0dbe8", borderRadius:8,
                          fontFamily:"'Tajawal',sans-serif", fontSize:12.5, resize:"vertical",
                          direction:"rtl", outline:"none", boxSizing:"border-box" }} />
