@@ -12934,6 +12934,668 @@ function LessonPrepPage() {
 }
 
 
+
+// ═══════════════════════════════════════════════════════════
+// 📊 بطاقة تشخيص قياس التحصيل — زيارات صفية
+// ═══════════════════════════════════════════════════════════
+const ASSESSMENT_TEACHERS = [
+  {id:1,  name:"معيض صالح محمد القرني",             mobile:"0503558248"},
+  {id:2,  name:"عبدالواحد بن مبارك القحطاني",        mobile:"0505539404"},
+  {id:3,  name:"حامد محمد عبدالله الزهراني",          mobile:"0506532085"},
+  {id:4,  name:"رامي علي حسن ال مطر الغامدي",        mobile:"0557427429"},
+  {id:5,  name:"عبدالحميد عبدالمعطي اللقماني",        mobile:"0546833114"},
+  {id:6,  name:"حسن حامد إبراهيم الساعدي",           mobile:"0503662918"},
+  {id:7,  name:"فواز محمد عطيه الثقفي",              mobile:"0560008385"},
+  {id:8,  name:"رجيان رويحي السلمي",                  mobile:"0503521337"},
+  {id:9,  name:"صالح احمد سعيد الغامدي",             mobile:"0534156173"},
+  {id:10, name:"بندر فيحان طلق السلمي",              mobile:"0504628452"},
+  {id:11, name:"عبدالله عبدالرحيم الطلحي",            mobile:"0560929220"},
+  {id:12, name:"عبدالرحمن ابراهيم الفقيه",            mobile:"0550200257"},
+  {id:13, name:"سلطان حمد محمد العتيبي",             mobile:"0569207311"},
+  {id:14, name:"عبدالهادي بن سالم الحربي",            mobile:"0555466070"},
+  {id:15, name:"فهد عبيد عبدالله النباتي",            mobile:"0555067808"},
+  {id:16, name:"طلال سعد ساعد السلمي",               mobile:"0540405600"},
+  {id:17, name:"هاني رده لافي الجحدلي",              mobile:"0503568998"},
+  {id:18, name:"عبد الله حامد اللقماني",              mobile:"0503540545"},
+  {id:19, name:"ضيف الله حلسان الزهراني",             mobile:"0566343399"},
+  {id:20, name:"حامد بن عبد الله المحمادي",           mobile:"0590494300"},
+  {id:21, name:"صالح أحمد سميح المجنوني",            mobile:"0563255858"},
+  {id:22, name:"محمد عوض عبدالله الجابري",           mobile:"0599589964"},
+  {id:23, name:"محمد مساعد فويران اللحياني",          mobile:"0555565403"},
+  {id:24, name:"مسلم سعد مسعود الجهني",              mobile:"0597433442"},
+  {id:25, name:"مشعل مساعد عيد الحربي",              mobile:"0595055281"},
+  {id:26, name:"بدر سرور مسعد العتيبي",              mobile:"0555575147"},
+  {id:27, name:"وليد مسلم سليم السهلي",              mobile:"0505356973"},
+  {id:28, name:"مصلح محمد مصلح المعبدي",             mobile:"0555527513"},
+  {id:29, name:"جازي عبدالرحمن الثبيتي",             mobile:"0553700008"},
+  {id:30, name:"بدر حمد محمد اللهيبي",               mobile:"0568988996"},
+  {id:31, name:"عطيه سعيد علي الغامدي",              mobile:"0504585484"},
+  {id:32, name:"علي عبدالله حزام بن عبود",           mobile:"0555687055"},
+  {id:33, name:"محمد علي عبدالله المحوري",            mobile:"0500055916"},
+];
+
+const TEACHING_METHODS = [
+  "المحاضرة والإلقاء","المناقشة والحوار","التعلم التعاوني","حل المشكلات",
+  "الاستكشاف والاستقصاء","لعب الأدوار","العصف الذهني","التعلم بالمشاريع",
+  "التقنية والوسائل الرقمية","الخرائط المفاهيمية","التعلم التبادلي","التعلم الذاتي",
+];
+
+const EVAL_SECTIONS = [
+  { id:"masooliya",   title:"المسؤولية والالتزام المهني",  color:"#0a3d5c", fields:["r_mas1"],
+    items:["الالتزام بمواعيد الدوام والحضور المبكر"] },
+  { id:"tawasel",     title:"التواصل والعلاقات",            color:"#0d5280", fields:["r_taw1","r_taw2"],
+    items:["التواصل الإيجابي مع الطلاب","التعاون مع الزملاء والإدارة"] },
+  { id:"tatawer",     title:"التطوير المهني",               color:"#0e7c7b", fields:["r_tat1","r_tat2","r_tat3"],
+    items:["المشاركة في التطوير الذاتي","تطبيق مستجدات التربية","الإفادة من التغذية الراجعة"] },
+  { id:"takhtet",     title:"التخطيط والتحضير",            color:"#9a7230", fields:["r_takh1","r_takh2"],
+    items:["جودة التحضير وشموليته","ارتباط الأهداف بالمحتوى"] },
+  { id:"estratijiyat",title:"الاستراتيجيات التعليمية",    color:"#4a2080", fields:["r_str1","r_str2","r_str3","r_str4","r_str5","r_str6","r_str7"],
+    items:["تنويع استراتيجيات التدريس","إدارة الوقت","تفعيل الطلاب","مراعاة الفروق الفردية","استخدام الوسائل","ربط التعلم بالحياة","إثارة الدافعية"] },
+  { id:"tatbiqat",    title:"التطبيقات والتقنية",          color:"#1a6b3c", fields:["r_app1","r_app2"],
+    items:["توظيف التقنية في التدريس","استخدام الموارد الرقمية"] },
+  { id:"taqwem",      title:"التقويم والتقييم",            color:"#7c1d1d", fields:["r_tqm1","r_tqm2","r_tqm3"],
+    items:["تنويع أساليب التقويم","استخدام التغذية الراجعة","ربط التقويم بالأهداف"] },
+  { id:"beea",        title:"البيئة الصفية",               color:"#2a4a80", fields:["r_bee1","r_bee2","r_bee3"],
+    items:["تهيئة بيئة تعلم محفزة","إدارة الصف","النظام والانضباط"] },
+  { id:"tahsel",      title:"التحصيل الدراسي",             color:"#1a5a1a", fields:["r_tah1","r_tah2"],
+    items:["مستوى فهم الطلاب","تحقيق أهداف الدرس"] },
+];
+
+const emptyForm = () => ({
+  visitDate:"", subject:"", grade:"", lesson:"", period:"",
+  studentCount:"", presentCount:"", absentCount:"",
+  visitNum:"1", visitPurpose:"", visitType:"حضوري", isNew:"لا",
+  methods:[], methodsOther:"",
+  scores: Object.fromEntries(
+    EVAL_SECTIONS.flatMap(s => s.fields.map(f => [f, 0]))
+  ),
+  prevRecs:"", strengths:"", support:"", recommendations:"", benefitFrom:"",
+  needs: Array(6).fill(null).map(() => ({need:"", program:""})),
+});
+
+function AssessmentPage({ teachers: appTeachers = [] }) {
+  const [view,          setView]          = useState("home"); // home | form | detail
+  const [selectedTeacher, setSelectedTeacher] = useState(null);
+  const [form,          setForm]          = useState(emptyForm());
+  const [assessments,   setAssessments]   = useState({});  // { teacherId: [rec, ...] }
+  const [filter,        setFilter]        = useState("all");
+  const [search,        setSearch]        = useState("");
+  const [saving,        setSaving]        = useState(false);
+  const [saved,         setSaved]         = useState(false);
+  const [detailRec,     setDetailRec]     = useState(null);
+
+  useEffect(() => {
+    DB.get("school-assessments", {}).then(data => {
+      if (data && typeof data === "object") setAssessments(data);
+    });
+  }, []);
+
+  const saveAssessments = (data) => {
+    setAssessments(data);
+    DB.set("school-assessments", data);
+  };
+
+  const getVisitCount = (tid) => (assessments[tid] || []).length;
+  const hasVisit = (tid) => getVisitCount(tid) > 0;
+
+  const totalVisited = ASSESSMENT_TEACHERS.filter(t => hasVisit(t.id)).length;
+
+  const setScore = (field, val) => setForm(f => ({...f, scores:{...f.scores,[field]:val}}));
+  const calcSectionScore = (fields) => {
+    const vals = fields.map(f => form.scores[f] || 0).filter(v => v > 0);
+    return vals.length ? Math.round(vals.reduce((a,b)=>a+b,0)/vals.length*10)/10 : 0;
+  };
+  const totalScore = () => {
+    const allFields = EVAL_SECTIONS.flatMap(s=>s.fields);
+    const vals = allFields.map(f => form.scores[f]||0).filter(v=>v>0);
+    return vals.length ? Math.round(vals.reduce((a,b)=>a+b,0)/vals.length*10)/10 : 0;
+  };
+  const scoreColor = (s) => s>=4?"#1a6b3c":s>=3?"#9a7230":s>=2?"#e67e22":"#8b1a1a";
+  const scoreLabel = (s) => s>=4.5?"ممتاز":s>=3.5?"جيد جداً":s>=2.5?"جيد":s>=1.5?"مقبول":"يحتاج دعم";
+
+  const handleSave = async () => {
+    if (!selectedTeacher) return;
+    setSaving(true);
+    const rec = {
+      id: Date.now(),
+      teacherId: selectedTeacher.id,
+      teacherName: selectedTeacher.name,
+      teacherMobile: selectedTeacher.mobile,
+      savedAt: new Date().toLocaleDateString("ar-SA"),
+      ...form,
+      totalScore: totalScore(),
+    };
+    const updated = {
+      ...assessments,
+      [selectedTeacher.id]: [...(assessments[selectedTeacher.id]||[]), rec]
+    };
+    saveAssessments(updated);
+    setSaving(false); setSaved(true);
+    setTimeout(() => setSaved(false), 2500);
+  };
+
+  const handlePrint = () => {
+    if (!selectedTeacher) return;
+    const scoreRows = EVAL_SECTIONS.map(sec => {
+      const avg = (() => {
+        const vals = sec.fields.map(f=>form.scores[f]||0).filter(v=>v>0);
+        return vals.length ? Math.round(vals.reduce((a,b)=>a+b,0)/vals.length*10)/10 : 0;
+      })();
+      return `<tr><td style="text-align:right;padding:7px 10px;font-weight:600">${sec.title}</td>
+        ${sec.fields.map(f=>`<td style="text-align:center;padding:7px">${form.scores[f]||"—"}</td>`).join("")}
+        <td style="text-align:center;padding:7px;font-weight:900;color:${scoreColor(avg)}">${avg||"—"}</td></tr>`;
+    }).join("");
+    printWindow(`<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8">
+    <title>بطاقة تشخيص التحصيل</title>
+    <style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Tajawal','Noto Naskh Arabic',Arial,sans-serif;direction:rtl;padding:20px;font-size:12px}
+    .hdr{background:linear-gradient(135deg,#071e34,#0a3d5c,#0e6d6b);color:#fff;padding:18px 20px;border-radius:10px;margin-bottom:16px;text-align:center}
+    .hdr h1{font-size:17px;font-weight:900;margin-bottom:4px}.hdr p{font-size:11px;opacity:.7}
+    .info-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px}
+    .info-item{background:#f0f4f8;border-radius:7px;padding:8px 10px}
+    .info-item label{display:block;font-size:9px;color:#5a7080;margin-bottom:2px}
+    .info-item span{font-size:12px;font-weight:700;color:#1a2d3e}
+    .sec-title{font-size:12px;font-weight:900;color:#fff;padding:8px 12px;border-radius:7px 7px 0 0}
+    table{width:100%;border-collapse:collapse;margin-bottom:12px;font-size:11px}
+    th{background:#f0f5fa;padding:7px;text-align:center;font-weight:700;color:#0a3d5c;border:1px solid #d0dbe8}
+    td{border:1px solid #d0dbe8;padding:6px}
+    .score-total{text-align:center;padding:12px;background:linear-gradient(135deg,#0a3d5c,#0e7c7b);color:#fff;border-radius:10px;margin:14px 0}
+    .obs{background:#f9fbfd;border:1px solid #d0dbe8;border-radius:7px;padding:10px;margin-bottom:10px;min-height:50px}
+    .obs-lbl{font-size:11px;font-weight:700;color:#0a3d5c;margin-bottom:5px}
+    .sigs{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:20px}
+    .sig{border-top:1.5px solid #1a2d3e;padding-top:6px;text-align:center;font-size:11px}
+    @media print{@page{size:A4;margin:1cm}}</style></head><body>
+    <div class="hdr"><h1>بطاقة تشخيص قياس التحصيل الدراسي</h1>
+    <p>مدرسة عبيدة بن الحارث المتوسطة — إدارة تعليم جدة</p></div>
+    <div class="info-grid">
+      <div class="info-item"><label>اسم المعلم</label><span>${selectedTeacher.name}</span></div>
+      <div class="info-item"><label>المادة</label><span>${form.subject||"—"}</span></div>
+      <div class="info-item"><label>الفصل</label><span>${form.grade||"—"}</span></div>
+      <div class="info-item"><label>عنوان الدرس</label><span>${form.lesson||"—"}</span></div>
+      <div class="info-item"><label>تاريخ الزيارة</label><span>${form.visitDate||"—"}</span></div>
+      <div class="info-item"><label>الحصة</label><span>${form.period||"—"}</span></div>
+      <div class="info-item"><label>عدد الطلاب</label><span>${form.studentCount||"—"}</span></div>
+      <div class="info-item"><label>نوع الزيارة</label><span>${form.visitType}</span></div>
+    </div>
+    <table><thead><tr><th>المعيار</th><th colspan="2">التقييم</th><th>المتوسط</th></tr></thead>
+    <tbody>${scoreRows}</tbody></table>
+    <div class="score-total"><div style="font-size:13px;opacity:.8">الدرجة الكلية</div>
+    <div style="font-size:30px;font-weight:900">${totalScore()}</div>
+    <div style="font-size:13px;margin-top:4px">${scoreLabel(totalScore())}</div></div>
+    ${form.strengths?`<div class="obs"><div class="obs-lbl">نقاط القوة</div>${form.strengths}</div>`:""}
+    ${form.support?`<div class="obs"><div class="obs-lbl">جوانب تحتاج دعماً</div>${form.support}</div>`:""}
+    ${form.recommendations?`<div class="obs"><div class="obs-lbl">التوصيات</div>${form.recommendations}</div>`:""}
+    <div class="sigs"><div class="sig">توقيع المعلم<br><br>${selectedTeacher.name}</div>
+    <div class="sig">توقيع مدير المدرسة<br><br>فازع عبدالله القرني</div></div>
+    <script>window.onload=()=>window.print()</script></body></html>`);
+  };
+
+  const filteredTeachers = ASSESSMENT_TEACHERS.filter(t => {
+    if (search && !t.name.includes(search)) return false;
+    if (filter === "visited") return hasVisit(t.id);
+    if (filter === "pending") return !hasVisit(t.id);
+    return true;
+  });
+
+  /* ══ شاشة تفاصيل زيارة سابقة ══ */
+  if (view === "detail" && detailRec) {
+    const ts = totalScore();
+    return (
+      <div dir="rtl" style={{ fontFamily:"'Tajawal','Cairo',sans-serif" }}>
+        <div style={{ display:"flex", alignItems:"center", gap:12, padding:"12px 16px",
+          background:"#fff", borderBottom:"1px solid #d0dbe8", flexWrap:"wrap" }}>
+          <button onClick={() => { setView("home"); setDetailRec(null); }}
+            style={{ padding:"7px 14px", borderRadius:8, border:"1.5px solid #d0dbe8",
+                     fontSize:13, fontWeight:700, cursor:"pointer", background:"#f0f4f8", color:"#5a7080" }}>
+            → العودة
+          </button>
+          <div style={{ flex:1, fontWeight:700, color:"#0a3d5c", fontSize:14 }}>
+            {detailRec.teacherName} — {detailRec.visitDate||detailRec.savedAt}
+          </div>
+        </div>
+        <div style={{ maxWidth:860, margin:"0 auto", padding:"16px 14px 60px" }}>
+          <div style={{ background:"linear-gradient(135deg,#071e34,#0a3d5c,#0e6d6b)", borderRadius:14,
+            padding:"20px 24px", color:"#fff", marginBottom:16, textAlign:"center" }}>
+            <div style={{ fontSize:11, opacity:.7, marginBottom:4 }}>{detailRec.teacherName}</div>
+            <div style={{ fontSize:48, fontWeight:900 }}>{detailRec.totalScore||"—"}</div>
+            <div style={{ fontSize:14, marginTop:4 }}>{scoreLabel(detailRec.totalScore||0)}</div>
+          </div>
+          {EVAL_SECTIONS.map(sec => {
+            const vals = sec.fields.map(f=>detailRec.scores?.[f]||0).filter(v=>v>0);
+            const avg = vals.length?Math.round(vals.reduce((a,b)=>a+b,0)/vals.length*10)/10:0;
+            return (
+              <div key={sec.id} style={{ background:"#fff", borderRadius:12, marginBottom:10,
+                border:"1px solid #d0dbe8", overflow:"hidden" }}>
+                <div style={{ background:sec.color, padding:"10px 14px", display:"flex",
+                  justifyContent:"space-between", alignItems:"center" }}>
+                  <span style={{ color:"#fff", fontWeight:800, fontSize:13 }}>{sec.title}</span>
+                  <span style={{ background:"rgba(255,255,255,0.2)", color:"#fff", borderRadius:20,
+                    padding:"2px 12px", fontWeight:900, fontSize:13 }}>{avg||"—"}/5</span>
+                </div>
+                <div style={{ padding:"10px 14px", display:"flex", flexWrap:"wrap", gap:8 }}>
+                  {sec.items.map((item,j) => {
+                    const val = detailRec.scores?.[sec.fields[j]]||0;
+                    return (
+                      <div key={j} style={{ display:"flex", alignItems:"center", gap:8, flex:"1 1 200px" }}>
+                        <span style={{ fontSize:11, color:"#5a7080", flex:1 }}>{item}</span>
+                        <span style={{ fontWeight:900, fontSize:14, color:scoreColor(val) }}>{val||"—"}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+          {[{l:"نقاط القوة",v:detailRec.strengths},{l:"جوانب تحتاج دعماً",v:detailRec.support},{l:"التوصيات",v:detailRec.recommendations}]
+            .filter(x=>x.v).map(x=>(
+            <div key={x.l} style={{ background:"#fff", borderRadius:12, padding:14, marginBottom:10,
+              border:"1px solid #d0dbe8" }}>
+              <div style={{ fontWeight:800, color:"#0a3d5c", fontSize:13, marginBottom:6 }}>{x.l}</div>
+              <div style={{ fontSize:13, color:"#1a2d3e", lineHeight:1.8 }}>{x.v}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  /* ══ نموذج التقييم ══ */
+  if (view === "form" && selectedTeacher) {
+    const ScoreRow = ({ item, field, cls }) => (
+      <tr style={{ background: cls%2===0?"#f9fbfd":"#fff" }}>
+        <td style={{ padding:"10px 12px", fontSize:12, fontWeight:500, color:"#1a2d3e", textAlign:"right" }}>{item}</td>
+        {[1,2,3,4,5].map(n => (
+          <td key={n} style={{ textAlign:"center", padding:"8px 4px" }}>
+            <label style={{ cursor:"pointer" }}>
+              <input type="radio" name={field} value={n} checked={form.scores[field]===n}
+                onChange={()=>setScore(field,n)} style={{ display:"none" }} />
+              <div style={{
+                width:28, height:28, borderRadius:"50%", margin:"0 auto",
+                display:"flex", alignItems:"center", justifyContent:"center",
+                border:"2px solid", cursor:"pointer", fontSize:11, fontWeight:700, transition:"all .15s",
+                borderColor: form.scores[field]===n
+                  ? (n===1?"#c0392b":n===2?"#e67e22":n===3?"#d4ac0d":n===4?"#27ae60":"#0a3d5c")
+                  : "#d0dbe8",
+                background: form.scores[field]===n
+                  ? (n===1?"#c0392b":n===2?"#e67e22":n===3?"#d4ac0d":n===4?"#27ae60":"#0a3d5c")
+                  : "#fafcff",
+                color: form.scores[field]===n ? "#fff" : "#5a7080",
+              }} onClick={()=>setScore(field,n)}>{n}</div>
+            </label>
+          </td>
+        ))}
+        <td style={{ textAlign:"center", padding:"8px 6px" }}>
+          <span style={{ fontWeight:900, fontSize:13, color:scoreColor(form.scores[field]||0) }}>
+            {form.scores[field]||"—"}
+          </span>
+        </td>
+      </tr>
+    );
+
+    const SectionCard = ({ sec }) => {
+      const avg = calcSectionScore(sec.fields);
+      return (
+        <div style={{ background:"#fff", borderRadius:12, marginBottom:14,
+          border:"1px solid #d0dbe8", overflow:"hidden", boxShadow:"0 2px 12px rgba(10,61,92,0.07)" }}>
+          <div style={{ background:sec.color, padding:"11px 16px", display:"flex",
+            alignItems:"center", justifyContent:"space-between" }}>
+            <span style={{ color:"#fff", fontWeight:800, fontSize:14 }}>{sec.title}</span>
+            {avg>0&&<span style={{ background:"rgba(255,255,255,0.2)", color:"#fff", borderRadius:20,
+              padding:"2px 12px", fontWeight:900, fontSize:13 }}>المتوسط: {avg}</span>}
+          </div>
+          <div style={{ overflowX:"auto" }}>
+            <table style={{ width:"100%", borderCollapse:"collapse", fontSize:12 }}>
+              <thead>
+                <tr style={{ background:"#f0f5fa" }}>
+                  <th style={{ padding:"8px 12px", textAlign:"right", color:"#0a3d5c", fontWeight:700, borderBottom:"2px solid #d0dbe8" }}>المعيار</th>
+                  {[1,2,3,4,5].map(n=><th key={n} style={{ padding:"8px 6px", textAlign:"center", color:scoreColor(n), fontWeight:900, borderBottom:"2px solid #d0dbe8" }}>{n}</th>)}
+                  <th style={{ padding:"8px 6px", textAlign:"center", color:"#0a3d5c", fontWeight:700, borderBottom:"2px solid #d0dbe8" }}>الدرجة</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sec.items.map((item,j)=>(
+                  <ScoreRow key={j} item={item} field={sec.fields[j]} cls={j} />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      );
+    };
+
+    const F = ({label, id, type="text", placeholder="", value, onChange, children}) => (
+      <div style={{ display:"flex", flexDirection:"column", gap:4 }}>
+        <label style={{ fontSize:11, fontWeight:700, color:"#5a7080" }}>{label}</label>
+        {children || (
+          <input type={type} value={value} onChange={onChange} placeholder={placeholder}
+            style={{ padding:"8px 10px", border:"1.5px solid #d0dbe8", borderRadius:8,
+                     fontFamily:"'Tajawal',sans-serif", fontSize:13, color:"#1a2d3e",
+                     background:"#f9fbfd", direction:"rtl", outline:"none" }} />
+        )}
+      </div>
+    );
+
+    const RadioGroup = ({name, options, value, onChange}) => (
+      <div style={{ display:"flex", gap:8 }}>
+        {options.map(opt=>(
+          <label key={opt} style={{ display:"flex", alignItems:"center", gap:7, padding:"7px 14px",
+            border:`2px solid ${value===opt?"#0e7c7b":"#d0dbe8"}`,
+            borderRadius:8, cursor:"pointer", fontSize:12, fontWeight:value===opt?700:400,
+            background:value===opt?"#e8f8f8":"#fafcff", color:value===opt?"#0e7c7b":"#5a7080" }}>
+            <input type="radio" name={name} value={opt} checked={value===opt}
+              onChange={()=>onChange(opt)} style={{ display:"none" }} />
+            {opt}
+          </label>
+        ))}
+      </div>
+    );
+
+    return (
+      <div dir="rtl" style={{ fontFamily:"'Tajawal','Cairo',sans-serif", background:"#f0f4f8", minHeight:"100vh" }}>
+        {/* رأس النموذج */}
+        <div style={{ background:"#fff", borderBottom:"1px solid #d0dbe8", padding:"12px 16px",
+          display:"flex", alignItems:"center", gap:12, flexWrap:"wrap",
+          position:"sticky", top:0, zIndex:50, boxShadow:"0 2px 8px rgba(10,61,92,0.08)" }}>
+          <button onClick={() => setView("home")}
+            style={{ padding:"7px 14px", borderRadius:8, border:"1.5px solid #d0dbe8",
+                     fontSize:13, fontWeight:700, cursor:"pointer", background:"#f0f4f8", color:"#5a7080" }}>
+            → العودة
+          </button>
+          <div style={{ flex:1, fontWeight:700, color:"#0a3d5c", fontSize:14 }}>
+            {selectedTeacher.name}
+          </div>
+          <button onClick={handlePrint}
+            style={{ padding:"8px 14px", borderRadius:8, border:"1.5px solid #d0dbe8",
+                     fontSize:12, fontWeight:700, cursor:"pointer", background:"#f0f4f8", color:"#5a7080" }}>
+            🖨️ طباعة
+          </button>
+          <button onClick={handleSave} disabled={saving}
+            style={{ padding:"8px 18px", borderRadius:8, border:"none",
+                     background:saving?"#aaa":"linear-gradient(135deg,#0e7c7b,#0a3d5c)",
+                     color:"#fff", fontSize:13, fontWeight:700, cursor:saving?"not-allowed":"pointer",
+                     fontFamily:"'Tajawal',sans-serif" }}>
+            {saving?"⏳ جارٍ الحفظ...":saved?"✅ تم الحفظ":"💾 حفظ البطاقة"}
+          </button>
+        </div>
+
+        <div style={{ maxWidth:900, margin:"0 auto", padding:"16px 14px 60px" }}>
+
+          {/* البيانات الأساسية */}
+          <div style={{ background:"#fff", borderRadius:12, marginBottom:14, overflow:"hidden",
+            border:"1px solid #d0dbe8", boxShadow:"0 2px 12px rgba(10,61,92,0.07)" }}>
+            <div style={{ background:"linear-gradient(135deg,#0a3d5c,#0d5280)", padding:"11px 16px",
+              display:"flex", alignItems:"center", gap:10 }}>
+              <div style={{ width:32, height:32, background:"rgba(255,255,255,0.2)", borderRadius:8,
+                display:"flex", alignItems:"center", justifyContent:"center", fontSize:16 }}>📋</div>
+              <span style={{ color:"#fff", fontWeight:800, fontSize:14 }}>البيانات الأساسية</span>
+            </div>
+            <div style={{ padding:"16px" }}>
+              <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(180px,1fr))", gap:10, marginBottom:12 }}>
+                {[
+                  {l:"اسم المعلم",    v:selectedTeacher.name,  ro:true},
+                  {l:"الجوال",        v:selectedTeacher.mobile, ro:true},
+                  {l:"تاريخ الزيارة", v:form.visitDate,  k:"visitDate"},
+                  {l:"المادة",        v:form.subject,    k:"subject", ph:"اسم المادة"},
+                  {l:"الفصل",        v:form.grade,      k:"grade",   ph:"الصف والفصل"},
+                  {l:"عنوان الدرس",  v:form.lesson,     k:"lesson",  ph:"موضوع الحصة"},
+                  {l:"الحصة",        v:form.period,     k:"period",  ph:"رقم الحصة"},
+                  {l:"عدد الطلاب",   v:form.studentCount,k:"studentCount",tp:"number"},
+                  {l:"الحاضرون",     v:form.presentCount,k:"presentCount",tp:"number"},
+                  {l:"الغائبون",     v:form.absentCount, k:"absentCount",tp:"number"},
+                  {l:"رقم الزيارة",  v:form.visitNum,   k:"visitNum"},
+                  {l:"الغرض",        v:form.visitPurpose,k:"visitPurpose",ph:"الغرض من الزيارة"},
+                ].map((f,i)=>(
+                  <F key={i} label={f.l}>
+                    <input type={f.tp||"text"} value={f.v||""} readOnly={f.ro}
+                      placeholder={f.ph||""}
+                      onChange={e => !f.ro && setForm(p=>({...p,[f.k]:e.target.value}))}
+                      style={{ padding:"8px 10px", border:"1.5px solid #d0dbe8", borderRadius:8,
+                               fontFamily:"'Tajawal',sans-serif", fontSize:12.5, color:"#1a2d3e",
+                               background:f.ro?"#f0f4f8":"#f9fbfd", direction:"rtl", outline:"none" }} />
+                  </F>
+                ))}
+              </div>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16 }}>
+                <div>
+                  <div style={{ fontSize:12, fontWeight:700, color:"#0a3d5c", marginBottom:6 }}>نوع الزيارة</div>
+                  <RadioGroup name="vtype" options={["حضوري","عن بعد"]}
+                    value={form.visitType} onChange={v=>setForm(f=>({...f,visitType:v}))} />
+                </div>
+                <div>
+                  <div style={{ fontSize:12, fontWeight:700, color:"#0a3d5c", marginBottom:6 }}>هل المعلم جديد على المادة؟</div>
+                  <RadioGroup name="isnew" options={["نعم","لا"]}
+                    value={form.isNew} onChange={v=>setForm(f=>({...f,isNew:v}))} />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* أساليب التعليم */}
+          <div style={{ background:"#fff", borderRadius:12, marginBottom:14, overflow:"hidden",
+            border:"1px solid #d0dbe8", boxShadow:"0 2px 12px rgba(10,61,92,0.07)" }}>
+            <div style={{ background:"linear-gradient(135deg,#0e7c7b,#12a09e)", padding:"11px 16px",
+              display:"flex", alignItems:"center", gap:10 }}>
+              <div style={{ width:32, height:32, background:"rgba(255,255,255,0.2)", borderRadius:8,
+                display:"flex", alignItems:"center", justifyContent:"center", fontSize:16 }}>🎓</div>
+              <span style={{ color:"#fff", fontWeight:800, fontSize:14 }}>أساليب التعليم والتعلم المُستخدمة</span>
+            </div>
+            <div style={{ padding:"14px 16px" }}>
+              <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))", gap:8 }}>
+                {TEACHING_METHODS.map(m => {
+                  const checked = form.methods.includes(m);
+                  return (
+                    <label key={m} onClick={()=>setForm(f=>({...f,methods:checked?f.methods.filter(x=>x!==m):[...f.methods,m]}))}
+                      style={{ display:"flex", alignItems:"flex-start", gap:8, padding:"9px 12px",
+                               border:`1.5px solid ${checked?"#0e7c7b":"#d0dbe8"}`,
+                               borderRadius:8, cursor:"pointer", background:checked?"#e8f8f8":"#fafcff",
+                               transition:"all .15s" }}>
+                      <div style={{ width:20, height:20, border:`2px solid ${checked?"#0e7c7b":"#d0dbe8"}`,
+                        borderRadius:5, display:"flex", alignItems:"center", justifyContent:"center",
+                        background:checked?"#0e7c7b":"#fff", color:"#fff", fontSize:12, flexShrink:0, marginTop:1 }}>
+                        {checked?"✓":""}
+                      </div>
+                      <span style={{ fontSize:12.5, color:checked?"#0e7c7b":"#1a2d3e", lineHeight:1.4 }}>{m}</span>
+                    </label>
+                  );
+                })}
+              </div>
+              {form.methods.length > 0 && (
+                <div style={{ marginTop:10 }}>
+                  <label style={{ fontSize:11, fontWeight:700, color:"#5a7080", display:"block", marginBottom:4 }}>أساليب أخرى</label>
+                  <input value={form.methodsOther} onChange={e=>setForm(f=>({...f,methodsOther:e.target.value}))}
+                    placeholder="اذكر أي أساليب أخرى..."
+                    style={{ width:"100%", padding:"8px 10px", border:"1.5px solid #d0dbe8", borderRadius:8,
+                             fontFamily:"'Tajawal',sans-serif", fontSize:12.5, outline:"none", boxSizing:"border-box" }} />
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* محاور التقييم */}
+          {EVAL_SECTIONS.map(sec => <SectionCard key={sec.id} sec={sec} />)}
+
+          {/* الدرجة الكلية */}
+          {totalScore() > 0 && (
+            <div style={{ background:"linear-gradient(135deg,#071e34,#0a3d5c,#0e6d6b)", borderRadius:14,
+              padding:"20px", textAlign:"center", color:"#fff", marginBottom:14 }}>
+              <div style={{ fontSize:12, opacity:.7 }}>الدرجة الكلية للزيارة</div>
+              <div style={{ fontSize:52, fontWeight:900, margin:"8px 0 4px" }}>{totalScore()}</div>
+              <div style={{ fontSize:14, background:"rgba(255,255,255,0.15)", borderRadius:20,
+                padding:"4px 18px", display:"inline-block" }}>{scoreLabel(totalScore())}</div>
+            </div>
+          )}
+
+          {/* الملاحظات والتوصيات */}
+          {[
+            {l:"الملاحظات من الزيارات السابقة", k:"prevRecs"},
+            {l:"✅ نقاط القوة والإيجابيات", k:"strengths"},
+            {l:"🔧 جوانب تحتاج دعماً وتطويراً", k:"support"},
+            {l:"📋 التوصيات والمقترحات", k:"recommendations"},
+            {l:"🎓 الإفادة من زيارة المشرف / المدير", k:"benefitFrom"},
+          ].map(({l,k})=>(
+            <div key={k} style={{ background:"#fff", borderRadius:12, marginBottom:10,
+              border:"1px solid #d0dbe8", padding:14 }}>
+              <label style={{ fontSize:12.5, fontWeight:700, color:"#0a3d5c", display:"block", marginBottom:6 }}>{l}</label>
+              <textarea value={form[k]} onChange={e=>setForm(f=>({...f,[k]:e.target.value}))}
+                rows={3} placeholder="اكتب هنا..."
+                style={{ width:"100%", padding:"9px 12px", border:"1.5px solid #d0dbe8", borderRadius:8,
+                         fontFamily:"'Tajawal',sans-serif", fontSize:12.5, resize:"vertical",
+                         direction:"rtl", outline:"none", boxSizing:"border-box" }} />
+            </div>
+          ))}
+
+          {/* الاحتياجات التدريبية */}
+          <div style={{ background:"#fff", borderRadius:12, marginBottom:14, overflow:"hidden",
+            border:"1px solid #d0dbe8" }}>
+            <div style={{ background:"linear-gradient(135deg,#4a2080,#6b35b0)", padding:"11px 16px" }}>
+              <span style={{ color:"#fff", fontWeight:800, fontSize:14 }}>📚 الاحتياجات التدريبية</span>
+            </div>
+            <div style={{ padding:14 }}>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, fontSize:11,
+                fontWeight:700, color:"#0a3d5c", marginBottom:6, padding:"0 2px" }}>
+                <span>الاحتياج التدريبي</span><span>البرنامج المقترح</span>
+              </div>
+              {form.needs.map((n,i)=>(
+                <div key={i} style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:8 }}>
+                  <input value={n.need} placeholder={`احتياج ${i+1}`}
+                    onChange={e=>setForm(f=>({...f,needs:f.needs.map((x,j)=>j===i?{...x,need:e.target.value}:x)}))}
+                    style={{ padding:"7px 10px", border:"1.5px solid #d0dbe8", borderRadius:8,
+                             fontFamily:"'Tajawal',sans-serif", fontSize:12.5, outline:"none" }} />
+                  <input value={n.program} placeholder="البرنامج المناسب"
+                    onChange={e=>setForm(f=>({...f,needs:f.needs.map((x,j)=>j===i?{...x,program:e.target.value}:x)}))}
+                    style={{ padding:"7px 10px", border:"1.5px solid #d0dbe8", borderRadius:8,
+                             fontFamily:"'Tajawal',sans-serif", fontSize:12.5, outline:"none" }} />
+                </div>
+              ))}
+            </div>
+          </div>
+
+        </div>
+      </div>
+    );
+  }
+
+  /* ══ الصفحة الرئيسية — قائمة المعلمين ══ */
+  return (
+    <div dir="rtl" style={{ fontFamily:"'Tajawal','Cairo',sans-serif", minHeight:"100vh", background:"#f0f4f8" }}>
+
+      {/* Hero */}
+      <div style={{ background:"linear-gradient(160deg,#071e34 0%,#0a3d5c 50%,#0e6d6b 100%)",
+        padding:"28px 20px 50px", textAlign:"center", position:"relative", overflow:"hidden" }}>
+        <div style={{ position:"relative", zIndex:2 }}>
+          <div style={{ fontSize:32, marginBottom:6 }}>📊</div>
+          <div style={{ fontSize:22, fontWeight:900, color:"#fff", marginBottom:4 }}>بطاقات تشخيص قياس التحصيل</div>
+          <div style={{ fontSize:12, color:"rgba(255,255,255,0.6)" }}>مدرسة عبيدة بن الحارث المتوسطة</div>
+          <div style={{ display:"flex", gap:12, justifyContent:"center", marginTop:18, flexWrap:"wrap" }}>
+            {[
+              {n:ASSESSMENT_TEACHERS.length, l:"إجمالي المعلمين",    c:"#fff"},
+              {n:totalVisited,               l:"تمت زيارتهم",         c:"#6dffa0"},
+              {n:ASSESSMENT_TEACHERS.length-totalVisited, l:"لم تتم زيارتهم", c:"#ffcf6d"},
+            ].map((s,i)=>(
+              <div key={i} style={{ background:"rgba(255,255,255,0.1)", border:"1px solid rgba(255,255,255,0.15)",
+                borderRadius:12, padding:"12px 22px", textAlign:"center", minWidth:110 }}>
+                <div style={{ fontSize:26, fontWeight:900, color:s.c }}>{s.n}</div>
+                <div style={{ fontSize:11, color:"rgba(255,255,255,0.6)", marginTop:3 }}>{s.l}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div style={{ maxWidth:900, margin:"-24px auto 0", padding:"0 14px 60px", position:"relative", zIndex:10 }}>
+
+        {/* شريط البحث */}
+        <div style={{ background:"#fff", borderRadius:14, boxShadow:"0 4px 20px rgba(10,61,92,0.1)",
+          padding:"12px 16px", marginBottom:16, display:"flex", gap:10, alignItems:"center",
+          border:"1px solid #d0dbe8" }}>
+          <span style={{ fontSize:18, color:"#5a7080" }}>🔍</span>
+          <input value={search} onChange={e=>setSearch(e.target.value)}
+            placeholder="ابحث باسم المعلم..."
+            style={{ flex:1, border:"none", outline:"none", fontFamily:"'Tajawal',sans-serif",
+                     fontSize:14, color:"#1a2d3e", background:"transparent" }} />
+          <div style={{ display:"flex", gap:6 }}>
+            {["all","visited","pending"].map(f=>(
+              <button key={f} onClick={()=>setFilter(f)}
+                style={{ padding:"5px 12px", borderRadius:20, fontSize:11.5, fontWeight:700,
+                         cursor:"pointer", border:`2px solid ${filter===f?"#0e7c7b":"#d0dbe8"}`,
+                         background:filter===f?"#e8f8f8":"#fafcff",
+                         color:filter===f?"#0e7c7b":"#5a7080", fontFamily:"'Tajawal',sans-serif" }}>
+                {f==="all"?"الكل":f==="visited"?"تمت الزيارة":"لم تُزَر"}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* شبكة المعلمين */}
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))", gap:12 }}>
+          {filteredTeachers.map(t => {
+            const count = getVisitCount(t.id);
+            const visited = count > 0;
+            const lastRec = visited ? assessments[t.id][assessments[t.id].length-1] : null;
+            return (
+              <div key={t.id} style={{
+                background:"#fff", borderRadius:12, border:"1.5px solid #d0dbe8",
+                boxShadow:"0 2px 12px rgba(10,61,92,0.07)", padding:14, cursor:"pointer",
+                display:"flex", flexDirection:"column", gap:10, position:"relative", overflow:"hidden",
+                transition:"all .2s", borderRight:`4px solid ${visited?"#0e7c7b":"#c8973a"}`,
+              }}
+                onMouseOver={e=>{e.currentTarget.style.boxShadow="0 6px 24px rgba(10,61,92,0.14)";e.currentTarget.style.transform="translateY(-2px)";}}
+                onMouseOut={e=>{e.currentTarget.style.boxShadow="0 2px 12px rgba(10,61,92,0.07)";e.currentTarget.style.transform="translateY(0)";}}>
+                <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                  <div style={{ width:44, height:44, borderRadius:12, flexShrink:0,
+                    background:"linear-gradient(135deg,#0a3d5c,#0e7c7b)",
+                    display:"flex", alignItems:"center", justifyContent:"center",
+                    color:"#fff", fontWeight:900, fontSize:18, fontFamily:"serif" }}>
+                    {t.name.charAt(0)}
+                  </div>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontWeight:700, fontSize:13, color:"#1a2d3e",
+                      overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{t.name}</div>
+                    <div style={{ fontSize:11, color:"#5a7080", direction:"ltr", textAlign:"right" }}>{t.mobile}</div>
+                  </div>
+                  <div style={{ padding:"3px 10px", borderRadius:20, fontSize:11, fontWeight:700, flexShrink:0,
+                    background:visited?"#e8f8f0":"#fff8e8", color:visited?"#1a6b3c":"#9a7230",
+                    border:`1px solid ${visited?"#a0d8b8":"#e8c96a"}` }}>
+                    {visited?"✅ زيارة":"⏳ لم تُزَر"}
+                  </div>
+                </div>
+                <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between",
+                  paddingTop:8, borderTop:"1px solid #e8eef4" }}>
+                  <div style={{ fontSize:11, color:"#5a7080" }}>
+                    عدد الزيارات: <span style={{ fontWeight:700, color:"#0e7c7b" }}>{count}</span>
+                    {lastRec&&<span style={{ marginRight:6, color:"#aaa" }}>| آخر: {lastRec.savedAt}</span>}
+                  </div>
+                  <div style={{ display:"flex", gap:6 }}>
+                    {visited && (
+                      <button onClick={e=>{e.stopPropagation();setDetailRec(assessments[t.id][assessments[t.id].length-1]);setView("detail");}}
+                        style={{ padding:"5px 10px", background:"#f0f4f8", border:"1.5px solid #d0dbe8",
+                                 borderRadius:7, fontSize:11, fontWeight:700, cursor:"pointer", color:"#5a7080" }}>
+                        📋 عرض
+                      </button>
+                    )}
+                    <button onClick={()=>{setSelectedTeacher(t);setForm(emptyForm());setView("form");}}
+                      style={{ padding:"5px 12px", background:"#0a3d5c", border:"none",
+                               borderRadius:7, fontSize:11, fontWeight:700, cursor:"pointer", color:"#fff",
+                               fontFamily:"'Tajawal',sans-serif" }}>
+                      + زيارة
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {filteredTeachers.length === 0 && (
+          <div style={{ textAlign:"center", padding:"40px", color:"#5a7080" }}>
+            <div style={{ fontSize:36, marginBottom:8 }}>🔍</div>
+            <div style={{ fontWeight:700 }}>لا توجد نتائج</div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ═══════════════════════════════════════════════════════════
 //  🎯 صفحة قياس أداء المعلمين — التطوير المهني
 // ═══════════════════════════════════════════════════════════
@@ -19859,7 +20521,7 @@ export default function SchoolWebsite() {
       const hash = window.location.hash.replace("#","") || "home";
       if (hash.startsWith("ann-")) { setDirectAnnId(hash.replace("ann-","")); return; }
       setDirectAnnId(null);
-      if (["home","attendance","announcements","activities","settings","students","messages","surveys","sms","report","gradeanalysis","monthlyreport","teacherprofile","absencestats","attendancereport","student-absence","strategies","calendar","gallery","certificates","poll","raffle","broadcast","groupdivider","quiz","classtimer","luckywheel","exitticket","timetable","classvisits","honorboard","tasks","dailyquiz","aiteacher","lessonprep","lessonrecommend","officialforms","portfolio","earlywarning","meetings","heatmap","committeemeeting","teachereval"].includes(hash)) setPage(hash);
+      if (["home","attendance","announcements","activities","settings","students","messages","surveys","sms","report","gradeanalysis","monthlyreport","teacherprofile","absencestats","attendancereport","student-absence","strategies","calendar","gallery","certificates","poll","raffle","broadcast","groupdivider","quiz","classtimer","luckywheel","exitticket","timetable","classvisits","honorboard","tasks","dailyquiz","aiteacher","lessonprep","lessonrecommend","officialforms","portfolio","earlywarning","meetings","heatmap","committeemeeting","teachereval","assessment"].includes(hash)) setPage(hash);
     };
     window.addEventListener("hashchange", h); h();
     return () => window.removeEventListener("hashchange", h);
@@ -20064,6 +20726,7 @@ export default function SchoolWebsite() {
     { id: "exitticket",    label: "بطاقة الخروج",       icon: "🚪" },
     { id: "timetable",     label: "جدول الحصص",         icon: "🗓️" },
     { id: "classvisits",   label: "الزيارات الفنية",    icon: "👁" },
+    { id: "assessment",    label: "بطاقة التشخيص",      icon: "📊" },
     { id: "honorboard",    label: "لوحة الشرف",         icon: "🏆" },
     { id: "tasks",         label: "تتبع المهام",        icon: "✅" },
     { id: "gradeanalysis",    label: "تحليل درجات الطلاب",     icon: "📊" },
@@ -20391,6 +21054,7 @@ export default function SchoolWebsite() {
                 {page === "lessonprep"     && <LessonPrepPage />}
                 {page === "lessonrecommend"&& <LessonRecommendPage classList={classList} />}
                 {page === "teachereval"    && <TeacherEvalPage teachers={teachers} />}
+                {page === "assessment"     && <AssessmentPage teachers={teachers} />}
                 {page === "settings"       && <SettingsPage teachers={teachers} setTeachers={setTeachers} saveTeachers={saveTeachers} week={week} setWeek={setWeek} saveWeek={saveWeek} users={users} siteFont={siteFont} setSiteFont={setSiteFont} saveSiteFont={saveSiteFont} weekArchive={weekArchive} archiveCurrentWeek={archiveCurrentWeek} />}
               </div>
             </div>
@@ -20611,6 +21275,7 @@ export default function SchoolWebsite() {
         {page === "lessonprep"     && <LessonPrepPage />}
         {page === "lessonrecommend"&& <LessonRecommendPage classList={classList} />}
         {page === "teachereval"    && <TeacherEvalPage teachers={teachers} />}
+                {page === "assessment"     && <AssessmentPage teachers={teachers} />}
         {page === "settings"      && <SettingsPage teachers={teachers} setTeachers={setTeachers} saveTeachers={saveTeachers} week={week} setWeek={setWeek} saveWeek={saveWeek} users={users} siteFont={siteFont} setSiteFont={setSiteFont} saveSiteFont={saveSiteFont} weekArchive={weekArchive} archiveCurrentWeek={archiveCurrentWeek} />}
       </main>
       <footer className="relative text-center py-6 text-xs border-t bg-white mt-8 overflow-hidden" style={{borderColor:"rgba(13,148,136,.15)"}}>
