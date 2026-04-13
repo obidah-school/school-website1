@@ -1761,8 +1761,26 @@ function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, sa
       {showDatePicker && (
         <div className="bg-gradient-to-l from-amber-50 to-teal-50 border-2 border-amber-300 rounded-2xl p-4 mb-4 shadow-lg">
           <div className="font-black text-teal-800 text-sm mb-3 flex items-center justify-between">
-            <span>📅 تحديد أسبوع جديد <span className="text-xs text-gray-400 font-normal mr-1">(اختر أي يوم من الأسبوع المطلوب — سيحدد الأسبوع تلقائياً)</span></span>
-            <button onClick={() => { setShowDatePicker(false); setDpPreview(null); }} className="text-gray-400 hover:text-gray-600 text-lg font-bold">✕</button>
+            <span>📅 تحديد أسبوع جديد <span className="text-xs text-gray-400 font-normal mr-1">(اختر أي يوم من الأسبوع المطلوب)</span></span>
+            <div className="flex items-center gap-2">
+              <button onClick={() => {
+                // إعادة ضبط الأسبوع الحالي من اليوم الحالي فوراً
+                const today = new Date();
+                const dow = today.getDay();
+                const diffToSunday = dow === 0 ? 0 : dow >= 5 ? (7 - dow) : -dow;
+                const sunday = new Date(today);
+                sunday.setDate(today.getDate() + diffToSunday);
+                const isoSunday = `${sunday.getFullYear()}-${String(sunday.getMonth()+1).padStart(2,'0')}-${String(sunday.getDate()).padStart(2,'0')}`;
+                const newWeek = generateWeekDays(isoSunday);
+                if (setWeek) setWeek(newWeek);
+                if (saveWeek) saveWeek(newWeek);
+                setShowDatePicker(false);
+                setSelectedDay(today.getDay() < 5 ? today.getDay() : 0);
+              }} className="bg-teal-100 text-teal-700 hover:bg-teal-200 rounded-lg px-3 py-1 text-xs font-black transition-all">
+                📍 الأسبوع الحالي
+              </button>
+              <button onClick={() => { setShowDatePicker(false); setDpPreview(null); }} className="text-gray-400 hover:text-gray-600 text-lg font-bold">✕</button>
+            </div>
           </div>
 
           {/* نوع التقويم */}
@@ -20850,7 +20868,53 @@ export default function SchoolWebsite() {
           DB.get("school-surveys", []),
           DB.get("school-week-archive", []),
         ]);
-        setTeachers(t); setWeek(w); setAttendance(att); setAnnouncements(ann);
+
+        // ── التحقق من صحة التاريخ المحفوظ ──
+        // إذا كانت السنة الهجرية أكبر من 2000 فهي بيانات تالفة — نُعيد الحساب من اليوم
+        const weekIsValid = (wk) => {
+          if (!wk?.days?.[0]?.dateH) return false;
+          const parts = wk.days[0].dateH.split('/');
+          const hYear = parseInt(parts[2] || '0');
+          return hYear > 1400 && hYear < 1600;
+        };
+
+        let validWeek = w;
+        if (!weekIsValid(w)) {
+          // إعادة حساب الأسبوع الحالي من اليوم
+          const today = new Date();
+          const dow = today.getDay();
+          const diffToSunday = dow === 0 ? 0 : dow >= 5 ? (7 - dow) : -dow;
+          const sunday = new Date(today);
+          sunday.setDate(today.getDate() + diffToSunday);
+          const WDAYS = ["الأحد","الاثنين","الثلاثاء","الأربعاء","الخميس"];
+          const pad = n => String(n).padStart(2,'0');
+          const g2h = (gy, gm, gd) => {
+            const a = Math.floor((14-gm)/12), y = gy+4800-a, mo = gm+12*a-3;
+            let jdn = gd + Math.floor((153*mo+2)/5) + 365*y + Math.floor(y/4) - Math.floor(y/100) + Math.floor(y/400) - 32045;
+            let l = jdn-1948440+10632;
+            const n2 = Math.floor((l-1)/10631);
+            l = l-10631*n2+354;
+            const J = Math.floor((10985-l)/5316)*Math.floor((50*l)/17719) + Math.floor(l/5670)*Math.floor((43*l)/15238);
+            l = l - Math.floor((30-J)/15)*Math.floor((17719*J)/50) - Math.floor(J/16)*Math.floor((15238*J)/43) + 29;
+            const hm = Math.floor((24*l)/709);
+            return { d: l-Math.floor((709*hm)/24), m: hm, y: 30*n2+J-30 };
+          };
+          validWeek = {
+            days: WDAYS.map((name,i) => {
+              const d = new Date(sunday); d.setDate(sunday.getDate()+i);
+              const h = g2h(d.getFullYear(), d.getMonth()+1, d.getDate());
+              return {
+                name,
+                dateH: `${pad(h.d)}/${pad(h.m)}/${h.y}`,
+                dateM: `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()}`
+              };
+            })
+          };
+          // حفظ الأسبوع الصحيح في Firebase
+          DB.set("school-week", validWeek);
+        }
+
+        setTeachers(t); setWeek(validWeek); setAttendance(att); setAnnouncements(ann);
         setActivities(act); setSiteFont(font);
         setMessages(Array.isArray(msgs) ? msgs : []);
         setSurveys(Array.isArray(survs) ? survs : []);
