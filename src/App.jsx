@@ -3232,25 +3232,41 @@ function ExcelImportModal({ onImport, onClose }) {
 
 // ===== أدوات التاريخ الهجري/الميلادي =====
 function gregorianToHijri(gYear, gMonth, gDay) {
-  const jd = Math.floor((1461*(gYear+4800+Math.floor((gMonth-14)/12)))/4)+
-             Math.floor((367*(gMonth-2-12*Math.floor((gMonth-14)/12)))/12)-
-             Math.floor((3*Math.floor((gYear+4900+Math.floor((gMonth-14)/12))/100))/4)+
-             gDay-32075;
-  const l=jd-1948440+10632, n=Math.floor((l-1)/10631), l2=l-10631*n+354;
-  const j=Math.floor((10985-l2)/5316)*Math.floor((50*l2)/17719)+Math.floor(l2/5670)*Math.floor((43*l2)/15238);
-  const l3=l2-Math.floor((30-j)/15)*Math.floor((17719*j)/50)-Math.floor(j/16)*Math.floor((15238*j)/43)+29;
-  return { d:Math.floor((24*l3)/709)===0?l3:l3-Math.floor((709*Math.floor((24*l3)/709))/24),
-           m:Math.floor((24*l3)/709), y:30*n+j-30 };
+  // خوارزمية Julian Day Number — موثوقة ودقيقة
+  const a = Math.floor((14 - gMonth) / 12);
+  const y = gYear + 4800 - a;
+  const m = gMonth + 12 * a - 3;
+  let jdn = gDay + Math.floor((153 * m + 2) / 5) + 365 * y +
+            Math.floor(y / 4) - Math.floor(y / 100) + Math.floor(y / 400) - 32045;
+  // تحويل JDN إلى هجري
+  let l = jdn - 1948440 + 10632;
+  const n = Math.floor((l - 1) / 10631);
+  l = l - 10631 * n + 354;
+  const J = Math.floor((10985 - l) / 5316) * Math.floor((50 * l) / 17719) +
+            Math.floor(l / 5670) * Math.floor((43 * l) / 15238);
+  l = l - Math.floor((30 - J) / 15) * Math.floor((17719 * J) / 50) -
+      Math.floor(J / 16) * Math.floor((15238 * J) / 43) + 29;
+  const hMonth = Math.floor((24 * l) / 709);
+  const hDay   = l - Math.floor((709 * hMonth) / 24);
+  const hYear  = 30 * n + J - 30;
+  return { d: hDay, m: hMonth, y: hYear };
 }
+
 function hijriToGregorian(hYear, hMonth, hDay) {
-  const n=Math.floor((hYear-1)/30), r=hYear-30*n-1;
-  const j=Math.floor((r*11+3)/30)+Math.floor(29.5*(hMonth-1))+hDay+
-           n*10631-Math.floor((r+0.1)/2.97)+1948440-385;
-  const l=j+68569, n2=Math.floor((4*l)/146097);
-  const l2=l-Math.floor((146097*n2+3)/4), i2=Math.floor((4000*(l2+1))/1461001);
-  const l3=l2-Math.floor((1461*i2)/4)+31, j2=Math.floor((80*l3)/2447);
-  const gDay=l3-Math.floor((2447*j2)/80), l4=Math.floor(j2/11);
-  return new Date(100*n2+i2+l4, j2+2-12*l4, gDay);
+  // تحويل هجري → Julian Day Number → ميلادي
+  let jdn = hDay + Math.ceil(29.5 * (hMonth - 1)) + (hYear - 1) * 354 +
+            Math.floor((3 + 11 * hYear) / 30) + 1948440 - 385;
+  // Julian Day → Gregorian
+  let l = jdn + 68569;
+  const n = Math.floor((4 * l) / 146097);
+  l = l - Math.floor((146097 * n + 3) / 4);
+  const i = Math.floor((4000 * (l + 1)) / 1461001);
+  l = l - Math.floor((1461 * i) / 4) + 31;
+  const j = Math.floor((80 * l) / 2447);
+  const gDay   = l - Math.floor((2447 * j) / 80);
+  const gMonth = j + 2 - 12 * Math.floor(j / 11);
+  const gYear  = 100 * (n - 49) + i + Math.floor(j / 11);
+  return new Date(gYear, gMonth - 1, gDay);
 }
 function padZ(n){return String(n).padStart(2,'0');}
 function fmtHijri(h){return `${padZ(h.d)}/${padZ(h.m)}/${h.y}`;}
