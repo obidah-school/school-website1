@@ -3471,33 +3471,6 @@ async function compressImage(dataUrl, maxKB = 200) {
 // الرابط: https://your-site.vercel.app/#excuses
 // ═══════════════════════════════════════════════════════════
 
-async function compressImage(dataUrl, maxKB = 200) {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.onload = () => {
-      const canvas = document.createElement("canvas");
-      let { width, height } = img;
-      const maxDim = 1200;
-      if (width > maxDim || height > maxDim) {
-        const ratio = Math.min(maxDim / width, maxDim / height);
-        width  = Math.round(width  * ratio);
-        height = Math.round(height * ratio);
-      }
-      canvas.width = width; canvas.height = height;
-      const ctx = canvas.getContext("2d");
-      ctx.drawImage(img, 0, 0, width, height);
-      let quality = 0.8;
-      let result = canvas.toDataURL("image/jpeg", quality);
-      while (result.length > maxKB * 1024 * 1.37 && quality > 0.2) {
-        quality -= 0.1;
-        result = canvas.toDataURL("image/jpeg", quality);
-      }
-      resolve(result);
-    };
-    img.onerror = () => resolve(dataUrl);
-    img.src = dataUrl;
-  });
-}
 
 function StudentExcusePortal({ onBack, siteFont, isAdmin = false }) {
   const YEAR_KEY = new Date().getFullYear();
