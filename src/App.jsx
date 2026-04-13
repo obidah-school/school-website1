@@ -1164,6 +1164,37 @@ function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, sa
   const [dpYear,  setDpYear]  = useState(1447);
   const [dpPreview, setDpPreview] = useState(null);
   const GREG_M_ATT = ["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"];
+  const [refreshing, setRefreshing] = useState(false);
+  const [lastSync,   setLastSync]   = useState(null);
+
+  // ── تحديث تلقائي من Firebase عند فتح الصفحة ──
+  useEffect(() => {
+    const refresh = async () => {
+      setRefreshing(true);
+      try {
+        const [freshAtt, freshWeek, freshTeachers, freshAssembly, freshTAssembly, freshMosala] = await Promise.all([
+          DB.get("school-attendance", {}),
+          DB.get("school-week", week),
+          DB.get("school-teachers", teachers),
+          DB.get("school-assembly", {}),
+          DB.get("school-teacher-assembly", {}),
+          DB.get("school-mosala", []),
+        ]);
+        if (freshAtt)      setAttendance(freshAtt);
+        if (freshWeek?.days) {
+          const yr = parseInt((freshWeek.days[0]?.dateH||"").split('/')[2]||0);
+          if (yr > 1400 && yr < 1600) setWeek(freshWeek);
+        }
+        if (Array.isArray(freshTeachers) && freshTeachers.length) setTeachers(freshTeachers);
+        if (freshAssembly && typeof freshAssembly === "object")  { setAssembly(freshAssembly); }
+        if (freshTAssembly && typeof freshTAssembly === "object") { setTeacherAssembly(freshTAssembly); }
+        if (Array.isArray(freshMosala)) setMosalaList(freshMosala);
+        setLastSync(new Date().toLocaleTimeString("ar-SA"));
+      } catch(e) { console.error("Refresh error:", e); }
+      setRefreshing(false);
+    };
+    refresh();
+  }, []); // يعمل مرة عند فتح الصفحة
 
   // ── مساءلة ── (Firebase + localStorage cache)
   const [showMosala, setShowMosala] = useState(false);
@@ -1615,7 +1646,39 @@ function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, sa
               className="bg-red-700 bg-opacity-70 hover:bg-opacity-90 text-white rounded-xl px-3 py-2 text-sm font-bold border border-red-400 border-opacity-50 shadow">
               🗑️ مسح الحضور
             </button>
-            <div className="bg-white bg-opacity-20 px-3 py-2 rounded-xl text-xs font-bold">💾 حفظ تلقائي</div>
+            <button onClick={async () => {
+                setRefreshing(true);
+                try {
+                  const [freshAtt, freshWeek, freshTeachers, freshAssembly, freshTAssembly, freshMosala] = await Promise.all([
+                    DB.get("school-attendance", {}),
+                    DB.get("school-week", week),
+                    DB.get("school-teachers", teachers),
+                    DB.get("school-assembly", {}),
+                    DB.get("school-teacher-assembly", {}),
+                    DB.get("school-mosala", []),
+                  ]);
+                  if (freshAtt) setAttendance(freshAtt);
+                  if (freshWeek?.days) {
+                    const yr = parseInt((freshWeek.days[0]?.dateH||"").split('/')[2]||0);
+                    if (yr > 1400 && yr < 1600) setWeek(freshWeek);
+                  }
+                  if (Array.isArray(freshTeachers) && freshTeachers.length) setTeachers(freshTeachers);
+                  if (freshAssembly && typeof freshAssembly === "object")  setAssembly(freshAssembly);
+                  if (freshTAssembly && typeof freshTAssembly === "object") setTeacherAssembly(freshTAssembly);
+                  if (Array.isArray(freshMosala)) setMosalaList(freshMosala);
+                  setLastSync(new Date().toLocaleTimeString("ar-SA"));
+                } catch(e) {}
+                setRefreshing(false);
+              }}
+              className="bg-white bg-opacity-20 hover:bg-opacity-30 text-white rounded-xl px-3 py-2 text-xs font-bold flex items-center gap-1 transition-all border border-white border-opacity-30"
+              title="تحديث البيانات من السحابة">
+              {refreshing ? "⏳ جارٍ التحديث..." : "🔄 تحديث"}
+            </button>
+            {lastSync && (
+              <div className="bg-white bg-opacity-10 px-3 py-2 rounded-xl text-xs font-bold text-white opacity-70">
+                آخر تحديث {lastSync}
+              </div>
+            )}
           </div>
         </div>
       </div>
