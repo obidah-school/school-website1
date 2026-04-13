@@ -3465,38 +3465,97 @@ async function compressImage(dataUrl, maxKB = 200) {
   });
 }
 
-function StudentExcusePortal({ onBack, siteFont, isAdmin = false }) {
-  const YEAR_KEY = new Date().getFullYear(); // مفتاح السنة الدراسية الحالية
 
-  const [view,        setView]        = useState("login"); // login|form|success|admin
-  const [student,     setStudent]      = useState(null);
-  const [nationalId,  setNationalId]   = useState("");
-  const [idError,     setIdError]      = useState("");
-  const [excuses,     setExcuses]      = useState([]);
-  const [students,    setStudents]     = useState([]);
-  const [loading,     setLoading]      = useState(false);
-  const [saving,      setSaving]       = useState(false);
-  const [adminFilter, setAdminFilter]  = useState("all");
-  const [adminSearch, setAdminSearch]  = useState("");
-  const [page,        setPage]         = useState(1);
-  const [archiveYear, setArchiveYear]  = useState(null);
-  const [archiveData, setArchiveData]  = useState([]);
+// ═══════════════════════════════════════════════════════════
+// 📋 بوابة الأعذار — نسخة محسّنة مع رابط مستمر
+// الرابط: https://your-site.vercel.app/#excuses
+// ═══════════════════════════════════════════════════════════
+
+async function compressImage(dataUrl, maxKB = 200) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      let { width, height } = img;
+      const maxDim = 1200;
+      if (width > maxDim || height > maxDim) {
+        const ratio = Math.min(maxDim / width, maxDim / height);
+        width  = Math.round(width  * ratio);
+        height = Math.round(height * ratio);
+      }
+      canvas.width = width; canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, width, height);
+      let quality = 0.8;
+      let result = canvas.toDataURL("image/jpeg", quality);
+      while (result.length > maxKB * 1024 * 1.37 && quality > 0.2) {
+        quality -= 0.1;
+        result = canvas.toDataURL("image/jpeg", quality);
+      }
+      resolve(result);
+    };
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
+  });
+}
+
+function StudentExcusePortal({ onBack, siteFont, isAdmin = false }) {
+  const YEAR_KEY = new Date().getFullYear();
+  const SITE_URL = window.location.origin + window.location.pathname;
+  const EXCUSE_URL = SITE_URL + "#excuses";
+
+  const [view,        setView]        = useState("login");
+  const [student,     setStudent]     = useState(null);
+  const [nationalId,  setNationalId]  = useState("");
+  const [idError,     setIdError]     = useState("");
+  const [excuses,     setExcuses]     = useState([]);
+  const [students,    setStudents]    = useState([]);
+  const [loading,     setLoading]     = useState(false);
+  const [saving,      setSaving]      = useState(false);
+  const [adminFilter, setAdminFilter] = useState("all");
+  const [adminSearch, setAdminSearch] = useState("");
+  const [page,        setPage]        = useState(1);
+  const [archiveYear, setArchiveYear] = useState(null);
+  const [archiveData, setArchiveData] = useState([]);
+  const [copied,      setCopied]      = useState(false);
   const PER_PAGE = 20;
   const xlsRef = useRef();
 
-  // نموذج العذر
-  const [excuseType,   setExcuseType]   = useState("text");
-  const [absenceDates, setAbsenceDates] = useState("");
-  const [reason,       setReason]       = useState("");
-  const [reasonCat,    setReasonCat]    = useState("مرض");
-  const [fileData,     setFileData]     = useState(null);
-  const [fileName,     setFileName]     = useState("");
-  const [fileSize,     setFileSize]     = useState(0);
-  const [parentName,   setParentName]   = useState("");
-  const [parentPhone,  setParentPhone]  = useState("");
+  // ── نموذج العذر ──
+  const [excuseType,    setExcuseType]    = useState("text");
+  const [absenceDay,    setAbsenceDay]    = useState("");  // اليوم
+  const [absenceDateH,  setAbsenceDateH]  = useState("");  // هجري
+  const [absenceDateM,  setAbsenceDateM]  = useState("");  // ميلادي
+  const [reason,        setReason]        = useState("");
+  const [reasonCat,     setReasonCat]     = useState("مرض");
+  const [fileData,      setFileData]      = useState(null);
+  const [fileName,      setFileName]      = useState("");
+  const [fileSize,      setFileSize]      = useState(0);
+  const [parentName,    setParentName]    = useState("");
+  const [parentPhone,   setParentPhone]   = useState("");
+  const [parentRelation,setParentRelation]= useState("ولي الأمر");
 
-  const REASON_CATS = ["مرض","ظرف عائلي","سفر","حادث أو إصابة","موعد طبي","وفاة في العائلة","أخرى"];
-  const YEAR_KEYS   = [YEAR_KEY, YEAR_KEY - 1, YEAR_KEY - 2]; // السنوات المتاحة للأرشيف
+  const REASON_CATS   = ["مرض","ظرف عائلي","سفر","حادث أو إصابة","موعد طبي","وفاة في العائلة","أخرى"];
+  const RELATIONS     = ["ولي الأمر","الأب","الأم","الأخ","الأخت","العم","الخال","جهة رسمية","أخرى"];
+  const WEEK_DAYS_AR  = ["الأحد","الاثنين","الثلاثاء","الأربعاء","الخميس","الجمعة","السبت"];
+  const YEAR_KEYS     = [YEAR_KEY, YEAR_KEY - 1, YEAR_KEY - 2];
+
+  // ── إعداد اليوم الحالي ──
+  useEffect(() => {
+    const today = new Date();
+    const dayName = WEEK_DAYS_AR[today.getDay()];
+    setAbsenceDay(dayName);
+    // تاريخ ميلادي
+    const dd = String(today.getDate()).padStart(2,"0");
+    const mm = String(today.getMonth()+1).padStart(2,"0");
+    const yyyy = today.getFullYear();
+    setAbsenceDateM(`${dd}/${mm}/${yyyy}`);
+    // تاريخ هجري تقريبي
+    try {
+      const h = gregorianToHijri(today.getFullYear(), today.getMonth()+1, today.getDate());
+      setAbsenceDateH(`${String(h.d).padStart(2,"0")}/${String(h.m).padStart(2,"0")}/${h.y}`);
+    } catch {}
+  }, []);
 
   // ── تحميل البيانات ──
   useEffect(() => {
@@ -3511,17 +3570,10 @@ function StudentExcusePortal({ onBack, siteFont, isAdmin = false }) {
 
   const loadExcuses = async (year) => {
     setLoading(true);
-    const key = `school-excuses-${year}`;
-    const data = await DB.get(key, {});
-    // تحويل object إلى array مرتب بالأحدث أولاً
+    const data = await DB.get(`school-excuses-${year}`, {});
     const arr = Object.values(data || {}).sort((a, b) => b.id - a.id);
-    if (year === YEAR_KEY) {
-      setExcuses(arr);
-      setArchiveYear(null);
-    } else {
-      setArchiveData(arr);
-      setArchiveYear(year);
-    }
+    if (year === YEAR_KEY) { setExcuses(arr); setArchiveYear(null); }
+    else { setArchiveData(arr); setArchiveYear(year); }
     setLoading(false);
   };
 
@@ -3533,7 +3585,7 @@ function StudentExcusePortal({ onBack, siteFont, isAdmin = false }) {
       s.nationalId?.trim() === nationalId.trim() ||
       s.id?.trim() === nationalId.trim()
     );
-    if (!found) { setIdError("رقم الهوية غير موجود — تواصل مع الإدارة"); return; }
+    if (!found) { setIdError("رقم الهوية غير موجود — تواصل مع إدارة المدرسة"); return; }
     setStudent(found);
     setView("form");
   };
@@ -3541,17 +3593,15 @@ function StudentExcusePortal({ onBack, siteFont, isAdmin = false }) {
   // ── رفع وضغط الصورة ──
   const handleFile = async (e) => {
     const file = e.target.files[0]; if (!file) return;
-    const raw = file.size;
-    if (raw > 5 * 1024 * 1024) { alert("الحد الأقصى للملف 5 ميجابايت"); e.target.value=""; return; }
+    if (file.size > 5 * 1024 * 1024) { alert("الحد الأقصى 5 ميجابايت"); e.target.value=""; return; }
     const reader = new FileReader();
     reader.onload = async (ev) => {
       let data = ev.target.result;
       if (file.type.startsWith("image/")) {
-        // ضغط الصورة تلقائياً
         data = await compressImage(data, 200);
         setFileSize(Math.round(data.length * 0.75 / 1024));
       } else {
-        setFileSize(Math.round(raw / 1024));
+        setFileSize(Math.round(file.size / 1024));
       }
       setFileData(data);
       setFileName(file.name);
@@ -3562,34 +3612,35 @@ function StudentExcusePortal({ onBack, siteFont, isAdmin = false }) {
 
   // ── حفظ العذر ──
   const handleSubmit = async () => {
-    if (!absenceDates.trim()) { alert("أدخل تاريخ الغياب"); return; }
+    if (!absenceDay) { alert("اختر يوم الغياب"); return; }
+    if (!absenceDateM) { alert("أدخل تاريخ الغياب"); return; }
+    if (!parentName.trim()) { alert("أدخل اسم المُرسِل"); return; }
     if (excuseType === "text" && !reason.trim()) { alert("أدخل نص العذر"); return; }
     if (excuseType !== "text" && !fileData) { alert("يرجى إرفاق الملف"); return; }
-    if (fileSize > 400) {
-      if (!window.confirm(`حجم الملف ${fileSize}KB — قد يؤثر على الأداء. هل تريد المتابعة؟`)) return;
-    }
     setSaving(true);
     const id = Date.now();
     const rec = {
       id,
-      studentId:    student.id || student.nationalId,
-      studentName:  student.name,
-      nationalId:   student.nationalId || student.id,
-      className:    student.className || "",
-      absenceDates,
+      studentId:     student.id || student.nationalId,
+      studentName:   student.name,
+      nationalId:    student.nationalId || student.id,
+      className:     student.className || "",
+      absenceDay,
+      absenceDateH,
+      absenceDateM,
       reasonCat,
-      reason:       excuseType === "text" ? reason : "",
+      reason:        excuseType === "text" ? reason : "",
       excuseType,
-      fileName:     excuseType !== "text" ? fileName : "",
-      fileData:     excuseType !== "text" ? fileData : "", // مضغوطة للصور
-      fileSizeKB:   fileSize,
+      fileName:      excuseType !== "text" ? fileName : "",
+      fileData:      excuseType !== "text" ? fileData : "",
+      fileSizeKB:    fileSize,
       parentName,
       parentPhone,
-      status:       "قيد المراجعة",
-      submittedAt:  new Date().toLocaleDateString("ar-SA"),
-      year:         YEAR_KEY,
+      parentRelation,
+      status:        "قيد المراجعة",
+      submittedAt:   new Date().toLocaleDateString("ar-SA"),
+      year:          YEAR_KEY,
     };
-    // حفظ كل عذر في node منفصل باستخدام ID كمفتاح
     const key = `school-excuses-${YEAR_KEY}`;
     const existing = await DB.get(key, {});
     await DB.set(key, { ...existing, [id]: rec });
@@ -3598,36 +3649,35 @@ function StudentExcusePortal({ onBack, siteFont, isAdmin = false }) {
     setView("success");
   };
 
-  // ── تحديث حالة العذر ──
+  // ── نسخ الرابط ──
+  const copyLink = () => {
+    navigator.clipboard.writeText(EXCUSE_URL).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    });
+  };
+
+  // ── تحديث حالة ──
   const updateStatus = async (excuseId, newStatus) => {
     const key = `school-excuses-${archiveYear || YEAR_KEY}`;
     const existing = await DB.get(key, {});
-    if (existing[excuseId]) {
-      existing[excuseId].status = newStatus;
-      await DB.set(key, existing);
-    }
-    if (archiveYear) {
-      setArchiveData(prev => prev.map(ex => ex.id === excuseId ? { ...ex, status: newStatus } : ex));
-    } else {
-      setExcuses(prev => prev.map(ex => ex.id === excuseId ? { ...ex, status: newStatus } : ex));
-    }
+    if (existing[excuseId]) { existing[excuseId].status = newStatus; await DB.set(key, existing); }
+    const update = ex => ex.id === excuseId ? { ...ex, status: newStatus } : ex;
+    if (archiveYear) setArchiveData(prev => prev.map(update));
+    else setExcuses(prev => prev.map(update));
   };
 
-  // ── حذف عذر ──
   const deleteExcuse = async (excuseId) => {
     if (!window.confirm("حذف هذا العذر نهائياً؟")) return;
     const key = `school-excuses-${archiveYear || YEAR_KEY}`;
     const existing = await DB.get(key, {});
     delete existing[excuseId];
     await DB.set(key, existing);
-    if (archiveYear) {
-      setArchiveData(prev => prev.filter(ex => ex.id !== excuseId));
-    } else {
-      setExcuses(prev => prev.filter(ex => ex.id !== excuseId));
-    }
+    const filter = ex => ex.id !== excuseId;
+    if (archiveYear) setArchiveData(prev => prev.filter(filter));
+    else setExcuses(prev => prev.filter(filter));
   };
 
-  // ── استيراد Excel ──
   const handleXLS = async (e) => {
     const file = e.target.files[0]; if (!file) return;
     try {
@@ -3673,17 +3723,13 @@ function StudentExcusePortal({ onBack, siteFont, isAdmin = false }) {
 
   const totalPages = Math.ceil(filteredExcuses.length / PER_PAGE);
   const pageData   = filteredExcuses.slice((page-1)*PER_PAGE, page*PER_PAGE);
-
   const counts = {
     all:      currentList.length,
     pending:  currentList.filter(ex=>ex.status==="قيد المراجعة").length,
     accepted: currentList.filter(ex=>ex.status==="مقبول").length,
     rejected: currentList.filter(ex=>ex.status==="مرفوض").length,
   };
-
-  // حجم تقريبي للبيانات
-  const totalSizeKB = Math.round(currentList.reduce((s, ex) =>
-    s + (ex.fileSizeKB || 0) + 1, 0));
+  const totalSizeKB = Math.round(currentList.reduce((s,ex)=>s+(ex.fileSizeKB||0)+1,0));
 
   const S = {
     page:  { minHeight:"100vh", background:"#f0f4f8", fontFamily:"'Cairo','Noto Naskh Arabic',sans-serif", direction:"rtl" },
@@ -3696,6 +3742,9 @@ function StudentExcusePortal({ onBack, siteFont, isAdmin = false }) {
     input: { width:"100%", padding:"11px 14px", border:"1.5px solid #e2e8f0", borderRadius:10,
               fontFamily:"'Cairo',sans-serif", fontSize:14, color:"#1e293b", outline:"none",
               background:"#f8fafc", direction:"rtl", boxSizing:"border-box" },
+    select:{ width:"100%", padding:"11px 14px", border:"1.5px solid #e2e8f0", borderRadius:10,
+              fontFamily:"'Cairo',sans-serif", fontSize:14, color:"#1e293b", outline:"none",
+              background:"#f8fafc", direction:"rtl", cursor:"pointer" },
   };
 
   // ═══ لوحة الإدارة ═══
@@ -3710,15 +3759,20 @@ function StudentExcusePortal({ onBack, siteFont, isAdmin = false }) {
           <div style={{ flex:1 }}>
             <div style={{ fontWeight:900, fontSize:15 }}>إدارة أعذار الطلاب</div>
             <div style={{ opacity:.7, fontSize:11 }}>
-              {archiveYear ? `أرشيف ${archiveYear}` : `العام الحالي ${YEAR_KEY}`}
-              {" · "}{totalSizeKB}KB حجم تقريبي
+              {archiveYear ? `أرشيف ${archiveYear}` : `العام الحالي ${YEAR_KEY}`} · {totalSizeKB}KB
             </div>
           </div>
-          {/* اختيار السنة للأرشيف */}
+          {/* زر نسخ الرابط */}
+          <button onClick={copyLink}
+            style={{ ...S.btn, background: copied ? "rgba(110,231,183,0.3)" : "rgba(255,255,255,0.15)",
+                     color:"#fff", fontSize:11, padding:"7px 12px",
+                     border:"1px solid rgba(255,255,255,0.3)" }}>
+            {copied ? "✅ تم النسخ" : "🔗 نسخ رابط الأعذار"}
+          </button>
           <select value={archiveYear || YEAR_KEY} onChange={e => loadExcuses(Number(e.target.value))}
             style={{ padding:"6px 10px", borderRadius:8, border:"1px solid rgba(255,255,255,0.3)",
-                     background:"rgba(255,255,255,0.15)", color:"#fff", fontFamily:"'Cairo',sans-serif",
-                     fontSize:12, cursor:"pointer" }}>
+                     background:"rgba(255,255,255,0.15)", color:"#fff",
+                     fontFamily:"'Cairo',sans-serif", fontSize:12, cursor:"pointer" }}>
             {YEAR_KEYS.map(y => <option key={y} value={y} style={{ background:"#1e3a5f" }}>
               {y === YEAR_KEY ? `${y} (الحالي)` : `${y} (أرشيف)`}
             </option>)}
@@ -3731,6 +3785,25 @@ function StudentExcusePortal({ onBack, siteFont, isAdmin = false }) {
         </div>
 
         <div style={{ maxWidth:1000, margin:"0 auto", padding:"14px 12px 60px" }}>
+
+          {/* رابط مستمر */}
+          <div style={{ ...S.card, padding:"12px 16px", marginBottom:14,
+            background:"linear-gradient(135deg,#eff6ff,#f0fdf4)",
+            border:"1.5px solid #93c5fd", display:"flex", alignItems:"center", gap:10, flexWrap:"wrap" }}>
+            <span style={{ fontSize:18 }}>🔗</span>
+            <div style={{ flex:1 }}>
+              <div style={{ fontWeight:900, fontSize:12.5, color:"#1e3a5f", marginBottom:3 }}>
+                الرابط المباشر لبوابة الأعذار — أرسله لأولياء الأمور
+              </div>
+              <code style={{ fontSize:11.5, color:"#1d4ed8", background:"#dbeafe",
+                padding:"3px 8px", borderRadius:6, userSelect:"all" }}>{EXCUSE_URL}</code>
+            </div>
+            <button onClick={copyLink}
+              style={{ ...S.btn, background: copied ? "#d1fae5" : "#1d4ed8",
+                       color: copied ? "#065f46" : "#fff", fontSize:12, padding:"8px 16px" }}>
+              {copied ? "✅ تم النسخ" : "نسخ الرابط 📋"}
+            </button>
+          </div>
 
           {/* إحصائيات */}
           <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:8, marginBottom:14 }}>
@@ -3748,26 +3821,7 @@ function StudentExcusePortal({ onBack, siteFont, isAdmin = false }) {
             ))}
           </div>
 
-          {/* حجم البيانات ومؤشر الأداء */}
-          {totalSizeKB > 0 && (
-            <div style={{ ...S.card, padding:"10px 14px", marginBottom:12, display:"flex",
-              alignItems:"center", gap:10, flexWrap:"wrap" }}>
-              <span style={{ fontSize:14 }}>💾</span>
-              <div style={{ flex:1, fontSize:12, color:"#374151" }}>
-                <strong>حجم البيانات:</strong> {totalSizeKB} KB
-                {" — "}
-                <span style={{ color: totalSizeKB < 500 ? "#065f46" : totalSizeKB < 2000 ? "#92400e" : "#991b1b",
-                  fontWeight:700 }}>
-                  {totalSizeKB < 500 ? "✅ ممتاز" : totalSizeKB < 2000 ? "⚠️ جيد" : "❌ كبير — يُوصى بأرشفة السنوات القديمة"}
-                </span>
-              </div>
-              <div style={{ fontSize:11, color:"#94a3b8" }}>
-                الصور تُضغط تلقائياً &lt; 200KB
-              </div>
-            </div>
-          )}
-
-          {/* شريط البحث والفلتر */}
+          {/* شريط البحث */}
           <div style={{ ...S.card, padding:"10px 12px", marginBottom:12,
             display:"flex", gap:8, flexWrap:"wrap", alignItems:"center" }}>
             <input value={adminSearch} onChange={e=>{setAdminSearch(e.target.value);setPage(1);}}
@@ -3786,16 +3840,16 @@ function StudentExcusePortal({ onBack, siteFont, isAdmin = false }) {
             </div>
           </div>
 
-          {/* معلومة Excel */}
+          {/* تنسيق Excel */}
           <div style={{ background:"#eff6ff", border:"1px solid #bfdbfe", borderRadius:10,
             padding:"8px 14px", marginBottom:12, fontSize:11.5, color:"#1e40af", fontWeight:600 }}>
             📌 تنسيق Excel: <strong>عمود أ</strong> اسم الطالب | <strong>عمود ب</strong> رقم الهوية | <strong>عمود ج</strong> الفصل
           </div>
 
+          {/* القائمة */}
           {loading ? (
             <div style={{ textAlign:"center", padding:"40px", color:"#64748b" }}>
-              <div style={{ fontSize:30, marginBottom:8 }}>⏳</div>
-              <div style={{ fontWeight:700 }}>جارٍ التحميل...</div>
+              <div style={{ fontSize:30, marginBottom:8 }}>⏳</div><div style={{ fontWeight:700 }}>جارٍ التحميل...</div>
             </div>
           ) : filteredExcuses.length === 0 ? (
             <div style={{ textAlign:"center", padding:"40px", color:"#94a3b8" }}>
@@ -3804,15 +3858,12 @@ function StudentExcusePortal({ onBack, siteFont, isAdmin = false }) {
             </div>
           ) : (
             <>
-              {/* القائمة - صفحة واحدة في كل مرة */}
               <div style={{ display:"flex", flexDirection:"column", gap:10, marginBottom:14 }}>
                 {pageData.map(ex => {
                   const sc = statusColor(ex.status);
                   return (
-                    <div key={ex.id} style={{ ...S.card, padding:"14px",
-                      borderRight:`4px solid ${sc.border}` }}>
-                      <div style={{ display:"flex", justifyContent:"space-between",
-                        alignItems:"flex-start", flexWrap:"wrap", gap:8 }}>
+                    <div key={ex.id} style={{ ...S.card, padding:"14px", borderRight:`4px solid ${sc.border}` }}>
+                      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", flexWrap:"wrap", gap:8 }}>
                         <div style={{ display:"flex", alignItems:"center", gap:10 }}>
                           <div style={{ width:42, height:42, borderRadius:12, flexShrink:0,
                             background:"linear-gradient(135deg,#1e3a5f,#1d4ed8)",
@@ -3823,7 +3874,7 @@ function StudentExcusePortal({ onBack, siteFont, isAdmin = false }) {
                           <div>
                             <div style={{ fontWeight:900, fontSize:13.5, color:"#1e293b" }}>{ex.studentName}</div>
                             <div style={{ fontSize:11, color:"#64748b", marginTop:1 }}>
-                              🪪 {ex.nationalId} &nbsp;·&nbsp; 🏫 {ex.className||"—"} &nbsp;·&nbsp; 📅 {ex.submittedAt}
+                              🪪 {ex.nationalId} · 🏫 {ex.className||"—"} · 📅 {ex.submittedAt}
                             </div>
                           </div>
                         </div>
@@ -3849,26 +3900,27 @@ function StudentExcusePortal({ onBack, siteFont, isAdmin = false }) {
                       </div>
                       <div style={{ marginTop:10, padding:"10px 12px", background:"#f8fafc",
                         borderRadius:10, border:"1px solid #e2e8f0", fontSize:12 }}>
-                        <div style={{ display:"flex", gap:14, flexWrap:"wrap", marginBottom:6 }}>
-                          <span><strong>تواريخ الغياب:</strong> {ex.absenceDates}</span>
+                        {/* معلومات اليوم والتاريخ */}
+                        <div style={{ display:"flex", gap:12, flexWrap:"wrap", marginBottom:6,
+                          background:"#eff6ff", padding:"6px 10px", borderRadius:8 }}>
+                          {ex.absenceDay && <span>📅 <strong>اليوم:</strong> {ex.absenceDay}</span>}
+                          {ex.absenceDateH && <span>🌙 {ex.absenceDateH} هـ</span>}
+                          {ex.absenceDateM && <span>☀️ {ex.absenceDateM} م</span>}
+                        </div>
+                        <div style={{ display:"flex", gap:12, flexWrap:"wrap", marginBottom:6 }}>
                           <span><strong>السبب:</strong> {ex.reasonCat}</span>
-                          {ex.parentName && <span><strong>ولي الأمر:</strong> {ex.parentName}</span>}
-                          {ex.parentPhone && <span><strong>جوال:</strong> {ex.parentPhone}</span>}
-                          {ex.fileSizeKB > 0 && <span style={{ color:"#94a3b8" }}>حجم الملف: {ex.fileSizeKB}KB</span>}
+                          {ex.parentName && <span>👤 <strong>{ex.parentRelation||"ولي الأمر"}:</strong> {ex.parentName}</span>}
+                          {ex.parentPhone && <span>📱 {ex.parentPhone}</span>}
+                          {ex.fileSizeKB > 0 && <span style={{ color:"#94a3b8" }}>({ex.fileSizeKB}KB)</span>}
                         </div>
                         {ex.excuseType === "text" && ex.reason && (
                           <div style={{ color:"#374151", lineHeight:1.8 }}>{ex.reason}</div>
                         )}
                         {ex.excuseType === "image" && ex.fileData && (
-                          <div>
-                            <img src={ex.fileData} alt="عذر"
-                              style={{ maxWidth:"100%", maxHeight:180, borderRadius:8,
-                                       border:"1px solid #e2e8f0", cursor:"pointer", marginTop:6 }}
-                              onClick={()=>window.open(ex.fileData)} />
-                            <div style={{ fontSize:10, color:"#94a3b8", marginTop:3 }}>
-                              اضغط على الصورة للعرض الكامل
-                            </div>
-                          </div>
+                          <img src={ex.fileData} alt="عذر"
+                            style={{ maxWidth:"100%", maxHeight:180, borderRadius:8,
+                                     border:"1px solid #e2e8f0", cursor:"pointer", marginTop:6 }}
+                            onClick={()=>window.open(ex.fileData)} />
                         )}
                         {ex.excuseType === "pdf" && ex.fileData && (
                           <a href={ex.fileData} download={ex.fileName}
@@ -3883,8 +3935,6 @@ function StudentExcusePortal({ onBack, siteFont, isAdmin = false }) {
                   );
                 })}
               </div>
-
-              {/* التنقل بين الصفحات */}
               {totalPages > 1 && (
                 <div style={{ display:"flex", justifyContent:"center", gap:8, alignItems:"center" }}>
                   <button onClick={()=>setPage(p=>Math.max(1,p-1))} disabled={page===1}
@@ -3893,7 +3943,7 @@ function StudentExcusePortal({ onBack, siteFont, isAdmin = false }) {
                     ← السابق
                   </button>
                   <span style={{ fontSize:12, fontWeight:700, color:"#64748b" }}>
-                    {page} / {totalPages} &nbsp;·&nbsp; {filteredExcuses.length} عذر
+                    {page} / {totalPages} · {filteredExcuses.length} عذر
                   </span>
                   <button onClick={()=>setPage(p=>Math.min(totalPages,p+1))} disabled={page===totalPages}
                     style={{ ...S.btn, background:page===totalPages?"#f1f5f9":"#1d4ed8",
@@ -3913,24 +3963,30 @@ function StudentExcusePortal({ onBack, siteFont, isAdmin = false }) {
   if (view === "success") {
     return (
       <div style={{ ...S.page, display:"flex", alignItems:"center", justifyContent:"center", padding:"20px" }}>
-        <div style={{ ...S.card, padding:"36px 28px", maxWidth:400, width:"100%", textAlign:"center" }}>
+        <div style={{ ...S.card, padding:"36px 28px", maxWidth:420, width:"100%", textAlign:"center" }}>
           <div style={{ fontSize:54, marginBottom:12 }}>✅</div>
           <div style={{ fontWeight:900, fontSize:19, color:"#065f46", marginBottom:8 }}>تم تقديم العذر بنجاح</div>
           <div style={{ fontSize:13, color:"#64748b", lineHeight:1.8, marginBottom:20 }}>
             سيتم مراجعته من قِبَل الإدارة في أقرب وقت
           </div>
+          {/* ملخص العذر */}
           <div style={{ background:"#f0fdf4", borderRadius:12, padding:"14px",
-            border:"1px solid #6ee7b7", fontSize:13, marginBottom:20 }}>
-            <strong>{student?.name}</strong><br/>
-            <span style={{ color:"#64748b", fontSize:12 }}>تواريخ الغياب: {absenceDates}</span>
+            border:"1px solid #6ee7b7", textAlign:"right", marginBottom:20 }}>
+            <div style={{ fontWeight:900, color:"#1e293b", marginBottom:8 }}>{student?.name}</div>
+            <div style={{ fontSize:12, color:"#64748b", lineHeight:2 }}>
+              <div>📅 {absenceDay} — {absenceDateH} هـ / {absenceDateM} م</div>
+              <div>📌 {reasonCat}</div>
+              <div>👤 {parentRelation}: {parentName}</div>
+              {parentPhone && <div>📱 {parentPhone}</div>}
+            </div>
           </div>
           <button onClick={()=>{ setView("login"); setNationalId(""); setStudent(null);
-            setReason(""); setFileData(null); setFileName(""); setAbsenceDates(""); }}
+            setReason(""); setFileData(null); setFileName(""); }}
             style={{ ...S.btn, background:"linear-gradient(135deg,#1e3a5f,#1d4ed8)", color:"#fff", width:"100%" }}>
             ← تقديم عذر آخر
           </button>
           {onBack && <button onClick={onBack}
-            style={{ ...S.btn, background:"#f1f5f9", color:"#64748b", width:"100%", marginTop:8 }}>
+            style={{ ...S.btn, background:"#f1f5f9", color:"#64748b", width:"100%", marginTop:8, fontSize:12 }}>
             العودة للرئيسية
           </button>}
         </div>
@@ -3950,10 +4006,10 @@ function StudentExcusePortal({ onBack, siteFont, isAdmin = false }) {
           <span style={{ fontSize:22 }}>📋</span>
           <div style={{ flex:1 }}>
             <div style={{ fontWeight:900, fontSize:14 }}>نموذج تقديم العذر</div>
-            <div style={{ opacity:.7, fontSize:11 }}>{student.name}</div>
+            <div style={{ opacity:.7, fontSize:11 }}>مدرسة عبيدة بن الحارث المتوسطة</div>
           </div>
         </div>
-        <div style={{ maxWidth:580, margin:"0 auto", padding:"14px 12px 60px" }}>
+        <div style={{ maxWidth:600, margin:"0 auto", padding:"14px 12px 60px" }}>
 
           {/* بيانات الطالب */}
           <div style={{ ...S.card, padding:"13px 16px", marginBottom:12,
@@ -3973,35 +4029,68 @@ function StudentExcusePortal({ onBack, siteFont, isAdmin = false }) {
             </div>
           </div>
 
-          {/* تاريخ الغياب والسبب */}
+          {/* ── اليوم والتاريخ ── */}
           <div style={{ ...S.card, padding:"16px", marginBottom:12 }}>
             <div style={{ fontWeight:900, color:"#1e3a5f", fontSize:13.5, marginBottom:12,
-              display:"flex", alignItems:"center", gap:8 }}>📅 تفاصيل الغياب</div>
+              display:"flex", alignItems:"center", gap:8 }}>📅 يوم وتاريخ الغياب</div>
+
+            {/* اليوم */}
             <div style={{ marginBottom:12 }}>
               <label style={{ fontSize:12, fontWeight:700, color:"#64748b", display:"block", marginBottom:5 }}>
-                تاريخ/تواريخ الغياب *
+                يوم الغياب *
               </label>
-              <input value={absenceDates} onChange={e=>setAbsenceDates(e.target.value)}
-                placeholder="مثال: 13/04/2026 أو 13-15 أبريل 2026"
-                style={S.input} />
-            </div>
-            <div>
-              <label style={{ fontSize:12, fontWeight:700, color:"#64748b", display:"block", marginBottom:7 }}>سبب الغياب</label>
               <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
-                {REASON_CATS.map(r => (
-                  <button key={r} onClick={()=>setReasonCat(r)}
-                    style={{ padding:"6px 13px", borderRadius:20, fontSize:12, fontWeight:700,
+                {WEEK_DAYS_AR.filter(d=>!["الجمعة","السبت"].includes(d)).map(d=>(
+                  <button key={d} onClick={()=>setAbsenceDay(d)}
+                    style={{ padding:"7px 14px", borderRadius:20, fontSize:12.5, fontWeight:700,
                              cursor:"pointer", border:"1.5px solid",
-                             borderColor: reasonCat===r?"#1d4ed8":"#e2e8f0",
-                             background:  reasonCat===r?"#1d4ed8":"#f8fafc",
-                             color:       reasonCat===r?"#fff":"#374151",
-                             fontFamily:"'Cairo',sans-serif" }}>{r}</button>
+                             borderColor: absenceDay===d?"#1d4ed8":"#e2e8f0",
+                             background:  absenceDay===d?"#1d4ed8":"#f8fafc",
+                             color:       absenceDay===d?"#fff":"#374151",
+                             fontFamily:"'Cairo',sans-serif" }}>{d}</button>
                 ))}
+              </div>
+            </div>
+
+            {/* التاريخ */}
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+              <div>
+                <label style={{ fontSize:12, fontWeight:700, color:"#64748b", display:"block", marginBottom:5 }}>
+                  🌙 التاريخ الهجري
+                </label>
+                <input value={absenceDateH} onChange={e=>setAbsenceDateH(e.target.value)}
+                  placeholder="مثال: 14/10/1447"
+                  style={{ ...S.input, fontSize:13 }} />
+              </div>
+              <div>
+                <label style={{ fontSize:12, fontWeight:700, color:"#64748b", display:"block", marginBottom:5 }}>
+                  ☀️ التاريخ الميلادي
+                </label>
+                <input value={absenceDateM} onChange={e=>setAbsenceDateM(e.target.value)}
+                  placeholder="مثال: 13/04/2026"
+                  style={{ ...S.input, fontSize:13 }} />
               </div>
             </div>
           </div>
 
-          {/* نوع العذر */}
+          {/* ── سبب الغياب ── */}
+          <div style={{ ...S.card, padding:"16px", marginBottom:12 }}>
+            <div style={{ fontWeight:900, color:"#1e3a5f", fontSize:13.5, marginBottom:12,
+              display:"flex", alignItems:"center", gap:8 }}>📌 سبب الغياب</div>
+            <div style={{ display:"flex", flexWrap:"wrap", gap:6, marginBottom:14 }}>
+              {REASON_CATS.map(r => (
+                <button key={r} onClick={()=>setReasonCat(r)}
+                  style={{ padding:"6px 13px", borderRadius:20, fontSize:12, fontWeight:700,
+                           cursor:"pointer", border:"1.5px solid",
+                           borderColor: reasonCat===r?"#1d4ed8":"#e2e8f0",
+                           background:  reasonCat===r?"#1d4ed8":"#f8fafc",
+                           color:       reasonCat===r?"#fff":"#374151",
+                           fontFamily:"'Cairo',sans-serif" }}>{r}</button>
+              ))}
+            </div>
+          </div>
+
+          {/* ── إرفاق العذر ── */}
           <div style={{ ...S.card, padding:"16px", marginBottom:12 }}>
             <div style={{ fontWeight:900, color:"#1e3a5f", fontSize:13.5, marginBottom:12,
               display:"flex", alignItems:"center", gap:8 }}>📎 إرفاق العذر</div>
@@ -4028,9 +4117,9 @@ function StudentExcusePortal({ onBack, siteFont, isAdmin = false }) {
                   borderRadius:12, background:"#eff6ff", cursor:"pointer", textAlign:"center" }}>
                   <span style={{ fontSize:34 }}>{excuseType==="image"?"🖼️":"📄"}</span>
                   <span style={{ fontWeight:700, color:"#1d4ed8", fontSize:13 }}>
-                    اضغط لاختيار {excuseType==="image"?"صورة (تُضغط تلقائياً)":"ملف PDF"}
+                    اضغط لاختيار {excuseType==="image"?"صورة":"ملف PDF"}
                   </span>
-                  <span style={{ fontSize:11, color:"#94a3b8" }}>الحد الأقصى 5MB — الصور تُضغط لـ &lt;200KB</span>
+                  <span style={{ fontSize:11, color:"#94a3b8" }}>الحد الأقصى 5MB · الصور تُضغط تلقائياً</span>
                   <input type="file" accept={excuseType==="image"?"image/*":".pdf"}
                     onChange={handleFile} style={{ display:"none" }} />
                 </label>
@@ -4038,8 +4127,7 @@ function StudentExcusePortal({ onBack, siteFont, isAdmin = false }) {
                 <div style={{ border:"1.5px solid #6ee7b7", borderRadius:12, padding:12, background:"#f0fdf4" }}>
                   <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
                     <span style={{ fontSize:12.5, fontWeight:700, color:"#065f46" }}>
-                      {excuseType==="image"?"🖼️":"📄"} {fileName}
-                      <span style={{ fontWeight:400, color:"#64748b", marginRight:6 }}>({fileSize}KB)</span>
+                      {excuseType==="image"?"🖼️":"📄"} {fileName} ({fileSize}KB)
                     </span>
                     <button onClick={()=>{setFileData(null);setFileName("");}}
                       style={{ background:"#fee2e2", border:"none", borderRadius:8, color:"#991b1b",
@@ -4049,28 +4137,46 @@ function StudentExcusePortal({ onBack, siteFont, isAdmin = false }) {
                     <img src={fileData} alt="معاينة"
                       style={{ maxWidth:"100%", maxHeight:150, borderRadius:8, border:"1px solid #e2e8f0" }} />
                   )}
-                  {fileSize > 300 && (
-                    <div style={{ fontSize:11, color:"#92400e", marginTop:6 }}>
-                      ⚠️ الملف كبير نسبياً — قد يؤثر على سرعة التحميل
-                    </div>
-                  )}
                 </div>
               )
             )}
           </div>
 
-          {/* بيانات ولي الأمر */}
+          {/* ── بيانات المُرسِل ── */}
           <div style={{ ...S.card, padding:"16px", marginBottom:16 }}>
             <div style={{ fontWeight:900, color:"#1e3a5f", fontSize:13.5, marginBottom:12,
-              display:"flex", alignItems:"center", gap:8 }}>👨‍👦 بيانات ولي الأمر (اختياري)</div>
+              display:"flex", alignItems:"center", gap:8 }}>👤 بيانات المُرسِل</div>
+
+            {/* العلاقة بالطالب */}
+            <div style={{ marginBottom:12 }}>
+              <label style={{ fontSize:12, fontWeight:700, color:"#64748b", display:"block", marginBottom:5 }}>
+                صفة المُرسِل وعلاقته بالطالب *
+              </label>
+              <div style={{ display:"flex", flexWrap:"wrap", gap:6, marginBottom:10 }}>
+                {RELATIONS.map(r => (
+                  <button key={r} onClick={()=>setParentRelation(r)}
+                    style={{ padding:"6px 12px", borderRadius:20, fontSize:11.5, fontWeight:700,
+                             cursor:"pointer", border:"1.5px solid",
+                             borderColor: parentRelation===r?"#0e7c7b":"#e2e8f0",
+                             background:  parentRelation===r?"#0e7c7b":"#f8fafc",
+                             color:       parentRelation===r?"#fff":"#374151",
+                             fontFamily:"'Cairo',sans-serif" }}>{r}</button>
+                ))}
+              </div>
+            </div>
+
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
               <div>
-                <label style={{ fontSize:11.5, fontWeight:700, color:"#64748b", display:"block", marginBottom:4 }}>الاسم</label>
+                <label style={{ fontSize:11.5, fontWeight:700, color:"#64748b", display:"block", marginBottom:4 }}>
+                  اسم {parentRelation} *
+                </label>
                 <input value={parentName} onChange={e=>setParentName(e.target.value)}
-                  placeholder="اسم ولي الأمر" style={S.input} />
+                  placeholder={`اسم ${parentRelation}`} style={S.input} />
               </div>
               <div>
-                <label style={{ fontSize:11.5, fontWeight:700, color:"#64748b", display:"block", marginBottom:4 }}>رقم الجوال</label>
+                <label style={{ fontSize:11.5, fontWeight:700, color:"#64748b", display:"block", marginBottom:4 }}>
+                  رقم الجوال
+                </label>
                 <input value={parentPhone} onChange={e=>setParentPhone(e.target.value)}
                   placeholder="05xxxxxxxx" style={{ ...S.input, direction:"ltr", textAlign:"right" }} />
               </div>
@@ -4092,42 +4198,71 @@ function StudentExcusePortal({ onBack, siteFont, isAdmin = false }) {
   // ═══ شاشة الدخول بالهوية ═══
   return (
     <div style={{ ...S.page, display:"flex", flexDirection:"column",
-      alignItems:"center", justifyContent:"center", padding:"20px" }}>
-      <div style={{ ...S.card, padding:"34px 26px", maxWidth:380, width:"100%", textAlign:"center" }}>
+      alignItems:"center", justifyContent:"center", padding:"20px", minHeight:"100vh" }}>
+      <div style={{ ...S.card, padding:"34px 26px", maxWidth:420, width:"100%", textAlign:"center" }}>
+        {/* شعار وعنوان */}
         <div style={{ background:"linear-gradient(135deg,#1e3a5f,#1d4ed8)", borderRadius:"50%",
-          width:68, height:68, display:"flex", alignItems:"center", justifyContent:"center",
+          width:72, height:72, display:"flex", alignItems:"center", justifyContent:"center",
           fontSize:32, margin:"0 auto 14px" }}>📋</div>
-        <h1 style={{ fontSize:19, fontWeight:900, color:"#1e293b", marginBottom:4 }}>بوابة الأعذار</h1>
-        <p style={{ fontSize:12.5, color:"#64748b", marginBottom:22, lineHeight:1.7 }}>
-          مدرسة عبيدة بن الحارث المتوسطة<br/>
-          أدخل رقم هوية الطالب للمتابعة
+        <h1 style={{ fontSize:19, fontWeight:900, color:"#1e293b", marginBottom:4 }}>بوابة أعذار الطلاب</h1>
+        <p style={{ fontSize:12.5, color:"#64748b", marginBottom:6, lineHeight:1.8 }}>
+          مدرسة عبيدة بن الحارث المتوسطة
         </p>
+        <p style={{ fontSize:11.5, color:"#94a3b8", marginBottom:22 }}>
+          أدخل رقم هوية الطالب لتقديم عذر الغياب
+        </p>
+
         {students.length === 0 && (
           <div style={{ background:"#fef3c7", border:"1px solid #fde68a", borderRadius:10,
             padding:"9px 14px", marginBottom:14, fontSize:12, color:"#92400e", fontWeight:600 }}>
             ⚠️ لم تُضَف قائمة الطلاب بعد — تواصل مع إدارة المدرسة
           </div>
         )}
-        <div style={{ marginBottom:14, textAlign:"right" }}>
+
+        <div style={{ marginBottom:16, textAlign:"right" }}>
           <label style={{ fontSize:12, fontWeight:700, color:"#64748b", display:"block", marginBottom:6 }}>
-            رقم هوية الطالب
+            🪪 رقم هوية الطالب
           </label>
           <input value={nationalId} onChange={e=>{setNationalId(e.target.value);setIdError("");}}
             onKeyDown={e=>e.key==="Enter"&&handleLogin()}
             placeholder="أدخل رقم الهوية"
-            style={{ ...S.input, fontSize:16, textAlign:"center", letterSpacing:2 }} />
-          {idError && <div style={{ color:"#dc2626", fontSize:12, fontWeight:700, marginTop:5 }}>{idError}</div>}
+            style={{ ...S.input, fontSize:18, textAlign:"center", letterSpacing:3,
+                     fontWeight:700, color:"#1e3a5f", padding:"13px 14px" }} />
+          {idError && <div style={{ color:"#dc2626", fontSize:12, fontWeight:700, marginTop:6,
+            background:"#fee2e2", padding:"6px 10px", borderRadius:8 }}>{idError}</div>}
         </div>
+
         <button onClick={handleLogin}
           style={{ ...S.btn, width:"100%", background:"linear-gradient(135deg,#1e3a5f,#1d4ed8)",
-                   color:"#fff", fontSize:14, padding:"12px",
-                   boxShadow:"0 4px 16px rgba(29,78,216,0.28)" }}>
+                   color:"#fff", fontSize:15, padding:"13px",
+                   boxShadow:"0 4px 16px rgba(29,78,216,0.28)", marginBottom:10 }}>
           دخول ← تقديم عذر
         </button>
+
         {onBack && <button onClick={onBack}
-          style={{ ...S.btn, width:"100%", background:"#f1f5f9", color:"#64748b", marginTop:8, fontSize:12 }}>
+          style={{ ...S.btn, width:"100%", background:"#f1f5f9", color:"#64748b", fontSize:12 }}>
           ← العودة للرئيسية
         </button>}
+
+        {/* شريط الرابط */}
+        <div style={{ marginTop:20, padding:"10px 12px", background:"#f8fafc",
+          borderRadius:10, border:"1px solid #e2e8f0" }}>
+          <div style={{ fontSize:10.5, color:"#94a3b8", marginBottom:5 }}>
+            رابط هذه الصفحة — يمكن مشاركته مع أولياء الأمور
+          </div>
+          <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+            <code style={{ fontSize:10, color:"#1d4ed8", flex:1, wordBreak:"break-all",
+              textAlign:"right", background:"#eff6ff", padding:"4px 8px", borderRadius:6 }}>
+              {EXCUSE_URL}
+            </code>
+            <button onClick={copyLink}
+              style={{ ...S.btn, padding:"5px 10px", fontSize:11,
+                       background: copied ? "#d1fae5" : "#1d4ed8",
+                       color: copied ? "#065f46" : "#fff", flexShrink:0 }}>
+              {copied ? "✅" : "📋"}
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -21614,9 +21749,16 @@ export default function SchoolWebsite() {
     return h.startsWith("ann-") ? h.replace("ann-","") : null;
   });
 
+  // فتح بوابة الأعذار مباشرة عبر رابط #excuses
+  const [excuseFromHash, setExcuseFromHash] = useState(() =>
+    window.location.hash.replace("#","") === "excuses"
+  );
+
   useEffect(() => {
     const h = () => {
       const hash = window.location.hash.replace("#","") || "home";
+      if (hash === "excuses") { setExcuseFromHash(true); return; }
+      setExcuseFromHash(false);
       if (hash.startsWith("ann-")) { setDirectAnnId(hash.replace("ann-","")); return; }
       setDirectAnnId(null);
       if (["home","attendance","announcements","activities","settings","students","messages","surveys","sms","report","gradeanalysis","monthlyreport","teacherprofile","absencestats","attendancereport","student-absence","strategies","calendar","gallery","certificates","poll","raffle","broadcast","groupdivider","quiz","classtimer","luckywheel","exitticket","timetable","classvisits","honorboard","tasks","dailyquiz","aiteacher","lessonprep","lessonrecommend","officialforms","portfolio","earlywarning","meetings","heatmap","committeemeeting","teachereval","assessment","studentexcuses"].includes(hash)) setPage(hash);
@@ -21833,7 +21975,7 @@ export default function SchoolWebsite() {
   );
 
   if (directAnnId) return <SingleAnnouncementPage announcements={announcements} siteFont={siteFont} annId={directAnnId} />;
-  if (!user && excusePortal) return <StudentExcusePortal onBack={() => setExcusePortal(false)} siteFont={siteFont} isAdmin={false} />;
+  if (excuseFromHash || (!user && excusePortal)) return <StudentExcusePortal onBack={() => { setExcusePortal(false); setExcuseFromHash(false); window.location.hash = ""; }} siteFont={siteFont} isAdmin={false} />;
   if (!user && publicAnnouncements) return <PublicAnnouncementsPage announcements={announcements} siteFont={siteFont} onBack={() => setPublicAnnouncements(false)} />;
   if (!user && studentRaffle) return <StudentRafflePortal siteFont={siteFont} onBack={() => setStudentRaffle(false)} />;
   if (!user && teacherPortal) return <TeacherPortal classList={classList} setClassList={setClassList} saveClass={saveClass} siteFont={siteFont} onBack={() => setTeacherPortal(false)} attendance={attendance} teachers={teachers} week={week} onSendNote={handleSendNote} messages={messages} />;
