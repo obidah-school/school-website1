@@ -1761,7 +1761,7 @@ function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, sa
       {showDatePicker && (
         <div className="bg-gradient-to-l from-amber-50 to-teal-50 border-2 border-amber-300 rounded-2xl p-4 mb-4 shadow-lg">
           <div className="font-black text-teal-800 text-sm mb-3 flex items-center justify-between">
-            <span>📅 تحديد أسبوع جديد <span className="text-xs text-gray-400 font-normal mr-1">(اختر تاريخ يوم الأحد)</span></span>
+            <span>📅 تحديد أسبوع جديد <span className="text-xs text-gray-400 font-normal mr-1">(اختر أي يوم من الأسبوع المطلوب — سيحدد الأسبوع تلقائياً)</span></span>
             <button onClick={() => { setShowDatePicker(false); setDpPreview(null); }} className="text-gray-400 hover:text-gray-600 text-lg font-bold">✕</button>
           </div>
 
@@ -3257,24 +3257,36 @@ function fmtHijri(h){return `${padZ(h.d)}/${padZ(h.m)}/${h.y}`;}
 function fmtGreg(d){return `${padZ(d.getDate())}/${padZ(d.getMonth()+1)}/${d.getFullYear()}`;}
 const HIJRI_MONTHS=["محرم","صفر","ربيع الأول","ربيع الآخر","جمادى الأولى","جمادى الآخرة","رجب","شعبان","رمضان","شوال","ذو القعدة","ذو الحجة"];
 const WEEK_DAYS=["الأحد","الاثنين","الثلاثاء","الأربعاء","الخميس"];
-function generateWeekDays(sundayIso) {
-  const base = new Date(sundayIso);
+function generateWeekDays(anyDateIso) {
+  const base = new Date(anyDateIso);
+  const dayOfWeek = base.getDay();
+  const diffToSunday = dayOfWeek === 0 ? 0 : dayOfWeek >= 5 ? (7 - dayOfWeek) : -dayOfWeek;
+  const sunday = new Date(base);
+  sunday.setDate(base.getDate() + diffToSunday);
   return {
     days: WEEK_DAYS.map((name,i) => {
-      const d = new Date(base); d.setDate(d.getDate()+i);
+      const d = new Date(sunday); d.setDate(sunday.getDate()+i);
       const h = gregorianToHijri(d.getFullYear(), d.getMonth()+1, d.getDate());
       return { name, dateH: fmtHijri(h), dateM: fmtGreg(d) };
     })
   };
 }
 function generateWeekDaysFromHijri(hDay, hMonth, hYear) {
-  // تحويل الأحد الهجري لميلادي ثم توليد باقي الأيام
-  const sundayGreg = hijriToGregorian(hYear, hMonth, hDay);
+  // تحويل التاريخ الهجري للميلادي
+  const greg = hijriToGregorian(hYear, hMonth, hDay);
+  const d = new Date(greg);
+  // إيجاد يوم الأحد من نفس الأسبوع
+  const dayOfWeek = d.getDay(); // 0=Sun, 1=Mon, ...
+  // في المنطقة العربية الأسبوع يبدأ الأحد
+  const diffToSunday = dayOfWeek === 0 ? 0 : dayOfWeek >= 5 ? (7 - dayOfWeek) : -dayOfWeek;
+  const sunday = new Date(d);
+  sunday.setDate(d.getDate() + diffToSunday);
+  // إذا كان يوم جمعة أو سبت اذهب للأحد القادم
   return {
     days: WEEK_DAYS.map((name,i) => {
-      const d = new Date(sundayGreg); d.setDate(d.getDate()+i);
-      const h = gregorianToHijri(d.getFullYear(), d.getMonth()+1, d.getDate());
-      return { name, dateH: fmtHijri(h), dateM: fmtGreg(d) };
+      const dd = new Date(sunday); dd.setDate(sunday.getDate()+i);
+      const h = gregorianToHijri(dd.getFullYear(), dd.getMonth()+1, dd.getDate());
+      return { name, dateH: fmtHijri(h), dateM: fmtGreg(dd) };
     })
   };
 }
@@ -13011,10 +13023,10 @@ const EVAL_SECTIONS = [
     items:["مستوى تنفيذ التوصيات السابقة","مواطن القوة والتميز","الدعم والخبرات المقدمة من المشرف","التوصيات"] },
 ];
 
-const HIJRI_MONTHS = ["محرم","صفر","ربيع الأول","ربيع الآخر","جمادى الأولى","جمادى الآخرة","رجب","شعبان","رمضان","شوال","ذو القعدة","ذو الحجة"];
-const HIJRI_YEARS  = Array.from({length:7},(_,i)=>1447+i); // 1447-1453 (covers to 2031)
-const GREGORIAN_MONTHS = ["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"];
-const GREGORIAN_YEARS  = Array.from({length:4},(_,i)=>2025+i); // 2025-2028
+const HIJRI_MONTHS_ASS = ["محرم","صفر","ربيع الأول","ربيع الآخر","جمادى الأولى","جمادى الآخرة","رجب","شعبان","رمضان","شوال","ذو القعدة","ذو الحجة"];
+const HIJRI_YEARS_ASS  = Array.from({length:7},(_,i)=>1447+i); // 1447-1453 (covers to 2031)
+const GREGORIAN_MONTHS_ASS = ["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"];
+const GREGORIAN_YEARS_ASS  = Array.from({length:4},(_,i)=>2025+i); // 2025-2028
 
 const emptyForm = () => ({
   visitDate:"", subject:"", grade:"", lesson:"", period:"",
@@ -13253,7 +13265,7 @@ function AssessmentPage({ teachers: appTeachers = [] }) {
         <div class="sig">
           <div class="sig-space"></div>
           <div class="sig-name">${form.principalName||"فازع عبدالله حسن القرني"}</div>
-          <div class="sig-title">مدير المدرسة</div>
+          <div class="sig-title">${form.principalName==="أمين الحنيطي"?"وكيل المدرسة":"مدير المدرسة"}</div>
         </div>
         <div class="sig">
           <div class="sig-space"></div>
@@ -13472,9 +13484,9 @@ function AssessmentPage({ teachers: appTeachers = [] }) {
                     { label:"اليوم", val:form.hijriDay, key:"hijriDay",
                       opts:["",...Array.from({length:30},(_,i)=>String(i+1))] },
                     { label:"الشهر", val:form.hijriMonth, key:"hijriMonth",
-                      opts:["",...HIJRI_MONTHS] },
+                      opts:["",...HIJRI_MONTHS_ASS] },
                     { label:"السنة", val:form.hijriYear, key:"hijriYear",
-                      opts:HIJRI_YEARS.map(String) },
+                      opts:HIJRI_YEARS_ASS.map(String) },
                   ].map(s=>(
                     <div key={s.key}>
                       <div style={{ fontSize:9.5, color:"rgba(255,255,255,0.6)", marginBottom:3 }}>{s.label}</div>
@@ -13497,9 +13509,9 @@ function AssessmentPage({ teachers: appTeachers = [] }) {
                     { label:"اليوم", val:form.gregDay, key:"gregDay",
                       opts:["",...Array.from({length:31},(_,i)=>String(i+1))] },
                     { label:"الشهر", val:form.gregMonth, key:"gregMonth",
-                      opts:["",...GREGORIAN_MONTHS] },
+                      opts:["",...GREGORIAN_MONTHS_ASS] },
                     { label:"السنة", val:form.gregYear, key:"gregYear",
-                      opts:GREGORIAN_YEARS.map(String) },
+                      opts:GREGORIAN_YEARS_ASS.map(String) },
                   ].map(s=>(
                     <div key={s.key}>
                       <div style={{ fontSize:9.5, color:"rgba(255,255,255,0.6)", marginBottom:3 }}>{s.label}</div>
@@ -13703,12 +13715,15 @@ function AssessmentPage({ teachers: appTeachers = [] }) {
               {/* حقول الأسماء */}
               <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14, marginBottom:24 }}>
                 <div>
-                  <label style={{ fontSize:11, fontWeight:700, color:"#5a7080", display:"block", marginBottom:5 }}>اسم مدير المدرسة</label>
-                  <input value={form.principalName||""} onChange={e=>setForm(f=>({...f,principalName:e.target.value}))}
-                    placeholder="اسم مدير المدرسة"
+                  <label style={{ fontSize:11, fontWeight:700, color:"#5a7080", display:"block", marginBottom:5 }}>المدير / الوكيل المُوقِّع</label>
+                  <select value={form.principalName||"فازع عبدالله حسن القرني"}
+                    onChange={e=>setForm(f=>({...f,principalName:e.target.value}))}
                     style={{ width:"100%", padding:"9px 12px", border:"1.5px solid #d0dbe8", borderRadius:8,
                              fontFamily:"'Tajawal',sans-serif", fontSize:13, color:"#1a2d3e",
-                             background:"#f9fbfd", direction:"rtl", outline:"none", boxSizing:"border-box" }} />
+                             background:"#f9fbfd", direction:"rtl", outline:"none", boxSizing:"border-box" }}>
+                    <option value="فازع عبدالله حسن القرني">فازع عبدالله حسن القرني — مدير المدرسة</option>
+                    <option value="أمين الحنيطي">أمين الحنيطي — وكيل المدرسة</option>
+                  </select>
                 </div>
                 <div>
                   <label style={{ fontSize:11, fontWeight:700, color:"#5a7080", display:"block", marginBottom:5 }}>اسم المشرف التربوي</label>
@@ -13723,7 +13738,8 @@ function AssessmentPage({ teachers: appTeachers = [] }) {
               <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:24 }}>
                 {[
                   { title:"توقيع المعلم",       name:selectedTeacher?.name||"" },
-                  { title:"مدير المدرسة",        name:form.principalName||"فازع عبدالله حسن القرني" },
+                  { title: form.principalName==="أمين الحنيطي" ? "وكيل المدرسة" : "مدير المدرسة",
+                    name:form.principalName||"فازع عبدالله حسن القرني" },
                   { title:"المشرف التربوي",      name:form.supervisorName||"" },
                 ].map((s,i)=>(
                   <div key={i} style={{ textAlign:"center" }}>
@@ -21329,56 +21345,55 @@ export default function SchoolWebsite() {
               </div>
             </div>
 
-            {/* ══ شريط التنقل — صفّان ══ */}
-            <div style={{ flexShrink:0, background:"#fff", borderTop:"1px solid #e2e8f0", boxShadow:"0 -4px 24px rgba(0,0,0,0.10)" }}>
+            {/* ══ شريط التنقل — قائمتان يمين ويسار ══ */}
+            <div style={{ flexShrink:0, background:"#fff", borderTop:"1px solid #e2e8f0",
+              boxShadow:"0 -4px 24px rgba(0,0,0,0.10)", maxHeight:"45vh", overflowY:"auto",
+              WebkitOverflowScrolling:"touch" }}>
 
-              {/* ─ الصف الأول: الصفحات الرئيسية ─ */}
-              <div style={{
-                display:"flex", overflowX:"auto", WebkitOverflowScrolling:"touch",
-                scrollbarWidth:"none", borderBottom:"1px solid #f1f5f9",
-                background:"#fff", padding:"3px 2px 0",
-              }}>
-                <style>{`.mno-scroll::-webkit-scrollbar{display:none}`}</style>
+              {/* ─ الصفحات الرئيسية — شريط أفقي ─ */}
+              <div style={{ display:"flex", overflowX:"auto", WebkitOverflowScrolling:"touch",
+                scrollbarWidth:"none", borderBottom:"2px solid #f1f5f9",
+                background:"linear-gradient(135deg,#0d9488,#0f766e)", padding:"4px 4px 2px" }}>
                 {pages.map(p => {
                   const active = page === p.id;
                   return (
                     <button key={p.id} onClick={() => navigate(p.id)} style={{
                       display:"flex", flexDirection:"column", alignItems:"center",
                       justifyContent:"center", padding:"5px 10px 4px",
-                      border:"none", cursor:"pointer", background:"transparent",
-                      flexShrink:0, minWidth:52,
-                      borderBottom: active ? "2.5px solid #0d9488" : "2.5px solid transparent",
+                      border:"none", cursor:"pointer", flexShrink:0, minWidth:52,
+                      background: active ? "rgba(255,255,255,0.25)" : "transparent",
+                      borderRadius:8, margin:"0 1px",
+                      borderBottom: active ? "2.5px solid #fff" : "2.5px solid transparent",
                       transition:"all .15s",
                     }}>
                       <span style={{ fontSize:17, lineHeight:1 }}>{p.icon}</span>
                       <span style={{ fontSize:8, fontWeight:800, marginTop:2, whiteSpace:"nowrap",
-                        color: active ? "#0d9488" : "#9ca3af",
+                        color: active ? "#fff" : "rgba(255,255,255,0.75)",
                         fontFamily:"'Cairo',sans-serif" }}>{p.label}</span>
                     </button>
                   );
                 })}
               </div>
 
-              {/* ─ الصف الثاني: الأدوات الإضافية ─ */}
-              <div style={{
-                display:"flex", overflowX:"auto", WebkitOverflowScrolling:"touch",
-                scrollbarWidth:"none", background:"#fafbfc", padding:"3px 2px 5px",
-              }}>
+              {/* ─ الأدوات — شبكة عمودين ─ */}
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr",
+                background:"#fafbfc", padding:"4px" }}>
                 {extraPages.map(p => {
                   const active = page === p.id;
                   return (
                     <button key={p.id} onClick={() => navigate(p.id)} style={{
-                      display:"flex", flexDirection:"column", alignItems:"center",
-                      justifyContent:"center", padding:"4px 9px 3px",
-                      border:"none", cursor:"pointer", flexShrink:0, minWidth:48,
+                      display:"flex", flexDirection:"row", alignItems:"center", gap:6,
+                      padding:"8px 10px", border:"none", cursor:"pointer",
                       background: active ? "#f0fdfa" : "transparent",
-                      borderRadius:8, margin:"0 1px",
-                      transition:"all .15s",
+                      borderRadius:8, margin:"1px",
+                      border: active ? "1px solid #0d9488" : "1px solid transparent",
+                      transition:"all .15s", textAlign:"right",
+                      fontFamily:"'Cairo',sans-serif",
                     }}>
-                      <span style={{ fontSize:14, lineHeight:1 }}>{p.icon}</span>
-                      <span style={{ fontSize:7.5, fontWeight:700, marginTop:2, whiteSpace:"nowrap",
-                        color: active ? "#0d9488" : "#b0bec5",
-                        fontFamily:"'Cairo',sans-serif" }}>{p.label}</span>
+                      <span style={{ fontSize:16, flexShrink:0 }}>{p.icon}</span>
+                      <span style={{ fontSize:11, fontWeight:700, whiteSpace:"nowrap",
+                        overflow:"hidden", textOverflow:"ellipsis",
+                        color: active ? "#0d9488" : "#374151" }}>{p.label}</span>
                     </button>
                   );
                 })}
