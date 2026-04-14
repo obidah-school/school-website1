@@ -3493,6 +3493,14 @@ function StudentExcusePortal({ onBack, siteFont, isAdmin = false }) {
   const [copied,      setCopied]      = useState(false);
   const PER_PAGE = 20;
   const xlsRef = useRef();
+  // ── إدارة الطلاب ──
+  const [showStudentsPanel, setShowStudentsPanel] = useState(false);
+  const [showAddStudent,    setShowAddStudent]    = useState(false);
+  const [newStudentName,    setNewStudentName]    = useState("");
+  const [newStudentId,      setNewStudentId]      = useState("");
+  const [newStudentClass,   setNewStudentClass]   = useState("");
+  const [studentSearch,     setStudentSearch]     = useState("");
+  const [studentClassFilter,setStudentClassFilter]= useState("all");
 
   // ── نموذج العذر ──
   const [excuseType,    setExcuseType]    = useState("text");
@@ -3554,9 +3562,10 @@ function StudentExcusePortal({ onBack, siteFont, isAdmin = false }) {
   const handleLogin = () => {
     setIdError("");
     if (!nationalId.trim()) { setIdError("أدخل رقم هوية الطالب"); return; }
+    const query = nationalId.trim().toLowerCase();
     const found = students.find(s =>
-      s.nationalId?.trim() === nationalId.trim() ||
-      s.id?.trim() === nationalId.trim()
+      (s.nationalId?.toString().trim().toLowerCase() === query) ||
+      (s.id?.toString().trim().toLowerCase() === query)
     );
     if (!found) { setIdError("رقم الهوية غير موجود — تواصل مع إدارة المدرسة"); return; }
     setStudent(found);
@@ -3657,25 +3666,139 @@ function StudentExcusePortal({ onBack, siteFont, isAdmin = false }) {
       await loadXLSX();
       const buf = await file.arrayBuffer();
       const wb = window.XLSX.read(buf);
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const rows = window.XLSX.utils.sheet_to_json(ws, { header:1 });
       const imported = [];
-      rows.forEach((row, i) => {
-        if (i === 0) return;
-        const name  = String(row[0]||"").trim();
-        const natId = String(row[1]||"").trim();
-        const cls   = String(row[2]||"").trim();
-        if (name) imported.push({ id: natId||String(Date.now()+i), name, nationalId: natId, className: cls });
+
+      wb.SheetNames.forEach((sheetName, sheetIdx) => {
+        const ws = wb.Sheets[sheetName];
+        const rows = window.XLSX.utils.sheet_to_json(ws, { header:1, defval:"" });
+
+        // ── اكتشاف تلقائي لصف الهيدر ──
+        // نبحث عن صف يحتوي على "الاسم" أو "اسم" أو "name" أو نصف بيانات رقمية
+        let dataStartRow = 1; // افتراضي: بداية من الصف الثاني
+        let nameCol = 0, idCol = 1, classCol = 2;
+
+        for (let i = 0; i < Math.min(rows.length, 25); i++) {
+          const row = rows[i];
+          const vals = row.map(v => String(v||"").trim());
+          // البحث عن صف الهيدر
+          const nameIdx = vals.findIndex(v => v === "الاسم" || v.toLowerCase() === "name");
+          const idIdx   = vals.findIndex(v => v.includes("هوية") || v.includes("سجل") || v.includes("id") || v.toLowerCase().includes("national"));
+          if (nameIdx !== -1) {
+            nameCol = nameIdx;
+            if (idIdx !== -1) idCol = idIdx;
+            // البحث عن عمود الفصل
+            const clsIdx = vals.findIndex(v => v.includes("فصل") || v.includes("class") || v.includes("شعبة"));
+            if (clsIdx !== -1) classCol = clsIdx;
+            dataStartRow = i + 1;
+            break;
+          }
+        }
+
+        // ── استخراج اسم الفصل من رأس الكشف الرسمي ──
+        // في كشوف وزارة التعليم: الصف الدراسي في الصف الثاني عمود B (index 1,1)
+        // رقم الفصل في الصف الثامن عمود B (index 7,1)
+        const gradeLevel  = String((rows[1]||[])[1]||"").trim().replace(/nan/g,"");
+        const classNumber = String((rows[7]||[])[1]||"").trim().replace(/nan/g,"");
+        let detectedClass;
+        if (gradeLevel && classNumber && classNumber !== "الكل") {
+          detectedClass = `${gradeLevel} - ${classNumber}`;
+        } else if (gradeLevel) {
+          // إذا كان "الكل" نعطي رقم تسلسلي للفصل
+          const sheetNum = wb.SheetNames.indexOf(sheetName) + 1;
+          detectedClass = `${gradeLevel} - فصل ${sheetNum}`;
+        } else {
+          detectedClass = sheetName;
+        }
+
+        rows.forEach((row, i) => {
+          if (i < dataStartRow) return;
+          const name  = String(row[nameCol]||"").trim();
+          const natId = String(row[idCol]||"").trim().replace(/[^0-9a-zA-Z]/g,"");
+          // محاولة قراءة الفصل من العمود أو استخدام المكتشف
+          const cls   = classCol < row.length ? String(row[classCol]||"").trim() : "";
+          const finalClass = (cls && cls !== name && cls !== natId && cls.length > 0) ? cls : detectedClass;
+
+          // تجاهل الصفوف الفارغة أو التي تحتوي على نصوص هيدر
+          if (!name || name === "الاسم" || name.length < 2) return;
+          // تجاهل الصفوف التي ليس فيها هوية صالحة
+          if (!natId || natId.length < 4) return;
+
+          imported.push({
+            id: natId,
+            name,
+            nationalId: natId,
+            className: finalClass
+          });
+        });
       });
+
       if (imported.length) {
         const merged = [...students];
-        imported.forEach(ns => { if (!merged.find(s => s.nationalId === ns.nationalId)) merged.push(ns); });
+        let added = 0;
+        imported.forEach(ns => {
+          if (!merged.find(s => s.nationalId === ns.nationalId)) {
+            merged.push(ns);
+            added++;
+          }
+        });
         setStudents(merged);
         await DB.set("school-excuse-students", merged);
-        alert(`✅ تم استيراد ${imported.length} طالب — إجمالي: ${merged.length}`);
+        alert(`✅ تم استيراد ${added} طالب جديد من ${wb.SheetNames.length} شيت\nإجمالي الطلاب: ${merged.length}`);
+      } else {
+        alert("⚠️ لم يتم العثور على بيانات طلاب في الملف");
       }
-    } catch { alert("خطأ في قراءة الملف"); }
+    } catch(err) { alert("خطأ في قراءة الملف: " + err.message); }
     e.target.value = "";
+  };
+
+  // ── إضافة طالب يدوياً ──
+  const addStudentManually = async () => {
+    if (!newStudentName.trim()) { alert("أدخل اسم الطالب"); return; }
+    if (!newStudentId.trim())   { alert("أدخل رقم الهوية"); return; }
+    if (students.find(s => s.nationalId?.toString().trim() === newStudentId.trim())) {
+      alert("رقم الهوية موجود مسبقاً"); return;
+    }
+    const ns = { id: newStudentId.trim(), name: newStudentName.trim(),
+                  nationalId: newStudentId.trim(), className: newStudentClass.trim() };
+    const merged = [...students, ns];
+    setStudents(merged);
+    await DB.set("school-excuse-students", merged);
+    setNewStudentName(""); setNewStudentId(""); setNewStudentClass("");
+    setShowAddStudent(false);
+    alert("✅ تمت إضافة الطالب بنجاح");
+  };
+
+  // ── حذف طالب ──
+  const deleteStudent = async (sid) => {
+    if (!window.confirm("حذف هذا الطالب؟")) return;
+    const merged = students.filter(s => s.id !== sid && s.nationalId !== sid);
+    setStudents(merged);
+    await DB.set("school-excuse-students", merged);
+  };
+
+  // ── تصدير الطلاب Excel مصنّف حسب الفصل ──
+  const exportStudentsExcel = async () => {
+    await loadXLSX();
+    const wb = window.XLSX.utils.book_new();
+    // فصل الطلاب حسب الفصل
+    const classes = {};
+    students.forEach(s => {
+      const cls = s.className?.trim() || "غير محدد";
+      if (!classes[cls]) classes[cls] = [];
+      classes[cls].push(s);
+    });
+    // ورقة كاملة
+    const allRows = [["الاسم","رقم الهوية","الفصل"]];
+    students.forEach(s => allRows.push([s.name||"", s.nationalId||s.id||"", s.className||""]));
+    window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.aoa_to_sheet(allRows), "كل الطلاب");
+    // ورقة لكل فصل
+    Object.entries(classes).forEach(([cls, arr]) => {
+      const rows = [["الاسم","رقم الهوية","الفصل"]];
+      arr.forEach(s => rows.push([s.name||"", s.nationalId||s.id||"", s.className||""]));
+      const safeName = cls.replace(/[\/\\?*\[\]]/g,"").slice(0,31);
+      window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.aoa_to_sheet(rows), safeName);
+    });
+    window.XLSX.writeFile(wb, `طلاب_الأعذار_${new Date().getFullYear()}.xlsx`);
   };
 
   const statusColor = (s) => ({
@@ -3754,10 +3877,152 @@ function StudentExcusePortal({ onBack, siteFont, isAdmin = false }) {
             style={{ ...S.btn, background:"rgba(255,255,255,0.2)", color:"#fff", fontSize:11, padding:"7px 12px" }}>
             📥 استيراد طلاب
           </button>
+          {/* أيقونة عرض الطلاب */}
+          <button onClick={()=>{ setShowStudentsPanel(v=>!v); setShowAddStudent(false); }}
+            style={{ ...S.btn, background: showStudentsPanel ? "rgba(110,231,183,0.35)" : "rgba(255,255,255,0.2)",
+                     color:"#fff", fontSize:11, padding:"7px 12px",
+                     border: showStudentsPanel ? "1.5px solid #6ee7b7" : "1px solid rgba(255,255,255,0.3)" }}>
+            👥 الطلاب ({students.length})
+          </button>
+          {/* أيقونة إضافة طالب */}
+          <button onClick={()=>{ setShowAddStudent(v=>!v); setShowStudentsPanel(false); }}
+            style={{ ...S.btn, background: showAddStudent ? "rgba(253,224,71,0.35)" : "rgba(255,255,255,0.2)",
+                     color:"#fff", fontSize:11, padding:"7px 12px",
+                     border: showAddStudent ? "1.5px solid #fde047" : "1px solid rgba(255,255,255,0.3)" }}>
+            ➕ إضافة طالب
+          </button>
           <input ref={xlsRef} type="file" accept=".xlsx,.xls,.csv" style={{ display:"none" }} onChange={handleXLS} />
         </div>
 
         <div style={{ maxWidth:1000, margin:"0 auto", padding:"14px 12px 60px" }}>
+
+          {/* ─── لوحة عرض الطلاب ─── */}
+          {showStudentsPanel && (() => {
+            const classes = [...new Set(students.map(s => s.className?.trim()||"غير محدد"))].sort();
+            const filtered = students.filter(s => {
+              const matchClass = studentClassFilter === "all" || (s.className?.trim()||"غير محدد") === studentClassFilter;
+              const matchSearch = !studentSearch || s.name?.includes(studentSearch) || (s.nationalId||s.id)?.includes(studentSearch);
+              return matchClass && matchSearch;
+            });
+            return (
+              <div style={{ ...S.card, marginBottom:14, overflow:"hidden" }}>
+                <div style={{ background:"linear-gradient(135deg,#1e3a5f,#0e7c7b)", padding:"12px 16px",
+                  display:"flex", alignItems:"center", gap:10, flexWrap:"wrap" }}>
+                  <span style={{ fontSize:20 }}>👥</span>
+                  <div style={{ flex:1, color:"#fff", fontWeight:900, fontSize:14 }}>
+                    قائمة الطلاب — {students.length} طالب
+                  </div>
+                  <button onClick={exportStudentsExcel}
+                    style={{ ...S.btn, background:"rgba(255,255,255,0.2)", color:"#fff", fontSize:11, padding:"6px 12px" }}>
+                    📊 تصدير Excel مصنّف
+                  </button>
+                  <button onClick={()=>setShowStudentsPanel(false)}
+                    style={{ background:"rgba(255,255,255,0.15)", border:"none", borderRadius:8,
+                             color:"#fff", fontSize:16, width:28, height:28, cursor:"pointer",
+                             display:"flex", alignItems:"center", justifyContent:"center" }}>✕</button>
+                </div>
+                <div style={{ padding:"12px 14px" }}>
+                  <div style={{ display:"flex", gap:8, flexWrap:"wrap", marginBottom:10 }}>
+                    <input value={studentSearch} onChange={e=>setStudentSearch(e.target.value)}
+                      placeholder="🔍 بحث بالاسم أو الهوية"
+                      style={{ ...S.input, flex:"1 1 160px", fontSize:12 }} />
+                    <select value={studentClassFilter} onChange={e=>setStudentClassFilter(e.target.value)}
+                      style={{ ...S.select, flex:"0 0 120px", fontSize:12 }}>
+                      <option value="all">كل الفصول ({students.length})</option>
+                      {classes.map(c => <option key={c} value={c}>{c} ({students.filter(s=>(s.className?.trim()||"غير محدد")===c).length})</option>)}
+                    </select>
+                  </div>
+                  {filtered.length === 0 ? (
+                    <div style={{ textAlign:"center", padding:"24px", color:"#94a3b8", fontSize:13 }}>لا يوجد طلاب</div>
+                  ) : (
+                    <div style={{ maxHeight:320, overflowY:"auto" }}>
+                      <table style={{ width:"100%", borderCollapse:"collapse", fontSize:12.5 }}>
+                        <thead>
+                          <tr style={{ background:"#f1f5f9", borderBottom:"2px solid #e2e8f0" }}>
+                            <th style={{ padding:"8px 10px", textAlign:"right", fontWeight:800, color:"#475569" }}>#</th>
+                            <th style={{ padding:"8px 10px", textAlign:"right", fontWeight:800, color:"#475569" }}>الاسم</th>
+                            <th style={{ padding:"8px 10px", textAlign:"right", fontWeight:800, color:"#475569" }}>🪪 رقم الهوية</th>
+                            <th style={{ padding:"8px 10px", textAlign:"right", fontWeight:800, color:"#475569" }}>🏫 الفصل</th>
+                            <th style={{ padding:"8px 10px", textAlign:"center", fontWeight:800, color:"#475569" }}>حذف</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filtered.map((s,i) => (
+                            <tr key={s.nationalId||s.id} style={{ borderBottom:"1px solid #f1f5f9",
+                              background: i%2===0 ? "#fff" : "#f8fafc" }}>
+                              <td style={{ padding:"7px 10px", color:"#94a3b8", fontWeight:700 }}>{i+1}</td>
+                              <td style={{ padding:"7px 10px", fontWeight:700, color:"#1e293b" }}>{s.name}</td>
+                              <td style={{ padding:"7px 10px", fontFamily:"monospace", color:"#1d4ed8",
+                                fontWeight:700, letterSpacing:1 }}>{s.nationalId||s.id}</td>
+                              <td style={{ padding:"7px 10px" }}>
+                                <span style={{ background:"#eff6ff", color:"#1d4ed8", padding:"2px 10px",
+                                  borderRadius:20, fontWeight:700, fontSize:11 }}>
+                                  {s.className||"—"}
+                                </span>
+                              </td>
+                              <td style={{ padding:"7px 10px", textAlign:"center" }}>
+                                <button onClick={()=>deleteStudent(s.nationalId||s.id)}
+                                  style={{ background:"#fee2e2", border:"none", borderRadius:6, color:"#991b1b",
+                                    fontSize:12, padding:"3px 8px", cursor:"pointer" }}>🗑️</button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* ─── فورم إضافة طالب ─── */}
+          {showAddStudent && (
+            <div style={{ ...S.card, marginBottom:14, overflow:"hidden" }}>
+              <div style={{ background:"linear-gradient(135deg,#065f46,#0d9488)", padding:"12px 16px",
+                display:"flex", alignItems:"center", gap:10 }}>
+                <span style={{ fontSize:20 }}>➕</span>
+                <div style={{ flex:1, color:"#fff", fontWeight:900, fontSize:14 }}>إضافة طالب جديد</div>
+                <button onClick={()=>setShowAddStudent(false)}
+                  style={{ background:"rgba(255,255,255,0.15)", border:"none", borderRadius:8,
+                           color:"#fff", fontSize:16, width:28, height:28, cursor:"pointer",
+                           display:"flex", alignItems:"center", justifyContent:"center" }}>✕</button>
+              </div>
+              <div style={{ padding:"16px 14px" }}>
+                <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:10, marginBottom:12 }}>
+                  <div>
+                    <label style={{ fontSize:11.5, fontWeight:700, color:"#64748b", display:"block", marginBottom:5 }}>
+                      👤 اسم الطالب *
+                    </label>
+                    <input value={newStudentName} onChange={e=>setNewStudentName(e.target.value)}
+                      placeholder="اسم الطالب الكامل"
+                      style={{ ...S.input, fontSize:13 }} />
+                  </div>
+                  <div>
+                    <label style={{ fontSize:11.5, fontWeight:700, color:"#64748b", display:"block", marginBottom:5 }}>
+                      🪪 رقم الهوية *
+                    </label>
+                    <input value={newStudentId} onChange={e=>setNewStudentId(e.target.value)}
+                      placeholder="رقم الهوية الوطنية"
+                      style={{ ...S.input, fontSize:13, fontFamily:"monospace", letterSpacing:1 }} />
+                  </div>
+                  <div>
+                    <label style={{ fontSize:11.5, fontWeight:700, color:"#64748b", display:"block", marginBottom:5 }}>
+                      🏫 الفصل
+                    </label>
+                    <input value={newStudentClass} onChange={e=>setNewStudentClass(e.target.value)}
+                      placeholder="مثال: 1أ / 2ب"
+                      style={{ ...S.input, fontSize:13 }} />
+                  </div>
+                </div>
+                <button onClick={addStudentManually}
+                  style={{ ...S.btn, background:"linear-gradient(135deg,#065f46,#0d9488)",
+                           color:"#fff", fontSize:13, padding:"10px 24px" }}>
+                  ✅ إضافة الطالب
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* رابط مستمر */}
           <div style={{ ...S.card, padding:"12px 16px", marginBottom:14,
@@ -3816,7 +4081,7 @@ function StudentExcusePortal({ onBack, siteFont, isAdmin = false }) {
           {/* تنسيق Excel */}
           <div style={{ background:"#eff6ff", border:"1px solid #bfdbfe", borderRadius:10,
             padding:"8px 14px", marginBottom:12, fontSize:11.5, color:"#1e40af", fontWeight:600 }}>
-            📌 تنسيق Excel: <strong>عمود أ</strong> اسم الطالب | <strong>عمود ب</strong> رقم الهوية | <strong>عمود ج</strong> الفصل
+            📌 يدعم ملفات كشوف الأسماء الرسمية (متعددة الشيتات) · أو تنسيق بسيط: <strong>عمود أ</strong> الاسم | <strong>عمود ب</strong> رقم الهوية | <strong>عمود ج</strong> الفصل
           </div>
 
           {/* القائمة */}
