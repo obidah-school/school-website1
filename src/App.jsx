@@ -1577,34 +1577,33 @@ function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, sa
       <div class="stat abs"><span>${countAbsent(selectedDay)}</span><small>❌ غائب</small></div>
     </div>
     ${(() => {
-      const presentNames = teachers.filter((_, ti) => { const st = attendance[ti]?.[selectedDay]?.status||"حاضر"; return st==="حاضر"||st==="متأخر"; });
-      const excusedNames = teachers.filter((_, ti) => (attendance[ti]?.[selectedDay]?.status||"حاضر")==="مستأذن");
-      const absentNames  = teachers.filter((_, ti) => (attendance[ti]?.[selectedDay]?.status||"حاضر")==="غائب");
+      // نعتمد على زر الطابور الخاص بكل معلم تماماً كالواجهة
+      const presentNames      = teachers.filter((_, ti) => getTeacherAssembly(ti, selectedDay) === true);
+      const absentFromAsm     = teachers.filter((_, ti) => getTeacherAssembly(ti, selectedDay) === false);
+      const notMarkedNames    = teachers.filter((_, ti) => getTeacherAssembly(ti, selectedDay) === null);
       const excuseGroups = {};
       teachers.forEach((t, ti) => {
         const r = attendance[ti]?.[selectedDay]||{};
-        if ((r.status||"حاضر")==="مستأذن" && r.excuseReason) {
+        if (getTeacherAssembly(ti, selectedDay) === false && r.excuseReason) {
           if (!excuseGroups[r.excuseReason]) excuseGroups[r.excuseReason]=[];
           excuseGroups[r.excuseReason].push(t);
         }
       });
       const excuseDetailHTML = Object.entries(excuseGroups).map(([k,v])=>`<div>${k==="مولود"?"🎉":k==="وفاة"?"🕊️":k==="مرض"?"🏥":"📌"} <strong>${k}</strong>: ${v.join("، ")}</div>`).join("");
+      const notMarkedHTML = notMarkedNames.length ? `<div class="labor-section" style="background:#f8fafc;border:1px solid #e2e8f0;grid-column:1/-1"><h3>⬜ لم يُسجَّل طابورهم (${notMarkedNames.length})</h3><div class="names" style="color:#64748b">${notMarkedNames.join(" · ")}</div></div>` : "";
       return `<div class="labor-box">
-        <h2>🎺 الحضور للطابور الصباحي — ${presentNames.length} من ${teachers.length}</h2>
+        <h2>🎺 الحضور للطابور الصباحي — حضر: ${presentNames.length} | لم يحضر: ${absentFromAsm.length} | الإجمالي: ${teachers.length}</h2>
         <div class="labor-grid">
           <div class="labor-section present">
-            <h3>✅ حاضرون للطابور (${presentNames.length})</h3>
+            <h3>✅ حضروا الطابور (${presentNames.length})</h3>
             <div class="names">${presentNames.join(" · ") || "—"}</div>
           </div>
-          <div class="labor-section excused">
-            <h3>📋 مستأذنون (${excusedNames.length})</h3>
-            <div class="names">${excusedNames.join(" · ") || "لا يوجد"}</div>
+          <div class="labor-section absent">
+            <h3>❌ لم يحضروا الطابور (${absentFromAsm.length})</h3>
+            <div class="names">${absentFromAsm.map(n=>{ const ti=teachers.indexOf(n); const r=attendance[ti]?.[selectedDay]||{}; const ic=r.excuseReason==="مولود"?"🎉":r.excuseReason==="وفاة"?"🕊️":r.excuseReason==="مرض"?"🏥":r.excuseReason?"📌":""; return ic?`${ic}${n}`:n; }).join(" · ") || "لا يوجد"}</div>
             ${excuseDetailHTML ? `<div class="excuse-detail">${excuseDetailHTML}</div>` : ""}
           </div>
-          <div class="labor-section absent">
-            <h3>❌ غائبون (${absentNames.length})</h3>
-            <div class="names">${absentNames.join(" · ") || "لا يوجد"}</div>
-          </div>
+          ${notMarkedHTML}
         </div>
       </div>`;
     })()}
@@ -1813,90 +1812,105 @@ function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, sa
 
         {/* ── بطاقة الحاضرين للطابور ── */}
         {(() => {
-          const presentForAssembly = teachers.filter((_, ti) => {
-            const st = attendance[ti]?.[selectedDay]?.status || "حاضر";
-            return st === "حاضر" || st === "متأخر";
-          });
-          const excusedToday = teachers.filter((_, ti) => {
-            const st = attendance[ti]?.[selectedDay]?.status || "حاضر";
-            return st === "مستأذن";
-          });
-          const absentToday = teachers.filter((_, ti) => {
-            const st = attendance[ti]?.[selectedDay]?.status || "حاضر";
-            return st === "غائب";
-          });
+          // نعتمد على زر الطابور الخاص بكل معلم (✅/❌) وليس حالة الحضور العامة
+          const presentForAssembly  = teachers.filter((_, ti) => getTeacherAssembly(ti, selectedDay) === true);
+          const absentFromAssembly  = teachers.filter((_, ti) => getTeacherAssembly(ti, selectedDay) === false);
+          const notMarkedAssembly   = teachers.filter((_, ti) => getTeacherAssembly(ti, selectedDay) === null);
+
+          // تجميع أسباب الاستئذان للغائبين عن الطابور
           const excuseReasonGroups = {};
-          teachers.forEach((_, ti) => {
+          teachers.forEach((t, ti) => {
             const r = attendance[ti]?.[selectedDay] || {};
-            if ((r.status||"حاضر") === "مستأذن" && r.excuseReason) {
+            if (getTeacherAssembly(ti, selectedDay) === false && r.excuseReason) {
               if (!excuseReasonGroups[r.excuseReason]) excuseReasonGroups[r.excuseReason] = [];
-              excuseReasonGroups[r.excuseReason].push(teachers[ti]);
+              excuseReasonGroups[r.excuseReason].push(t);
             }
           });
+
           return (
             <div className="bg-white rounded-2xl border-2 border-teal-200 shadow-sm mb-4 overflow-hidden">
-              <div className="bg-gradient-to-l from-teal-600 to-emerald-700 px-4 py-2.5 flex items-center gap-2">
+              <div className="bg-gradient-to-l from-teal-600 to-emerald-700 px-4 py-2.5 flex items-center gap-2 flex-wrap">
                 <span className="text-xl">🎺</span>
                 <span className="font-black text-white text-sm">الحضور للطابور الصباحي</span>
-                <span className="mr-auto bg-white bg-opacity-25 text-white font-black text-sm px-3 py-0.5 rounded-full">
-                  {presentForAssembly.length} / {teachers.length}
-                </span>
+                <div className="mr-auto flex gap-2 flex-wrap">
+                  <span className="bg-emerald-500 bg-opacity-80 text-white font-black text-xs px-2.5 py-0.5 rounded-full">
+                    ✅ حضر: {presentForAssembly.length}
+                  </span>
+                  <span className="bg-red-500 bg-opacity-80 text-white font-black text-xs px-2.5 py-0.5 rounded-full">
+                    ❌ لم يحضر: {absentFromAssembly.length}
+                  </span>
+                  {notMarkedAssembly.length > 0 && (
+                    <span className="bg-white bg-opacity-20 text-white font-black text-xs px-2.5 py-0.5 rounded-full">
+                      ⬜ لم يُسجَّل: {notMarkedAssembly.length}
+                    </span>
+                  )}
+                </div>
               </div>
-              <div className="p-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
-                {/* الحاضرون */}
-                <div className="bg-emerald-50 rounded-xl p-2.5 border border-emerald-100">
-                  <div className="text-xs font-black text-emerald-700 mb-2 flex items-center gap-1">
-                    ✅ حاضرون للطابور
-                    <span className="bg-emerald-600 text-white text-xs font-black px-2 py-0.5 rounded-full mr-1">{presentForAssembly.length}</span>
+              <div className="p-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+
+                {/* الحاضرون للطابور */}
+                <div className="bg-emerald-50 rounded-xl p-2.5 border border-emerald-200">
+                  <div className="text-xs font-black text-emerald-700 mb-2 flex items-center gap-1.5">
+                    ✅ حضروا الطابور
+                    <span className="bg-emerald-600 text-white text-xs font-black px-2 py-0.5 rounded-full">{presentForAssembly.length}</span>
                   </div>
                   <div className="flex flex-wrap gap-1">
                     {presentForAssembly.map((name, i) => (
-                      <span key={i} className="text-xs bg-white border border-emerald-200 text-emerald-800 font-bold px-2 py-0.5 rounded-lg">{name}</span>
+                      <span key={i} className="text-xs bg-white border border-emerald-300 text-emerald-800 font-bold px-2 py-0.5 rounded-lg">{name}</span>
                     ))}
-                    {presentForAssembly.length === 0 && <span className="text-xs text-gray-400">—</span>}
+                    {presentForAssembly.length === 0 && (
+                      <span className="text-xs text-gray-400 italic">لا يوجد — سجّل الحضور في الجدول أدناه</span>
+                    )}
                   </div>
                 </div>
-                {/* المستأذنون */}
-                <div className="bg-blue-50 rounded-xl p-2.5 border border-blue-100">
-                  <div className="text-xs font-black text-blue-700 mb-2 flex items-center gap-1">
-                    📋 مستأذنون
-                    <span className="bg-blue-600 text-white text-xs font-black px-2 py-0.5 rounded-full mr-1">{excusedToday.length}</span>
+
+                {/* الغائبون عن الطابور */}
+                <div className="bg-red-50 rounded-xl p-2.5 border border-red-200">
+                  <div className="text-xs font-black text-red-700 mb-2 flex items-center gap-1.5">
+                    ❌ لم يحضروا الطابور
+                    <span className="bg-red-600 text-white text-xs font-black px-2 py-0.5 rounded-full">{absentFromAssembly.length}</span>
                   </div>
-                  <div className="flex flex-wrap gap-1">
-                    {excusedToday.map((name, i) => {
+                  <div className="flex flex-wrap gap-1 mb-1">
+                    {absentFromAssembly.map((name, i) => {
                       const r = attendance[teachers.indexOf(name)]?.[selectedDay] || {};
-                      const reasonIcon = r.excuseReason==="مولود"?"🎉":r.excuseReason==="وفاة"?"🕊️":r.excuseReason==="مرض"?"🏥":r.excuseReason?"📌":"";
+                      const st = r.status || "حاضر";
+                      const rIcon = r.excuseReason==="مولود"?"🎉":r.excuseReason==="وفاة"?"🕊️":r.excuseReason==="مرض"?"🏥":r.excuseReason==="موعد مستشفى"?"💊":st==="مستأذن"?"📋":st==="غائب"?"❌":"";
                       return (
-                        <span key={i} className="text-xs bg-white border border-blue-200 text-blue-800 font-bold px-2 py-0.5 rounded-lg">
-                          {reasonIcon} {name}
+                        <span key={i} className="text-xs bg-white border border-red-200 text-red-800 font-bold px-2 py-0.5 rounded-lg">
+                          {rIcon} {name}
                         </span>
                       );
                     })}
-                    {excusedToday.length === 0 && <span className="text-xs text-gray-400">لا يوجد</span>}
+                    {absentFromAssembly.length === 0 && (
+                      <span className="text-xs text-gray-400 italic">لا يوجد</span>
+                    )}
                   </div>
                   {Object.entries(excuseReasonGroups).length > 0 && (
-                    <div className="mt-1.5 pt-1.5 border-t border-blue-100 space-y-0.5">
+                    <div className="mt-1.5 pt-1.5 border-t border-red-100 space-y-0.5">
                       {Object.entries(excuseReasonGroups).map(([reason, names]) => (
-                        <div key={reason} className="text-xs text-blue-600 font-bold">
+                        <div key={reason} className="text-xs text-red-600 font-bold">
                           {reason==="مولود"?"🎉":reason==="وفاة"?"🕊️":reason==="مرض"?"🏥":"📌"} {reason}: {names.join("، ")}
                         </div>
                       ))}
                     </div>
                   )}
                 </div>
-                {/* الغائبون */}
-                <div className="bg-red-50 rounded-xl p-2.5 border border-red-100">
-                  <div className="text-xs font-black text-red-700 mb-2 flex items-center gap-1">
-                    ❌ غائبون
-                    <span className="bg-red-600 text-white text-xs font-black px-2 py-0.5 rounded-full mr-1">{absentToday.length}</span>
+
+                {/* لم يُسجَّل بعد */}
+                {notMarkedAssembly.length > 0 && (
+                  <div className="sm:col-span-2 bg-gray-50 rounded-xl p-2.5 border border-gray-200">
+                    <div className="text-xs font-black text-gray-500 mb-2 flex items-center gap-1.5">
+                      ⬜ لم يُسجَّل طابورهم بعد
+                      <span className="bg-gray-400 text-white text-xs font-black px-2 py-0.5 rounded-full">{notMarkedAssembly.length}</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {notMarkedAssembly.map((name, i) => (
+                        <span key={i} className="text-xs bg-white border border-gray-200 text-gray-600 font-bold px-2 py-0.5 rounded-lg">{name}</span>
+                      ))}
+                    </div>
                   </div>
-                  <div className="flex flex-wrap gap-1">
-                    {absentToday.map((name, i) => (
-                      <span key={i} className="text-xs bg-white border border-red-200 text-red-800 font-bold px-2 py-0.5 rounded-lg">{name}</span>
-                    ))}
-                    {absentToday.length === 0 && <span className="text-xs text-gray-400">لا يوجد</span>}
-                  </div>
-                </div>
+                )}
+
               </div>
             </div>
           );
