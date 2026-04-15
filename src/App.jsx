@@ -712,7 +712,7 @@ function PublicAnnouncementsPage({ announcements, siteFont, onLogin, onTeacherPo
               </button>
               <div className="border-t border-gray-100 pt-3 space-y-2">
                 <button onClick={onTeacherPortal} className="w-full py-2.5 rounded-xl font-bold text-white text-sm" style={{background:"linear-gradient(135deg,#1e3a5f,#2563eb)"}}>
-                  👨‍🏫 بوابة المعلم
+                  📊 تقويم الأداء الذاتي
                 </button>
                 <button onClick={onParentPortal} className="w-full py-2.5 rounded-xl font-bold text-white text-sm bg-gradient-to-l from-blue-500 to-indigo-600">
                   👨‍👦 بوابة أولياء الأمور
@@ -802,7 +802,7 @@ function LoginPage({ users, onLogin, siteFont, onParentPortal, onTeacherPortal, 
             <button onClick={onTeacherPortal}
               className="w-full py-3 rounded-xl font-bold hover:shadow-lg transition-all text-sm text-white mb-2"
               style={{ background: "linear-gradient(135deg, #1e3a5f, #2563eb)" }}>
-              👨‍🏫 بوابة المعلم — إدخال مستويات الطلاب
+              📊 التقويم الذاتي لمعايير الأداء الوظيفي
             </button>
             <button onClick={onParentPortal}
               className="w-full py-3 rounded-xl bg-gradient-to-l from-blue-500 to-indigo-600 text-white font-bold hover:shadow-lg transition-all text-sm">
@@ -6969,204 +6969,1010 @@ function TeacherPPTAI({ teacherInfo }) {
   );
 }
 
-function TeacherPortal({ classList, setClassList, saveClass, siteFont, onBack, attendance, teachers, week, onSendNote, messages }) {
-  const [step, setStep] = useState("login"); // login | dashboard | attendance
-  const [activeTab, setActiveTab] = useState("grades"); // grades | attendance
-  const [teacherId, setTeacherId] = useState("");
-  const [teacherAccounts, setTeacherAccounts] = useState([]);
+// ===== بوابة التقويم الذاتي لمعايير الأداء الوظيفي =====
+
+// ═══════════════════════════════════════════════════
+// معايير الأداء الوظيفي للمعلم — 11 عنصراً رسمياً
+// ═══════════════════════════════════════════════════
+const PERFORMANCE_DOMAINS = [
+  {
+    id: "d1",
+    num: 1,
+    title: "أداء الواجبات الوظيفية",
+    icon: "🏫",
+    color: "#1d4ed8",
+    bg: "#eff6ff",
+    weight: 10,
+    details: [
+      "التقيد بالدوام الرسمي",
+      "تأدية الحصص الدراسية وفق الجدول الدراسي",
+      "المشاركة في الإشراف والمناوبة وحصص الانتظار",
+      "إعداد ومتابعة الدروس والواجبات والاختبارات",
+    ]
+  },
+  {
+    id: "d2",
+    num: 2,
+    title: "التفاعل مع المجتمع",
+    icon: "🤝",
+    color: "#0d9488",
+    bg: "#f0fdfa",
+    weight: 10,
+    details: [
+      "المشاركة الفاعلة في مجتمعات التعلم المهنية",
+      "تبادل الزيارات",
+      "الدروس التطبيقية",
+      "بحث الدرس",
+      "حضور الدورات والورش التدريبية",
+    ]
+  },
+  {
+    id: "d3",
+    num: 3,
+    title: "التفاعل مع أولياء الأمور",
+    icon: "👨‍👩‍👧",
+    color: "#7c3aed",
+    bg: "#faf5ff",
+    weight: 10,
+    details: [
+      "التواصل الفعّال مع أولياء الأمور بالتنسيق مع الموجه الطلابية",
+      "تزويد أولياء الأمور بمستويات الطالبة",
+      "إيصال الملاحظات الهامة لأولياء الأمور",
+      "تفعيل الخطة الأسبوعية للمدرسة",
+      "المشاركة الفاعلة في الجمعية العمومية للمعلمين وأولياء الأمور",
+    ]
+  },
+  {
+    id: "d4",
+    num: 4,
+    title: "التنويع في استراتيجيات التدريس",
+    icon: "🎯",
+    color: "#d97706",
+    bg: "#fffbeb",
+    weight: 10,
+    details: [
+      "استخدام استراتيجيات متنوعة تناسب مستويات الطالبات",
+      "مراعاة الفروق الفردية",
+    ]
+  },
+  {
+    id: "d5",
+    num: 5,
+    title: "تحسين نتائج المتعلمات",
+    icon: "📈",
+    color: "#059669",
+    bg: "#f0fdf4",
+    weight: 10,
+    details: [
+      "معالجة الفاقد التعليمي",
+      "وضع الخطط العلاجية للطالبات الضعيفات",
+      "وضع الخطط الإثرائية للطالبات المتميزين",
+      "تكريم الطالبات المتميزات والذين تحسّن مستواهم",
+    ]
+  },
+  {
+    id: "d6",
+    num: 6,
+    title: "إعداد وتنفيذ خطة التعلم",
+    icon: "📋",
+    color: "#0284c7",
+    bg: "#f0f9ff",
+    weight: 10,
+    details: [
+      "توزيع المنهج وإعداد الدروس",
+      "إعداد الواجبات والاختبارات",
+      "تنفيذ الدروس",
+    ]
+  },
+  {
+    id: "d7",
+    num: 7,
+    title: "توظيف تقنيات ووسائل التعلم المناسبة",
+    icon: "💻",
+    color: "#6d28d9",
+    bg: "#f5f3ff",
+    weight: 10,
+    details: [
+      "دمج التقنية في التعليم",
+      "التنويع في الوسائل التعليمية",
+    ]
+  },
+  {
+    id: "d8",
+    num: 8,
+    title: "تهيئة البيئة التعليمية",
+    icon: "🏛️",
+    color: "#be185d",
+    bg: "#fdf2f8",
+    weight: 5,
+    details: [
+      "مراعاة حاجات الطالبات",
+      "تهيئة البيئة النفسية للطالبات",
+      "التحفيز المادي والمعنوي",
+      "توفير متطلبات الدرس",
+    ]
+  },
+  {
+    id: "d9",
+    num: 9,
+    title: "الإدارة الصفية",
+    icon: "🏫",
+    color: "#b45309",
+    bg: "#fef9c3",
+    weight: 5,
+    details: [
+      "ضبط سلوك الطالبات",
+      "شد انتباه الطالبات",
+      "مراعاة الفروق الفردية",
+      "متابعة الحضور والغياب والتأخر",
+    ]
+  },
+  {
+    id: "d10",
+    num: 10,
+    title: "تحليل نتائج المتعلمات وتشخيص مستوياتهم",
+    icon: "📊",
+    color: "#0f766e",
+    bg: "#f0fdfa",
+    weight: 10,
+    details: [
+      "تحليل نتائج الاختبارات الفترية والنهائية",
+      "تصنيف الطلبة وفق نتائجهم",
+      "معالجة الفاقد التعليمي",
+      "تحديد نقاط القوة والضعف",
+    ]
+  },
+  {
+    id: "d11",
+    num: 11,
+    title: "تنوع أساليب التقويم",
+    icon: "📝",
+    color: "#1e40af",
+    bg: "#eff6ff",
+    weight: 10,
+    details: [
+      "تطبيق الاختبارات الورقية والإلكترونية",
+      "المشاريع الطلابية",
+      "المهام الأدائية",
+      "ملفات إنجاز الطالبات",
+    ]
+  },
+];
+
+// سلم التقدير الرسمي (1 → 5)
+const PERF_RATINGS = [
+  { value: 5, label: "5",  fullLabel: "ممتاز",        color: "#059669", bg: "#d1fae5", textColor:"#065f46", desc: "أداء استثنائي ومتفوق" },
+  { value: 4, label: "4",  fullLabel: "جيد جداً",     color: "#0d9488", bg: "#ccfbf1", textColor:"#134e4a", desc: "أداء أعلى من المتوقع" },
+  { value: 3, label: "3",  fullLabel: "جيد",           color: "#d97706", bg: "#fef3c7", textColor:"#78350f", desc: "أداء يستوفي المعيار" },
+  { value: 2, label: "2",  fullLabel: "مقبول",         color: "#f97316", bg: "#ffedd5", textColor:"#7c2d12", desc: "أداء يحتاج تحسين" },
+  { value: 1, label: "1",  fullLabel: "ضعيف",          color: "#dc2626", bg: "#fee2e2", textColor:"#7f1d1d", desc: "أداء دون المستوى" },
+];
+
+
+function PerformanceStandardsPortal({ siteFont, onBack }) {
+  const [step, setStep]                   = useState("login");
+  const [teachersList, setTeachersList]   = useState([]);
+  const [loadingList, setLoadingList]     = useState(true);
+  const [loginId, setLoginId]             = useState("");
+  const [loginError, setLoginError]       = useState("");
   const [currentTeacher, setCurrentTeacher] = useState(null);
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [absenceReasons, setAbsenceReasons] = useState({});
-  const [savingReason, setSavingReason] = useState(null);
-  const [savedMsg, setSavedMsg] = useState("");
+  // ratings: { "d1": 0-5, "d2": 0-5, ... }
+  const [ratings, setRatings]             = useState({});
+  const [evidence, setEvidence]           = useState({});   // { "d1": true/false }
+  const [notes, setNotes]                 = useState({});   // { "d1": string }
+  const [activeDomain, setActiveDomain]   = useState(0);
+  const [saving, setSaving]               = useState(false);
+  const [savedResult, setSavedResult]     = useState(null);
+  const [uploadMsg, setUploadMsg]         = useState("");
+  const fileRef = useRef(null);
 
   useEffect(() => {
-    DB.get("school-teacher-accounts", []).then(data => {
-      setTeacherAccounts(Array.isArray(data) ? data : []);
-      setLoading(false);
+    DB.get("school-perf-teachers", []).then(d => {
+      setTeachersList(Array.isArray(d) ? d : []);
+      setLoadingList(false);
     });
   }, []);
 
-  useEffect(() => {
-    if (currentTeacher) {
-      DB.get("school-absence-reasons", {}).then(data => {
-        setAbsenceReasons(data && typeof data === "object" ? data : {});
-      });
-    }
-  }, [currentTeacher]);
-
-  const saveAbsenceReason = async (key, reason, faresDate) => {
-    setSavingReason(key);
-    const updated = { ...absenceReasons, [key]: { reason, faresDate, savedAt: new Date().toLocaleDateString("ar-SA") } };
-    setAbsenceReasons(updated);
-    await DB.set("school-absence-reasons", updated);
-    setSavingReason(null);
-    setSavedMsg("✅ تم الحفظ");
-    setTimeout(() => setSavedMsg(""), 2000);
+  // ─── رفع ملف Excel/CSV ───
+  const handleExcelUpload = async (e) => {
+    const file = e.target.files?.[0]; if (!file) return;
+    const ext = file.name.split(".").pop().toLowerCase();
+    if (!["xlsx","xls","csv"].includes(ext)) { setUploadMsg("❌ يُقبل xlsx أو csv فقط"); return; }
+    setUploadMsg("⏳ جاري المعالجة…");
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      try {
+        let teachers = [];
+        if (ext === "csv") {
+          const lines = ev.target.result.split(/\r?\n/).filter(Boolean);
+          for (let i = 1; i < lines.length; i++) {
+            const cols = lines[i].split(",");
+            const name = (cols[0]||"").trim().replace(/^"|"$/g,"");
+            const id   = (cols[1]||"").trim().replace(/^"|"$/g,"").replace(/[^0-9]/g,"");
+            if (name && id) teachers.push({ name, id });
+          }
+        } else {
+          if (window.XLSX) {
+            const wb = window.XLSX.read(ev.target.result, { type:"array" });
+            const ws = wb.Sheets[wb.SheetNames[0]];
+            const rows = window.XLSX.utils.sheet_to_json(ws, { header:1 });
+            for (let i = 1; i < rows.length; i++) {
+              const name = String(rows[i][0]||"").trim();
+              const id   = String(rows[i][1]||"").trim().replace(/[^0-9]/g,"");
+              if (name && id) teachers.push({ name, id });
+            }
+          } else { setUploadMsg("❌ مكتبة XLSX غير محمّلة. استخدم CSV بدلاً منه."); return; }
+        }
+        if (!teachers.length) { setUploadMsg("❌ لم يتم العثور على بيانات صالحة"); return; }
+        await DB.set("school-perf-teachers", teachers);
+        setTeachersList(teachers);
+        setUploadMsg(`✅ تم رفع ${teachers.length} معلم/معلمة`);
+        setTimeout(() => setUploadMsg(""), 4000);
+      } catch(err) { setUploadMsg("❌ خطأ: " + err.message); }
+    };
+    if (ext === "csv") reader.readAsText(file, "utf-8");
+    else               reader.readAsArrayBuffer(file);
+    e.target.value = "";
   };
 
+  // ─── تسجيل الدخول ───
   const handleLogin = () => {
-    if (!teacherId.trim()) { setError("أدخل رقم الهوية"); return; }
-    const found = teacherAccounts.find(t => t.id === teacherId.trim());
-    if (found) {
-      setCurrentTeacher(found);
-      setStep("dashboard");
-      setError("");
-    } else {
-      setError("رقم الهوية غير مسجل. تواصل مع الإدارة.");
-    }
+    const id = loginId.trim();
+    if (!id) { setLoginError("أدخل رقم الهوية الوطنية"); return; }
+    const teacher = teachersList.find(t => t.id === id);
+    if (!teacher) { setLoginError("رقم الهوية غير مسجل. تواصل مع الإدارة."); return; }
+    DB.get("school-perf-results", []).then(results => {
+      const prev = Array.isArray(results) ? results.find(r => r.teacherId === id) : null;
+      setCurrentTeacher(teacher);
+      if (prev) { setSavedResult(prev); setStep("results"); }
+      else      { setStep("assessment"); setActiveDomain(0); setRatings({}); setEvidence({}); setNotes({}); }
+      setLoginError("");
+    });
   };
 
-  // فصول المعلم فقط (إذا مرتبطة باسمه)
-  const myClasses = classList.filter(c =>
-    !currentTeacher || !c.teacher || c.teacher === "" ||
-    c.teacher === currentTeacher.name
-  );
+  // ─── حساب الدرجات ───
+  // درجة عنصر واحد من 100 = تقييم(1-5) × وزنه% × 20
+  // مجموع كل العناصر = الدرجة من 100
+  // ثم من 5 = (المجموع / 100) × 5
+  const calcScores = (ratingsObj) => {
+    let totalFrom100 = 0;
+    const domainDetails = PERFORMANCE_DOMAINS.map(d => {
+      const val = ratingsObj[d.id] || 0;
+      // الدرجة من 100 لهذا العنصر = (val / 5) × weight
+      const scoreFor100 = val > 0 ? (val / 5) * d.weight : 0;
+      return { id: d.id, title: d.title, icon: d.icon, color: d.color, bg: d.bg,
+               weight: d.weight, rating: val, scoreFor100: Math.round(scoreFor100 * 100) / 100 };
+    });
+    totalFrom100 = domainDetails.reduce((s, d) => s + d.scoreFor100, 0);
+    totalFrom100 = Math.round(totalFrom100 * 100) / 100;
+    const totalFrom5 = Math.round((totalFrom100 / 100) * 5 * 100) / 100;
+    return { totalFrom100, totalFrom5, domainDetails };
+  };
 
-  if (loading) return (
-    <div className="min-h-screen flex items-center justify-center" style={{ fontFamily: siteFont, background: "linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%)" }}>
-      <div className="text-white text-center"><div className="text-5xl mb-4 animate-bounce">👨‍🏫</div><p>جاري التحميل…</p></div>
+  const levelInfo = (score100) => {
+    if (score100 >= 90) return { label:"ممتاز",          color:"#059669", bg:"#d1fae5" };
+    if (score100 >= 75) return { label:"جيد جداً",       color:"#0d9488", bg:"#ccfbf1" };
+    if (score100 >= 60) return { label:"جيد",             color:"#d97706", bg:"#fef3c7" };
+    if (score100 >= 50) return { label:"مقبول",           color:"#f97316", bg:"#ffedd5" };
+    return                     { label:"يحتاج تطوير",     color:"#dc2626", bg:"#fee2e2" };
+  };
+
+  // ─── الإرسال ───
+  const handleSubmit = async () => {
+    const filled = PERFORMANCE_DOMAINS.filter(d => ratings[d.id] > 0);
+    if (filled.length < PERFORMANCE_DOMAINS.length) {
+      const ans = window.confirm(`لم تقيّم ${PERFORMANCE_DOMAINS.length - filled.length} عنصراً. هل تريد الإرسال مع ترك الفراغات؟`);
+      if (!ans) return;
+    }
+    setSaving(true);
+    const { totalFrom100, totalFrom5, domainDetails } = calcScores(ratings);
+    const rec = {
+      id:          currentTeacher.id + "_" + Date.now(),
+      teacherId:   currentTeacher.id,
+      teacherName: currentTeacher.name,
+      date: new Date().toLocaleDateString("ar-SA-u-nu-latn",{year:"numeric",month:"2-digit",day:"2-digit"}),
+      totalFrom100, totalFrom5, domainDetails,
+      ratings, evidence, notes,
+    };
+    const existing = await DB.get("school-perf-results", []);
+    const filtered = Array.isArray(existing) ? existing.filter(r => r.teacherId !== currentTeacher.id) : [];
+    await DB.set("school-perf-results", [rec, ...filtered]);
+    setSavedResult(rec);
+    setSaving(false);
+    setStep("results");
+  };
+
+  const domain  = PERFORMANCE_DOMAINS[activeDomain];
+  const total   = PERFORMANCE_DOMAINS.length;
+
+  // ══════════════ شاشة الدخول ══════════════
+  if (loadingList) return (
+    <div className="min-h-screen flex items-center justify-center" style={{ fontFamily:siteFont, background:"linear-gradient(135deg,#0f172a,#1e3a5f)" }}>
+      <div className="text-white text-center"><div className="text-5xl mb-4 animate-bounce">📊</div><p>جاري التحميل…</p></div>
     </div>
   );
 
   if (step === "login") return (
-    <div dir="rtl" className="min-h-screen flex items-center justify-center p-4"
-      style={{ fontFamily: siteFont, background: "linear-gradient(135deg, #1e3a5f 0%, #1d4ed8 60%, #1e40af 100%)" }}>
-      <div className="w-full max-w-sm">
-        <div className="text-center text-white mb-8">
-          <div className="text-6xl mb-4">👨‍🏫</div>
-          <h1 className="text-2xl font-black mb-1">مدرسة عبيدة بن الحارث المتوسطة</h1>
-          <p className="opacity-70 text-sm">بوابة المعلم — إدخال مستويات الطلاب</p>
-        </div>
-        <div className="bg-white rounded-3xl p-6 shadow-2xl">
-          <h2 className="text-center font-black text-gray-800 mb-5 text-lg">دخول المعلم</h2>
-          <div className="space-y-4">
-            <div>
-              <label className="text-xs font-bold text-gray-500 mb-1.5 block">رقم الهوية الوطنية</label>
-              <input type="text" value={teacherId}
-                onChange={e => { setTeacherId(e.target.value); setError(""); }}
-                onKeyDown={e => e.key === "Enter" && handleLogin()}
-                placeholder="أدخل رقم هويتك"
-                className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-blue-400 focus:outline-none text-sm text-center tracking-widest font-bold" />
-            </div>
-            {error && <div className="bg-red-50 text-red-600 text-xs font-bold p-3 rounded-xl text-center">{error}</div>}
-            <button onClick={handleLogin}
-              className="w-full py-3 rounded-xl font-black text-white hover:shadow-lg transition-all"
-              style={{ background: "linear-gradient(135deg, #1e3a5f, #2563eb)" }}>
-              دخول 👨‍🏫
-            </button>
+    <div dir="rtl" className="min-h-screen" style={{ fontFamily:siteFont, background:"linear-gradient(135deg,#0f172a 0%,#1e3a5f 50%,#1d4ed8 100%)" }}>
+      <div className="flex flex-col items-center justify-center min-h-screen p-4">
+        <div className="w-full max-w-lg">
+          <div className="text-center text-white mb-8">
+            <div className="w-20 h-20 rounded-3xl flex items-center justify-center text-4xl mx-auto mb-4 shadow-2xl" style={{ background:"rgba(255,255,255,0.12)", backdropFilter:"blur(10px)", border:"1px solid rgba(255,255,255,0.2)" }}>📊</div>
+            <h1 className="text-2xl font-black mb-2">مدرسة عبيدة بن الحارث المتوسطة</h1>
+            <p className="text-sm opacity-70 bg-white/10 rounded-full px-5 py-2 inline-block">بطاقة التقويم الذاتي لعناصر الأداء الوظيفي</p>
           </div>
-          <div className="mt-4 pt-4 border-t border-gray-100 text-center">
-            <p className="text-xs text-gray-400 mb-2">كلمة المرور هي رقم هويتك الوطنية</p>
-            <button onClick={onBack} className="text-xs text-blue-500 font-bold hover:underline">← العودة للصفحة الرئيسية</button>
+
+          <div className="bg-white rounded-3xl p-7 shadow-2xl mb-4">
+            <div className="text-center mb-6">
+              <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl mx-auto mb-3" style={{ background:"linear-gradient(135deg,#1e3a5f,#1d4ed8)" }}>👨‍🏫</div>
+              <h2 className="font-black text-gray-800 text-xl">دخول المعلم / المعلمة</h2>
+              <p className="text-gray-400 text-xs mt-1">أدخل رقم هويتك لبدء التقييم الذاتي</p>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs font-bold text-gray-500 mb-1.5 block">رقم الهوية الوطنية</label>
+                <input type="text" inputMode="numeric" value={loginId}
+                  onChange={e => { setLoginId(e.target.value); setLoginError(""); }}
+                  onKeyDown={e => e.key === "Enter" && handleLogin()}
+                  placeholder="أدخل رقم هويتك"
+                  className="w-full px-4 py-4 rounded-2xl border-2 border-gray-200 focus:border-blue-400 focus:outline-none text-center tracking-widest font-black text-xl" />
+              </div>
+              {loginError && <div className="bg-red-50 border border-red-200 text-red-600 text-sm font-bold p-3 rounded-xl text-center">{loginError}</div>}
+              <button onClick={handleLogin} className="w-full py-4 rounded-2xl font-black text-white text-base hover:shadow-xl transition-all" style={{ background:"linear-gradient(135deg,#1e3a5f,#1d4ed8)" }}>
+                بدء التقييم الذاتي ◄
+              </button>
+            </div>
+          </div>
+
+          {/* رفع قائمة المعلمين */}
+          <div className="bg-white/10 backdrop-blur rounded-2xl p-5 border border-white/20 mb-4">
+            <div className="flex items-center gap-3 mb-3">
+              <span className="text-2xl">📥</span>
+              <div>
+                <p className="text-white font-black text-sm">رفع قائمة المعلمين (للإدارة فقط)</p>
+                <p className="text-white/60 text-xs">ملف Excel أو CSV: العمود الأول الاسم، الثاني رقم الهوية</p>
+              </div>
+            </div>
+            <div className="flex gap-2 items-center">
+              <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" onChange={handleExcelUpload} className="hidden" />
+              <button onClick={() => fileRef.current?.click()} className="flex-1 py-2.5 rounded-xl font-bold text-sm border-2 border-white/40 text-white hover:bg-white/10 transition-all">
+                📂 اختيار ملف
+              </button>
+              {teachersList.length > 0 && (
+                <span className="bg-white/25 text-white text-xs font-black rounded-xl px-3 py-2">{teachersList.length} معلم</span>
+              )}
+            </div>
+            {uploadMsg && <p className="text-xs mt-2 font-bold" style={{ color: uploadMsg.startsWith("✅")?"#86efac":uploadMsg.startsWith("⏳")?"#fde68a":"#fca5a5" }}>{uploadMsg}</p>}
+          </div>
+
+          <div className="text-center">
+            <button onClick={onBack} className="text-white/50 hover:text-white text-xs font-bold transition-all">← العودة للصفحة الرئيسية</button>
           </div>
         </div>
       </div>
     </div>
   );
 
-  // واجهة المعلم بعد الدخول
-  return (
-    <div dir="rtl" className="min-h-screen" style={{ fontFamily: siteFont, background: "linear-gradient(135deg, #eff6ff 0%, #f0fdf4 100%)" }}>
-            {/* شريط التنقل */}
-      <nav className="bg-white shadow-md sticky top-0 z-50 border-b border-blue-100">
-        <div className="w-full px-3">
-          <div className="flex items-center justify-between h-14">
+  // ══════════════ شاشة النتائج السابقة ══════════════
+  if (step === "results" && savedResult) {
+    const { totalFrom100, totalFrom5, domainDetails, teacherName, date } = savedResult;
+    const lvl = levelInfo(totalFrom100);
+    return (
+      <div dir="rtl" className="min-h-screen pb-16" style={{ fontFamily:siteFont, background:"linear-gradient(135deg,#f8fafc,#eff6ff)" }}>
+        <div className="sticky top-0 z-40 shadow-lg" style={{ background:`linear-gradient(135deg,${lvl.color},${lvl.color}bb)` }}>
+          <div className="flex items-center justify-between px-4 h-14 text-white">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl flex items-center justify-center text-white text-base" style={{ background: "linear-gradient(135deg, #1e3a5f, #2563eb)" }}>🏫</div>
+              <span className="text-xl">✅</span>
               <div>
-                <div className="font-black text-blue-900 text-sm">مدرسة عبيدة بن الحارث</div>
-                <div className="text-xs text-gray-400">بوابة المعلم</div>
+                <div className="font-black text-sm">نتيجة التقويم الذاتي</div>
+                <div className="text-xs opacity-70">{teacherName}</div>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="hidden sm:flex items-center gap-2 bg-blue-50 rounded-xl px-3 py-1.5">
-                <div className="w-7 h-7 rounded-full bg-blue-200 flex items-center justify-center text-blue-700 text-xs font-black">
-                  {currentTeacher.name.charAt(0)}
-                </div>
-                <div className="text-xs">
-                  <div className="font-black text-blue-900">{currentTeacher.name}</div>
-                  <div className="text-gray-400">معلم</div>
-                </div>
+            <button onClick={() => { setStep("login"); setCurrentTeacher(null); setLoginId(""); setSavedResult(null); }} className="text-xs opacity-70 hover:opacity-100 font-bold">خروج</button>
+          </div>
+        </div>
+
+        <div className="max-w-2xl mx-auto px-3 pt-5 space-y-4">
+          {/* بطاقة النتيجة الإجمالية */}
+          <div className="rounded-3xl p-7 text-white text-center shadow-2xl" style={{ background:`linear-gradient(135deg,${lvl.color},${lvl.color}99)` }}>
+            <div className="text-5xl mb-3">✅</div>
+            <h2 className="font-black text-xl mb-1">تم إرسال تقييمك بنجاح</h2>
+            <p className="opacity-75 text-sm mb-6">بتاريخ {date} — سيطّلع عليه المدير</p>
+            <div className="flex items-center justify-center gap-6">
+              <div className="bg-white/25 rounded-2xl px-6 py-4 text-center">
+                <div className="text-5xl font-black">{totalFrom100}</div>
+                <div className="text-sm opacity-80 mt-1">الدرجة من 100</div>
               </div>
-              <button onClick={() => { setStep("login"); setCurrentTeacher(null); setTeacherId(""); }}
-                className="text-xs text-red-500 font-bold px-3 py-1.5 rounded-lg hover:bg-red-50">خروج</button>
+              <div className="text-3xl opacity-60">/</div>
+              <div className="bg-white/25 rounded-2xl px-6 py-4 text-center">
+                <div className="text-5xl font-black">{totalFrom5}</div>
+                <div className="text-sm opacity-80 mt-1">الدرجة من 5</div>
+              </div>
+            </div>
+            <div className="mt-5">
+              <div className="bg-white/20 rounded-full h-3 overflow-hidden">
+                <div className="h-full bg-white rounded-full transition-all duration-1000" style={{ width:`${totalFrom100}%` }} />
+              </div>
+              <div className="font-black text-lg mt-2">{lvl.label}</div>
+            </div>
+          </div>
+
+          {/* جدول تفصيلي بكل العناصر */}
+          <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+            <div className="px-4 py-3 border-b border-gray-100" style={{ background:"linear-gradient(135deg,#1e3a5f,#1d4ed8)" }}>
+              <h3 className="font-black text-white text-sm">📋 تفصيل التقييم لكل عنصر</h3>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="bg-gray-50 text-gray-600">
+                    <th className="px-3 py-2 text-right font-black">م</th>
+                    <th className="px-3 py-2 text-right font-black">عنصر التقييم</th>
+                    <th className="px-3 py-2 text-center font-black">الوزن</th>
+                    <th className="px-3 py-2 text-center font-black">التقدير<br/>(1-5)</th>
+                    <th className="px-3 py-2 text-center font-black">الدرجة<br/>من 100</th>
+                    <th className="px-3 py-2 text-center font-black">شاهد</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(domainDetails||[]).map((d, idx) => {
+                    const rating = PERF_RATINGS.find(r => r.value === d.rating);
+                    const dom    = PERFORMANCE_DOMAINS[idx];
+                    return (
+                      <tr key={d.id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-50/50"}>
+                        <td className="px-3 py-2.5 text-center font-black text-gray-500">{idx+1}</td>
+                        <td className="px-3 py-2.5 font-bold text-gray-800" style={{ direction:"rtl" }}>
+                          <span className="ml-1">{dom?.icon}</span>{d.title}
+                        </td>
+                        <td className="px-3 py-2.5 text-center font-black text-gray-600">{d.weight}%</td>
+                        <td className="px-3 py-2.5 text-center">
+                          {d.rating > 0 ? (
+                            <span className="inline-block w-8 h-8 rounded-lg text-sm font-black flex items-center justify-center" style={{ background: rating?.bg, color: rating?.color }}>
+                              {d.rating}
+                            </span>
+                          ) : <span className="text-gray-300">—</span>}
+                        </td>
+                        <td className="px-3 py-2.5 text-center font-black" style={{ color: d.scoreFor100 > 0 ? dom?.color : "#ccc" }}>
+                          {d.scoreFor100 > 0 ? d.scoreFor100 : "—"}
+                        </td>
+                        <td className="px-3 py-2.5 text-center text-base">
+                          {savedResult.evidence?.[d.id] === true ? "✅" : savedResult.evidence?.[d.id] === false ? "❌" : "—"}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+                <tfoot>
+                  <tr style={{ background:"linear-gradient(135deg,#1e3a5f22,#1d4ed822)" }}>
+                    <td colSpan={2} className="px-3 py-3 font-black text-gray-800 text-sm">المجموع الكلي</td>
+                    <td className="px-3 py-3 text-center font-black text-gray-600">100%</td>
+                    <td className="px-3 py-3 text-center font-black text-blue-700 text-base">{totalFrom5} / 5</td>
+                    <td className="px-3 py-3 text-center font-black text-green-700 text-base">{totalFrom100} / 100</td>
+                    <td></td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+
+          {/* ملاحظات */}
+          {Object.keys(savedResult.notes||{}).some(k => savedResult.notes[k]) && (
+            <div className="bg-white rounded-2xl p-4 shadow-sm">
+              <h3 className="font-black text-gray-700 text-sm mb-3">📝 الملاحظات المُدخلة</h3>
+              {PERFORMANCE_DOMAINS.map(dom => {
+                const note = savedResult.notes?.[dom.id];
+                if (!note) return null;
+                return (
+                  <div key={dom.id} className="mb-2 p-2.5 rounded-xl text-xs" style={{ background:dom.bg }}>
+                    <span className="font-black" style={{ color:dom.color }}>{dom.icon} {dom.title}: </span>
+                    <span className="text-gray-700">{note}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          <button onClick={() => { setStep("assessment"); setActiveDomain(0); setSavedResult(null); setRatings(savedResult?.ratings||{}); setEvidence(savedResult?.evidence||{}); setNotes(savedResult?.notes||{}); }}
+            className="w-full py-3.5 rounded-2xl font-black text-white text-sm shadow-lg"
+            style={{ background:"linear-gradient(135deg,#7c3aed,#1d4ed8)" }}>
+            🔄 تعديل التقييم وإعادة الإرسال
+          </button>
+          <button onClick={() => { setStep("login"); setCurrentTeacher(null); setLoginId(""); setSavedResult(null); }}
+            className="w-full py-2.5 rounded-xl font-bold text-sm border-2 border-gray-200 text-gray-500 hover:bg-gray-50">
+            ← العودة
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ══════════════ شاشة التقييم ══════════════
+  const progressPct = Math.round((activeDomain / total) * 100);
+  const { totalFrom100: previewTotal, totalFrom5: previewFrom5 } = calcScores(ratings);
+  const filledCount = PERFORMANCE_DOMAINS.filter(d => ratings[d.id] > 0).length;
+
+  return (
+    <div dir="rtl" className="min-h-screen pb-16" style={{ fontFamily:siteFont, background:"linear-gradient(135deg,#f8fafc,#eff6ff)" }}>
+      {/* شريط التنقل */}
+      <div className="sticky top-0 z-40 shadow-lg" style={{ background:`linear-gradient(135deg,${domain.color},${domain.color}cc)` }}>
+        <div className="flex items-center justify-between px-4 h-14 text-white">
+          <div className="flex items-center gap-3">
+            <span className="text-xl">{domain.icon}</span>
+            <div>
+              <div className="font-black text-sm">{domain.title}</div>
+              <div className="text-xs opacity-70">عنصر {activeDomain+1} من {total}</div>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="text-xs opacity-80 hidden sm:block">{currentTeacher?.name}</div>
+            <button onClick={() => { setStep("login"); setCurrentTeacher(null); setLoginId(""); }} className="text-xs opacity-70 hover:opacity-100 font-bold">خروج</button>
+          </div>
+        </div>
+        <div className="h-1.5 bg-white/20">
+          <div className="h-full bg-white/75 transition-all duration-500" style={{ width:`${progressPct}%` }} />
+        </div>
+      </div>
+
+      <div className="max-w-xl mx-auto px-3 pt-5 space-y-4">
+        {/* بطاقة المعلم + التقدم */}
+        <div className="rounded-2xl p-4 text-white shadow-lg" style={{ background:`linear-gradient(135deg,${domain.color},${domain.color}99)` }}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center font-black text-lg">{currentTeacher?.name?.charAt(0)}</div>
+              <div>
+                <div className="font-black text-sm">{currentTeacher?.name}</div>
+                <div className="text-xs opacity-75">بطاقة التقويم الذاتي للأداء الوظيفي</div>
+              </div>
+            </div>
+            <div className="text-center">
+              <div className="text-xs opacity-75">مكتمل</div>
+              <div className="font-black text-lg">{filledCount}/{total}</div>
+            </div>
+          </div>
+          {/* شريط التقدم الإجمالي */}
+          {filledCount > 0 && (
+            <div className="mt-3 flex items-center gap-3">
+              <div className="flex-1 h-2 bg-white/20 rounded-full overflow-hidden">
+                <div className="h-full bg-white rounded-full" style={{ width:`${(filledCount/total)*100}%` }} />
+              </div>
+              <div className="text-xs font-black opacity-90">المتوقع: {previewTotal}/100 = {previewFrom5}/5</div>
+            </div>
+          )}
+        </div>
+
+        {/* بطاقة العنصر الحالي */}
+        <div className="bg-white rounded-3xl overflow-hidden shadow-md border-2" style={{ borderColor:`${domain.color}30` }}>
+          {/* رأس العنصر */}
+          <div className="p-5" style={{ background:`${domain.bg}` }}>
+            <div className="flex items-start gap-3">
+              <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl flex-shrink-0 shadow-sm" style={{ background:domain.color }}>
+                <span>{domain.icon}</span>
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs font-black text-white px-2 py-0.5 rounded-lg" style={{ background:domain.color }}>م{domain.num}</span>
+                  <span className="text-xs font-black bg-white/80 text-gray-600 px-2 py-0.5 rounded-lg border">الوزن: {domain.weight}%</span>
+                </div>
+                <h2 className="font-black text-gray-800 text-base mt-1.5">{domain.title}</h2>
+              </div>
+            </div>
+
+            {/* تفصيلات العنصر */}
+            <div className="mt-4 space-y-1.5">
+              <p className="text-xs font-black text-gray-500 mb-2">أمثلة على تحقق العنصر:</p>
+              {domain.details.map((detail, i) => (
+                <div key={i} className="flex items-start gap-2 text-xs text-gray-700">
+                  <span className="mt-0.5 flex-shrink-0 w-4 h-4 rounded-full bg-white flex items-center justify-center font-black text-gray-500 text-xs border" style={{ borderColor:`${domain.color}50` }}>{i+1}</span>
+                  <span>{detail}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* قسم التقييم */}
+          <div className="p-5">
+            <p className="text-xs font-black text-gray-500 mb-4 text-center">اختر مستواك في هذا العنصر:</p>
+
+            {/* أزرار سلم التقدير 1-5 */}
+            <div className="grid grid-cols-5 gap-2 mb-4">
+              {PERF_RATINGS.slice().reverse().map(r => {
+                const selected = ratings[domain.id] === r.value;
+                return (
+                  <button key={r.value}
+                    onClick={() => setRatings(prev => ({ ...prev, [domain.id]: r.value }))}
+                    className="rounded-2xl py-3 px-1 transition-all border-2 flex flex-col items-center gap-1"
+                    style={{
+                      background:   selected ? r.bg : "#f9fafb",
+                      borderColor:  selected ? r.color : "#e5e7eb",
+                      boxShadow:    selected ? `0 4px 14px ${r.color}50` : "none",
+                      transform:    selected ? "scale(1.06)" : "scale(1)",
+                    }}>
+                    <span className="text-2xl font-black" style={{ color: selected ? r.color : "#9ca3af" }}>{r.value}</span>
+                    <span className="text-center font-black leading-tight" style={{ fontSize:9, color: selected ? r.color : "#aaa" }}>{r.fullLabel}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* وصف التقدير المختار */}
+            {ratings[domain.id] > 0 && (() => {
+              const r = PERF_RATINGS.find(x => x.value === ratings[domain.id]);
+              // حساب الدرجة الجزئية
+              const partial = Math.round((ratings[domain.id] / 5) * domain.weight * 100) / 100;
+              return (
+                <div className="rounded-2xl p-4 mb-4 border" style={{ background:r.bg, borderColor:`${r.color}40` }}>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="font-black text-sm" style={{ color:r.color }}>{r.value} — {r.fullLabel}</span>
+                      <p className="text-xs mt-0.5" style={{ color:r.color }}>{r.desc}</p>
+                    </div>
+                    <div className="text-center bg-white rounded-xl px-3 py-2 shadow-sm">
+                      <div className="font-black text-lg" style={{ color:r.color }}>{partial}</div>
+                      <div className="text-xs text-gray-400">من {domain.weight}</div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* توافر الشاهد */}
+            <div className="rounded-xl p-3.5 bg-blue-50 border border-blue-100 mb-3">
+              <p className="text-xs font-black text-blue-800 mb-2.5">🗂️ هل يتوفر لديك شاهد أو دليل على تحقق هذا العنصر؟</p>
+              <div className="flex gap-3">
+                {[{v:true,l:"نعم — يتوفر شاهد ✅"},{v:false,l:"لا — لا يتوفر شاهد ❌"}].map(opt => (
+                  <button key={String(opt.v)}
+                    onClick={() => setEvidence(prev => ({ ...prev, [domain.id]: opt.v }))}
+                    className="flex-1 py-2 px-2 rounded-xl text-xs font-bold transition-all border-2"
+                    style={{
+                      background: evidence[domain.id] === opt.v ? (opt.v ? "#d1fae5" : "#fee2e2") : "#fff",
+                      borderColor: evidence[domain.id] === opt.v ? (opt.v ? "#059669" : "#dc2626") : "#e5e7eb",
+                      color: evidence[domain.id] === opt.v ? (opt.v ? "#059669" : "#dc2626") : "#9ca3af",
+                    }}>
+                    {opt.l}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* ملاحظة */}
+            <div>
+              <label className="text-xs font-bold text-gray-500 mb-1.5 block">ملاحظة / توضيح (اختياري):</label>
+              <textarea value={notes[domain.id]||""}
+                onChange={e => setNotes(prev => ({ ...prev, [domain.id]: e.target.value }))}
+                placeholder="أضف أي ملاحظة أو شاهد أو توضيح..."
+                rows={2}
+                className="w-full text-xs p-3 rounded-xl border border-gray-200 focus:border-blue-300 focus:outline-none resize-none" />
             </div>
           </div>
         </div>
-      </nav>
 
-      <main className="w-full py-3 px-2">
-        {/* ترحيب */}
-        <div className="rounded-b-2xl p-6 mb-6 text-white shadow-xl" style={{ background: "linear-gradient(135deg, #1e3a5f 0%, #2563eb 60%, #3b82f6 100%)" }}>
-          <div className="text-4xl mb-2">👨‍🏫</div>
-          <h2 className="text-2xl font-black">أهلاً، {currentTeacher.name}</h2>
-          <p className="opacity-80 text-sm mt-1">مرحباً بك في بوابة المعلم</p>
+        {/* أزرار التنقل */}
+        <div className="flex gap-3">
+          {activeDomain > 0 && (
+            <button onClick={() => { setActiveDomain(a => a-1); window.scrollTo(0,0); }}
+              className="flex-1 py-3.5 rounded-2xl font-black text-sm border-2 border-gray-200 text-gray-600 hover:bg-gray-50 transition-all">
+              ◄ السابق
+            </button>
+          )}
+          {activeDomain < total - 1 ? (
+            <button onClick={() => { setActiveDomain(a => a+1); window.scrollTo(0,0); }}
+              className="flex-1 py-3.5 rounded-2xl font-black text-white text-sm shadow-lg transition-all"
+              style={{ background:`linear-gradient(135deg,${domain.color},${domain.color}cc)` }}>
+              التالي ◄
+            </button>
+          ) : (
+            <button onClick={handleSubmit} disabled={saving}
+              className="flex-1 py-3.5 rounded-2xl font-black text-white text-sm shadow-lg transition-all"
+              style={{ background:"linear-gradient(135deg,#059669,#0d9488)", opacity:saving?0.7:1 }}>
+              {saving ? "⏳ جاري الحفظ…" : "✅ إرسال التقييم للمدير"}
+            </button>
+          )}
         </div>
 
-        {/* تبويبات */}
-        <div className="flex gap-2 mb-6 flex-wrap">
-          <button onClick={() => setActiveTab("grades")}
-            className={`flex-1 py-3 rounded-2xl font-black text-sm transition-all ${activeTab === "grades" ? "bg-blue-600 text-white shadow-md" : "bg-white text-gray-600 hover:bg-blue-50 border border-gray-200"}`}>
-            📊 مستويات الطلاب
-          </button>
-          <button onClick={() => setActiveTab("attendance")}
-            className={`flex-1 py-3 rounded-2xl font-black text-sm transition-all ${activeTab === "attendance" ? "bg-teal-600 text-white shadow-md" : "bg-white text-gray-600 hover:bg-teal-50 border border-gray-200"}`}>
-            📋 سجل غيابي وتأخراتي
-          </button>
-          <button onClick={() => setActiveTab("selfeval")}
-            className={`flex-1 py-3 rounded-2xl font-black text-sm transition-all ${activeTab === "selfeval" ? "bg-purple-600 text-white shadow-md" : "bg-white text-gray-600 hover:bg-purple-50 border border-gray-200"}`}>
-            🎯 تقييمي الذاتي
-          </button>
-          <button onClick={() => setActiveTab("pptai")}
-            className={`flex-1 py-3 rounded-2xl font-black text-sm transition-all ${activeTab === "pptai" ? "bg-blue-700 text-white shadow-md" : "bg-white text-gray-600 hover:bg-blue-50 border border-gray-200"}`}>
-            📚 مصادر تعليمية
-          </button>
+        {/* تنقل سريع بين العناصر */}
+        <div className="bg-white rounded-2xl p-3 shadow-sm">
+          <p className="text-xs font-bold text-gray-400 mb-2.5 text-center">انتقل مباشرة لأي عنصر</p>
+          <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-6">
+            {PERFORMANCE_DOMAINS.map((d, i) => {
+              const rated = ratings[d.id] > 0;
+              const rInfo = rated ? PERF_RATINGS.find(r => r.value === ratings[d.id]) : null;
+              return (
+                <button key={d.id}
+                  onClick={() => { setActiveDomain(i); window.scrollTo(0,0); }}
+                  className="rounded-xl py-2 px-1 text-center transition-all border-2 flex flex-col items-center gap-0.5"
+                  style={{
+                    background: activeDomain===i ? d.bg : rated ? rInfo?.bg : "#f9fafb",
+                    borderColor: activeDomain===i ? d.color : rated ? rInfo?.color : "#e5e7eb",
+                  }}>
+                  <span className="text-base">{d.icon}</span>
+                  <span className="font-black" style={{ fontSize:9, color: activeDomain===i ? d.color : rated ? rInfo?.color : "#aaa" }}>
+                    م{d.num}{rated ? ` (${ratings[d.id]})` : ""}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </div>
 
-        {/* محتوى التبويبات */}
-        {activeTab === "grades" && (
-          <StudentsPage
-            classList={myClasses}
-            setClassList={setClassList}
-            saveClass={saveClass}
-            deleteClass={() => {}}
-            teacherMode={true}
-            teacherName={currentTeacher.name}
-            onSendNote={onSendNote}
-            messages={messages}
-          />
+        {/* ملخص مؤقت للدرجة */}
+        {filledCount > 0 && (
+          <div className="bg-white rounded-2xl p-4 shadow-sm border border-blue-100">
+            <p className="text-xs font-black text-gray-500 mb-3 text-center">📊 ملخص درجاتك حتى الآن</p>
+            <div className="flex items-center justify-around">
+              <div className="text-center">
+                <div className="text-3xl font-black text-blue-700">{previewTotal}</div>
+                <div className="text-xs text-gray-400 font-bold">من 100</div>
+              </div>
+              <div className="text-gray-200 text-2xl">/</div>
+              <div className="text-center">
+                <div className="text-3xl font-black text-teal-700">{previewFrom5}</div>
+                <div className="text-xs text-gray-400 font-bold">من 5</div>
+              </div>
+              <div className="text-center">
+                <div className="font-black text-sm" style={{ color: levelInfo(previewTotal).color }}>{levelInfo(previewTotal).label}</div>
+                <div className="text-xs text-gray-400">({filledCount}/{total} عنصر)</div>
+              </div>
+            </div>
+            <div className="mt-3 h-2.5 rounded-full bg-gray-100 overflow-hidden">
+              <div className="h-full rounded-full transition-all duration-700"
+                style={{ width:`${previewTotal}%`, background:`linear-gradient(90deg,#1d4ed8,#059669)` }} />
+            </div>
+          </div>
         )}
-
-        {activeTab === "selfeval" && (
-          <TeacherSelfEval teacherInfo={currentTeacher} onDone={() => setActiveTab("grades")} />
-        )}
-
-        {activeTab === "pptai" && (
-          <TeacherPPTAI teacherInfo={currentTeacher} />
-        )}
-
-        {activeTab === "attendance" && (
-          <TeacherAttendanceView
-            currentTeacher={currentTeacher}
-            teachers={teachers}
-            attendance={attendance}
-            week={week}
-            absenceReasons={absenceReasons}
-            saveAbsenceReason={saveAbsenceReason}
-            savingReason={savingReason}
-            savedMsg={savedMsg}
-          />
-        )}
-      </main>
-
-      <footer className="text-center py-4 text-xs text-gray-400 border-t border-gray-200 bg-white mt-8">
-        مدرسة عبيدة بن الحارث المتوسطة — بوابة المعلم © ١٤٤٧ هـ
-      </footer>
+      </div>
     </div>
   );
 }
+
+
+function PerfResultsAdminPage() {
+  const [results,  setResults]  = useState([]);
+  const [teachers, setTeachers] = useState([]);
+  const [loading,  setLoading]  = useState(true);
+  const [selected, setSelected] = useState(null);
+  const [search,   setSearch]   = useState("");
+
+  useEffect(() => {
+    Promise.all([
+      DB.get("school-perf-results",  []),
+      DB.get("school-perf-teachers", []),
+    ]).then(([res, tch]) => {
+      setResults( Array.isArray(res) ? res : []);
+      setTeachers(Array.isArray(tch) ? tch : []);
+      setLoading(false);
+    });
+  }, []);
+
+  const levelInfo = (s) => {
+    if (s >= 90) return { label:"ممتاز",        color:"#059669", bg:"#d1fae5" };
+    if (s >= 75) return { label:"جيد جداً",     color:"#0d9488", bg:"#ccfbf1" };
+    if (s >= 60) return { label:"جيد",           color:"#d97706", bg:"#fef3c7" };
+    if (s >= 50) return { label:"مقبول",         color:"#f97316", bg:"#ffedd5" };
+    return             { label:"يحتاج تطوير",   color:"#dc2626", bg:"#fee2e2" };
+  };
+
+  const filtered  = results.filter(r => !search || r.teacherName.includes(search));
+  const submitted = new Set(results.map(r => r.teacherId));
+  const pending   = teachers.filter(t => !submitted.has(t.id));
+
+  if (loading) return (
+    <div className="flex items-center justify-center py-20 text-gray-400">
+      <div className="text-center"><div className="text-4xl mb-3 animate-bounce">📊</div><p>جاري التحميل…</p></div>
+    </div>
+  );
+
+  // ── تفاصيل معلم محدد ──
+  if (selected) {
+    const { totalFrom100, totalFrom5, domainDetails, teacherName, teacherId, date } = selected;
+    const lvl = levelInfo(totalFrom100);
+    return (
+      <div dir="rtl" className="max-w-2xl mx-auto px-3 py-4 space-y-4">
+        <button onClick={() => setSelected(null)} className="text-sm font-bold text-blue-600 hover:underline flex items-center gap-1">← قائمة النتائج</button>
+
+        {/* بطاقة المعلم */}
+        <div className="rounded-2xl p-6 text-white shadow-xl" style={{ background:`linear-gradient(135deg,${lvl.color},${lvl.color}99)` }}>
+          <div className="text-2xl mb-2">📊</div>
+          <h2 className="font-black text-xl">{teacherName}</h2>
+          <p className="opacity-70 text-xs mb-5">رقم الهوية: {teacherId} — بتاريخ: {date}</p>
+          <div className="flex items-center gap-4">
+            <div className="bg-white/25 rounded-2xl px-5 py-3 text-center">
+              <div className="text-4xl font-black">{totalFrom100}</div>
+              <div className="text-xs opacity-80">من 100</div>
+            </div>
+            <div className="bg-white/25 rounded-2xl px-5 py-3 text-center">
+              <div className="text-4xl font-black">{totalFrom5}</div>
+              <div className="text-xs opacity-80">من 5</div>
+            </div>
+            <div className="flex-1">
+              <div className="bg-white/20 rounded-full h-3 overflow-hidden">
+                <div className="h-full bg-white rounded-full" style={{ width:`${totalFrom100}%` }} />
+              </div>
+              <div className="font-black mt-1.5">{lvl.label}</div>
+            </div>
+          </div>
+        </div>
+
+        {/* جدول تفصيلي */}
+        <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+          <div className="px-4 py-3 border-b" style={{ background:"linear-gradient(135deg,#1e3a5f,#1d4ed8)" }}>
+            <h3 className="font-black text-white text-sm">📋 تفصيل التقييم الذاتي</h3>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-gray-50 text-gray-600">
+                  <th className="px-3 py-2.5 text-right font-black border-b">م</th>
+                  <th className="px-3 py-2.5 text-right font-black border-b">عنصر التقييم</th>
+                  <th className="px-3 py-2.5 text-center font-black border-b">الوزن</th>
+                  <th className="px-3 py-2.5 text-center font-black border-b">التقدير</th>
+                  <th className="px-3 py-2.5 text-center font-black border-b">الدرجة</th>
+                  <th className="px-3 py-2.5 text-center font-black border-b">شاهد</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(domainDetails||[]).map((d, idx) => {
+                  const dom    = PERFORMANCE_DOMAINS[idx];
+                  const rating = PERF_RATINGS.find(r => r.value === d.rating);
+                  return (
+                    <tr key={d.id} className={idx%2===0?"bg-white":"bg-gray-50/50"}>
+                      <td className="px-3 py-2.5 text-center font-black text-gray-400">{idx+1}</td>
+                      <td className="px-3 py-2.5 font-bold text-gray-700">
+                        {dom?.icon} {d.title}
+                      </td>
+                      <td className="px-3 py-2.5 text-center font-bold text-gray-500">{d.weight}%</td>
+                      <td className="px-3 py-2.5 text-center">
+                        {d.rating > 0 ? (
+                          <span className="inline-flex w-8 h-8 rounded-lg items-center justify-center font-black text-sm" style={{ background:rating?.bg, color:rating?.color }}>
+                            {d.rating}
+                          </span>
+                        ) : <span className="text-gray-300">—</span>}
+                      </td>
+                      <td className="px-3 py-2.5 text-center font-black" style={{ color: d.scoreFor100>0 ? dom?.color : "#ccc" }}>
+                        {d.scoreFor100 > 0 ? d.scoreFor100 : "—"}
+                      </td>
+                      <td className="px-3 py-2.5 text-center text-base">
+                        {selected.evidence?.[d.id]===true ? "✅" : selected.evidence?.[d.id]===false ? "❌" : "—"}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+              <tfoot>
+                <tr className="border-t-2 border-blue-100" style={{ background:"#eff6ff" }}>
+                  <td colSpan={2} className="px-3 py-3 font-black text-gray-800">المجموع الكلي</td>
+                  <td className="px-3 py-3 text-center font-black text-gray-600">100%</td>
+                  <td className="px-3 py-3 text-center font-black text-blue-700">{totalFrom5} / 5</td>
+                  <td className="px-3 py-3 text-center font-black text-green-700">{totalFrom100} / 100</td>
+                  <td></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+
+        {/* ملاحظات */}
+        {Object.keys(selected.notes||{}).some(k=>selected.notes[k]) && (
+          <div className="bg-white rounded-2xl p-4 shadow-sm">
+            <h3 className="font-black text-gray-700 text-sm mb-3">📝 ملاحظات المعلم</h3>
+            {PERFORMANCE_DOMAINS.map(dom => {
+              const note = selected.notes?.[dom.id];
+              if (!note) return null;
+              return (
+                <div key={dom.id} className="mb-2 p-2.5 rounded-xl text-xs" style={{ background:dom.bg }}>
+                  <span className="font-black" style={{ color:dom.color }}>{dom.icon} {dom.title}: </span>
+                  <span className="text-gray-700">{note}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ── القائمة الرئيسية ──
+  const avgScore = results.length > 0 ? Math.round(results.reduce((s,r) => s+(r.totalFrom100||0), 0) / results.length) : 0;
+
+  return (
+    <div dir="rtl" className="max-w-3xl mx-auto px-3 py-4 space-y-4">
+      {/* Header */}
+      <div className="rounded-2xl p-5 text-white shadow-lg" style={{ background:"linear-gradient(135deg,#1e3a5f,#1d4ed8)" }}>
+        <div className="flex items-center gap-4 mb-4">
+          <div className="text-4xl">📊</div>
+          <div>
+            <h2 className="font-black text-xl">نتائج التقويم الذاتي</h2>
+            <p className="opacity-70 text-sm">عناصر الأداء الوظيفي للمعلمين — {PERFORMANCE_DOMAINS.length} عنصراً من 100 درجة</p>
+          </div>
+        </div>
+        <div className="grid grid-cols-4 gap-3">
+          {[
+            { v:results.length,      l:"أكمل التقييم" },
+            { v:pending.length,      l:"لم يُكمل" },
+            { v:teachers.length,     l:"إجمالي" },
+            { v:`${avgScore}/100`,   l:"متوسط الدرجات" },
+          ].map(s => (
+            <div key={s.l} className="bg-white/15 rounded-xl py-2 px-2 text-center">
+              <div className="text-xl font-black">{s.v}</div>
+              <div className="text-xs opacity-75">{s.l}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* بحث */}
+      <input type="text" value={search} onChange={e => setSearch(e.target.value)}
+        placeholder="🔍 بحث باسم المعلم…"
+        className="w-full px-4 py-3 rounded-2xl border-2 border-gray-200 focus:border-blue-400 focus:outline-none text-sm" />
+
+      {/* قائمة المكتملين */}
+      {filtered.length === 0 ? (
+        <div className="text-center py-12 text-gray-400">
+          <div className="text-5xl mb-3">📭</div>
+          <p className="font-bold">لا توجد نتائج بعد</p>
+          <p className="text-xs mt-1">سيظهر التقييم هنا فور إرساله من المعلم</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <h3 className="font-black text-gray-600 text-xs px-1">✅ أكملوا التقييم ({filtered.length})</h3>
+          {filtered.map(rec => {
+            const lvl = levelInfo(rec.totalFrom100||0);
+            const filledCount = PERFORMANCE_DOMAINS.filter(d => rec.ratings?.[d.id] > 0).length;
+            return (
+              <button key={rec.id} onClick={() => setSelected(rec)}
+                className="w-full text-right bg-white rounded-2xl p-4 shadow-sm border-2 hover:shadow-md transition-all"
+                style={{ borderColor:`${lvl.color}25` }}>
+                <div className="flex items-center gap-3">
+                  <div className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-sm"
+                    style={{ background:`linear-gradient(135deg,${lvl.color},${lvl.color}88)` }}>
+                    <div className="text-center text-white">
+                      <div className="text-lg font-black">{rec.totalFrom5||0}</div>
+                      <div className="text-xs opacity-80">/5</div>
+                    </div>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-black text-gray-800 text-sm truncate">{rec.teacherName}</div>
+                    <div className="text-xs text-gray-400">{rec.date} · {filledCount}/{PERFORMANCE_DOMAINS.length} عنصر</div>
+                    <div className="flex items-center gap-2 mt-1.5">
+                      <div className="h-1.5 flex-1 rounded-full bg-gray-100 overflow-hidden">
+                        <div className="h-full rounded-full transition-all" style={{ width:`${rec.totalFrom100||0}%`, background:lvl.color }} />
+                      </div>
+                      <span className="text-xs font-black" style={{ color:lvl.color }}>{rec.totalFrom100||0}/100</span>
+                    </div>
+                  </div>
+                  <div>
+                    <span className="text-xs font-black px-2.5 py-1 rounded-xl" style={{ background:lvl.bg, color:lvl.color }}>{lvl.label}</span>
+                  </div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* المعلقون */}
+      {pending.length > 0 && (
+        <div>
+          <h3 className="font-black text-gray-600 text-xs px-1 mb-2">⏳ لم يُكملوا التقييم ({pending.length})</h3>
+          <div className="bg-white rounded-2xl divide-y border border-gray-100 shadow-sm">
+            {pending.map(t => (
+              <div key={t.id} className="flex items-center gap-3 px-4 py-3">
+                <div className="w-8 h-8 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center font-black text-amber-600 text-sm">{t.name.charAt(0)}</div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-bold text-gray-700 truncate">{t.name}</div>
+                  <div className="text-xs text-gray-400">{t.id}</div>
+                </div>
+                <span className="text-xs bg-amber-100 text-amber-700 font-bold px-2 py-0.5 rounded-full flex-shrink-0">معلّق</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+
 // ===== ثوابت التقييم الأسبوعي =====
 const EVAL_LEVELS = [
   { value: "", label: "— المستوى —", bg: "#f5f5f5", color: "#aaa" },
@@ -22134,7 +22940,7 @@ export default function SchoolWebsite() {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
   const [parentPortal,        setParentPortal]        = useState(false);
-  const [teacherPortal,       setTeacherPortal]       = useState(false);
+  const [perfStandardsPortal, setPerfStandardsPortal] = useState(false);
   const [studentRaffle,       setStudentRaffle]       = useState(false);
   const [publicAnnouncements, setPublicAnnouncements] = useState(false);
   const [excusePortal,        setExcusePortal]        = useState(false);
@@ -22171,14 +22977,14 @@ export default function SchoolWebsite() {
       setExcuseFromHash(false);
       if (hash.startsWith("ann-")) { setDirectAnnId(hash.replace("ann-","")); return; }
       setDirectAnnId(null);
-      if (["home","attendance","announcements","activities","settings","students","messages","surveys","sms","report","gradeanalysis","monthlyreport","teacherprofile","absencestats","attendancereport","student-absence","strategies","calendar","gallery","certificates","poll","raffle","broadcast","groupdivider","quiz","classtimer","luckywheel","exitticket","timetable","classvisits","honorboard","tasks","dailyquiz","aiteacher","lessonprep","lessonrecommend","officialforms","portfolio","earlywarning","meetings","heatmap","committeemeeting","teachereval","assessment","studentexcuses"].includes(hash)) setPage(hash);
+      if (["home","attendance","announcements","activities","settings","students","messages","surveys","sms","report","gradeanalysis","monthlyreport","teacherprofile","absencestats","attendancereport","student-absence","strategies","calendar","gallery","certificates","poll","raffle","broadcast","groupdivider","quiz","classtimer","luckywheel","exitticket","timetable","classvisits","honorboard","tasks","dailyquiz","aiteacher","lessonprep","lessonrecommend","officialforms","portfolio","earlywarning","meetings","heatmap","committeemeeting","teachereval","assessment","studentexcuses","perfresults"].includes(hash)) setPage(hash);
     };
     window.addEventListener("hashchange", h); h();
     return () => window.removeEventListener("hashchange", h);
   }, []);
 
   const navigate = (p) => {
-    if (p === "teacherportal") { setTeacherPortal(true); setMenuOpen(false); return; }
+    if (p === "teacherportal") { setPerfStandardsPortal(true); setMenuOpen(false); return; }
     setPage(p); window.location.hash = p; setMenuOpen(false);
   };
   const toggleViewMode = (m) => { setViewMode(m); localStorage.setItem("school-view-mode", m); };
@@ -22388,9 +23194,9 @@ export default function SchoolWebsite() {
   if (excuseFromHash || (!user && excusePortal)) return <StudentExcusePortal onBack={() => { setExcusePortal(false); setExcuseFromHash(false); window.location.hash = ""; }} siteFont={siteFont} isAdmin={false} />;
   if (!user && publicAnnouncements) return <PublicAnnouncementsPage announcements={announcements} siteFont={siteFont} onBack={() => setPublicAnnouncements(false)} />;
   if (!user && studentRaffle) return <StudentRafflePortal siteFont={siteFont} onBack={() => setStudentRaffle(false)} />;
-  if (!user && teacherPortal) return <TeacherPortal classList={classList} setClassList={setClassList} saveClass={saveClass} siteFont={siteFont} onBack={() => setTeacherPortal(false)} attendance={attendance} teachers={teachers} week={week} onSendNote={handleSendNote} messages={messages} />;
+  if (!user && perfStandardsPortal) return <PerformanceStandardsPortal siteFont={siteFont} onBack={() => setPerfStandardsPortal(false)} />;
   if (!user && parentPortal) return <ParentPortal classList={classList} setClassList={setClassList} saveClass={saveClass} messages={messages} setMessages={setMessages} saveMessages={saveMessages} surveys={surveys} setSurveys={setSurveys} saveSurveys={saveSurveys} siteFont={siteFont} onBack={() => setParentPortal(false)} />;
-  if (!user) return <LoginPage users={users} onLogin={setUser} siteFont={siteFont} onParentPortal={() => setParentPortal(true)} onTeacherPortal={() => setTeacherPortal(true)} onStudentRaffle={() => setStudentRaffle(true)} onPublicAnnouncements={() => setPublicAnnouncements(true)} onExcusePortal={() => setExcusePortal(true)} />;
+  if (!user) return <LoginPage users={users} onLogin={setUser} siteFont={siteFont} onParentPortal={() => setParentPortal(true)} onTeacherPortal={() => setPerfStandardsPortal(true)} onStudentRaffle={() => setStudentRaffle(true)} onPublicAnnouncements={() => setPublicAnnouncements(true)} onExcusePortal={() => setExcusePortal(true)} />;
 
   const pages = [
     { id: "home",            label: "الرئيسية",        icon: "🏠" },
@@ -22402,7 +23208,7 @@ export default function SchoolWebsite() {
     { id: "activities",    label: "الأنشطة",         icon: "⚡" },
     { id: "messages",      label: "رسائل الأهالي",  icon: "✉️" },
     { id: "sms",           label: "رسائل SMS",       icon: "📱" },
-    { id: "teacherportal", label: "بوابة المعلم",    icon: "👨‍🏫" },
+    { id: "teacherportal", label: "تقويم الأداء",    icon: "📊" },
     { id: "settings",      label: "الإعدادات",       icon: "⚙️" },
   ];
 
@@ -22443,6 +23249,7 @@ export default function SchoolWebsite() {
     { id: "lessonprep",    label: "تحضير الدرس الذكي",   icon: "📚" },
     { id: "lessonrecommend",label: "الخطط العلاجية",     icon: "🩺" },
     { id: "teachereval",   label: "قياس أداء المعلم",    icon: "🎯" },
+    { id: "perfresults",   label: "نتائج تقويم الأداء",  icon: "📊" },
   ];
 
   return (
@@ -22752,6 +23559,8 @@ export default function SchoolWebsite() {
                 {page === "lessonprep"     && <LessonPrepPage />}
                 {page === "lessonrecommend"&& <LessonRecommendPage classList={classList} />}
                 {page === "teachereval"    && <TeacherEvalPage teachers={teachers} />}
+        {page === "perfresults"    && <PerfResultsAdminPage />}
+                {page === "perfresults"    && <PerfResultsAdminPage />}
                 {page === "assessment"     && <AssessmentPage teachers={teachers} />}
                 {page === "studentexcuses" && <StudentExcusePortal isAdmin={true} siteFont={siteFont} />}
                 {page === "settings"       && <SettingsPage teachers={teachers} setTeachers={setTeachers} saveTeachers={saveTeachers} week={week} setWeek={setWeek} saveWeek={saveWeek} users={users} siteFont={siteFont} setSiteFont={setSiteFont} saveSiteFont={saveSiteFont} weekArchive={weekArchive} archiveCurrentWeek={archiveCurrentWeek} />}
@@ -22973,6 +23782,7 @@ export default function SchoolWebsite() {
         {page === "lessonprep"     && <LessonPrepPage />}
         {page === "lessonrecommend"&& <LessonRecommendPage classList={classList} />}
         {page === "teachereval"    && <TeacherEvalPage teachers={teachers} />}
+        {page === "perfresults"    && <PerfResultsAdminPage />}
                 {page === "assessment"     && <AssessmentPage teachers={teachers} />}
                 {page === "studentexcuses" && <StudentExcusePortal isAdmin={true} siteFont={siteFont} />}
         {page === "settings"      && <SettingsPage teachers={teachers} setTeachers={setTeachers} saveTeachers={saveTeachers} week={week} setWeek={setWeek} saveWeek={saveWeek} users={users} siteFont={siteFont} setSiteFont={setSiteFont} saveSiteFont={saveSiteFont} weekArchive={weekArchive} archiveCurrentWeek={archiveCurrentWeek} />}
