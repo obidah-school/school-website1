@@ -3,23 +3,131 @@ const SCHOOL_LOGO = `data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUND
 
 const FIREBASE_URL = "https://school-faza-default-rtdb.firebaseio.com";
 
-const DB = {
-  async get(key, fallback) {
-    try {
-      const r = await fetch(`${FIREBASE_URL}/school/${key}.json`);
-      const data = await r.json();
-      return data !== null ? data : fallback;
-    } catch { return fallback; }
+// ══════════════════════════════════════════════════════════
+// DB — نظام حفظ موثوق مع localStorage + Firebase + إعادة محاولة
+// الاستراتيجية: احفظ محلياً أولاً (فوري) ثم أرسل لـ Firebase
+// ══════════════════════════════════════════════════════════
+
+const DB_CACHE_PREFIX  = "db_cache_v2_";
+const DB_QUEUE_KEY     = "db_pending_queue_v2";
+const DB_SYNC_INTERVAL = 4000; // إعادة المحاولة كل 4 ثواني
+
+// ── قائمة الانتظار ──
+const dbQueue = {
+  load() {
+    try { return JSON.parse(localStorage.getItem(DB_QUEUE_KEY) || "[]"); } catch { return []; }
   },
-  async set(key, value) {
-    try {
-      await fetch(`${FIREBASE_URL}/school/${key}.json`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(value)
-      });
-    } catch (e) { console.error(e); }
+  save(q) {
+    try { localStorage.setItem(DB_QUEUE_KEY, JSON.stringify(q)); } catch {}
+  },
+  add(key, value) {
+    const q = this.load().filter(i => i.key !== key); // استبدل القديم بالجديد لنفس المفتاح
+    q.push({ key, value, ts: Date.now() });
+    this.save(q);
+  },
+  remove(key) {
+    const q = this.load().filter(i => i.key !== key);
+    this.save(q);
+  },
+  clear() { try { localStorage.removeItem(DB_QUEUE_KEY); } catch {} },
+};
+
+// ── الإرسال لـ Firebase مع إعادة المحاولة ──
+async function dbFirebasePut(key, value) {
+  try {
+    const r = await fetch(`${FIREBASE_URL}/school/${key}.json`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(value),
+      signal: AbortSignal.timeout(8000), // timeout 8 ثواني
+    });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    dbQueue.remove(key); // نجح — احذف من قائمة الانتظار
+    return true;
+  } catch {
+    return false; // فشل — يبقى في القائمة للمحاولة لاحقاً
   }
+}
+
+// ── معالج مزامنة القائمة ──
+let dbSyncTimer = null;
+let dbSyncRunning = false;
+
+function dbStartSync() {
+  if (dbSyncTimer) return;
+  dbSyncTimer = setInterval(async () => {
+    if (dbSyncRunning || !navigator.onLine) return;
+    const q = dbQueue.load();
+    if (!q.length) return;
+    dbSyncRunning = true;
+    for (const item of [...q]) {
+      await dbFirebasePut(item.key, item.value);
+    }
+    dbSyncRunning = false;
+    // أشعر React بحالة القائمة
+    window.dispatchEvent(new CustomEvent("db-queue-change", { detail: dbQueue.load().length }));
+  }, DB_SYNC_INTERVAL);
+}
+
+// ابدأ المزامنة فور تحميل الصفحة
+dbStartSync();
+
+// أعد المحاولة فور عودة الاتصال
+window.addEventListener("online", async () => {
+  const q = dbQueue.load();
+  if (!q.length) return;
+  for (const item of [...q]) {
+    await dbFirebasePut(item.key, item.value);
+  }
+  window.dispatchEvent(new CustomEvent("db-queue-change", { detail: dbQueue.load().length }));
+});
+
+const DB = {
+  // ── قراءة: Firebase أولاً، ثم localStorage كـ fallback ──
+  async get(key, fallback) {
+    // أولاً: جرّب الكاش المحلي (فوري)
+    let cached = null;
+    try {
+      const raw = localStorage.getItem(DB_CACHE_PREFIX + key);
+      if (raw) cached = JSON.parse(raw);
+    } catch {}
+
+    // ثانياً: جلب Firebase
+    try {
+      const r = await fetch(`${FIREBASE_URL}/school/${key}.json`,
+        { signal: AbortSignal.timeout(6000) });
+      const data = await r.json();
+      if (data !== null && data !== undefined) {
+        // حدّث الكاش المحلي
+        try { localStorage.setItem(DB_CACHE_PREFIX + key, JSON.stringify(data)); } catch {}
+        return data;
+      }
+      // Firebase فارغ — هل عندنا بيانات في الكاش المحلي؟
+      return cached !== null ? cached : fallback;
+    } catch {
+      // Firebase فشل — استخدم الكاش المحلي
+      return cached !== null ? cached : fallback;
+    }
+  },
+
+  // ── كتابة: localStorage أولاً (فوري) + Firebase + queue للفشل ──
+  async set(key, value) {
+    // 1. احفظ محلياً فوراً — لا ينتظر أحداً
+    try { localStorage.setItem(DB_CACHE_PREFIX + key, JSON.stringify(value)); } catch {}
+
+    // 2. أضف لقائمة الانتظار (ضمان الإرسال)
+    dbQueue.add(key, value);
+
+    // 3. حاول الإرسال لـ Firebase الآن
+    const ok = await dbFirebasePut(key, value);
+    if (ok) {
+      // أخبر UI بالنجاح
+      window.dispatchEvent(new CustomEvent("db-save-ok", { detail: key }));
+    } else {
+      // سيُعاد الإرسال تلقائياً من المزامنة الدورية
+      window.dispatchEvent(new CustomEvent("db-queue-change", { detail: dbQueue.load().length }));
+    }
+  },
 };
 
 const DEFAULT_TEACHERS = [
@@ -722,6 +830,7 @@ function PublicAnnouncementsPage({ announcements, siteFont, onLogin, onTeacherPo
             <div className="text-4xl mb-1">🏫</div>
             <h1 className="text-lg font-black text-white">مدرسة عبيدة بن الحارث المتوسطة</h1>
             <p className="text-white opacity-70 text-xs">بوابة الإعلانات المدرسية</p>
+            <div className="mt-1"><PageVisitorCounter pageKey="announcements" label="زيارة" /></div>
           </div>
           <button onClick={() => setShowLogin(!showLogin)}
             className="shrink-0 px-4 py-2 rounded-xl bg-white bg-opacity-20 text-white font-bold text-sm hover:bg-opacity-30 transition-all border border-white border-opacity-30">
@@ -750,8 +859,11 @@ function PublicAnnouncementsPage({ announcements, siteFont, onLogin, onTeacherPo
                 دخول — الإدارة
               </button>
               <div className="border-t border-gray-100 pt-3 space-y-2">
-                <button onClick={onTeacherPortal} className="w-full py-2.5 rounded-xl font-bold text-white text-sm" style={{background:"linear-gradient(135deg,#1e3a5f,#2563eb)"}}>
-                  📊 تقويم الأداء الذاتي
+                <button onClick={onTeacherProfile} className="w-full py-3 rounded-xl font-black text-white text-sm shadow-lg" style={{background:"linear-gradient(135deg,#1e3a5f,#1d4ed8)"}}>
+                  👨‍🏫 بوابة المعلم — ملف + تقييم + تحليل
+                </button>
+                <button onClick={onTeacherPortal} className="w-full py-2 rounded-xl font-bold text-white/80 text-xs border border-white/20" style={{background:"rgba(255,255,255,0.08)"}}>
+                  📊 التقويم الذاتي المباشر
                 </button>
                 <button onClick={onParentPortal} className="w-full py-2.5 rounded-xl font-bold text-white text-sm bg-gradient-to-l from-blue-500 to-indigo-600">
                   👨‍👦 بوابة أولياء الأمور
@@ -796,7 +908,7 @@ function PublicAnnouncementsPage({ announcements, siteFont, onLogin, onTeacherPo
   );
 }
 
-function LoginPage({ users, onLogin, siteFont, onParentPortal, onTeacherPortal, onStudentRaffle, onPublicAnnouncements, onExcusePortal }) {
+function LoginPage({ users, onLogin, siteFont, onParentPortal, onTeacherPortal, onStudentRaffle, onPublicAnnouncements, onExcusePortal, onTeacherProfile }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -1425,8 +1537,11 @@ function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, sa
   });
   const saveAssembly = (data) => {
     setAssembly(data);
-    DB.set("school-assembly", data);
+    // حفظ فوري محلياً + Firebase
+    try { localStorage.setItem(DB_CACHE_PREFIX + "school-assembly", JSON.stringify(data)); } catch {}
     try { localStorage.setItem("morning_assembly_v1", JSON.stringify(data)); } catch {}
+    dbQueue.add("school-assembly", data);
+    dbFirebasePut("school-assembly", data);
   };
   const getAssembly = (di) => assembly[`${week.days[di]?.dateH}_${di}`] ?? null;
   const setAssemblyDay = (di, val) => {
@@ -1441,8 +1556,10 @@ function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, sa
   });
   const saveTeacherAssembly = (data) => {
     setTeacherAssembly(data);
-    DB.set("school-teacher-assembly", data);
+    try { localStorage.setItem(DB_CACHE_PREFIX + "school-teacher-assembly", JSON.stringify(data)); } catch {}
     try { localStorage.setItem("teacher_assembly_v1", JSON.stringify(data)); } catch {}
+    dbQueue.add("school-teacher-assembly", data);
+    dbFirebasePut("school-teacher-assembly", data);
   };
   const getTeacherAssembly = (ti, di) => {
     const key = `${week.days[di]?.dateH}_${di}_${ti}`;
@@ -1494,23 +1611,23 @@ function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, sa
 
   // تحديث حقل في سجل الحضور
   const updateField = (ti, di, field, value) => {
-    attInitialized.current = true; // نتأكد من وضع العلامة قبل أي تعديل
+    attInitialized.current = true;
     setAttendance(prev => {
       const next = { ...prev, [ti]: { ...prev[ti], [di]: { ...(prev[ti]?.[di] || {}), [field]: value } } };
-      if (field === "status" && value === "حاضر") {
-        next[ti][di] = { status: "حاضر" };
-      }
-      if (field === "status" && value === "غائب") {
-        next[ti][di] = { status: "غائب", absType: next[ti][di]?.absType || "اضطراري", notes: next[ti][di]?.notes || "" };
-      }
-      if (field === "status" && value === "مستأذن") {
-        next[ti][di] = { status: "مستأذن", excuseFrom: "", excuseTo: "", excuseReason: "", notes: next[ti][di]?.notes || "" };
-      }
+      if (field === "status" && value === "حاضر")    { next[ti][di] = { status: "حاضر" }; }
+      if (field === "status" && value === "غائب")    { next[ti][di] = { status: "غائب",    absType: next[ti][di]?.absType || "اضطراري", notes: next[ti][di]?.notes || "" }; }
+      if (field === "status" && value === "مستأذن")  { next[ti][di] = { status: "مستأذن",  excuseFrom: "", excuseTo: "", excuseReason: "", notes: next[ti][di]?.notes || "" }; }
+      // ── احفظ فوراً في localStorage (لا ينتظر debounce) ──
+      try { localStorage.setItem(DB_CACHE_PREFIX + "school-attendance", JSON.stringify(next)); } catch {}
+      // ── أرسل لـ Firebase فوراً (بالتوازي مع debounce) ──
+      dbQueue.add("school-attendance", next);
+      dbFirebasePut("school-attendance", next);
       return next;
     });
   };
 
-  useEffect(() => { if (!attInitialized.current) return; const t = setTimeout(() => saveAttendance(attendance), 700); return () => clearTimeout(t); }, [attendance]);
+  // debounce احتياطي — الحفظ الفعلي يتم في updateField مباشرة
+  useEffect(() => { if (!attInitialized.current) return; const t = setTimeout(() => saveAttendance(attendance), 3000); return () => clearTimeout(t); }, [attendance]);
 
   // إحصائيات
   const countStatus = (di, st) => teachers.filter((_, ti) => (attendance[ti]?.[di]?.status || "حاضر") === st).length;
@@ -1784,6 +1901,7 @@ function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, sa
                 آخر تحديث {lastSync}
               </div>
             )}
+            <SyncStatusIndicator />
           </div>
         </div>
       </div>
@@ -7417,6 +7535,7 @@ function PerformanceStandardsPortal({ siteFont, onBack }) {
             <div className="w-20 h-20 rounded-3xl flex items-center justify-center text-4xl mx-auto mb-4 shadow-2xl" style={{ background:"rgba(255,255,255,0.12)", backdropFilter:"blur(10px)", border:"1px solid rgba(255,255,255,0.2)" }}>📊</div>
             <h1 className="text-2xl font-black mb-2">مدرسة عبيدة بن الحارث المتوسطة</h1>
             <p className="text-sm opacity-70 bg-white/10 rounded-full px-5 py-2 inline-block">بطاقة التقويم الذاتي لعناصر الأداء الوظيفي</p>
+            <div className="mt-2"><PageVisitorCounter pageKey="self-assessment" label="زيارة" /></div>
           </div>
 
           <div className="bg-white rounded-3xl p-7 shadow-2xl mb-4">
@@ -20161,6 +20280,956 @@ function TeacherAccountsSection() {
 }
 
 // ===== عداد الزوار =====
+
+// ═══════════════════════════════════════════════════
+// عداد زوار مستقل لكل صفحة
+// ═══════════════════════════════════════════════════
+function PageVisitorCounter({ pageKey, label = "زيارة" }) {
+  const [count, setCount] = useState(null);
+  useEffect(() => {
+    const key = `school-visitor-${pageKey}`;
+    DB.get(key, 0).then(c => {
+      const n = (c || 0) + 1;
+      setCount(n);
+      DB.set(key, n);
+    });
+  }, [pageKey]);
+  if (count === null) return null;
+  return (
+    <span className="inline-flex items-center gap-1 text-xs font-bold opacity-70">
+      <span>👁</span>
+      <span>{count.toLocaleString("ar-SA-u-nu-latn")} {label}</span>
+    </span>
+  );
+}
+
+// ═══════════════════════════════════════════════════
+// صفحة ملف المعلم الأسبوعي — بوابة المعلم
+// يدخل المعلم برقم هويته ويرى تقاريره الأسبوعية
+// ═══════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════
+// بوابة المعلم الموحدة — دخول واحد يفتح لوحة شاملة
+// ═══════════════════════════════════════════════════════════
+function TeacherProfilePortal({ siteFont, onBack, attendance, teachers, week }) {
+  const [step, setStep]             = useState("login");
+  const [loginId, setLoginId]       = useState("");
+  const [loginError, setLoginError] = useState("");
+  const [loading, setLoading]       = useState(false);
+  const [currentTeacher, setCurrentTeacher] = useState(null);
+  const [teacherIdx, setTeacherIdx] = useState(-1);
+  const [weekReports, setWeekReports] = useState({});
+  const [perfResults, setPerfResults] = useState([]);
+  const [tAssembly, setTAssembly]   = useState({});
+  const [activeTab, setActiveTab]   = useState("summary"); // summary | attendance | assembly | reports | selfeval | analytics
+
+  const weekKey = week?.days?.[0]?.dateH || "unknown";
+
+  // ── تسجيل الدخول ──
+  const handleLogin = async () => {
+    const id = loginId.trim();
+    if (!id) { setLoginError("أدخل رقم هويتك الوطنية"); return; }
+    setLoading(true);
+    let teacher = null, idx = -1;
+    idx = teachers.findIndex(t => String(t.id||"").trim() === id);
+    if (idx >= 0) { teacher = teachers[idx]; }
+    else {
+      const accounts = await DB.get("school-teacher-accounts", []);
+      const acc = Array.isArray(accounts) ? accounts.find(a => String(a.id).trim() === id) : null;
+      if (acc) teacher = acc;
+    }
+    if (!teacher) { setLoginError("رقم الهوية غير موجود. تواصل مع الإدارة."); setLoading(false); return; }
+    const [wr, pr, ta] = await Promise.all([
+      DB.get("school-teacher-weekly-reports", {}),
+      DB.get("school-perf-results", []),
+      DB.get("school-teacher-assembly", {}),
+    ]);
+    setWeekReports(wr || {});
+    setPerfResults(Array.isArray(pr) ? pr : []);
+    setTAssembly(ta || {});
+    setCurrentTeacher(teacher);
+    setTeacherIdx(idx);
+    setLoginError("");
+    setLoading(false);
+    setStep("dashboard");
+  };
+
+  // ── بيانات الحضور اليومي ──
+  const attSummary = (() => {
+    if (teacherIdx < 0) return [];
+    return (week?.days || []).map((d, di) => {
+      const rec = attendance?.[teacherIdx]?.[di] || {};
+      return { name: d.name, date: d.dateH, status: rec.status || "حاضر",
+               lateMin: parseInt(rec.lateMinutes)||0, lateType: rec.lateType||"",
+               absType: rec.absType||"", notes: rec.notes||"" };
+    });
+  })();
+
+  // ── بيانات الطابور ──
+  const assemblyDays = (week?.days || []).map((d, di) => {
+    const key = `${d.dateH}_${di}_${teacherIdx}`;
+    return { name: d.name, date: d.dateH, val: tAssembly[key] };
+  });
+
+  // ── تقارير المدير ──
+  const myReports = weekReports?.[weekKey]?.[currentTeacher?.id] || {};
+
+  // ── نتيجة التقييم الذاتي ──
+  const myPerfResult = perfResults.find(r => r.teacherId === currentTeacher?.id);
+
+  // ── إحصائيات الحضور ──
+  const absentDays   = attSummary.filter(d => d.status === "غائب").length;
+  const lateDays     = attSummary.filter(d => d.status === "متأخر").length;
+  const excusedDays  = attSummary.filter(d => d.status === "مستأذن").length;
+  const presentDays  = attSummary.filter(d => d.status === "حاضر").length;
+  const totalLateMins= attSummary.reduce((s,d) => s+(d.status==="متأخر"?d.lateMin:0), 0);
+  const asmPresent   = assemblyDays.filter(d => d.val===true).length;
+  const asmAbsent    = assemblyDays.filter(d => d.val===false).length;
+
+  const statusStyle = s => {
+    if (s==="غائب")   return { bg:"#fee2e2", color:"#dc2626", icon:"❌" };
+    if (s==="متأخر")  return { bg:"#fef3c7", color:"#d97706", icon:"⏰" };
+    if (s==="مستأذن") return { bg:"#e0f2fe", color:"#0284c7", icon:"📋" };
+    return                   { bg:"#d1fae5", color:"#059669", icon:"✅" };
+  };
+
+  const TABS = [
+    { id:"summary",   label:"الملخص",    icon:"🏠" },
+    { id:"attendance",label:"الحضور",    icon:"📊" },
+    { id:"assembly",  label:"الطابور",   icon:"🎺" },
+    { id:"reports",   label:"تقاريري",   icon:"📁" },
+    { id:"selfeval",  label:"تقييمي",    icon:"⭐" },
+    { id:"analytics", label:"التحليل",   icon:"📈" },
+  ];
+
+  // ════════ شاشة الدخول ════════
+  if (step === "login") return (
+    <div dir="rtl" className="min-h-screen flex flex-col items-center justify-center p-4"
+      style={{ fontFamily:siteFont, background:"linear-gradient(135deg,#0f172a,#1e3a5f,#1d4ed8)" }}>
+      <PageVisitorCounter pageKey="teacher-portal" label="زيارة" />
+      <div className="w-full max-w-md mt-4">
+        <div className="text-center text-white mb-8">
+          <div className="w-24 h-24 rounded-3xl mx-auto mb-4 flex items-center justify-center text-5xl shadow-2xl"
+            style={{ background:"rgba(255,255,255,0.12)", backdropFilter:"blur(10px)", border:"1px solid rgba(255,255,255,0.2)" }}>👨‍🏫</div>
+          <h1 className="text-2xl font-black mb-1">بوابة المعلم</h1>
+          <p className="text-sm opacity-60">مدرسة عبيدة بن الحارث المتوسطة</p>
+          <div className="flex justify-center gap-3 mt-3 flex-wrap text-xs opacity-75">
+            {["📊 التقويم الذاتي","📁 الملف الأسبوعي","📈 التحليل البياني","📋 التقارير"].map(l=>(
+              <span key={l} className="bg-white/10 rounded-full px-3 py-1">{l}</span>
+            ))}
+          </div>
+        </div>
+        <div className="bg-white rounded-3xl p-7 shadow-2xl">
+          <h2 className="font-black text-center text-gray-800 text-xl mb-6">الدخول برقم الهوية</h2>
+          <div className="space-y-4">
+            <input type="text" inputMode="numeric" value={loginId}
+              onChange={e=>{setLoginId(e.target.value);setLoginError("");}}
+              onKeyDown={e=>e.key==="Enter"&&handleLogin()}
+              placeholder="أدخل رقم هويتك الوطنية"
+              className="w-full px-4 py-4 rounded-2xl border-2 border-gray-200 focus:border-blue-400 focus:outline-none text-center font-black text-2xl tracking-widest" />
+            {loginError && <div className="bg-red-50 text-red-600 text-sm font-bold p-3 rounded-xl text-center border border-red-200">{loginError}</div>}
+            <button onClick={handleLogin} disabled={loading}
+              className="w-full py-4 rounded-2xl font-black text-white text-base transition-all hover:shadow-xl"
+              style={{background:"linear-gradient(135deg,#1e3a5f,#1d4ed8)",opacity:loading?0.7:1}}>
+              {loading?"⏳ جاري التحقق…":"دخول ◄"}
+            </button>
+          </div>
+        </div>
+        <div className="text-center mt-4">
+          <button onClick={onBack} className="text-white/40 hover:text-white text-xs font-bold transition-all">← العودة للصفحة الرئيسية</button>
+        </div>
+      </div>
+    </div>
+  );
+
+  // ════════ لوحة المعلم الموحدة ════════
+  return (
+    <div dir="rtl" className="min-h-screen pb-20" style={{ fontFamily:siteFont, background:"#f1f5f9" }}>
+
+      {/* رأس الصفحة */}
+      <div className="sticky top-0 z-50 shadow-lg" style={{background:"linear-gradient(135deg,#0f172a,#1e3a5f)"}}>
+        <div className="flex items-center justify-between px-4 h-14 text-white">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center font-black">{currentTeacher?.name?.charAt(0)}</div>
+            <div>
+              <div className="font-black text-sm truncate max-w-44">{currentTeacher?.name}</div>
+              <div className="text-xs opacity-60">بوابة المعلم الموحدة</div>
+            </div>
+          </div>
+          <button onClick={()=>{setStep("login");setCurrentTeacher(null);setLoginId("");}}
+            className="text-xs opacity-60 hover:opacity-100 font-bold bg-white/10 px-3 py-1.5 rounded-lg">خروج</button>
+        </div>
+
+        {/* تبويبات */}
+        <div className="flex overflow-x-auto px-2 pb-2 gap-1 scrollbar-hide">
+          {TABS.map(tab=>(
+            <button key={tab.id} onClick={()=>setActiveTab(tab.id)}
+              className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black transition-all"
+              style={{
+                background: activeTab===tab.id ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.1)",
+                color:      activeTab===tab.id ? "#1e3a5f"               : "rgba(255,255,255,0.7)",
+              }}>
+              <span>{tab.icon}</span><span>{tab.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="max-w-xl mx-auto px-3 pt-4 space-y-4">
+
+        {/* ══ تبويب الملخص ══ */}
+        {activeTab==="summary" && (
+          <>
+            {/* كروت إحصائية */}
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                { icon:"✅", label:"أيام حضور",    val:presentDays,  color:"#059669", bg:"#d1fae5" },
+                { icon:"❌", label:"أيام غياب",     val:absentDays,   color:"#dc2626", bg:"#fee2e2" },
+                { icon:"⏰", label:"أيام تأخر",     val:lateDays,     color:"#d97706", bg:"#fef3c7" },
+                { icon:"🎺", label:"حضور الطابور",  val:`${asmPresent}/${assemblyDays.length}`, color:"#7c3aed", bg:"#faf5ff" },
+              ].map(s=>(
+                <div key={s.label} className="rounded-2xl p-4 shadow-sm" style={{background:s.bg}}>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-xl">{s.icon}</span>
+                    <span className="text-xs font-bold" style={{color:s.color}}>{s.label}</span>
+                  </div>
+                  <div className="text-3xl font-black" style={{color:s.color}}>{s.val}</div>
+                </div>
+              ))}
+            </div>
+            {totalLateMins>0 && (
+              <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 text-sm font-black text-amber-800 flex items-center gap-2">
+                ⏱️ إجمالي دقائق التأخر هذا الأسبوع: <span className="text-xl">{totalLateMins}</span> دقيقة
+              </div>
+            )}
+
+            {/* ملخص تقييم الأداء */}
+            {myPerfResult ? (
+              <div className="rounded-2xl p-4 shadow-sm text-white" style={{background:"linear-gradient(135deg,#059669,#0d9488)"}}>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs opacity-75 mb-1">نتيجة التقويم الذاتي</p>
+                    <p className="text-xs opacity-60">{myPerfResult.date}</p>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-4xl font-black">{myPerfResult.totalFrom5}</div>
+                    <div className="text-xs opacity-80">/ 5.0</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-3xl font-black">{myPerfResult.totalFrom100}</div>
+                    <div className="text-xs opacity-80">/ 100</div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-white rounded-2xl p-4 shadow-sm border-2 border-dashed border-gray-200 text-center">
+                <p className="text-gray-400 text-sm font-bold">⭐ لم يُكمل التقويم الذاتي بعد</p>
+                <button onClick={()=>setActiveTab("selfeval")} className="mt-2 text-xs text-blue-600 font-black hover:underline">
+                  ابدأ التقييم الذاتي ◄
+                </button>
+              </div>
+            )}
+
+            {/* آخر تقارير المدير */}
+            <div className="bg-white rounded-2xl p-4 shadow-sm">
+              <h3 className="font-black text-gray-700 text-sm mb-3">📋 آخر تقارير المدير</h3>
+              {["madrasati","preparation","note"].map(k=>{
+                const labels = {madrasati:"💻 مدرستي", preparation:"📋 التحضير", note:"📝 الملاحظات"};
+                const val = myReports[k];
+                return val ? (
+                  <div key={k} className="mb-2 p-2.5 bg-gray-50 rounded-xl text-xs">
+                    <span className="font-black text-gray-600">{labels[k]}: </span>
+                    <span className="text-gray-700">{typeof val==="string"?val.substring(0,80):val?.text?.substring(0,80)}…</span>
+                  </div>
+                ) : (
+                  <div key={k} className="mb-1 text-xs text-gray-400 px-1">{labels[k]}: <span className="italic">لم يُضَف بعد</span></div>
+                );
+              })}
+            </div>
+          </>
+        )}
+
+        {/* ══ تبويب الحضور التفصيلي ══ */}
+        {activeTab==="attendance" && (
+          <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+            <div className="px-4 py-3 border-b" style={{background:"linear-gradient(135deg,#1e3a5f15,#1d4ed815)"}}>
+              <h3 className="font-black text-gray-800 text-sm">📊 سجل الحضور والغياب — {weekKey}</h3>
+            </div>
+            {attSummary.length===0 ? (
+              <p className="text-center text-gray-400 py-10 text-sm">لا توجد بيانات للأسبوع الحالي</p>
+            ) : (
+              <div className="divide-y">
+                {attSummary.map((d,i)=>{
+                  const st=statusStyle(d.status);
+                  return (
+                    <div key={i} className="flex items-center gap-3 px-4 py-3">
+                      <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0" style={{background:st.bg}}>{st.icon}</div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-black text-sm text-gray-800">{d.name}</span>
+                          <span className="text-xs text-gray-400">{d.date}</span>
+                          <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{background:st.bg,color:st.color}}>{d.status}</span>
+                          {d.status==="متأخر"&&d.lateMin>0&&<span className="text-xs bg-amber-50 text-amber-700 font-bold px-2 py-0.5 rounded-full">{d.lateMin} دقيقة</span>}
+                          {d.status==="غائب"&&d.absType&&<span className="text-xs bg-red-50 text-red-600 font-bold px-2 py-0.5 rounded-full">{d.absType}</span>}
+                        </div>
+                        {d.notes&&<p className="text-xs text-gray-500 mt-0.5 truncate">{d.notes}</p>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ══ تبويب الطابور ══ */}
+        {activeTab==="assembly" && (
+          <div className="space-y-3">
+            <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+              <div className="px-4 py-3 border-b flex items-center justify-between" style={{background:"linear-gradient(135deg,#7c3aed15,#1d4ed815)"}}>
+                <h3 className="font-black text-gray-800 text-sm">🎺 الطابور الصباحي</h3>
+                <div className="flex gap-2">
+                  <span className="text-xs bg-green-100 text-green-700 font-black px-2 py-0.5 rounded-full">✅ {asmPresent}</span>
+                  <span className="text-xs bg-red-100 text-red-700 font-black px-2 py-0.5 rounded-full">❌ {asmAbsent}</span>
+                  <span className="text-xs bg-gray-100 text-gray-500 font-black px-2 py-0.5 rounded-full">⬜ {assemblyDays.filter(d=>d.val===undefined).length}</span>
+                </div>
+              </div>
+              <div className="flex gap-2 p-3">
+                {assemblyDays.map((d,i)=>(
+                  <div key={i} className="flex-1 rounded-xl py-3 px-1 text-center"
+                    style={{background:d.val===true?"#d1fae5":d.val===false?"#fee2e2":"#f3f4f6"}}>
+                    <div className="text-2xl">{d.val===true?"✅":d.val===false?"❌":"⬜"}</div>
+                    <div className="text-xs font-black mt-1 truncate"
+                      style={{color:d.val===true?"#065f46":d.val===false?"#991b1b":"#9ca3af"}}>
+                      {d.name.slice(2)||d.name}
+                    </div>
+                    <div className="text-xs opacity-60 mt-0.5">{d.date?.split("/").slice(0,2).join("/")}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="bg-white rounded-2xl p-4 shadow-sm">
+              <div className="flex items-center justify-around text-center">
+                <div><div className="text-3xl font-black text-green-600">{asmPresent}</div><div className="text-xs text-gray-500">حضر</div></div>
+                <div className="w-px h-12 bg-gray-200" />
+                <div><div className="text-3xl font-black text-red-600">{asmAbsent}</div><div className="text-xs text-gray-500">غاب</div></div>
+                <div className="w-px h-12 bg-gray-200" />
+                <div><div className="text-3xl font-black text-gray-400">{assemblyDays.filter(d=>d.val===undefined).length}</div><div className="text-xs text-gray-500">لم يُسجَّل</div></div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ══ تبويب تقارير المدير ══ */}
+        {activeTab==="reports" && (
+          <TeacherReportCards reports={myReports} teacherName={currentTeacher?.name} />
+        )}
+
+        {/* ══ تبويب التقييم الذاتي ══ */}
+        {activeTab==="selfeval" && (
+          <div className="space-y-3">
+            {myPerfResult ? (
+              <>
+                <div className="rounded-2xl p-5 text-white shadow-xl" style={{background:"linear-gradient(135deg,#059669,#0d9488)"}}>
+                  <div className="text-2xl mb-2">⭐</div>
+                  <h2 className="font-black text-lg mb-1">نتيجة التقييم الذاتي</h2>
+                  <p className="opacity-70 text-xs mb-4">بتاريخ {myPerfResult.date}</p>
+                  <div className="flex items-center gap-4">
+                    <div className="bg-white/25 rounded-2xl px-5 py-3 text-center">
+                      <div className="text-4xl font-black">{myPerfResult.totalFrom100}</div>
+                      <div className="text-xs opacity-80">من 100</div>
+                    </div>
+                    <div className="bg-white/25 rounded-2xl px-5 py-3 text-center">
+                      <div className="text-4xl font-black">{myPerfResult.totalFrom5}</div>
+                      <div className="text-xs opacity-80">من 5</div>
+                    </div>
+                    <div className="flex-1">
+                      <div className="bg-white/20 rounded-full h-2.5 overflow-hidden">
+                        <div className="h-full bg-white rounded-full" style={{width:`${myPerfResult.totalFrom100}%`}} />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                {/* جدول مفصل */}
+                <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+                  <div className="px-4 py-3 border-b" style={{background:"linear-gradient(135deg,#05996920,#0d948820)"}}>
+                    <h3 className="font-black text-gray-800 text-sm">📋 تفصيل العناصر</h3>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead><tr className="bg-gray-50 text-gray-600">
+                        <th className="px-3 py-2 text-right font-black">م</th>
+                        <th className="px-3 py-2 text-right font-black">العنصر</th>
+                        <th className="px-3 py-2 text-center font-black">الوزن</th>
+                        <th className="px-3 py-2 text-center font-black">التقدير</th>
+                        <th className="px-3 py-2 text-center font-black">الدرجة</th>
+                      </tr></thead>
+                      <tbody>
+                        {(myPerfResult.domainDetails||[]).map((d,i)=>{
+                          const dom=PERFORMANCE_DOMAINS[i];
+                          const rt=PERF_RATINGS.find(r=>r.value===d.rating);
+                          return (
+                            <tr key={i} className={i%2===0?"bg-white":"bg-gray-50/50"}>
+                              <td className="px-3 py-2 text-center font-black text-gray-400">{i+1}</td>
+                              <td className="px-3 py-2 font-bold text-gray-700">{dom?.icon} {d.title}</td>
+                              <td className="px-3 py-2 text-center text-gray-500">{d.weight}%</td>
+                              <td className="px-3 py-2 text-center">
+                                {d.rating>0?<span className="inline-flex w-7 h-7 rounded-lg items-center justify-center font-black text-sm" style={{background:rt?.bg,color:rt?.color}}>{d.rating}</span>:<span className="text-gray-300">—</span>}
+                              </td>
+                              <td className="px-3 py-2 text-center font-black" style={{color:d.scoreFor100>0?dom?.color:"#ccc"}}>{d.scoreFor100||"—"}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                      <tfoot><tr style={{background:"#eff6ff"}}>
+                        <td colSpan={2} className="px-3 py-2.5 font-black text-gray-800">المجموع</td>
+                        <td className="px-3 py-2.5 text-center font-black text-gray-500">100%</td>
+                        <td className="px-3 py-2.5 text-center font-black text-blue-700">{myPerfResult.totalFrom5}/5</td>
+                        <td className="px-3 py-2.5 text-center font-black text-green-700">{myPerfResult.totalFrom100}/100</td>
+                      </tr></tfoot>
+                    </table>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="bg-white rounded-2xl p-8 shadow-sm text-center">
+                <div className="text-5xl mb-4">⭐</div>
+                <h3 className="font-black text-gray-800 mb-2">لم يُكمل التقييم الذاتي بعد</h3>
+                <p className="text-xs text-gray-500 mb-5">يمكنك إكمال التقييم من بوابة التقويم الذاتي</p>
+                <button onClick={()=>{onBack(); setTimeout(()=>window.location.hash="teacherportal",200);}}
+                  className="px-6 py-3 rounded-2xl font-black text-white text-sm" style={{background:"linear-gradient(135deg,#059669,#0d9488)"}}>
+                  📊 انتقل لبوابة التقويم الذاتي
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ══ تبويب التحليل البياني ══ */}
+        {activeTab==="analytics" && (
+          <TeacherAnalyticsTab
+            attSummary={attSummary}
+            assemblyDays={assemblyDays}
+            myPerfResult={myPerfResult}
+            myReports={myReports}
+            presentDays={presentDays} absentDays={absentDays}
+            lateDays={lateDays} excusedDays={excusedDays}
+            totalLateMins={totalLateMins}
+            asmPresent={asmPresent} asmAbsent={asmAbsent}
+          />
+        )}
+
+      </div>
+    </div>
+  );
+}
+
+// بطاقات التقارير التي يرفعها المدير للمعلم
+function TeacherReportCards({ reports, teacherName }) {
+  const sections = [
+    { key: "madrasati",   icon: "💻", title: "منصة مدرستي",    color: "#0d9488", bg: "#f0fdfa" },
+    { key: "preparation", icon: "📋", title: "تقرير التحضير",   color: "#7c3aed", bg: "#faf5ff" },
+    { key: "note",        icon: "📝", title: "ملاحظات المدير",  color: "#d97706", bg: "#fffbeb" },
+    { key: "files",       icon: "📎", title: "ملفات وصور",      color: "#1d4ed8", bg: "#eff6ff" },
+  ];
+  return (
+    <div className="space-y-3">
+      {sections.map(sec => {
+        const content = reports?.[sec.key];
+        if (sec.key === "files") {
+          const filesList = reports?.files || [];
+          return (
+            <div key={sec.key} className="rounded-2xl p-4 shadow-sm border-2"
+              style={{ background: sec.bg, borderColor: `${sec.color}20` }}>
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-xl">{sec.icon}</span>
+                <span className="font-black text-sm" style={{ color: sec.color }}>{sec.title}</span>
+                <span className="mr-auto text-xs font-black px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">{filesList.length} ملف</span>
+              </div>
+              {filesList.length === 0 ? (
+                <p className="text-xs text-gray-400">لا توجد ملفات لهذا الأسبوع</p>
+              ) : (
+                <div className="space-y-2">
+                  {filesList.map((f, i) => (
+                    <div key={i} className="flex items-center gap-3 bg-white rounded-xl p-3 border border-gray-100">
+                      <span className="text-2xl">{f.type==="image"?"🖼️":f.type==="pdf"?"📄":"📎"}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-bold text-sm text-gray-800 truncate">{f.name}</p>
+                        {f.note && <p className="text-xs text-gray-500">{f.note}</p>}
+                      </div>
+                      {f.url && (
+                        <a href={f.url} target="_blank" rel="noopener noreferrer"
+                          className="text-xs font-black px-3 py-1.5 rounded-xl text-white flex-shrink-0"
+                          style={{ background: sec.color }}>فتح</a>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        }
+        const text = typeof content === "string" ? content : content?.text;
+        return (
+          <div key={sec.key} className="rounded-2xl p-4 shadow-sm border-2"
+            style={{ background: sec.bg, borderColor: `${sec.color}20` }}>
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-xl">{sec.icon}</span>
+              <span className="font-black text-sm" style={{ color: sec.color }}>{sec.title}</span>
+            </div>
+            {text ? (
+              <div>
+                <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{text}</p>
+                {content?.url && (
+                  <a href={content.url} target="_blank" rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 text-xs font-black px-4 py-2 rounded-xl text-white mt-2"
+                    style={{ background: sec.color }}>📎 فتح الملف المرفق</a>
+                )}
+              </div>
+            ) : (
+              <p className="text-xs text-gray-400 font-medium">لم يُضَف تقرير لهذا الأسبوع بعد</p>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+
+// ══════════════════════════════════════════════
+// تبويب التحليل البياني الشامل
+// ══════════════════════════════════════════════
+function TeacherAnalyticsTab({ attSummary, assemblyDays, myPerfResult, myReports,
+  presentDays, absentDays, lateDays, excusedDays, totalLateMins, asmPresent, asmAbsent }) {
+
+  const totalDays = attSummary.length || 5;
+
+  // نسب الحضور
+  const attPct   = Math.round((presentDays / totalDays) * 100);
+  const absPct   = Math.round((absentDays  / totalDays) * 100);
+  const latePct  = Math.round((lateDays    / totalDays) * 100);
+  const excPct   = Math.round((excusedDays / totalDays) * 100);
+
+  // نسبة الطابور
+  const asmTotal  = assemblyDays.filter(d => d.val !== undefined).length;
+  const asmPct    = asmTotal > 0 ? Math.round((asmPresent / asmTotal) * 100) : null;
+
+  // التقييم الذاتي
+  const perfPct   = myPerfResult?.totalFrom100 || null;
+  const perfFrom5 = myPerfResult?.totalFrom5   || null;
+
+  // تقارير المدير
+  const madrasati   = myReports?.madrasati   || null;
+  const preparation = myReports?.preparation || null;
+
+  // مقياس التقدم الدائري (SVG بسيط)
+  const CircleProgress = ({ pct, color, size=80, label, sublabel }) => {
+    const r=30, cx=40, cy=40;
+    const circ = 2*Math.PI*r;
+    const dash  = pct!=null ? (pct/100)*circ : 0;
+    return (
+      <div className="flex flex-col items-center gap-1">
+        <svg width={size} height={size} viewBox="0 0 80 80">
+          <circle cx={cx} cy={cy} r={r} fill="none" stroke="#e5e7eb" strokeWidth="8"/>
+          <circle cx={cx} cy={cy} r={r} fill="none" stroke={color} strokeWidth="8"
+            strokeDasharray={`${dash} ${circ}`}
+            strokeDashoffset={circ/4}
+            strokeLinecap="round"
+            style={{transition:"stroke-dasharray 1s ease"}}/>
+          <text x={cx} y={cy+2} textAnchor="middle" dominantBaseline="middle"
+            style={{fontSize:14,fontWeight:900,fill:color}}>
+            {pct!=null?`${pct}%`:"—"}
+          </text>
+        </svg>
+        <div className="text-xs font-black text-gray-700 text-center">{label}</div>
+        {sublabel && <div className="text-xs text-gray-400 text-center">{sublabel}</div>}
+      </div>
+    );
+  };
+
+  // شريط تقدم أفقي
+  const ProgressBar = ({ label, val, max, pct, color, bg, icon, sub }) => (
+    <div className="mb-3">
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-xs font-black text-gray-700 flex items-center gap-1"><span>{icon}</span>{label}</span>
+        <span className="text-xs font-black" style={{color}}>{val}{sub}</span>
+      </div>
+      <div className="h-2.5 rounded-full overflow-hidden" style={{background:bg||"#f3f4f6"}}>
+        <div className="h-full rounded-full transition-all duration-700" style={{width:`${Math.min(pct,100)}%`, background:color}}/>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="space-y-4">
+
+      {/* ── الحضور والطابور — دوائر ── */}
+      <div className="bg-white rounded-2xl p-5 shadow-sm">
+        <h3 className="font-black text-gray-800 text-sm mb-4">📊 نسب الأداء الأسبوعي</h3>
+        <div className="grid grid-cols-3 gap-2">
+          <CircleProgress pct={attPct}  color="#059669" label="الحضور"   sublabel={`${presentDays}/${totalDays} أيام`}/>
+          <CircleProgress pct={asmPct}  color="#7c3aed" label="الطابور"  sublabel={asmTotal>0?`${asmPresent}/${asmTotal}`:"لم يُسجَّل"}/>
+          <CircleProgress pct={perfPct} color="#1d4ed8" label="التقييم"  sublabel={perfFrom5?`${perfFrom5}/5`:"لم يُكمل"}/>
+        </div>
+      </div>
+
+      {/* ── تفصيل الحضور ── */}
+      <div className="bg-white rounded-2xl p-5 shadow-sm">
+        <h3 className="font-black text-gray-800 text-sm mb-4">📅 تفصيل أيام الأسبوع</h3>
+        <ProgressBar icon="✅" label="حاضر"    val={presentDays}  sub=" أيام" pct={attPct}  color="#059669" bg="#d1fae5"/>
+        <ProgressBar icon="❌" label="غائب"     val={absentDays}   sub=" أيام" pct={absPct}  color="#dc2626" bg="#fee2e2"/>
+        <ProgressBar icon="⏰" label="متأخر"    val={lateDays}     sub=" أيام" pct={latePct} color="#d97706" bg="#fef3c7"/>
+        <ProgressBar icon="📋" label="مستأذن"   val={excusedDays}  sub=" أيام" pct={excPct}  color="#0284c7" bg="#e0f2fe"/>
+        {totalLateMins>0 && (
+          <div className="mt-3 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 text-xs font-black text-amber-800">
+            ⏱️ إجمالي دقائق التأخر: {totalLateMins} دقيقة = {Math.floor(totalLateMins/60)} ساعة و{totalLateMins%60} دقيقة
+          </div>
+        )}
+      </div>
+
+      {/* ── تحليل الطابور بالأيام ── */}
+      <div className="bg-white rounded-2xl p-5 shadow-sm">
+        <h3 className="font-black text-gray-800 text-sm mb-4">🎺 تحليل الطابور اليومي</h3>
+        <div className="space-y-2">
+          {assemblyDays.map((d,i)=>(
+            <div key={i} className="flex items-center gap-3">
+              <div className="w-16 text-xs font-black text-gray-600 text-right flex-shrink-0">{d.name}</div>
+              <div className="flex-1 h-7 rounded-xl flex items-center justify-center text-xs font-black"
+                style={{
+                  background: d.val===true?"#d1fae5":d.val===false?"#fee2e2":"#f3f4f6",
+                  color:      d.val===true?"#065f46":d.val===false?"#991b1b":"#9ca3af",
+                }}>
+                {d.val===true?"✅ حضر الطابور":d.val===false?"❌ غاب عن الطابور":"⬜ لم يُسجَّل"}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── تحليل التقييم الذاتي ── */}
+      {myPerfResult ? (
+        <div className="bg-white rounded-2xl p-5 shadow-sm">
+          <h3 className="font-black text-gray-800 text-sm mb-4">⭐ تحليل التقييم الذاتي</h3>
+          {(myPerfResult.domainDetails||[]).map((d,i)=>{
+            const dom = PERFORMANCE_DOMAINS[i];
+            const pct = d.weight>0 ? Math.round((d.scoreFor100/d.weight)*100) : 0;
+            return (
+              <div key={i} className="mb-2">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs font-bold text-gray-700 flex items-center gap-1">
+                    <span>{dom?.icon}</span>
+                    <span className="truncate max-w-36">{d.title}</span>
+                  </span>
+                  <span className="text-xs font-black flex-shrink-0" style={{color:dom?.color}}>
+                    {d.scoreFor100||0}/{d.weight} ({pct}%)
+                  </span>
+                </div>
+                <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
+                  <div className="h-full rounded-full transition-all duration-700"
+                    style={{width:`${pct}%`, background:dom?.color||"#1d4ed8"}}/>
+                </div>
+              </div>
+            );
+          })}
+          <div className="mt-4 pt-3 border-t flex items-center justify-between">
+            <span className="font-black text-gray-700 text-sm">المجموع الكلي</span>
+            <div className="flex gap-3">
+              <span className="bg-blue-100 text-blue-700 font-black text-sm px-3 py-1 rounded-xl">{myPerfResult.totalFrom5}/5</span>
+              <span className="bg-green-100 text-green-700 font-black text-sm px-3 py-1 rounded-xl">{myPerfResult.totalFrom100}/100</span>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="bg-white rounded-2xl p-4 shadow-sm border-2 border-dashed border-gray-200 text-center">
+          <p className="text-gray-400 text-sm">⭐ لم يُكمل التقييم الذاتي — لا يوجد تحليل</p>
+        </div>
+      )}
+
+      {/* ── تقارير المدير ── */}
+      <div className="bg-white rounded-2xl p-5 shadow-sm">
+        <h3 className="font-black text-gray-800 text-sm mb-4">📋 ملخص تقارير المدير</h3>
+        {[
+          { key:"madrasati",   icon:"💻", label:"منصة مدرستي",  color:"#0d9488", bg:"#f0fdfa" },
+          { key:"preparation", icon:"📋", label:"التحضير",       color:"#7c3aed", bg:"#faf5ff" },
+          { key:"note",        icon:"📝", label:"الملاحظات",     color:"#d97706", bg:"#fffbeb" },
+        ].map(sec=>{
+          const val = myReports?.[sec.key];
+          const text = typeof val==="string" ? val : val?.text;
+          return (
+            <div key={sec.key} className="mb-3 rounded-xl p-3" style={{background:sec.bg}}>
+              <div className="flex items-center gap-2 mb-1">
+                <span>{sec.icon}</span>
+                <span className="font-black text-xs" style={{color:sec.color}}>{sec.label}</span>
+                <span className="mr-auto text-xs font-black px-2 py-0.5 rounded-full"
+                  style={{background:text?"#d1fae5":"#f3f4f6", color:text?"#059669":"#9ca3af"}}>
+                  {text?"✅ مُضاف":"⬜ لم يُضَف"}
+                </span>
+              </div>
+              {text && <p className="text-xs text-gray-700 leading-relaxed">{text.substring(0,100)}{text.length>100?"…":""}</p>}
+            </div>
+          );
+        })}
+        <div className="mt-2 flex items-center justify-between text-xs">
+          <span className="text-gray-500">الملفات المرفوعة:</span>
+          <span className="font-black text-blue-700">{myReports?.files?.length||0} ملف</span>
+        </div>
+      </div>
+
+    </div>
+  );
+}
+
+
+                <div className="bg-red-400 transition-all" style={{width:`${asmAb/(asmPr+asmAb)*100}%`}}/>
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
+      {/* ── تحليل التقييم الذاتي ── */}
+      {perfResult && perfData.length>0 && (
+        <div className="bg-white rounded-2xl p-5 shadow-sm">
+          <h3 className="font-black text-gray-800 mb-3 text-sm">📊 تحليل التقييم الذاتي بالعناصر</h3>
+          <div className="flex items-center gap-3 mb-4">
+            <div className="rounded-2xl px-4 py-2 text-center text-white" style={{background:"linear-gradient(135deg,#1d4ed8,#0d9488)"}}>
+              <div className="text-3xl font-black">{perfResult.totalFrom100}</div>
+              <div className="text-xs opacity-80">من 100</div>
+            </div>
+            <div className="flex-1">
+              <div className="h-3 rounded-full bg-gray-100 overflow-hidden mb-1">
+                <div className="h-full rounded-full" style={{width:`${perfResult.totalFrom100}%`,background:"linear-gradient(90deg,#1d4ed8,#0d9488)"}}/>
+              </div>
+              <div className="text-xs text-gray-500 font-bold">{perfResult.totalFrom5}/5 — {
+                perfResult.totalFrom100>=90?"ممتاز":perfResult.totalFrom100>=75?"جيد جداً":
+                perfResult.totalFrom100>=60?"جيد":perfResult.totalFrom100>=50?"مقبول":"يحتاج تطوير"
+              }</div>
+            </div>
+          </div>
+          <div className="space-y-2">
+            {perfData.map((d,i)=>(
+              <div key={i}>
+                <div className="flex items-center justify-between text-xs mb-0.5">
+                  <span className="font-bold text-gray-600 truncate max-w-40">{d.label}</span>
+                  <span className="font-black flex-shrink-0" style={{color:d.color}}>{d.value}/{d.weight}</span>
+                </div>
+                <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
+                  <div className="h-full rounded-full" style={{width:`${d.weight>0?d.value/d.weight*100:0}%`,background:d.color}}/>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {totalDays===0 && !perfResult && (
+        <div className="bg-white rounded-2xl p-10 shadow-sm text-center text-gray-400">
+          <div className="text-5xl mb-3">📊</div>
+          <p className="font-bold">لا توجد بيانات كافية للتحليل بعد</p>
+          <p className="text-xs mt-1">ستظهر الرسوم البيانية بعد تسجيل بيانات الحضور والتقييم</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── صفحة إدارة تقارير المعلمين الأسبوعية (للمدير) ─────────────────
+function TeacherReportsAdminPage({ teachers, week }) {
+  const [reports, setReports]   = useState({});
+  const [loading, setLoading]   = useState(true);
+  const [selTeacher, setSel]    = useState(null);
+  const [search, setSearch]     = useState("");
+  const [saving, setSaving]     = useState(false);
+  const [savedMsg, setSavedMsg] = useState("");
+  const [draft, setDraft]       = useState({madrasati:"",preparation:"",note:"",files:[]});
+  const [fName, setFName]       = useState("");
+  const [fUrl, setFUrl]         = useState("");
+  const [fNote, setFNote]       = useState("");
+
+  const weekKey = week?.days?.[0]?.dateH || "unknown";
+
+  useEffect(() => {
+    DB.get("school-teacher-weekly-reports",{}).then(d=>{ setReports(d||{}); setLoading(false); });
+  },[]);
+
+  const openTeacher = (t) => {
+    setSel(t);
+    const ex = reports?.[weekKey]?.[t.id]||{};
+    setDraft({madrasati:ex.madrasati||"",preparation:ex.preparation||"",note:ex.note||"",files:ex.files||[]});
+  };
+
+  const saveRep = async () => {
+    if(!selTeacher) return;
+    setSaving(true);
+    const upd = {...reports,[weekKey]:{...(reports[weekKey]||{}),[selTeacher.id]:{...draft}}};
+    await DB.set("school-teacher-weekly-reports",upd);
+    setReports(upd); setSaving(false); setSavedMsg("✅ تم الحفظ");
+    setTimeout(()=>setSavedMsg(""),2500);
+  };
+
+  const addFile = () => {
+    if(!fUrl.trim()&&!fName.trim()) return;
+    setDraft(d=>({...d,files:[...d.files,{name:fName||fUrl,url:fUrl,note:fNote,type:"file"}]}));
+    setFName(""); setFUrl(""); setFNote("");
+  };
+
+  const filtered = (Array.isArray(teachers)?teachers:[]).filter(t=>!search||(t.name||"").includes(search));
+
+  if (loading) return (
+    <div className="flex items-center justify-center py-20 text-gray-400">
+      <div className="text-center"><div className="text-4xl animate-bounce mb-3">📁</div><p>جاري التحميل…</p></div>
+    </div>
+  );
+
+  if (selTeacher) return (
+    <div dir="rtl" className="max-w-xl mx-auto px-3 py-4 space-y-4">
+      <div className="flex items-center justify-between">
+        <button onClick={()=>setSel(null)} className="text-sm font-bold text-blue-600 hover:underline">← قائمة المعلمين</button>
+        {savedMsg && <span className="text-sm font-black text-green-600">{savedMsg}</span>}
+      </div>
+      <div className="rounded-2xl p-4 text-white shadow-lg" style={{background:"linear-gradient(135deg,#1e3a5f,#1d4ed8)"}}>
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center font-black text-xl">{selTeacher.name?.charAt(0)}</div>
+          <div><div className="font-black">{selTeacher.name}</div><div className="text-xs opacity-70">أسبوع: {weekKey}</div></div>
+        </div>
+      </div>
+      {[
+        {key:"madrasati",   label:"💻 منصة مدرستي",     c:"teal",   border:"border-teal-100",   focus:"focus:border-teal-400"},
+        {key:"preparation", label:"📋 تقرير التحضير",    c:"purple", border:"border-purple-100", focus:"focus:border-purple-400"},
+        {key:"note",        label:"📝 ملاحظات المدير",   c:"amber",  border:"border-amber-100",  focus:"focus:border-amber-400"},
+      ].map(f=>(
+        <div key={f.key} className={`bg-white rounded-2xl p-4 shadow-sm border-2 ${f.border}`}>
+          <label className={`text-sm font-black text-${f.c}-700 block mb-2`}>{f.label}</label>
+          <textarea value={draft[f.key]} onChange={e=>setDraft(d=>({...d,[f.key]:e.target.value}))}
+            placeholder={`أدخل ${f.label.replace(/[^\u0600-\u06FF\s]/g,"").trim()}…`}
+            rows={2} className={`w-full text-sm px-3 py-2 rounded-xl border border-gray-200 ${f.focus} focus:outline-none resize-none`}/>
+        </div>
+      ))}
+      <div className="bg-white rounded-2xl p-4 shadow-sm border-2 border-blue-100">
+        <label className="text-sm font-black text-blue-700 block mb-3">📎 ملفات وروابط</label>
+        <div className="space-y-2 mb-3">
+          <input value={fName} onChange={e=>setFName(e.target.value)} placeholder="اسم الملف"
+            className="w-full text-sm px-3 py-2 rounded-xl border border-gray-200 focus:outline-none"/>
+          <input value={fUrl} onChange={e=>setFUrl(e.target.value)} placeholder="رابط URL (اختياري)"
+            className="w-full text-sm px-3 py-2 rounded-xl border border-gray-200 focus:outline-none" dir="ltr"/>
+          <input value={fNote} onChange={e=>setFNote(e.target.value)} placeholder="ملاحظة (اختياري)"
+            className="w-full text-sm px-3 py-2 rounded-xl border border-gray-200 focus:outline-none"/>
+          <button onClick={addFile} className="w-full py-2 rounded-xl text-sm font-black text-white" style={{background:"#1d4ed8"}}>➕ إضافة</button>
+        </div>
+        {draft.files.map((f,i)=>(
+          <div key={i} className="flex items-center gap-2 bg-blue-50 rounded-xl px-3 py-2 text-xs mb-1.5">
+            <span>📎</span>
+            <span className="flex-1 font-bold text-gray-700 truncate">{f.name}</span>
+            <button onClick={()=>setDraft(d=>({...d,files:d.files.filter((_,j)=>j!==i)}))} className="text-red-400 font-bold">✕</button>
+          </div>
+        ))}
+      </div>
+      <button onClick={saveRep} disabled={saving}
+        className="w-full py-3.5 rounded-2xl font-black text-white shadow-lg"
+        style={{background:"linear-gradient(135deg,#059669,#0d9488)",opacity:saving?0.7:1}}>
+        {saving?"⏳ جاري الحفظ…":"💾 حفظ التقرير"}
+      </button>
+    </div>
+  );
+
+  const submitted = Object.keys(reports?.[weekKey]||{}).length;
+  return (
+    <div dir="rtl" className="max-w-2xl mx-auto px-3 py-4 space-y-4">
+      <div className="rounded-2xl p-5 text-white shadow-lg" style={{background:"linear-gradient(135deg,#1e3a5f,#1d4ed8)"}}>
+        <div className="flex items-center gap-4 mb-3">
+          <div className="text-4xl">📁</div>
+          <div><h2 className="font-black text-xl">تقارير المعلمين الأسبوعية</h2><p className="opacity-70 text-sm">أسبوع: {weekKey}</p></div>
+        </div>
+        <div className="flex gap-3">
+          {[{v:submitted,l:"مكتمل"},{v:filtered.length-submitted,l:"لم يُكمل"},{v:filtered.length,l:"إجمالي"}].map(s=>(
+            <div key={s.l} className="bg-white/15 rounded-xl px-4 py-2 text-center">
+              <div className="text-2xl font-black">{s.v}</div>
+              <div className="text-xs opacity-80">{s.l}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+      <input type="text" value={search} onChange={e=>setSearch(e.target.value)}
+        placeholder="🔍 بحث باسم المعلم…"
+        className="w-full px-4 py-3 rounded-2xl border-2 border-gray-200 focus:border-blue-400 focus:outline-none text-sm"/>
+      <div className="space-y-2">
+        {filtered.map((t,i)=>{
+          const hasRep = !!reports?.[weekKey]?.[t.id];
+          const rep = reports?.[weekKey]?.[t.id]||{};
+          const filled=[rep.madrasati,rep.preparation,rep.note].filter(Boolean).length+(rep.files?.length>0?1:0);
+          return (
+            <button key={i} onClick={()=>openTeacher(t)}
+              className="w-full text-right bg-white rounded-2xl p-4 shadow-sm border-2 hover:shadow-md transition-all"
+              style={{borderColor:hasRep?"#10b98130":"#e5e7eb"}}>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center font-black flex-shrink-0"
+                  style={{background:hasRep?"#d1fae5":"#f3f4f6",color:hasRep?"#065f46":"#9ca3af"}}>
+                  {t.name?.charAt(0)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-black text-sm text-gray-800 truncate">{t.name}</div>
+                  <div className="text-xs text-gray-400">{hasRep?`${filled}/4 حقول`:"لم يُضَف تقرير"}</div>
+                </div>
+                <span className={`text-xs font-black px-2.5 py-1 rounded-xl ${hasRep?"bg-green-100 text-green-700":"bg-gray-100 text-gray-400"}`}>
+                  {hasRep?"✅ مكتمل":"⬜ فارغ"}
+                </span>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+
+
+// ── مؤشر حالة الحفظ (يظهر في رأس الصفحة) ──
+function SyncStatusIndicator() {
+  const [pending, setPending] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(DB_QUEUE_KEY) || "[]").length; } catch { return 0; }
+  });
+  const [lastSaved, setLastSaved] = useState(null);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    const onQueueChange = (e) => {
+      setPending(e.detail || 0);
+      setSaving(false);
+    };
+    const onSaveOk = () => {
+      setSaving(false);
+      setLastSaved(new Date().toLocaleTimeString("ar-SA-u-nu-latn", { hour:"2-digit", minute:"2-digit" }));
+      setPending(prev => Math.max(0, prev - 1));
+    };
+    window.addEventListener("db-queue-change", onQueueChange);
+    window.addEventListener("db-save-ok", onSaveOk);
+    return () => {
+      window.removeEventListener("db-queue-change", onQueueChange);
+      window.removeEventListener("db-save-ok", onSaveOk);
+    };
+  }, []);
+
+  if (pending > 0) return (
+    <div className="flex items-center gap-1 text-xs font-black" style={{color:"#f97316"}}>
+      <span className="animate-pulse">🔴</span>
+      <span>{pending} معلق</span>
+    </div>
+  );
+  if (lastSaved) return (
+    <div className="flex items-center gap-1 text-xs font-black" style={{color:"#059669"}}>
+      <span>✅</span>
+      <span>محفوظ {lastSaved}</span>
+    </div>
+  );
+  return (
+    <div className="flex items-center gap-1 text-xs opacity-50">
+      <span>☁️</span>
+    </div>
+  );
+}
+
 function VisitorCounter({ siteFont }) {
   const [count, setCount] = useState(null);
   useEffect(() => {
@@ -23142,6 +24211,7 @@ export default function SchoolWebsite() {
   const [user, setUser] = useState(null);
   const [parentPortal,        setParentPortal]        = useState(false);
   const [perfStandardsPortal, setPerfStandardsPortal] = useState(false);
+  const [teacherProfilePortal, setTeacherProfilePortal] = useState(false);
   const [studentRaffle,       setStudentRaffle]       = useState(false);
   const [publicAnnouncements, setPublicAnnouncements] = useState(false);
   const [excusePortal,        setExcusePortal]        = useState(false);
@@ -23178,7 +24248,7 @@ export default function SchoolWebsite() {
       setExcuseFromHash(false);
       if (hash.startsWith("ann-")) { setDirectAnnId(hash.replace("ann-","")); return; }
       setDirectAnnId(null);
-      if (["home","attendance","announcements","activities","settings","students","messages","surveys","sms","report","gradeanalysis","monthlyreport","teacherprofile","absencestats","attendancereport","student-absence","strategies","calendar","gallery","certificates","poll","raffle","broadcast","groupdivider","quiz","classtimer","luckywheel","exitticket","timetable","classvisits","honorboard","tasks","dailyquiz","aiteacher","lessonprep","lessonrecommend","officialforms","portfolio","earlywarning","meetings","heatmap","committeemeeting","teachereval","assessment","studentexcuses","perfresults"].includes(hash)) setPage(hash);
+      if (["home","attendance","announcements","activities","settings","students","messages","surveys","sms","report","gradeanalysis","monthlyreport","teacherprofile","absencestats","attendancereport","student-absence","strategies","calendar","gallery","certificates","poll","raffle","broadcast","groupdivider","quiz","classtimer","luckywheel","exitticket","timetable","classvisits","honorboard","tasks","dailyquiz","aiteacher","lessonprep","lessonrecommend","officialforms","portfolio","earlywarning","meetings","heatmap","committeemeeting","teachereval","assessment","studentexcuses","perfresults","teacherreports"].includes(hash)) setPage(hash);
     };
     window.addEventListener("hashchange", h); h();
     return () => window.removeEventListener("hashchange", h);
@@ -23251,11 +24321,14 @@ export default function SchoolWebsite() {
           DB.set("school-week", validWeek);
         }
 
-        // استخدم النسخة الاحتياطية من localStorage إذا كانت Firebase فارغة
+        // استخدم الكاش المحلي إذا كانت Firebase فارغة أو بطيئة
         let finalAtt = att;
         if (!att || Object.keys(att).length === 0) {
           try {
-            const cached = JSON.parse(localStorage.getItem("attendance_cache_v1") || "null");
+            // جرّب الكاش الجديد أولاً ثم القديم
+            const c1 = JSON.parse(localStorage.getItem(DB_CACHE_PREFIX + "school-attendance") || "null");
+            const c2 = JSON.parse(localStorage.getItem("attendance_cache_v1") || "null");
+            const cached = (c1 && Object.keys(c1).length > 0) ? c1 : c2;
             if (cached && Object.keys(cached).length > 0) finalAtt = cached;
           } catch {}
         }
@@ -23350,8 +24423,10 @@ export default function SchoolWebsite() {
   const saveTeachers = (v) => DB.set("school-teachers", v);
   const saveWeek = (v) => DB.set("school-week", v);
   const saveAttendance = (v) => {
-    DB.set("school-attendance", v);
+    try { localStorage.setItem(DB_CACHE_PREFIX + "school-attendance", JSON.stringify(v)); } catch {}
     try { localStorage.setItem("attendance_cache_v1", JSON.stringify(v)); } catch {}
+    dbQueue.add("school-attendance", v);
+    dbFirebasePut("school-attendance", v);
   };
   const saveAnnouncements = (v) => DB.set("school-announcements", v);
   const saveActivities = (v) => DB.set("school-activities", v);
@@ -23407,8 +24482,9 @@ export default function SchoolWebsite() {
   if (!user && publicAnnouncements) return <PublicAnnouncementsPage announcements={announcements} siteFont={siteFont} onBack={() => setPublicAnnouncements(false)} />;
   if (!user && studentRaffle) return <StudentRafflePortal siteFont={siteFont} onBack={() => setStudentRaffle(false)} />;
   if (!user && perfStandardsPortal) return <PerformanceStandardsPortal siteFont={siteFont} onBack={() => setPerfStandardsPortal(false)} />;
+  if (!user && teacherProfilePortal) return <TeacherProfilePortal siteFont={siteFont} onBack={() => setTeacherProfilePortal(false)} attendance={attendance} teachers={teachers} week={week} />;
   if (!user && parentPortal) return <ParentPortal classList={classList} setClassList={setClassList} saveClass={saveClass} messages={messages} setMessages={setMessages} saveMessages={saveMessages} surveys={surveys} setSurveys={setSurveys} saveSurveys={saveSurveys} siteFont={siteFont} onBack={() => setParentPortal(false)} />;
-  if (!user) return <LoginPage users={users} onLogin={setUser} siteFont={siteFont} onParentPortal={() => setParentPortal(true)} onTeacherPortal={() => setPerfStandardsPortal(true)} onStudentRaffle={() => setStudentRaffle(true)} onPublicAnnouncements={() => setPublicAnnouncements(true)} onExcusePortal={() => setExcusePortal(true)} />;
+  if (!user) return <LoginPage users={users} onLogin={setUser} siteFont={siteFont} onParentPortal={() => setParentPortal(true)} onTeacherPortal={() => setPerfStandardsPortal(true)} onTeacherProfile={() => setTeacherProfilePortal(true)} onStudentRaffle={() => setStudentRaffle(true)} onPublicAnnouncements={() => setPublicAnnouncements(true)} onExcusePortal={() => setExcusePortal(true)} />;
 
   const pages = [
     { id: "home",            label: "الرئيسية",        icon: "🏠" },
@@ -23462,6 +24538,7 @@ export default function SchoolWebsite() {
     { id: "lessonrecommend",label: "الخطط العلاجية",     icon: "🩺" },
     { id: "teachereval",   label: "قياس أداء المعلم",    icon: "🎯" },
     { id: "perfresults",   label: "نتائج تقويم الأداء",  icon: "📊" },
+    { id: "teacherreports", label: "ملفات المعلمين الأسبوعية", icon: "📁" },
   ];
 
   return (
@@ -23772,6 +24849,8 @@ export default function SchoolWebsite() {
                 {page === "lessonrecommend"&& <LessonRecommendPage classList={classList} />}
                 {page === "teachereval"    && <TeacherEvalPage teachers={teachers} />}
         {page === "perfresults"    && <PerfResultsAdminPage />}
+        {page === "teacherreports" && <TeacherReportsAdminPage teachers={teachers} week={week} />}
+                {page === "teacherreports" && <TeacherReportsAdminPage teachers={teachers} week={week} />}
                 {page === "perfresults"    && <PerfResultsAdminPage />}
                 {page === "assessment"     && <AssessmentPage teachers={teachers} />}
                 {page === "studentexcuses" && <StudentExcusePortal isAdmin={true} siteFont={siteFont} />}
