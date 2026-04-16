@@ -12941,7 +12941,7 @@ function GradeAnalysisPage() {
           return (
             <div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
               {showLabels && d.value>0 && <div style={{fontSize:10,fontWeight:700,color:p.bg}}>{d.value}</div>}
-              <div style={{width:"100%",borderRadius:"6px 6px 0 0",background:p.bg,height:h+"%",minHeight:d.value?4:1,transition:"height .5s ease",opacity:d.value>0?1:.25}}/>
+              <div style={{width:"100%",borderRadius:"6px 6px 0 0",background:p.bg,height:h+"%",minHeight:d.value?4:1,transition:"height .5s ease",opacity:d.value?1:.25}}/>
               <div style={{fontSize:9,color:p.text,textAlign:"center",fontWeight:600,maxWidth:40,lineHeight:1.1}}>
                 {d.label.substring(0,4)}
               </div>
@@ -20975,18 +20975,6 @@ function TeacherAnalyticsTab({ attSummary, assemblyDays, myPerfResult, myReports
           <span className="font-black text-blue-700">{myReports?.files?.length||0} ملف</span>
         </div>
       </div>
-
-    </div>
-  );
-}
-
-
-                <div className="bg-red-400 transition-all" style={{width: (asmPr+asmAb ? Math.round(asmAb*100/(asmPr+asmAb)) : 0)+"%"}}/>
-              </div>
-            )}
-          </div>
-        );
-      })()}
 
       {/* ── تحليل التقييم الذاتي ── */}
       {perfResult && perfData.length>0 && (
