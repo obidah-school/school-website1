@@ -1158,6 +1158,8 @@ function HomePage({ teachers, announcements, activities, navigate, attendance, w
 
 
 function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, saveWeek, attendance, setAttendance, saveAttendance, navigate }) {
+  // ── حماية من الحفظ المبكر (قبل اكتمال تحميل Firebase) ──
+  const attInitialized = useRef(false);
   const [selectedDay, setSelectedDay] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
   const [showSummary, setShowSummary] = useState(false);
@@ -1185,14 +1187,33 @@ function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, sa
           DB.get("school-teacher-assembly", {}),
           DB.get("school-mosala", []),
         ]);
-        if (freshAtt)      setAttendance(freshAtt);
+        if (freshAtt && Object.keys(freshAtt).length > 0) {
+          setAttendance(freshAtt);
+          attInitialized.current = true;
+          try { localStorage.setItem("attendance_cache_v1", JSON.stringify(freshAtt)); } catch {}
+        } else {
+          // Firebase فارغة — جرّب الكاش المحلي
+          try {
+            const cached = JSON.parse(localStorage.getItem("attendance_cache_v1") || "null");
+            if (cached && Object.keys(cached).length > 0) {
+              setAttendance(cached);
+              attInitialized.current = true;
+            }
+          } catch {}
+        }
         if (freshWeek?.days) {
           const yr = parseInt((freshWeek.days[0]?.dateH||"").split('/')[2]||0);
           if (yr > 1400 && yr < 1600) setWeek(freshWeek);
         }
         if (Array.isArray(freshTeachers) && freshTeachers.length) setTeachers(freshTeachers);
-        if (freshAssembly && typeof freshAssembly === "object")  { setAssembly(freshAssembly); }
-        if (freshTAssembly && typeof freshTAssembly === "object") { setTeacherAssembly(freshTAssembly); }
+        if (freshAssembly && typeof freshAssembly === "object") {
+          setAssembly(freshAssembly);
+          try { localStorage.setItem("morning_assembly_v1", JSON.stringify(freshAssembly)); } catch {}
+        }
+        if (freshTAssembly && typeof freshTAssembly === "object") {
+          setTeacherAssembly(freshTAssembly);
+          try { localStorage.setItem("teacher_assembly_v1", JSON.stringify(freshTAssembly)); } catch {}
+        }
         if (Array.isArray(freshMosala)) setMosalaList(freshMosala);
         setLastSync(new Date().toLocaleTimeString("ar-SA"));
       } catch(e) { console.error("Refresh error:", e); }
@@ -1346,22 +1367,11 @@ function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, sa
     window.XLSX.writeFile(wb, `مساءلات_${new Date().toLocaleDateString("ar-SA-u-nu-latn")}.xlsx`);
   };
 
-  // ── الطابور الصباحي (Firebase + localStorage cache) ──
-  const [assembly, setAssembly] = useState({});
-  useEffect(() => {
-    DB.get("school-assembly", null).then(data => {
-      if (data && typeof data === "object" && !Array.isArray(data)) {
-        setAssembly(data);
-        try { localStorage.setItem("morning_assembly_v1", JSON.stringify(data)); } catch {}
-      } else {
-        try {
-          const cached = JSON.parse(localStorage.getItem("morning_assembly_v1") || "{}");
-          setAssembly(cached);
-          if (Object.keys(cached).length > 0) DB.set("school-assembly", cached);
-        } catch {}
-      }
-    });
-  }, []);
+  // ── الطابور الصباحي ──
+  // (يُحمَّل من Firebase عبر refresh() الرئيسي في أعلى المكوّن)
+  const [assembly, setAssembly] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("morning_assembly_v1") || "{}"); } catch { return {}; }
+  });
   const saveAssembly = (data) => {
     setAssembly(data);
     DB.set("school-assembly", data);
@@ -1373,22 +1383,11 @@ function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, sa
     saveAssembly({ ...assembly, [key]: val });
   };
 
-  // ── الطابور الصباحي لكل معلم (Firebase + localStorage cache) ──
-  const [teacherAssembly, setTeacherAssembly] = useState({});
-  useEffect(() => {
-    DB.get("school-teacher-assembly", null).then(data => {
-      if (data && typeof data === "object" && !Array.isArray(data)) {
-        setTeacherAssembly(data);
-        try { localStorage.setItem("teacher_assembly_v1", JSON.stringify(data)); } catch {}
-      } else {
-        try {
-          const cached = JSON.parse(localStorage.getItem("teacher_assembly_v1") || "{}");
-          setTeacherAssembly(cached);
-          if (Object.keys(cached).length > 0) DB.set("school-teacher-assembly", cached);
-        } catch {}
-      }
-    });
-  }, []);
+  // ── الطابور الصباحي لكل معلم ──
+  // (يُحمَّل من Firebase عبر refresh() الرئيسي في أعلى المكوّن)
+  const [teacherAssembly, setTeacherAssembly] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("teacher_assembly_v1") || "{}"); } catch { return {}; }
+  });
   const saveTeacherAssembly = (data) => {
     setTeacherAssembly(data);
     DB.set("school-teacher-assembly", data);
@@ -1444,6 +1443,7 @@ function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, sa
 
   // تحديث حقل في سجل الحضور
   const updateField = (ti, di, field, value) => {
+    attInitialized.current = true; // نتأكد من وضع العلامة قبل أي تعديل
     setAttendance(prev => {
       const next = { ...prev, [ti]: { ...prev[ti], [di]: { ...(prev[ti]?.[di] || {}), [field]: value } } };
       if (field === "status" && value === "حاضر") {
@@ -1459,7 +1459,7 @@ function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, sa
     });
   };
 
-  useEffect(() => { const t = setTimeout(() => saveAttendance(attendance), 700); return () => clearTimeout(t); }, [attendance]);
+  useEffect(() => { if (!attInitialized.current) return; const t = setTimeout(() => saveAttendance(attendance), 700); return () => clearTimeout(t); }, [attendance]);
 
   // إحصائيات
   const countStatus = (di, st) => teachers.filter((_, ti) => (attendance[ti]?.[di]?.status || "حاضر") === st).length;
@@ -1705,14 +1705,20 @@ function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, sa
                     DB.get("school-teacher-assembly", {}),
                     DB.get("school-mosala", []),
                   ]);
-                  if (freshAtt) setAttendance(freshAtt);
+                  if (freshAtt) { setAttendance(freshAtt); attInitialized.current = true; }
                   if (freshWeek?.days) {
                     const yr = parseInt((freshWeek.days[0]?.dateH||"").split('/')[2]||0);
                     if (yr > 1400 && yr < 1600) setWeek(freshWeek);
                   }
                   if (Array.isArray(freshTeachers) && freshTeachers.length) setTeachers(freshTeachers);
-                  if (freshAssembly && typeof freshAssembly === "object")  setAssembly(freshAssembly);
-                  if (freshTAssembly && typeof freshTAssembly === "object") setTeacherAssembly(freshTAssembly);
+                  if (freshAssembly && typeof freshAssembly === "object") {
+                    setAssembly(freshAssembly);
+                    try { localStorage.setItem("morning_assembly_v1", JSON.stringify(freshAssembly)); } catch {}
+                  }
+                  if (freshTAssembly && typeof freshTAssembly === "object") {
+                    setTeacherAssembly(freshTAssembly);
+                    try { localStorage.setItem("teacher_assembly_v1", JSON.stringify(freshTAssembly)); } catch {}
+                  }
                   if (Array.isArray(freshMosala)) setMosalaList(freshMosala);
                   setLastSync(new Date().toLocaleTimeString("ar-SA"));
                 } catch(e) {}
@@ -7167,10 +7173,31 @@ function PerformanceStandardsPortal({ siteFont, onBack }) {
   const fileRef = useRef(null);
 
   useEffect(() => {
-    DB.get("school-perf-teachers", []).then(d => {
-      setTeachersList(Array.isArray(d) ? d : []);
+    (async () => {
+      // 1. حاول تحميل القائمة المرفوعة خصيصاً لبطاقة الأداء
+      const perfList = await DB.get("school-perf-teachers", []);
+      if (Array.isArray(perfList) && perfList.length > 0) {
+        setTeachersList(perfList);
+        setLoadingList(false);
+        return;
+      }
+      // 2. جرّب قائمة حسابات المعلمين (من صفحة الإعدادات)
+      const accounts = await DB.get("school-teacher-accounts", []);
+      if (Array.isArray(accounts) && accounts.length > 0) {
+        const mapped = accounts.map(a => ({ name: a.name, id: a.id }));
+        setTeachersList(mapped);
+        setLoadingList(false);
+        return;
+      }
+      // 3. آخر ملاذ: القائمة الافتراضية المضمّنة بالكود
+      //    (تعمل فقط للاختبار — يجب رفع قائمة بأرقام الهويات الصحيحة)
+      const defaultList = DEFAULT_TEACHERS.map((name, i) => ({
+        name,
+        id: String(1100000000 + i),
+      }));
+      setTeachersList(defaultList);
       setLoadingList(false);
-    });
+    })();
   }, []);
 
   // ─── رفع ملف Excel/CSV ───
@@ -19866,6 +19893,9 @@ function TeacherAccountsSection() {
   const save = async (list) => {
     setAccounts(list);
     await DB.set("school-teacher-accounts", list);
+    // مزامنة تلقائية مع قائمة بطاقة الأداء الوظيفي
+    const perfList = list.map(a => ({ name: a.name, id: a.id }));
+    await DB.set("school-perf-teachers", perfList);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
@@ -23050,7 +23080,15 @@ export default function SchoolWebsite() {
           DB.set("school-week", validWeek);
         }
 
-        setTeachers(t); setWeek(validWeek); setAttendance(att); setAnnouncements(ann);
+        // استخدم النسخة الاحتياطية من localStorage إذا كانت Firebase فارغة
+        let finalAtt = att;
+        if (!att || Object.keys(att).length === 0) {
+          try {
+            const cached = JSON.parse(localStorage.getItem("attendance_cache_v1") || "null");
+            if (cached && Object.keys(cached).length > 0) finalAtt = cached;
+          } catch {}
+        }
+        setTeachers(t); setWeek(validWeek); setAttendance(finalAtt); setAnnouncements(ann);
         setActivities(act); setSiteFont(font);
         setMessages(Array.isArray(msgs) ? msgs : []);
         setSurveys(Array.isArray(survs) ? survs : []);
@@ -23140,7 +23178,10 @@ export default function SchoolWebsite() {
 
   const saveTeachers = (v) => DB.set("school-teachers", v);
   const saveWeek = (v) => DB.set("school-week", v);
-  const saveAttendance = (v) => DB.set("school-attendance", v);
+  const saveAttendance = (v) => {
+    DB.set("school-attendance", v);
+    try { localStorage.setItem("attendance_cache_v1", JSON.stringify(v)); } catch {}
+  };
   const saveAnnouncements = (v) => DB.set("school-announcements", v);
   const saveActivities = (v) => DB.set("school-activities", v);
   const saveSiteFont = (v) => DB.set("school-font", v);
