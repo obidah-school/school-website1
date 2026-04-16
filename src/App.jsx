@@ -7250,10 +7250,49 @@ function PerformanceStandardsPortal({ siteFont, onBack }) {
   }, []);
 
   // ─── رفع ملف Excel/CSV ───
+  // دالة ذكية لاستخراج أسماء المعلمين وأرقام هوياتهم من أي تنسيق Excel/CSV
+  const extractTeachersFromRows = (rows) => {
+    const teachers = [];
+    // طريقة 1: ابحث في أول 20 صف عن عنوان "الإسم" + "رقم الهوية"
+    let nameIdx = -1, idIdx = -1, headerRow = -1;
+    for (let ri = 0; ri < Math.min(rows.length, 20); ri++) {
+      const row = rows[ri] || [];
+      const ni = row.findIndex(c => typeof c === "string" && (c.includes("الإسم") || c.includes("الاسم") || c.toLowerCase() === "name"));
+      const ii = row.findIndex(c => typeof c === "string" && (c.includes("رقم الهوية") || c.includes("هوية") || c.includes("الهوية")));
+      if (ni >= 0 && ii >= 0) { nameIdx = ni; idIdx = ii; headerRow = ri; break; }
+    }
+    if (nameIdx >= 0 && idIdx >= 0) {
+      rows.slice(headerRow + 1).forEach(row => {
+        if (!row) return;
+        const name = String(row[nameIdx]||"").trim();
+        const id   = String(row[idIdx]||"").trim().replace(/[^\d]/g,"");
+        if (name && /^\d{9,10}$/.test(id)) teachers.push({ name, id });
+      });
+      return teachers;
+    }
+    // طريقة 2: فحص كل خلية — إذا كانت رقم هوية ابحث عن اسم عربي في نفس الصف
+    rows.forEach(row => {
+      if (!row) return;
+      for (let ci = 0; ci < row.length; ci++) {
+        const cell = String(row[ci]||"").trim();
+        if (/^\d{9,10}$/.test(cell)) {
+          for (let ni = 0; ni < row.length; ni++) {
+            if (ni === ci) continue;
+            const nameStr = String(row[ni]||"").trim();
+            if (/^[\u0600-\u06FF\s]{5,}$/.test(nameStr) && nameStr.split(" ").length >= 2) {
+              teachers.push({ name: nameStr, id: cell }); break;
+            }
+          }
+        }
+      }
+    });
+    return teachers;
+  };
+
   const handleExcelUpload = async (e) => {
     const file = e.target.files?.[0]; if (!file) return;
     const ext = file.name.split(".").pop().toLowerCase();
-    if (!["xlsx","xls","csv"].includes(ext)) { setUploadMsg("❌ يُقبل xlsx أو csv فقط"); return; }
+    if (!["xlsx","xls","csv"].includes(ext)) { setUploadMsg("❌ يُقبل xlsx أو xls أو csv فقط"); return; }
     setUploadMsg("⏳ جاري المعالجة…");
     const reader = new FileReader();
     reader.onload = async (ev) => {
@@ -7261,29 +7300,31 @@ function PerformanceStandardsPortal({ siteFont, onBack }) {
         let teachers = [];
         if (ext === "csv") {
           const lines = ev.target.result.split(/\r?\n/).filter(Boolean);
-          for (let i = 1; i < lines.length; i++) {
-            const cols = lines[i].split(",");
-            const name = (cols[0]||"").trim().replace(/^"|"$/g,"");
-            const id   = (cols[1]||"").trim().replace(/^"|"$/g,"").replace(/[^0-9]/g,"");
-            if (name && id) teachers.push({ name, id });
+          const rows  = lines.map(l => l.split(",").map(c => c.trim().replace(/^"|"$/g,"")));
+          teachers = extractTeachersFromRows(rows);
+          // fallback للـ CSV البسيط: عمود 1 اسم، عمود 2 هوية
+          if (!teachers.length) {
+            for (let i = 1; i < rows.length; i++) {
+              const name = rows[i][0]; const id = (rows[i][1]||"").replace(/[^0-9]/g,"");
+              if (name && /^\d{9,10}$/.test(id)) teachers.push({ name, id });
+            }
           }
         } else {
-          if (window.XLSX) {
-            const wb = window.XLSX.read(ev.target.result, { type:"array" });
-            const ws = wb.Sheets[wb.SheetNames[0]];
-            const rows = window.XLSX.utils.sheet_to_json(ws, { header:1 });
-            for (let i = 1; i < rows.length; i++) {
-              const name = String(rows[i][0]||"").trim();
-              const id   = String(rows[i][1]||"").trim().replace(/[^0-9]/g,"");
-              if (name && id) teachers.push({ name, id });
-            }
-          } else { setUploadMsg("❌ مكتبة XLSX غير محمّلة. استخدم CSV بدلاً منه."); return; }
+          if (!window.XLSX) { setUploadMsg("❌ مكتبة XLSX غير محمّلة"); return; }
+          const wb   = window.XLSX.read(ev.target.result, { type:"array" });
+          const ws   = wb.Sheets[wb.SheetNames[0]];
+          const rows = window.XLSX.utils.sheet_to_json(ws, { header:1, defval:null });
+          teachers = extractTeachersFromRows(rows);
         }
-        if (!teachers.length) { setUploadMsg("❌ لم يتم العثور على بيانات صالحة"); return; }
-        await DB.set("school-perf-teachers", teachers);
-        setTeachersList(teachers);
-        setUploadMsg(`✅ تم رفع ${teachers.length} معلم/معلمة`);
-        setTimeout(() => setUploadMsg(""), 4000);
+        // إزالة التكرارات
+        const unique = [];
+        const seen   = new Set();
+        teachers.forEach(t => { if (!seen.has(t.id)) { seen.add(t.id); unique.push(t); } });
+        if (!unique.length) { setUploadMsg("❌ لم يتم التعرف على البيانات. تأكد أن الملف يحتوي على أسماء المعلمين وأرقام هوياتهم"); return; }
+        await DB.set("school-perf-teachers", unique);
+        setTeachersList(unique);
+        setUploadMsg(`✅ تم رفع ${unique.length} معلم/معلمة بنجاح`);
+        setTimeout(() => setUploadMsg(""), 5000);
       } catch(err) { setUploadMsg("❌ خطأ: " + err.message); }
     };
     if (ext === "csv") reader.readAsText(file, "utf-8");
@@ -19972,23 +20013,92 @@ function TeacherAccountsSection() {
   const handleExcel = async (file) => {
     await loadXLSX();
     const buf = await file.arrayBuffer();
-    const wb = window.XLSX.read(buf);
-    const ws = wb.Sheets[wb.SheetNames[0]];
-    const data = window.XLSX.utils.sheet_to_json(ws, { header: 1 });
-    const hdrs = data[0]?.map(h => String(h || "").trim()) || [];
-    const nameIdx = hdrs.findIndex(h => h.includes("اسم") || h.toLowerCase().includes("name"));
-    const idIdx = hdrs.findIndex(h => h.includes("هوية") || h.includes("هوي") || h.includes("رقم") || h.toLowerCase().includes("id"));
-    if (nameIdx < 0 || idIdx < 0) { alert("لم يتم العثور على أعمدة الاسم والهوية. تأكد أن الملف يحتوي على عمودي: الاسم ورقم الهوية"); return; }
-    const imported = data.slice(1)
-      .filter(r => r[nameIdx] && r[idIdx])
-      .map(r => ({ name: String(r[nameIdx]).trim(), id: String(r[idIdx]).trim() }));
-    const merged = [...accounts];
-    let added = 0;
-    imported.forEach(t => {
-      if (!merged.find(a => a.id === t.id)) { merged.push(t); added++; }
-    });
+    const wb  = window.XLSX.read(buf);
+    const ws  = wb.Sheets[wb.SheetNames[0]];
+    // قراءة كل الصفوف بما فيها الفارغة
+    const data = window.XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
+
+    // ── الطريقة 1: ابحث في كل صفوف الملف عن صف يحتوي على "الاسم" و"رقم الهوية"
+    let nameIdx = -1, idIdx = -1, headerRow = -1;
+    for (let ri = 0; ri < Math.min(data.length, 20); ri++) {
+      const row = data[ri] || [];
+      const ni = row.findIndex(c => typeof c === "string" && (c.includes("الإسم") || c.includes("الاسم") || c.toLowerCase() === "name"));
+      const ii = row.findIndex(c => typeof c === "string" && (c.includes("رقم الهوية") || c.includes("هوية") || c.includes("الهوية")));
+      if (ni >= 0 && ii >= 0) { nameIdx = ni; idIdx = ii; headerRow = ri; break; }
+    }
+
+    // ── الطريقة 2: إذا لم يجد عناوين، يفحص كل صف ويبحث عن خلية تحتوي اسماً عربياً
+    //               بجانبها خلية تبدو كرقم هوية (9-10 أرقام)
+    if (nameIdx < 0 || idIdx < 0) {
+      const teachers = [];
+      for (const row of data) {
+        if (!row) continue;
+        for (let ci = 0; ci < row.length; ci++) {
+          const cell = row[ci];
+          if (!cell) continue;
+          const cellStr = String(cell).trim();
+          // رقم هوية: 9-10 أرقام
+          if (/^\d{9,10}$/.test(cellStr)) {
+            // ابحث عن اسم في نفس الصف
+            for (let ni = 0; ni < row.length; ni++) {
+              if (ni === ci) continue;
+              const nameCell = row[ni];
+              if (!nameCell) continue;
+              const nameStr = String(nameCell).trim();
+              // اسم عربي: يحتوي على حروف عربية وفراغات ولا يحتوي على أرقام
+              if (/^[\u0600-\u06FF\s]+$/.test(nameStr) && nameStr.length > 5 && nameStr.split(" ").length >= 2) {
+                teachers.push({ name: nameStr, id: cellStr });
+                break;
+              }
+            }
+          }
+        }
+      }
+      if (teachers.length > 0) {
+        const merged = [...accounts]; let added = 0;
+        teachers.forEach(t => { if (!merged.find(a => a.id === t.id)) { merged.push(t); added++; } });
+        save(merged);
+        alert("✅ تم إضافة " + added + " معلم. الإجمالي: " + merged.length);
+        return;
+      }
+      // ── الطريقة 3 (CSV بسيط): عمودان فقط بدون عنوان
+      const simple = [];
+      for (const row of data) {
+        if (!row || row.length < 2) continue;
+        const c0 = String(row[0]||"" ).trim();
+        const c1 = String(row[1]||"" ).trim();
+        const c2 = String(row[2]||row[1]||"" ).trim();
+        // اسم في العمود الأول ورقم هوية في الثاني أو الثالث
+        if (/^[\u0600-\u06FF\s]{5,}$/.test(c0)) {
+          const id = [c1,c2].find(x => /^\d{9,10}$/.test(x));
+          if (id) simple.push({ name: c0, id });
+        }
+      }
+      if (simple.length > 0) {
+        const merged = [...accounts]; let added = 0;
+        simple.forEach(t => { if (!merged.find(a => a.id === t.id)) { merged.push(t); added++; } });
+        save(merged);
+        alert("✅ تم إضافة " + added + " معلم. الإجمالي: " + merged.length);
+        return;
+      }
+      alert("⚠️ لم يتم التعرف على تنسيق الملف تلقائياً.\n\nيمكنك رفع ملف CSV بعمودين فقط:\n• العمود الأول: الاسم\n• العمود الثاني: رقم الهوية\n\nأو إضافة المعلمين يدوياً من الحقول أعلاه.");
+      return;
+    }
+
+    // ── الطريقة 1 تجد العناوين — قرأ البيانات من الصف التالي للعنوان
+    const imported = data.slice(headerRow + 1)
+      .filter(r => r && r[nameIdx] && r[idIdx])
+      .map(r => ({
+        name: String(r[nameIdx]).trim(),
+        id:   String(r[idIdx]).trim().replace(/[^\d]/g, ""),
+      }))
+      .filter(t => t.name && /^\d{9,10}$/.test(t.id));
+
+    if (imported.length === 0) { alert("لم يتم العثور على بيانات صالحة في الملف"); return; }
+    const merged = [...accounts]; let added = 0;
+    imported.forEach(t => { if (!merged.find(a => a.id === t.id)) { merged.push(t); added++; } });
     save(merged);
-    alert(`✅ تم إضافة ${added} معلم جديد. الإجمالي: ${merged.length}`);
+    alert("✅ تم إضافة " + added + " معلم جديد. الإجمالي: " + merged.length);
   };
 
   return (
