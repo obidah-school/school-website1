@@ -5854,7 +5854,7 @@ function CertificatesPage({ teachers, attendance, week, classList }) {
         <div className="grid gap-3 sm:grid-cols-2">
           {certs.map(cert => (
             <div key={cert.id} className="bg-white rounded-2xl p-4 shadow-sm border border-amber-100 flex items-center gap-4">
-              <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl flex-shrink-0" style={{background:`${TYPE_COLORS[cert.type] || "#0d9488"}22`}}>🏅</div>
+              <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl flex-shrink-0" style={{background:(TYPE_COLORS[cert.type] || "#0d9488")+"22"}}>🏅</div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-black text-gray-800">{cert.name}</span>
@@ -5964,7 +5964,7 @@ function PollPage({ teachers }) {
                     <span className="text-xs text-gray-400 flex-shrink-0 ml-2">{v} ({pct}%)</span>
                   </div>
                   <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                    <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: i === 0 ? "#fbbf24" : "#0d9488" }} />
+                    <div className="h-full rounded-full transition-all" style={{ width: pct+"%", background: i === 0 ? "#fbbf24" : "#0d9488" }} />
                   </div>
                 </div>
                 {!myVote && (
@@ -6056,7 +6056,7 @@ function StudentRafflePortal({ siteFont, onBack }) {
 
         <div className="grid grid-cols-3 gap-2 mb-5">
           {[{emoji:"🥇",val:"50 ريال"},{emoji:"🥈",val:"30 ريال"},{emoji:"🥉",val:"20 ريال"}].map((p,i) => (
-            <div key={i} className="prize-in bg-white bg-opacity-20 rounded-2xl p-3 text-center text-white border border-white border-opacity-30" style={{animationDelay:`${i*0.15}s`}}>
+            <div key={i} className="prize-in bg-white bg-opacity-20 rounded-2xl p-3 text-center text-white border border-white border-opacity-30" style={{animationDelay:(i*0.15)+"s"}}>
               <div className="text-2xl">{p.emoji}</div>
               <div className="font-black text-sm mt-1">{p.val}</div>
               <div className="text-xs opacity-70">بطاقة شحن</div>
@@ -6440,7 +6440,7 @@ function RafflePage() {
               </div>
               <div className="space-y-4">
                 {winners.map((w, i) => (
-                  <div key={i} className="winner-pop rounded-3xl p-6 border-2 shadow-lg text-center" style={{background:w.prize.bg, borderColor:w.prize.border, animationDelay:`${i*0.2}s`}}>
+                  <div key={i} className="winner-pop rounded-3xl p-6 border-2 shadow-lg text-center" style={{background:w.prize.bg, borderColor:w.prize.border, animationDelay:(i*0.2)+"s"}}>
                     <div className="text-5xl mb-2">{w.prize.emoji}</div>
                     <div className="text-3xl font-black mb-1" style={{color:w.prize.color}}>{w.name}</div>
                     <div className="text-sm text-gray-500 mb-3">{w.class}</div>
@@ -7627,7 +7627,7 @@ function PerformanceStandardsPortal({ siteFont, onBack }) {
             </div>
             <div className="mt-5">
               <div className="bg-white/20 rounded-full h-3 overflow-hidden">
-                <div className="h-full bg-white rounded-full transition-all duration-1000" style={{ width:`${totalFrom100}%` }} />
+                <div className="h-full bg-white rounded-full transition-all duration-1000" style={{ width:(totalFrom100)+"%" }} />
               </div>
               <div className="font-black text-lg mt-2">{lvl.label}</div>
             </div>
@@ -7745,7 +7745,7 @@ function PerformanceStandardsPortal({ siteFont, onBack }) {
           </div>
         </div>
         <div className="h-1.5 bg-white/20">
-          <div className="h-full bg-white/75 transition-all duration-500" style={{ width:`${progressPct}%` }} />
+          <div className="h-full bg-white/75 transition-all duration-500" style={{ width:progressPct+"%" }} />
         </div>
       </div>
 
@@ -7769,7 +7769,7 @@ function PerformanceStandardsPortal({ siteFont, onBack }) {
           {filledCount > 0 && (
             <div className="mt-3 flex items-center gap-3">
               <div className="flex-1 h-2 bg-white/20 rounded-full overflow-hidden">
-                <div className="h-full bg-white rounded-full" style={{ width:`${(filledCount/total)*100}%` }} />
+                <div className="h-full bg-white rounded-full" style={{ width:((filledCount/total)*100)+"%"}} />
               </div>
               <div className="text-xs font-black opacity-90">المتوقع: {previewTotal}/100 = {previewFrom5}/5</div>
             </div>
@@ -7777,9 +7777,9 @@ function PerformanceStandardsPortal({ siteFont, onBack }) {
         </div>
 
         {/* بطاقة العنصر الحالي */}
-        <div className="bg-white rounded-3xl overflow-hidden shadow-md border-2" style={{ borderColor:`${domain.color}30` }}>
+        <div className="bg-white rounded-3xl overflow-hidden shadow-md border-2" style={{ borderColor:(domain.color)+"30" }}>
           {/* رأس العنصر */}
-          <div className="p-5" style={{ background:`${domain.bg}` }}>
+          <div className="p-5" style={{ background:domain.bg }}>
             <div className="flex items-start gap-3">
               <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl flex-shrink-0 shadow-sm" style={{ background:domain.color }}>
                 <span>{domain.icon}</span>
@@ -7798,7 +7798,7 @@ function PerformanceStandardsPortal({ siteFont, onBack }) {
               <p className="text-xs font-black text-gray-500 mb-2">أمثلة على تحقق العنصر:</p>
               {domain.details.map((detail, i) => (
                 <div key={i} className="flex items-start gap-2 text-xs text-gray-700">
-                  <span className="mt-0.5 flex-shrink-0 w-4 h-4 rounded-full bg-white flex items-center justify-center font-black text-gray-500 text-xs border" style={{ borderColor:`${domain.color}50` }}>{i+1}</span>
+                  <span className="mt-0.5 flex-shrink-0 w-4 h-4 rounded-full bg-white flex items-center justify-center font-black text-gray-500 text-xs border" style={{ borderColor:(domain.color)+"50" }}>{i+1}</span>
                   <span>{detail}</span>
                 </div>
               ))}
@@ -7836,7 +7836,7 @@ function PerformanceStandardsPortal({ siteFont, onBack }) {
               // حساب الدرجة الجزئية
               const partial = Math.round((ratings[domain.id] / 5) * domain.weight * 100) / 100;
               return (
-                <div className="rounded-2xl p-4 mb-4 border" style={{ background:r.bg, borderColor:`${r.color}40` }}>
+                <div className="rounded-2xl p-4 mb-4 border" style={{ background:r.bg, borderColor:(r.color)+"40" }}>
                   <div className="flex items-center justify-between">
                     <div>
                       <span className="font-black text-sm" style={{ color:r.color }}>{r.value} — {r.fullLabel}</span>
@@ -7951,7 +7951,7 @@ function PerformanceStandardsPortal({ siteFont, onBack }) {
             </div>
             <div className="mt-3 h-2.5 rounded-full bg-gray-100 overflow-hidden">
               <div className="h-full rounded-full transition-all duration-700"
-                style={{ width:`${previewTotal}%`, background:`linear-gradient(90deg,#1d4ed8,#059669)` }} />
+                style={{ width:previewTotal+"%", background:"linear-gradient(90deg,#1d4ed8,#059669)" }} />
             </div>
           </div>
         )}
@@ -8021,7 +8021,7 @@ function PerfResultsAdminPage() {
             </div>
             <div className="flex-1">
               <div className="bg-white/20 rounded-full h-3 overflow-hidden">
-                <div className="h-full bg-white rounded-full" style={{ width:`${totalFrom100}%` }} />
+                <div className="h-full bg-white rounded-full" style={{ width:(totalFrom100)+"%" }} />
               </div>
               <div className="font-black mt-1.5">{lvl.label}</div>
             </div>
@@ -8156,7 +8156,7 @@ function PerfResultsAdminPage() {
             return (
               <button key={rec.id} onClick={() => setSelected(rec)}
                 className="w-full text-right bg-white rounded-2xl p-4 shadow-sm border-2 hover:shadow-md transition-all"
-                style={{ borderColor:`${lvl.color}25` }}>
+                style={{ borderColor:(lvl.color)+"25" }}>
                 <div className="flex items-center gap-3">
                   <div className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-sm"
                     style={{ background:`linear-gradient(135deg,${lvl.color},${lvl.color}88)` }}>
@@ -8170,7 +8170,7 @@ function PerfResultsAdminPage() {
                     <div className="text-xs text-gray-400">{rec.date} · {filledCount}/{PERFORMANCE_DOMAINS.length} عنصر</div>
                     <div className="flex items-center gap-2 mt-1.5">
                       <div className="h-1.5 flex-1 rounded-full bg-gray-100 overflow-hidden">
-                        <div className="h-full rounded-full transition-all" style={{ width:`${rec.totalFrom100||0}%`, background:lvl.color }} />
+                        <div className="h-full rounded-full transition-all" style={{ width:(rec.totalFrom100||0)+"%", background:lvl.color }} />
                       </div>
                       <span className="text-xs font-black" style={{ color:lvl.color }}>{rec.totalFrom100||0}/100</span>
                     </div>
@@ -20645,7 +20645,7 @@ function TeacherProfilePortal({ siteFont, onBack, attendance, teachers, week }) 
                     </div>
                     <div className="flex-1">
                       <div className="bg-white/20 rounded-full h-2.5 overflow-hidden">
-                        <div className="h-full bg-white rounded-full" style={{width:`${myPerfResult.totalFrom100}%`}} />
+                        <div className="h-full bg-white rounded-full" style={{width:(myPerfResult.totalFrom100)+"%"}} />
                       </div>
                     </div>
                   </div>
@@ -20740,7 +20740,7 @@ function TeacherReportCards({ reports, teacherName }) {
           const filesList = reports?.files || [];
           return (
             <div key={sec.key} className="rounded-2xl p-4 shadow-sm border-2"
-              style={{ background: sec.bg, borderColor: `${sec.color}20` }}>
+              style={{ background: sec.bg, borderColor: (sec.color)+"20" }}>
               <div className="flex items-center gap-2 mb-3">
                 <span className="text-xl">{sec.icon}</span>
                 <span className="font-black text-sm" style={{ color: sec.color }}>{sec.title}</span>
@@ -20772,7 +20772,7 @@ function TeacherReportCards({ reports, teacherName }) {
         const text = typeof content === "string" ? content : content?.text;
         return (
           <div key={sec.key} className="rounded-2xl p-4 shadow-sm border-2"
-            style={{ background: sec.bg, borderColor: `${sec.color}20` }}>
+            style={{ background: sec.bg, borderColor: (sec.color)+"20" }}>
             <div className="flex items-center gap-2 mb-2">
               <span className="text-xl">{sec.icon}</span>
               <span className="font-black text-sm" style={{ color: sec.color }}>{sec.title}</span>
@@ -20856,7 +20856,7 @@ function TeacherAnalyticsTab({ attSummary, assemblyDays, myPerfResult, myReports
         <span className="text-xs font-black" style={{color}}>{val}{sub}</span>
       </div>
       <div className="h-2.5 rounded-full overflow-hidden" style={{background:bg||"#f3f4f6"}}>
-        <div className="h-full rounded-full transition-all duration-700" style={{width:`${Math.min(pct,100)}%`, background:color}}/>
+        <div className="h-full rounded-full transition-all duration-700" style={{width:Math.min(pct,100)+"%", background:color}}/>
       </div>
     </div>
   );
@@ -20927,7 +20927,7 @@ function TeacherAnalyticsTab({ attSummary, assemblyDays, myPerfResult, myReports
                 </div>
                 <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
                   <div className="h-full rounded-full transition-all duration-700"
-                    style={{width:`${pct}%`, background:dom?.color||"#1d4ed8"}}/>
+                    style={{width:pct+"%", background:dom?.color||"#1d4ed8"}}/>
                 </div>
               </div>
             );
@@ -20981,7 +20981,7 @@ function TeacherAnalyticsTab({ attSummary, assemblyDays, myPerfResult, myReports
 }
 
 
-                <div className="bg-red-400 transition-all" style={{width:`${asmAb/(asmPr+asmAb)*100}%`}}/>
+                <div className="bg-red-400 transition-all" style={{width:(asmPr+asmAb>0 ? (asmAb/(asmPr+asmAb)*100).toFixed(1)+"%" : "0%")}}/>
               </div>
             )}
           </div>
@@ -20999,7 +20999,7 @@ function TeacherAnalyticsTab({ attSummary, assemblyDays, myPerfResult, myReports
             </div>
             <div className="flex-1">
               <div className="h-3 rounded-full bg-gray-100 overflow-hidden mb-1">
-                <div className="h-full rounded-full" style={{width:`${perfResult.totalFrom100}%`,background:"linear-gradient(90deg,#1d4ed8,#0d9488)"}}/>
+                <div className="h-full rounded-full" style={{width:(perfResult.totalFrom100)+"%",background:"linear-gradient(90deg,#1d4ed8,#0d9488)"}}/>
               </div>
               <div className="text-xs text-gray-500 font-bold">{perfResult.totalFrom5}/5 — {
                 perfResult.totalFrom100>=90?"ممتاز":perfResult.totalFrom100>=75?"جيد جداً":
@@ -21015,7 +21015,7 @@ function TeacherAnalyticsTab({ attSummary, assemblyDays, myPerfResult, myReports
                   <span className="font-black flex-shrink-0" style={{color:d.color}}>{d.value}/{d.weight}</span>
                 </div>
                 <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
-                  <div className="h-full rounded-full" style={{width:`${d.weight>0?d.value/d.weight*100:0}%`,background:d.color}}/>
+                  <div className="h-full rounded-full" style={{width:(d.weight>0?d.value/d.weight*100:0)+"%",background:d.color}}/>
                 </div>
               </div>
             ))}
@@ -21908,7 +21908,7 @@ function ClassTimerPage() {
               </div>
               <div className="h-2 rounded-full bg-white bg-opacity-20 overflow-hidden">
                 <div className="h-full rounded-full bg-white transition-all duration-1000"
-                  style={{width: `${totalPct * 100}%`}}/>
+                  style={{width:(totalPct*100)+"%"}}/>
               </div>
             </div>
           </div>
@@ -22608,7 +22608,7 @@ ${v.needs.filter(n=>n.need).length>0?`
             return (
               <div key={v.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                 <div className="flex items-center justify-between px-5 py-3 border-b border-gray-50"
-                  style={{background:`${col}08`}}>
+                  style={{background:(col)+"08"}}>
                   <div>
                     <div className="font-black text-gray-800 text-base">{v.teacherName}</div>
                     <div className="text-xs text-gray-400 mt-0.5">
@@ -22694,7 +22694,7 @@ ${v.needs.filter(n=>n.need).length>0?`
           return (
             <div key={ax.key} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
               <div className="flex items-center justify-between px-4 py-3 border-b"
-                style={{borderRight:`4px solid ${ax.color}`,background:`${ax.color}08`}}>
+                style={{borderRight:`4px solid ${ax.color}`,background:(ax.color)+"08"}}>
                 <span className="font-black text-sm" style={{color:ax.color}}>{ax.label}</span>
                 <span className="text-xs px-3 py-1 rounded-full font-black text-white" style={{background:ax.color}}>
                   {sc} / {mx}
@@ -24680,28 +24680,28 @@ export default function SchoolWebsite() {
         {[...Array(12)].map((_,i) => (
           <div key={"dr"+i} className="fdot absolute rounded-full"
             style={{
-              right: `${2 + (i%4)*2.5}%`,
-              top:   `${8 + i*7.5}%`,
-              width:  `${4 + (i%3)*3}px`,
-              height: `${4 + (i%3)*3}px`,
+              right: (2 + (i%4)*2.5)+'%',
+              top:   (8 + i*7.5)+'%',
+              width:  (4 + (i%3)*3)+'px',
+              height: (4 + (i%3)*3)+'px',
               background: ["#0d9488","#2dd4bf","#0284c7","#38bdf8","#7c3aed","#a78bfa"][i%6],
               opacity: 0.25 + (i%4)*0.06,
-              animationDelay: `${i*0.4}s`,
-              animationDuration: `${3.5 + i*0.3}s`,
+              animationDelay: (i*0.4)+'s',
+              animationDuration: (3.5 + i*0.3)+'s',
             }} />
         ))}
         {/* نقاط رذاذ يسار */}
         {[...Array(12)].map((_,i) => (
           <div key={"dl"+i} className="fdot absolute rounded-full"
             style={{
-              left:  `${2 + (i%4)*2.5}%`,
-              top:   `${5 + i*7.8}%`,
-              width:  `${3 + (i%3)*4}px`,
-              height: `${3 + (i%3)*4}px`,
+              left:  (2 + (i%4)*2.5)+'%',
+              top:   (5 + i*7.8)+'%',
+              width:  (3 + (i%3)*4)+'px',
+              height: (3 + (i%3)*4)+'px',
               background: ["#f59e0b","#fbbf24","#0d9488","#34d399","#0284c7","#7dd3fc"][i%6],
               opacity: 0.2 + (i%4)*0.05,
-              animationDelay: `${i*0.35 + 1}s`,
-              animationDuration: `${4 + i*0.25}s`,
+              animationDelay: (i*0.35 + 1)+'s',
+              animationDuration: (4 + i*0.25)+'s',
             }} />
         ))}
 
