@@ -7344,6 +7344,13 @@ function PerformanceStandardsPortal({ siteFont, onBack }) {
   const fileRef = useRef(null);
 
   useEffect(() => {
+    try {
+      const preferredId = localStorage.getItem("preferred_teacher_eval_id") || "";
+      if (preferredId && !loginId) setLoginId(preferredId);
+    } catch {}
+  }, []);
+
+  useEffect(() => {
     (async () => {
       // 1. حاول تحميل القائمة المرفوعة خصيصاً لبطاقة الأداء
       const perfList = await DB.get("school-perf-teachers", []);
@@ -20313,7 +20320,7 @@ function PageVisitorCounter({ pageKey, label = "زيارة" }) {
 // ═══════════════════════════════════════════════════════════
 // بوابة المعلم الموحدة — دخول واحد يفتح لوحة شاملة
 // ═══════════════════════════════════════════════════════════
-function TeacherProfilePortal({ siteFont, onBack, attendance, teachers, week }) {
+function TeacherProfilePortal({ siteFont, onBack, onOpenSelfEval, attendance, teachers, week }) {
   const [step, setStep]             = useState("login");
   const [loginId, setLoginId]       = useState("");
   const [loginError, setLoginError] = useState("");
@@ -20324,6 +20331,15 @@ function TeacherProfilePortal({ siteFont, onBack, attendance, teachers, week }) 
   const [perfResults, setPerfResults] = useState([]);
   const [tAssembly, setTAssembly]   = useState({});
   const [activeTab, setActiveTab]   = useState("summary"); // summary | attendance | assembly | reports | selfeval | analytics
+  const [saveBadge, setSaveBadge]   = useState("");
+
+  const flashSaved = (msg = "تم الحفظ فورًا") => {
+    setSaveBadge(msg);
+    try { clearTimeout(window.__teacherPortalSaveBadgeTimer); } catch {}
+    try {
+      window.__teacherPortalSaveBadgeTimer = setTimeout(() => setSaveBadge(""), 1600);
+    } catch {}
+  };
 
   const weekKey = week?.days?.[0]?.dateH || "unknown";
 
@@ -20372,6 +20388,19 @@ function TeacherProfilePortal({ siteFont, onBack, attendance, teachers, week }) 
     const key = `${d.dateH}_${di}_${teacherIdx}`;
     return { name: d.name, date: d.dateH, val: tAssembly[key] };
   });
+
+  const saveTeacherAssemblyImmediate = async (di, val) => {
+    if (teacherIdx < 0 || !week?.days?.[di]) return;
+    const key = `${week.days[di].dateH}_${di}_${teacherIdx}`;
+    const next = { ...tAssembly, [key]: val };
+    setTAssembly(next);
+    try { localStorage.setItem("teacher_assembly_v1", JSON.stringify(next)); } catch {}
+    try { localStorage.setItem(DB_CACHE_PREFIX + "school-teacher-assembly", JSON.stringify(next)); } catch {}
+    try { dbQueue.add("school-teacher-assembly", next); } catch {}
+    try { dbFirebasePut("school-teacher-assembly", next); } catch {}
+    try { await DB.set("school-teacher-assembly", next); } catch {}
+    flashSaved(val === true ? "تم حفظ حضور الطابور مباشرة" : "تم حفظ غياب الطابور مباشرة");
+  };
 
   // ── تقارير المدير ──
   const myReports = weekReports?.[weekKey]?.[currentTeacher?.id] || {};
@@ -20463,18 +20492,34 @@ function TeacherProfilePortal({ siteFont, onBack, attendance, teachers, week }) 
         </div>
 
         {/* تبويبات */}
-        <div className="flex overflow-x-auto px-2 pb-2 gap-1 scrollbar-hide">
+        <div className="flex overflow-x-auto px-2 pb-2 gap-2 scrollbar-hide">
           {TABS.map(tab=>(
             <button key={tab.id} onClick={()=>setActiveTab(tab.id)}
-              className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black transition-all"
+              className="flex-shrink-0 flex items-center gap-2 px-3.5 py-2 rounded-2xl text-xs font-black transition-all border"
               style={{
-                background: activeTab===tab.id ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.1)",
-                color:      activeTab===tab.id ? "#1e3a5f"               : "rgba(255,255,255,0.7)",
+                background: activeTab===tab.id ? "linear-gradient(135deg,#ffffff,#e0f2fe)" : "rgba(255,255,255,0.08)",
+                color:      activeTab===tab.id ? "#0f172a" : "rgba(255,255,255,0.82)",
+                borderColor: activeTab===tab.id ? "rgba(255,255,255,0.75)" : "rgba(255,255,255,0.14)",
+                boxShadow: activeTab===tab.id ? "0 8px 22px rgba(15,23,42,.18)" : "none",
+                transform: activeTab===tab.id ? "translateY(-1px)" : "translateY(0)",
               }}>
-              <span>{tab.icon}</span><span>{tab.label}</span>
+              <span className="w-7 h-7 rounded-xl flex items-center justify-center text-sm"
+                style={{
+                  background: activeTab===tab.id ? "linear-gradient(135deg,#1d4ed8,#0d9488)" : "rgba(255,255,255,0.12)",
+                  color: "#fff",
+                  boxShadow: activeTab===tab.id ? "0 6px 14px rgba(29,78,216,.28)" : "none",
+                }}>{tab.icon}</span>
+              <span>{tab.label}</span>
             </button>
           ))}
         </div>
+        {saveBadge && (
+          <div className="px-3 pb-3">
+            <div className="mx-auto max-w-xs rounded-2xl px-3 py-2 text-center text-xs font-black text-emerald-800 bg-emerald-50 border border-emerald-200 shadow-sm">
+              ✅ {saveBadge}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="max-w-xl mx-auto px-3 pt-4 space-y-4">
@@ -20698,8 +20743,12 @@ function TeacherProfilePortal({ siteFont, onBack, attendance, teachers, week }) 
                 <div className="text-5xl mb-4">⭐</div>
                 <h3 className="font-black text-gray-800 mb-2">لم يُكمل التقييم الذاتي بعد</h3>
                 <p className="text-xs text-gray-500 mb-5">يمكنك إكمال التقييم من بوابة التقويم الذاتي</p>
-                <button onClick={()=>{onBack(); setTimeout(()=>window.location.hash="teacherportal",200);}}
-                  className="px-6 py-3 rounded-2xl font-black text-white text-sm" style={{background:"linear-gradient(135deg,#059669,#0d9488)"}}>
+                <button onClick={()=>{
+                    try { localStorage.setItem("preferred_teacher_eval_id", String(currentTeacher?.id || loginId || "")); } catch {}
+                    if (onOpenSelfEval) onOpenSelfEval();
+                    else onBack();
+                  }}
+                  className="px-6 py-3 rounded-2xl font-black text-white text-sm shadow-lg" style={{background:"linear-gradient(135deg,#059669,#0d9488)"}}>
                   📊 انتقل لبوابة التقويم الذاتي
                 </button>
               </div>
@@ -24481,7 +24530,7 @@ export default function SchoolWebsite() {
   if (!user && publicAnnouncements) return <PublicAnnouncementsPage announcements={announcements} siteFont={siteFont} onBack={() => setPublicAnnouncements(false)} />;
   if (!user && studentRaffle) return <StudentRafflePortal siteFont={siteFont} onBack={() => setStudentRaffle(false)} />;
   if (!user && perfStandardsPortal) return <PerformanceStandardsPortal siteFont={siteFont} onBack={() => setPerfStandardsPortal(false)} />;
-  if (!user && teacherProfilePortal) return <TeacherProfilePortal siteFont={siteFont} onBack={() => setTeacherProfilePortal(false)} attendance={attendance} teachers={teachers} week={week} />;
+  if (!user && teacherProfilePortal) return <TeacherProfilePortal siteFont={siteFont} onBack={() => setTeacherProfilePortal(false)} onOpenSelfEval={() => { setTeacherProfilePortal(false); setPerfStandardsPortal(true); }} attendance={attendance} teachers={teachers} week={week} />;
   if (!user && parentPortal) return <ParentPortal classList={classList} setClassList={setClassList} saveClass={saveClass} messages={messages} setMessages={setMessages} saveMessages={saveMessages} surveys={surveys} setSurveys={setSurveys} saveSurveys={saveSurveys} siteFont={siteFont} onBack={() => setParentPortal(false)} />;
   if (!user) return <LoginPage users={users} onLogin={setUser} siteFont={siteFont} onParentPortal={() => setParentPortal(true)} onTeacherPortal={() => setPerfStandardsPortal(true)} onTeacherProfile={() => setTeacherProfilePortal(true)} onStudentRaffle={() => setStudentRaffle(true)} onPublicAnnouncements={() => setPublicAnnouncements(true)} onExcusePortal={() => setExcusePortal(true)} />;
 
