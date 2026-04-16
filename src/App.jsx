@@ -5955,7 +5955,7 @@ function PollPage({ teachers }) {
             return (
               <div key={name} className="flex items-center gap-3">
                 <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-black flex-shrink-0"
-                  style={{ background: i === 0 ? "#fbbf24" : i === 1 ? "#9ca3af" : i === 2 ? "#cd7f32" : "#f3f4f6", color: i < 3 ? "white" : "#6b7280" }}>
+                  style={{ background: i === 0 ? "#fbbf24" : i === 1 ? "#9ca3af" : i === 2 ? "#cd7f32" : "#f3f4f6", color: i <= 2 ? "white" : "#6b7280" }}>
                   {i+1}
                 </div>
                 <div className="flex-1 min-w-0">
@@ -7668,7 +7668,7 @@ function PerformanceStandardsPortal({ siteFont, onBack }) {
                             </span>
                           ) : <span className="text-gray-300">—</span>}
                         </td>
-                        <td className="px-3 py-2.5 text-center font-black" style={{ color: d.scoreFor100 > 0 ? dom?.color : "#ccc" }}>
+                        <td className="px-3 py-2.5 text-center font-black" style={{ color: d.scoreFor100 ? dom?.color : "#ccc" }}>
                           {d.scoreFor100 > 0 ? d.scoreFor100 : "—"}
                         </td>
                         <td className="px-3 py-2.5 text-center text-base">
@@ -8063,7 +8063,7 @@ function PerfResultsAdminPage() {
                           </span>
                         ) : <span className="text-gray-300">—</span>}
                       </td>
-                      <td className="px-3 py-2.5 text-center font-black" style={{ color: d.scoreFor100>0 ? dom?.color : "#ccc" }}>
+                      <td className="px-3 py-2.5 text-center font-black" style={{ color: d.scoreFor100 ? dom?.color : "#ccc" }}>
                         {d.scoreFor100 > 0 ? d.scoreFor100 : "—"}
                       </td>
                       <td className="px-3 py-2.5 text-center text-base">
@@ -12501,9 +12501,9 @@ function TeacherProfilePage({ teachers, attendance, week, weekArchive, classList
               </div>
             </div>
             <div className="h-2 flex">
-              <div style={{width:stats.totalDays>0?(stats.present/stats.totalDays*100)+"%":"100%",background:"#22c55e"}}/>
-              <div style={{width:stats.totalDays>0?((stats.lateMorn+stats.latePeriod)/stats.totalDays*100)+"%":"0%",background:"#f59e0b"}}/>
-              <div style={{width:stats.totalDays>0?(stats.absent/stats.totalDays*100)+"%":"0%",background:"#ef4444"}}/>
+              <div style={{width:stats.totalDays?(stats.present/stats.totalDays*100)+"%":"100%",background:"#22c55e"}}/>
+              <div style={{width:stats.totalDays?((stats.lateMorn+stats.latePeriod)/stats.totalDays*100)+"%":"0%",background:"#f59e0b"}}/>
+              <div style={{width:stats.totalDays?(stats.absent/stats.totalDays*100)+"%":"0%",background:"#ef4444"}}/>
             </div>
           </div>
 
@@ -12563,7 +12563,7 @@ function TeacherProfilePage({ teachers, attendance, week, weekArchive, classList
                       <div className="text-2xl font-black text-blue-700">{rem}</div>
                       <div className="text-xs text-gray-400">متبقي من {bal.total}</div>
                       <div className="h-2 bg-gray-100 rounded-full mt-2">
-                        <div className="h-full rounded-full transition-all" style={{width:pct+"%",background:rem>5?"#22c55e":rem>0?"#f59e0b":"#ef4444"}}/>
+                        <div className="h-full rounded-full transition-all" style={{width:pct+"%",background:rem>=5?"#22c55e":rem>=1?"#f59e0b":"#ef4444"}}/>
                       </div>
                     </div>
                   );
@@ -12941,7 +12941,7 @@ function GradeAnalysisPage() {
           return (
             <div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
               {showLabels && d.value>0 && <div style={{fontSize:10,fontWeight:700,color:p.bg}}>{d.value}</div>}
-              <div style={{width:"100%",borderRadius:"6px 6px 0 0",background:p.bg,height:h+"%",minHeight:d.value>0?4:1,transition:"height .5s ease",opacity:d.value>0?1:.25}}/>
+              <div style={{width:"100%",borderRadius:"6px 6px 0 0",background:p.bg,height:h+"%",minHeight:d.value?4:1,transition:"height .5s ease",opacity:d.value>0?1:.25}}/>
               <div style={{fontSize:9,color:p.text,textAlign:"center",fontWeight:600,maxWidth:40,lineHeight:1.1}}>
                 {d.label.substring(0,4)}
               </div>
@@ -13550,7 +13550,7 @@ function GradeAnalysisPage() {
                         <td className="px-3 py-3 text-center"><span className="text-xs px-2 py-1 rounded-full font-bold bg-indigo-100 text-indigo-700">{m.name}</span></td>
                         <td className="px-3 py-3 text-center"><span className="text-xs px-2 py-1 rounded-full font-bold" style={{background:m.type==="ختامي"?"#fef3c7":"#dcfce7",color:m.type==="ختامي"?"#b45309":"#166534"}}>{m.type}</span></td>
                         <td className="px-3 py-3 text-center font-black text-blue-700">{m.cw}</td>
-                        <td className="px-3 py-3 text-center font-black" style={{color:m.fe>0?"#d97706":"#9ca3af"}}>{m.fe||"—"}</td>
+                        <td className="px-3 py-3 text-center font-black" style={{color:m.fe?"#d97706":"#9ca3af"}}>{m.fe||"—"}</td>
                         <td className="px-4 py-3 text-xs text-gray-500">{m.round2}</td>
                       </tr>
                     );
@@ -14120,7 +14120,7 @@ function GradeAnalysisPage() {
                             {subjNames.slice(0,5).map(sub=>{
                               const v=subTotal(s.grades?.[sub]);
                               const gc=gaGradeLabel(v);
-                              return <td key={sub} className="px-2 py-3 text-center font-black text-sm" style={{color:v>0?gc.c:"#9ca3af"}}>{v||"—"}</td>;
+                              return <td key={sub} className="px-2 py-3 text-center font-black text-sm" style={{color:v?gc.c:"#9ca3af"}}>{v||"—"}</td>;
                             })}
                             <td className="px-3 py-3 text-center">
                               <span className="text-xs font-black px-2 py-1 rounded-full" style={{background:g.bg,color:g.c}}>
@@ -20676,7 +20676,7 @@ function TeacherProfilePortal({ siteFont, onBack, attendance, teachers, week }) 
                               <td className="px-3 py-2 text-center">
                                 {d.rating>0?<span className="inline-flex w-7 h-7 rounded-lg items-center justify-center font-black text-sm" style={{background:rt?.bg,color:rt?.color}}>{d.rating}</span>:<span className="text-gray-300">—</span>}
                               </td>
-                              <td className="px-3 py-2 text-center font-black" style={{color:d.scoreFor100>0?dom?.color:"#ccc"}}>{d.scoreFor100||"—"}</td>
+                              <td className="px-3 py-2 text-center font-black" style={{color:d.scoreFor100?dom?.color:"#ccc"}}>{d.scoreFor100||"—"}</td>
                             </tr>
                           );
                         })}
@@ -20981,7 +20981,7 @@ function TeacherAnalyticsTab({ attSummary, assemblyDays, myPerfResult, myReports
 }
 
 
-                <div className="bg-red-400 transition-all" style={{width:(asmPr+asmAb>0 ? (asmAb/(asmPr+asmAb)*100).toFixed(1)+"%" : "0%")}}/>
+                <div className="bg-red-400 transition-all" style={{width: (asmPr+asmAb ? Math.round(asmAb*100/(asmPr+asmAb)) : 0)+"%"}}/>
               </div>
             )}
           </div>
@@ -21015,7 +21015,7 @@ function TeacherAnalyticsTab({ attSummary, assemblyDays, myPerfResult, myReports
                   <span className="font-black flex-shrink-0" style={{color:d.color}}>{d.value}/{d.weight}</span>
                 </div>
                 <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
-                  <div className="h-full rounded-full" style={{width:(d.weight>0?d.value/d.weight*100:0)+"%",background:d.color}}/>
+                  <div className="h-full rounded-full" style={{width:(d.weight?d.value/d.weight*100:0)+"%",background:d.color}}/>
                 </div>
               </div>
             ))}
@@ -23459,9 +23459,9 @@ function AbsenceStatsPage({ teachers, attendance, week, weekArchive }) {
                 </div>
                 {/* شريط الحضور المرئي */}
                 <div className="h-3 flex">
-                  <div style={{width:st.totalDays>0?(st.present/st.totalDays*100)+"%":"0%",background:"#22c55e"}}/>
-                  <div style={{width:st.totalDays>0?((st.lateMorn+st.latePeriod)/st.totalDays*100)+"%":"0%",background:"#f59e0b"}}/>
-                  <div style={{width:st.totalDays>0?(st.absent/st.totalDays*100)+"%":"0%",background:"#ef4444"}}/>
+                  <div style={{width:st.totalDays?(st.present/st.totalDays*100)+"%":"0%",background:"#22c55e"}}/>
+                  <div style={{width:st.totalDays?((st.lateMorn+st.latePeriod)/st.totalDays*100)+"%":"0%",background:"#f59e0b"}}/>
+                  <div style={{width:st.totalDays?(st.absent/st.totalDays*100)+"%":"0%",background:"#ef4444"}}/>
                 </div>
               </div>
 
@@ -23985,7 +23985,7 @@ function AttendanceAnalysisPage() {
                       </div>
                       <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
                         <div className={"h-full rounded-full transition-all " + item.color}
-                          style={{width: (item.total > 0 ? Math.min(100, item.val/item.total*100) : 0)+"%"}}/>
+                          style={{width: (item.total ? Math.min(100, item.val/item.total*100) : 0)+"%"}}/>
                       </div>
                     </div>
                   ))}
