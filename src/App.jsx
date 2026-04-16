@@ -112,19 +112,21 @@ const DB = {
 
   // ── كتابة: localStorage أولاً (فوري) + Firebase + queue للفشل ──
   async set(key, value) {
-    // 1. احفظ محلياً فوراً — لا ينتظر أحداً
+    // 1. احفظ محلياً فوراً
     try { localStorage.setItem(DB_CACHE_PREFIX + key, JSON.stringify(value)); } catch {}
 
     // 2. أضف لقائمة الانتظار (ضمان الإرسال)
     dbQueue.add(key, value);
+    // أخبر UI فوراً بوجود عملية معلقة
+    window.dispatchEvent(new CustomEvent("db-queue-change", { detail: dbQueue.load().length }));
 
     // 3. حاول الإرسال لـ Firebase الآن
     const ok = await dbFirebasePut(key, value);
     if (ok) {
-      // أخبر UI بالنجاح
+      // نجح — أخبر UI بالنجاح وصفّر العداد
       window.dispatchEvent(new CustomEvent("db-save-ok", { detail: key }));
     } else {
-      // سيُعاد الإرسال تلقائياً من المزامنة الدورية
+      // فشل — سيُعاد الإرسال من المزامنة الدورية
       window.dispatchEvent(new CustomEvent("db-queue-change", { detail: dbQueue.load().length }));
     }
   },
@@ -21175,34 +21177,43 @@ function TeacherReportsAdminPage({ teachers, week }) {
 
 // ── مؤشر حالة الحفظ (يظهر في رأس الصفحة) ──
 function SyncStatusIndicator() {
-  const [pending, setPending] = useState(() => {
+  const getQueueLen = () => {
     try { return JSON.parse(localStorage.getItem(DB_QUEUE_KEY) || "[]").length; } catch { return 0; }
-  });
+  };
+
+  const [pending, setPending] = useState(getQueueLen);
   const [lastSaved, setLastSaved] = useState(null);
-  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    const onQueueChange = (e) => {
-      setPending(e.detail || 0);
-      setSaving(false);
-    };
+    // حدّث العدد من الطابور الفعلي
+    const refresh = () => setPending(getQueueLen());
+
+    const onQueueChange = () => refresh();
+
     const onSaveOk = () => {
-      setSaving(false);
+      refresh();
       setLastSaved(new Date().toLocaleTimeString("ar-SA-u-nu-latn", { hour:"2-digit", minute:"2-digit" }));
-      setPending(prev => Math.max(0, prev - 1));
     };
+
+    // تحقق كل ثانيتين من حالة الطابور
+    const ticker = setInterval(refresh, 2000);
+
     window.addEventListener("db-queue-change", onQueueChange);
     window.addEventListener("db-save-ok", onSaveOk);
     return () => {
+      clearInterval(ticker);
       window.removeEventListener("db-queue-change", onQueueChange);
       window.removeEventListener("db-save-ok", onSaveOk);
     };
   }, []);
 
   if (pending > 0) return (
-    <div className="flex items-center gap-1 text-xs font-black" style={{color:"#f97316"}}>
-      <span className="animate-pulse">🔴</span>
-      <span>{pending} معلق</span>
+    <div className="flex items-center gap-2 text-xs font-black px-2 py-1 rounded-lg" style={{color:"#dc2626", background:"#fee2e2"}}>
+      <span className="animate-pulse text-base">🔴</span>
+      <div>
+        <div>{pending} معلق</div>
+        <div className="font-normal opacity-70">جاري الإرسال...</div>
+      </div>
     </div>
   );
   if (lastSaved) return (
