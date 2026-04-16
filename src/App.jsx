@@ -39,6 +39,45 @@ const DEFAULT_TEACHERS = [
   "علي عبدالله حزام بن عبود","محمد علي عبدالله المحوري"
 ];
 
+// قائمة المعلمين مع أرقام هوياتهم — تُستخدم في بطاقة التقويم الذاتي للأداء الوظيفي
+// ملاحظة: يرجى استبدال الأرقام بالأرقام الصحيحة من خلال رفع ملف Excel في صفحة الإعدادات
+// قائمة المعلمين بأرقام هوياتهم الرسمية — مستخرجة من ملف بيانات المدرسة
+const DEFAULT_TEACHERS_WITH_IDS = [
+  { name: "معيض صالح محمد القرني", id: "1036502514" },
+  { name: "عبدالواحد بن مبارك بن عبدالواحد الجبعه الخنفري القحطاني", id: "1046618607" },
+  { name: "حامد محمد عبدالله الزهراني", id: "1056228677" },
+  { name: "رامي علي حسن ال مطر الغامدي", id: "1032749952" },
+  { name: "عبدالحميد عبدالمعطي حميد اللقماني", id: "1048137358" },
+  { name: "حسن حامد إبراهيم الساعدي", id: "1025827583" },
+  { name: "فواز محمد عطيه الثقفي", id: "1024289223" },
+  { name: "رجيان رويحي عتيق الله السلمي", id: "1068362936" },
+  { name: "صالح احمد سعيد الغامدي", id: "1037320924" },
+  { name: "بندر فيحان طلق السلمي", id: "1049094053" },
+  { name: "عبدالله عبدالرحيم محمد الطلحي", id: "1018372589" },
+  { name: "عبدالرحمن ابراهيم علي الفقيه", id: "1073328542" },
+  { name: "سلطان حمد محمد المقاطي العتيبي", id: "1005422215" },
+  { name: "عبدالهادي بن سالم بن عويتق المعبدي الحربي", id: "1009800283" },
+  { name: "فهد عبيد عبدالله النباتي", id: "1035178803" },
+  { name: "طلال سعد ساعد السلمي", id: "1036658415" },
+  { name: "هاني رده لافي الجحدلي", id: "1010690061" },
+  { name: "عبد الله حامد خليوي اللقماني", id: "1015309949" },
+  { name: "ضيف الله حلسان صالح الزهراني", id: "1054217631" },
+  { name: "حامد بن عبد الله بن علي المحمادي", id: "1031670795" },
+  { name: "صالح أحمد سميح المجنوني", id: "1064090242" },
+  { name: "محمد عوض عبدالله الجابري", id: "1033897784" },
+  { name: "محمد مساعد فويران اللحياني", id: "1028026183" },
+  { name: "مسلم سعد مسعود الجهني", id: "1102617287" },
+  { name: "مشعل مساعد عيد الحربي", id: "1102809009" },
+  { name: "بدر سرور مسعد العتيبي", id: "1033283704" },
+  { name: "وليد مسلم سليم السهلي", id: "1057175273" },
+  { name: "مصلح محمد مصلح المعبدي", id: "1043906278" },
+  { name: "جازي عبدالرحمن عبدربه الثبيتي", id: "1045345863" },
+  { name: "بدر حمد محمد اللهيبي", id: "1022066664" },
+  { name: "عطيه سعيد علي الغامدي", id: "1072245713" },
+  { name: "علي عبدالله حزام بن عبود", id: "1066246867" },
+  { name: "محمد علي عبدالله المحوري", id: "1063668352" },
+];
+
 const DEFAULT_WEEK = {
   days: [
     { name: "الأحد",    dateH: "10/10/1447", dateM: "05/04/2026" },
@@ -1206,13 +1245,25 @@ function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, sa
           if (yr > 1400 && yr < 1600) setWeek(freshWeek);
         }
         if (Array.isArray(freshTeachers) && freshTeachers.length) setTeachers(freshTeachers);
-        if (freshAssembly && typeof freshAssembly === "object") {
+        // الطابور — فقط اضبط إذا كانت هناك بيانات فعلية (لا تمسح بـ {} فارغة)
+        if (freshAssembly && typeof freshAssembly === "object" && Object.keys(freshAssembly).length > 0) {
           setAssembly(freshAssembly);
           try { localStorage.setItem("morning_assembly_v1", JSON.stringify(freshAssembly)); } catch {}
+        } else if (!freshAssembly || Object.keys(freshAssembly).length === 0) {
+          // Firebase فارغة — ابقَ على بيانات localStorage الموجودة
+          try {
+            const cached = JSON.parse(localStorage.getItem("morning_assembly_v1") || "null");
+            if (cached && Object.keys(cached).length > 0) setAssembly(cached);
+          } catch {}
         }
-        if (freshTAssembly && typeof freshTAssembly === "object") {
+        if (freshTAssembly && typeof freshTAssembly === "object" && Object.keys(freshTAssembly).length > 0) {
           setTeacherAssembly(freshTAssembly);
           try { localStorage.setItem("teacher_assembly_v1", JSON.stringify(freshTAssembly)); } catch {}
+        } else if (!freshTAssembly || Object.keys(freshTAssembly).length === 0) {
+          try {
+            const cached = JSON.parse(localStorage.getItem("teacher_assembly_v1") || "null");
+            if (cached && Object.keys(cached).length > 0) setTeacherAssembly(cached);
+          } catch {}
         }
         if (Array.isArray(freshMosala)) setMosalaList(freshMosala);
         setLastSync(new Date().toLocaleTimeString("ar-SA"));
@@ -1711,11 +1762,11 @@ function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, sa
                     if (yr > 1400 && yr < 1600) setWeek(freshWeek);
                   }
                   if (Array.isArray(freshTeachers) && freshTeachers.length) setTeachers(freshTeachers);
-                  if (freshAssembly && typeof freshAssembly === "object") {
+                  if (freshAssembly && typeof freshAssembly === "object" && Object.keys(freshAssembly).length > 0) {
                     setAssembly(freshAssembly);
                     try { localStorage.setItem("morning_assembly_v1", JSON.stringify(freshAssembly)); } catch {}
                   }
-                  if (freshTAssembly && typeof freshTAssembly === "object") {
+                  if (freshTAssembly && typeof freshTAssembly === "object" && Object.keys(freshTAssembly).length > 0) {
                     setTeacherAssembly(freshTAssembly);
                     try { localStorage.setItem("teacher_assembly_v1", JSON.stringify(freshTAssembly)); } catch {}
                   }
@@ -7189,13 +7240,11 @@ function PerformanceStandardsPortal({ siteFont, onBack }) {
         setLoadingList(false);
         return;
       }
-      // 3. آخر ملاذ: القائمة الافتراضية المضمّنة بالكود
-      //    (تعمل فقط للاختبار — يجب رفع قائمة بأرقام الهويات الصحيحة)
-      const defaultList = DEFAULT_TEACHERS.map((name, i) => ({
-        name,
-        id: String(1100000000 + i),
-      }));
-      setTeachersList(defaultList);
+      // 3. استخدم القائمة الافتراضية مع الأرقام المضمّنة
+      //    (يرجى رفع قائمة بالأرقام الصحيحة من الإعدادات)
+      setTeachersList(DEFAULT_TEACHERS_WITH_IDS);
+      // احفظها في Firebase تلقائياً لتُستخدم في المرات القادمة
+      await DB.set("school-perf-teachers", DEFAULT_TEACHERS_WITH_IDS);
       setLoadingList(false);
     })();
   }, []);
@@ -19884,8 +19933,16 @@ function TeacherAccountsSection() {
   const fileRef = useRef(null);
 
   useEffect(() => {
-    DB.get("school-teacher-accounts", []).then(data => {
-      setAccounts(Array.isArray(data) ? data : []);
+    DB.get("school-teacher-accounts", []).then(async data => {
+      if (Array.isArray(data) && data.length > 0) {
+        setAccounts(data);
+      } else {
+        // أول تشغيل: ملأ تلقائياً من القائمة الافتراضية
+        const initial = DEFAULT_TEACHERS_WITH_IDS;
+        setAccounts(initial);
+        await DB.set("school-teacher-accounts", initial);
+        await DB.set("school-perf-teachers",    initial);
+      }
       setLoading(false);
     });
   }, []);
@@ -19940,8 +19997,11 @@ function TeacherAccountsSection() {
         <h3 className="font-bold text-gray-800">👨‍🏫 حسابات المعلمين — بوابة المعلم</h3>
         {saved && <span className="text-xs text-green-600 font-bold bg-green-50 px-3 py-1 rounded-full">✅ تم الحفظ</span>}
       </div>
-      <div className="bg-blue-50 rounded-xl p-3 text-xs text-blue-700 font-medium mb-4">
-        💡 كل معلم يدخل بوابة المعلم برقم هويته كـ"كلمة مرور" — يمكنه فقط إدخال مستويات الطلاب
+      <div className="bg-blue-50 rounded-xl p-3 text-xs text-blue-700 font-medium mb-4 space-y-1">
+        <p>💡 كل معلم يدخل <strong>بوابة التقويم الذاتي</strong> برقم هويته الوطنية</p>
+        <p className="text-green-700 bg-green-50 rounded-lg px-2 py-1">
+          ✅ القائمة مُحمَّلة بالأرقام الرسمية المستخرجة من ملف بيانات المدرسة — يمكن التعديل أو إضافة معلمين جدد
+        </p>
       </div>
 
       {/* إضافة يدوية */}
@@ -19976,7 +20036,8 @@ function TeacherAccountsSection() {
                   <span className="font-medium text-sm text-gray-800">{a.name}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded-lg font-mono">{a.id}</span>
+                  <span className="text-xs bg-gray-100 px-2 py-1 rounded-lg font-mono" style={{color: a.id.startsWith("100000000") ? "#d97706" : "#9ca3af"}}>{a.id}</span>
+                  {a.id.startsWith("100000000") && <span className="text-xs bg-amber-100 text-amber-600 font-bold px-1.5 py-0.5 rounded">⚠️ افتراضي</span>}
                   <button onClick={() => removeOne(a.id)} className="text-red-400 hover:text-red-600 text-sm px-1">🗑️</button>
                 </div>
               </div>
