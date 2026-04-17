@@ -25723,6 +25723,7 @@ export default function SchoolWebsite() {
   ];
   // ── تقارير وإدارة
   const reportPages = [
+    { id: "dailyattend",   label: "كشف الحضور اليومي",   icon: "📅" },
     { id: "poll",           label: "تميّز المعلم",         icon: "🏆" },
     { id: "surveys",        label: "الاستبيانات",          icon: "📊" },
     { id: "report",         label: "تقرير برنامج",         icon: "📋" },
