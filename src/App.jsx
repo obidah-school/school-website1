@@ -21712,6 +21712,487 @@ function SuggestionsAdminPage() {
   );
 }
 
+
+// ================================================================
+// ===== صفحة الرخصة المهنية للمعلمين =====
+// ================================================================
+function ProfessionalLicensePage() {
+
+  const SPECIALIZATIONS = [
+    "رياضيات","علوم","لغة عربية","اجتماعيات","تربية إسلامية",
+    "إنجليزي","حاسب وتقنية","تربية بدنية","فنون","كيمياء",
+    "فيزياء","أحياء","جغرافيا","تاريخ","تربية وطنية","أخرى"
+  ];
+
+  const PROGRAMS = [
+    { id:"planning",      label:"التخطيط للتدريس",           icon:"📋" },
+    { id:"strategies",    label:"استراتيجيات التدريس",        icon:"🎯" },
+    { id:"classmanage",   label:"إدارة الصف",                icon:"🏫" },
+    { id:"assessment",    label:"التقويم والقياس",            icon:"📊" },
+    { id:"technology",    label:"توظيف التقنية",              icon:"💻" },
+    { id:"thinking",      label:"تنمية مهارات التفكير",       icon:"🧠" },
+    { id:"relations",     label:"بناء العلاقة مع الطلاب",    icon:"🤝" },
+    { id:"development",   label:"التطوير المهني",             icon:"🌱" },
+    { id:"timemanage",    label:"إدارة الوقت",                icon:"⏱️" },
+    { id:"communication", label:"مهارات التواصل",             icon:"💬" },
+  ];
+
+  const NEED_LEVELS = [
+    { val:"high",   label:"حاجة عالية",    color:"#dc2626", bg:"#fee2e2" },
+    { val:"medium", label:"حاجة متوسطة",   color:"#d97706", bg:"#fef3c7" },
+    { val:"low",    label:"حاجة منخفضة",   color:"#059669", bg:"#d1fae5" },
+  ];
+
+  const mkEmpty = (name="") => ({
+    name, specialization:"", yearsService:"", trainingHours:"",
+    programs: Object.fromEntries(PROGRAMS.map(p=>[p.id,{need:"",notes:""}])),
+    hasLicense: null, licenseReason:"",
+    licenseImages:[null,null],
+  });
+
+  const [records, setRecords]   = useState([]);
+  const [teachers, setTeachers] = useState([]);
+  const [loading, setLoading]   = useState(true);
+  const [selected, setSelected] = useState(null); // index
+  const [search, setSearch]     = useState("");
+  const [importing, setImporting] = useState(false);
+  const [saved, setSaved]       = useState(false);
+  const imgRefs = [useRef(), useRef()];
+
+  // تحميل من Firebase
+  useEffect(() => {
+    Promise.all([
+      DB.get("school-teachers", []),
+      DB.get("school-license-records", []),
+    ]).then(([tch, recs]) => {
+      const teacherList = Array.isArray(tch) ? tch : [];
+      const recList = Array.isArray(recs) ? recs : [];
+      setTeachers(teacherList);
+      // دمج السجلات مع قائمة المعلمين
+      const merged = teacherList.map(t => {
+        const existing = recList.find(r => r.name === t);
+        return existing || mkEmpty(t);
+      });
+      // أضف أي سجلات لمعلمين غير في القائمة
+      recList.forEach(r => {
+        if (!teacherList.includes(r.name)) merged.push(r);
+      });
+      setRecords(merged);
+      setLoading(false);
+    });
+  }, []);
+
+  const save = (newRecs) => {
+    setRecords(newRecs);
+    DB.set("school-license-records", newRecs);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 1500);
+  };
+
+  const updRecord = (idx, field, val) => {
+    const next = [...records];
+    next[idx] = { ...next[idx], [field]: val };
+    save(next);
+  };
+
+  const updProgram = (idx, progId, field, val) => {
+    const next = [...records];
+    next[idx] = {
+      ...next[idx],
+      programs: { ...next[idx].programs, [progId]: { ...next[idx].programs[progId], [field]: val } }
+    };
+    save(next);
+  };
+
+  const handleLicenseImg = (idx, recIdx, file) => {
+    if (!file) return;
+    readFileAsync(file, "dataurl").then(dataUrl => {
+      const next = [...records];
+      const imgs = [...(next[recIdx].licenseImages || [null, null])];
+      imgs[idx] = { dataUrl, name: file.name };
+      next[recIdx] = { ...next[recIdx], licenseImages: imgs };
+      save(next);
+    });
+  };
+
+  const removeLicenseImg = (idx, recIdx) => {
+    const next = [...records];
+    const imgs = [...(next[recIdx].licenseImages || [null, null])];
+    imgs[idx] = null;
+    next[recIdx] = { ...next[recIdx], licenseImages: imgs };
+    save(next);
+  };
+
+  // استيراد Excel
+  const handleImportExcel = async (file) => {
+    setImporting(true);
+    try {
+      await loadXLSX();
+      const buf = await file.arrayBuffer();
+      const wb = window.XLSX.read(buf);
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = window.XLSX.utils.sheet_to_json(ws, { header:1, defval:"" });
+      const names = [];
+      rows.forEach((row, i) => {
+        if (i === 0) return;
+        const name = String(row[0]||"").trim();
+        if (name && name.length > 2) names.push(name);
+      });
+      // أضف أسماء جديدة فقط
+      const existing = records.map(r => r.name);
+      const newRecs = [...records];
+      names.forEach(n => { if (!existing.includes(n)) newRecs.push(mkEmpty(n)); });
+      setTeachers(prev => {
+        const all = [...new Set([...prev, ...names])];
+        DB.set("school-teachers", all);
+        return all;
+      });
+      save(newRecs);
+      alert(`✅ تم استيراد ${names.length} معلم`);
+    } catch (e) {
+      alert("❌ خطأ في قراءة الملف");
+    }
+    setImporting(false);
+  };
+
+  const addManual = () => {
+    const name = prompt("أدخل اسم المعلم:");
+    if (!name?.trim()) return;
+    const newRecs = [...records, mkEmpty(name.trim())];
+    save(newRecs);
+    setSelected(newRecs.length - 1);
+  };
+
+  const deleteRecord = (idx) => {
+    if (!confirm("هل تريد حذف هذا السجل؟")) return;
+    const next = records.filter((_,i) => i !== idx);
+    save(next);
+    setSelected(null);
+  };
+
+  const getNeedLevel = (val) => NEED_LEVELS.find(n => n.val === val);
+  const getCompletePct = (rec) => {
+    if (!rec) return 0;
+    let done = 0, total = 4;
+    if (rec.specialization) done++;
+    if (rec.yearsService) done++;
+    if (rec.trainingHours) done++;
+    if (rec.hasLicense !== null) done++;
+    return Math.round(done / total * 100);
+  };
+
+  const filtered = records.filter(r =>
+    !search || r.name.includes(search)
+  );
+
+  if (loading) return (
+    <div className="flex items-center justify-center py-20 text-gray-400">
+      <div className="text-center"><div className="text-5xl mb-3 animate-bounce">🏆</div><p className="font-bold">جاري التحميل…</p></div>
+    </div>
+  );
+
+  // ── عرض تفاصيل معلم ──
+  if (selected !== null && records[selected]) {
+    const rec = records[selected];
+    const idx = selected;
+    const pct = getCompletePct(rec);
+    return (
+      <div dir="rtl" className="max-w-3xl mx-auto px-3 py-4 space-y-4" style={{fontFamily:"'Cairo',sans-serif"}}>
+        <div className="flex items-center gap-3 flex-wrap">
+          <button onClick={()=>setSelected(null)}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 shadow-sm">
+            ← قائمة المعلمين
+          </button>
+          <div className="flex-1 font-black text-lg text-gray-800">{rec.name}</div>
+          <div className="flex items-center gap-2">
+            {saved && <span className="text-green-600 text-xs font-bold">✅ محفوظ</span>}
+            <span className="text-xs font-bold px-3 py-1 rounded-full"
+              style={{background: pct===100?"#d1fae5":"#fef3c7", color: pct===100?"#059669":"#d97706"}}>
+              {pct}% مكتمل
+            </span>
+          </div>
+        </div>
+
+        {/* ── بيانات أساسية ── */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="px-5 py-3 font-black text-sm text-white flex items-center gap-2"
+            style={{background:"linear-gradient(135deg,#1e3a5f,#1d4ed8)"}}>
+            <span>👤</span> البيانات الأساسية
+          </div>
+          <div className="p-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div>
+              <label className="text-xs font-black text-gray-600 mb-1.5 block">📚 التخصص</label>
+              <select value={rec.specialization||""} onChange={e=>updRecord(idx,"specialization",e.target.value)}
+                className="w-full px-3 py-2.5 rounded-xl border-2 border-gray-200 focus:border-blue-400 focus:outline-none text-sm font-bold bg-white">
+                <option value="">— اختر التخصص —</option>
+                {SPECIALIZATIONS.map(s=><option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-black text-gray-600 mb-1.5 block">📅 سنوات الخدمة</label>
+              <select value={rec.yearsService||""} onChange={e=>updRecord(idx,"yearsService",e.target.value)}
+                className="w-full px-3 py-2.5 rounded-xl border-2 border-gray-200 focus:border-blue-400 focus:outline-none text-sm font-bold bg-white">
+                <option value="">— اختر —</option>
+                {["أقل من سنة","1-3 سنوات","4-6 سنوات","7-10 سنوات","11-15 سنة","أكثر من 15 سنة"].map(s=>(
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-black text-gray-600 mb-1.5 block">🎓 ساعات التدريب (تقريباً)</label>
+              <select value={rec.trainingHours||""} onChange={e=>updRecord(idx,"trainingHours",e.target.value)}
+                className="w-full px-3 py-2.5 rounded-xl border-2 border-gray-200 focus:border-blue-400 focus:outline-none text-sm font-bold bg-white">
+                <option value="">— اختر —</option>
+                {["أقل من 20 ساعة","20-40 ساعة","41-60 ساعة","61-80 ساعة","81-100 ساعة","أكثر من 100 ساعة"].map(s=>(
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* ── البرامج ── */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="px-5 py-3 font-black text-sm text-white flex items-center gap-2"
+            style={{background:"linear-gradient(135deg,#065f46,#0d9488)"}}>
+            <span>📋</span> البرامج التدريبية المحتاجة
+          </div>
+          <div className="divide-y divide-gray-100">
+            {PROGRAMS.map(prog => {
+              const pd = rec.programs?.[prog.id] || {need:"", notes:""};
+              const nl = getNeedLevel(pd.need);
+              return (
+                <div key={prog.id} className="px-5 py-3">
+                  <div className="flex items-start gap-3 flex-wrap sm:flex-nowrap">
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <span className="text-xl flex-shrink-0">{prog.icon}</span>
+                      <span className="font-black text-sm text-gray-800">{prog.label}</span>
+                      {nl && (
+                        <span className="text-xs font-black px-2 py-0.5 rounded-full flex-shrink-0"
+                          style={{background:nl.bg, color:nl.color}}>
+                          {nl.label}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex gap-2 items-center flex-shrink-0">
+                      <select value={pd.need||""} onChange={e=>updProgram(idx,prog.id,"need",e.target.value)}
+                        className="px-2 py-1.5 rounded-xl border-2 border-gray-200 focus:border-teal-400 focus:outline-none text-xs font-bold bg-white"
+                        style={{minWidth:130}}>
+                        <option value="">— درجة الحاجة —</option>
+                        {NEED_LEVELS.map(n=>(
+                          <option key={n.val} value={n.val}>{n.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="mt-2">
+                    <input value={pd.notes||""} onChange={e=>updProgram(idx,prog.id,"notes",e.target.value)}
+                      placeholder="أهمية البرنامج أو ملاحظات..."
+                      className="w-full px-3 py-2 rounded-xl border border-gray-200 focus:border-teal-400 focus:outline-none text-xs text-gray-700" />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* ── الرخصة المهنية ── */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="px-5 py-3 font-black text-sm text-white flex items-center gap-2"
+            style={{background:"linear-gradient(135deg,#7c3aed,#6d28d9)"}}>
+            <span>🏅</span> الرخصة المهنية
+          </div>
+          <div className="p-5 space-y-4">
+            <div>
+              <label className="text-xs font-black text-gray-600 mb-2 block">هل حصلت على الرخصة المهنية؟</label>
+              <div className="flex gap-3">
+                {[{val:true,label:"✅ نعم، حصلت عليها"},{val:false,label:"❌ لا، لم أحصل عليها"}].map(opt=>(
+                  <button key={String(opt.val)} onClick={()=>updRecord(idx,"hasLicense",opt.val)}
+                    className="flex-1 py-3 rounded-2xl font-black text-sm border-2 transition-all"
+                    style={{
+                      background: rec.hasLicense===opt.val ? (opt.val?"#d1fae5":"#fee2e2") : "#f9fafb",
+                      borderColor: rec.hasLicense===opt.val ? (opt.val?"#059669":"#dc2626") : "#e5e7eb",
+                      color: rec.hasLicense===opt.val ? (opt.val?"#065f46":"#991b1b") : "#6b7280",
+                    }}>
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {rec.hasLicense === false && (
+              <div>
+                <label className="text-xs font-black text-gray-600 mb-1.5 block">سبب عدم الحصول على الرخصة</label>
+                <textarea value={rec.licenseReason||""} onChange={e=>updRecord(idx,"licenseReason",e.target.value)}
+                  placeholder="اكتب السبب هنا..." rows={3}
+                  className="w-full px-4 py-3 rounded-2xl border-2 border-gray-200 focus:border-purple-400 focus:outline-none text-sm resize-none" />
+              </div>
+            )}
+
+            {rec.hasLicense === true && (
+              <div>
+                <label className="text-xs font-black text-gray-600 mb-3 block">صور الرخصة المهنية</label>
+                <div className="grid grid-cols-2 gap-4">
+                  {[0,1].map(imgIdx => {
+                    const img = rec.licenseImages?.[imgIdx];
+                    return (
+                      <div key={imgIdx} className="rounded-2xl overflow-hidden border-2 border-dashed"
+                        style={{borderColor: img?"#7c3aed":"#d1d5db", minHeight:160}}>
+                        {img ? (
+                          <div className="relative">
+                            <img src={img.dataUrl} alt={`رخصة ${imgIdx+1}`}
+                              className="w-full object-cover" style={{height:160}} />
+                            <button onClick={()=>removeLicenseImg(imgIdx,idx)}
+                              className="absolute top-2 left-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-lg">
+                              🗑️
+                            </button>
+                            <div className="text-center py-1.5 text-xs font-black text-white"
+                              style={{background:"#7c3aed"}}>صورة الرخصة {imgIdx+1}</div>
+                          </div>
+                        ) : (
+                          <label className="flex flex-col items-center justify-center h-full cursor-pointer hover:bg-purple-50 transition-all"
+                            style={{minHeight:160}}>
+                            <div className="text-3xl mb-2">📷</div>
+                            <div className="text-xs font-black" style={{color:"#7c3aed"}}>
+                              صورة الرخصة {imgIdx+1}
+                            </div>
+                            <div className="text-xs text-gray-400 mt-1">اضغط لرفع الصورة</div>
+                            <input type="file" accept="image/*" className="hidden"
+                              ref={imgRefs[imgIdx]}
+                              onChange={e=>{const f=e.target.files?.[0];if(f)handleLicenseImg(imgIdx,idx,f);e.target.value="";}} />
+                          </label>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ── أزرار ── */}
+        <div className="flex justify-between items-center">
+          <button onClick={()=>deleteRecord(idx)}
+            className="px-4 py-2 rounded-xl text-sm font-bold text-red-600 bg-red-50 border border-red-200 hover:bg-red-100">
+            🗑️ حذف السجل
+          </button>
+          <button onClick={()=>setSelected(null)}
+            className="px-6 py-2.5 rounded-xl text-sm font-black text-white"
+            style={{background:"linear-gradient(135deg,#1e3a5f,#1d4ed8)"}}>
+            ← رجوع للقائمة
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── القائمة الرئيسية ──
+  const stats = {
+    total: records.length,
+    hasLicense: records.filter(r=>r.hasLicense===true).length,
+    noLicense:  records.filter(r=>r.hasLicense===false).length,
+    pending:    records.filter(r=>r.hasLicense===null).length,
+  };
+
+  return (
+    <div dir="rtl" className="max-w-3xl mx-auto px-3 py-4 space-y-4" style={{fontFamily:"'Cairo',sans-serif"}}>
+      {/* ── Header ── */}
+      <div className="rounded-2xl p-5 text-white shadow-xl"
+        style={{background:"linear-gradient(135deg,#1e3a5f,#1d4ed8,#7c3aed)"}}>
+        <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
+          <div className="flex items-center gap-3">
+            <div className="text-4xl">🏅</div>
+            <div>
+              <h2 className="font-black text-xl">الرخصة المهنية للمعلمين</h2>
+              <p className="opacity-70 text-xs">تتبع البرامج التدريبية وحالة الرخصة</p>
+            </div>
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            <label className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-black cursor-pointer border border-white/30 bg-white/15 hover:bg-white/25">
+              {importing ? "⏳ جاري..." : "📥 استيراد Excel"}
+              <input type="file" accept=".xlsx,.xls" className="hidden"
+                onChange={e=>{const f=e.target.files?.[0];if(f)handleImportExcel(f);e.target.value="";}} />
+            </label>
+            <button onClick={addManual}
+              className="px-3 py-2 rounded-xl text-xs font-black border border-white/30 bg-white/15 hover:bg-white/25">
+              ➕ إضافة يدوي
+            </button>
+          </div>
+        </div>
+        <div className="grid grid-cols-4 gap-3">
+          {[
+            {v:stats.total,     l:"إجمالي",      c:"#93c5fd"},
+            {v:stats.hasLicense,l:"حاصل",        c:"#86efac"},
+            {v:stats.noLicense, l:"لم يحصل",     c:"#fca5a5"},
+            {v:stats.pending,   l:"غير محدد",    c:"#fbbf24"},
+          ].map(s=>(
+            <div key={s.l} className="bg-white/15 rounded-xl py-2 text-center">
+              <div className="text-xl font-black" style={{color:s.c}}>{s.v}</div>
+              <div className="text-xs opacity-75">{s.l}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── بحث ── */}
+      <input value={search} onChange={e=>setSearch(e.target.value)}
+        placeholder="🔍 بحث باسم المعلم..."
+        className="w-full px-4 py-3 rounded-2xl border-2 border-gray-200 focus:border-blue-400 focus:outline-none text-sm" />
+
+      {/* ── القائمة ── */}
+      {filtered.length === 0 ? (
+        <div className="text-center py-16 text-gray-400">
+          <div className="text-5xl mb-3">👨‍🏫</div>
+          <p className="font-bold mb-2">لا يوجد معلمون</p>
+          <p className="text-sm">استورد ملف Excel أو أضف يدوياً</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {filtered.map((rec, i) => {
+            const realIdx = records.indexOf(rec);
+            const pct = getCompletePct(rec);
+            const highNeeds = PROGRAMS.filter(p => rec.programs?.[p.id]?.need === "high");
+            return (
+              <button key={i} onClick={()=>setSelected(realIdx)}
+                className="w-full bg-white rounded-2xl p-4 shadow-sm border border-gray-100 hover:shadow-md hover:border-blue-200 transition-all text-right">
+                <div className="flex items-center gap-3">
+                  <div className="w-11 h-11 rounded-2xl flex items-center justify-center text-xl flex-shrink-0"
+                    style={{background: rec.hasLicense===true?"#d1fae5":rec.hasLicense===false?"#fee2e2":"#f3f4f6"}}>
+                    {rec.hasLicense===true?"🏅":rec.hasLicense===false?"❌":"⏳"}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-black text-sm text-gray-800 truncate">{rec.name}</span>
+                      {rec.specialization && (
+                        <span className="text-xs px-2 py-0.5 rounded-full font-bold flex-shrink-0"
+                          style={{background:"#dbeafe",color:"#1d4ed8"}}>{rec.specialization}</span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-3 text-xs text-gray-500">
+                      {rec.yearsService && <span>📅 {rec.yearsService}</span>}
+                      {rec.trainingHours && <span>🎓 {rec.trainingHours}</span>}
+                      {highNeeds.length > 0 && (
+                        <span className="text-red-500 font-bold">⚠️ {highNeeds.length} احتياج عالي</span>
+                      )}
+                    </div>
+                    <div className="mt-1.5 bg-gray-100 rounded-full h-1.5 overflow-hidden">
+                      <div className="h-full rounded-full transition-all"
+                        style={{width:pct+"%", background: pct===100?"#059669":"#1d4ed8"}} />
+                    </div>
+                  </div>
+                  <span className="text-gray-300 flex-shrink-0">◄</span>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+
 function SyncStatusIndicator() {
   const getQueueLen = () => {
     try { return JSON.parse(localStorage.getItem(DB_QUEUE_KEY) || "[]").length; } catch { return 0; }
@@ -24354,6 +24835,7 @@ export default function SchoolWebsite() {
     { id: "committeemeeting",label: "اجتماعات اللجان",     icon: "👔" },
     { id: "teachereval",    label: "قياس أداء المعلم",     icon: "🎖️" },
     { id: "suggestions",    label: "آراء ومقترحات",        icon: "💬" },
+    { id: "prolicense",     label: "الرخصة المهنية",         icon: "🏅" },
     { id: "teacherreports", label: "ملفات المعلمين",       icon: "🗄️" },
   ];
   const extraPages = [...classToolPages, ...reportPages];
@@ -24666,11 +25148,15 @@ export default function SchoolWebsite() {
                 {page === "teachereval"    && <TeacherEvalPage teachers={teachers} />}
         {page === "perfresults"    && <PerfResultsAdminPage />}
         {page === "suggestions"    && <SuggestionsAdminPage />}
+        {page === "prolicense"     && <ProfessionalLicensePage />}
         {page === "teacherreports" && <TeacherReportsAdminPage teachers={teachers} week={week} />}
                 {page === "teacherreports" && <TeacherReportsAdminPage teachers={teachers} week={week} />}
                 {page === "perfresults"    && <PerfResultsAdminPage />}
         {page === "suggestions"    && <SuggestionsAdminPage />}
+        {page === "prolicense"     && <ProfessionalLicensePage />}
                 {page === "suggestions"    && <SuggestionsAdminPage />}
+        {page === "prolicense"     && <ProfessionalLicensePage />}
+                {page === "prolicense"     && <ProfessionalLicensePage />}
                 {page === "assessment"     && <AssessmentPage teachers={teachers} />}
                 {page === "studentexcuses" && <StudentExcusePortal isAdmin={true} siteFont={siteFont} />}
                 {page === "settings"       && <SettingsPage teachers={teachers} setTeachers={setTeachers} saveTeachers={saveTeachers} week={week} setWeek={setWeek} saveWeek={saveWeek} users={users} siteFont={siteFont} setSiteFont={setSiteFont} saveSiteFont={saveSiteFont} weekArchive={weekArchive} archiveCurrentWeek={archiveCurrentWeek} />}
@@ -24899,6 +25385,7 @@ export default function SchoolWebsite() {
         {page === "teachereval"    && <TeacherEvalPage teachers={teachers} />}
         {page === "perfresults"    && <PerfResultsAdminPage />}
         {page === "suggestions"    && <SuggestionsAdminPage />}
+        {page === "prolicense"     && <ProfessionalLicensePage />}
                 {page === "assessment"     && <AssessmentPage teachers={teachers} />}
                 {page === "studentexcuses" && <StudentExcusePortal isAdmin={true} siteFont={siteFont} />}
         {page === "settings"      && <SettingsPage teachers={teachers} setTeachers={setTeachers} saveTeachers={saveTeachers} week={week} setWeek={setWeek} saveWeek={saveWeek} users={users} siteFont={siteFont} setSiteFont={setSiteFont} saveSiteFont={saveSiteFont} weekArchive={weekArchive} archiveCurrentWeek={archiveCurrentWeek} />}
