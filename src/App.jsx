@@ -767,7 +767,7 @@ function SingleAnnouncementPage({ announcements, siteFont, annId }) {
             <div className="px-8 pt-8 pb-4">
               <div className="flex items-start gap-3 mb-3 flex-wrap">
                 <span className="text-3xl">{cIcons[ann.category] || "📢"}</span>
-                <h1 className={"font-black flex-1 leading-snug " + (ann.titleSize||"text-2xl")} style={{color: ann.titleColor||"#1f2937"}}>{ann.title}</h1>
+                <h1 className={"font-black flex-1 leading-snug " + (ann.titleSize||"text-2xl")} style={{color: ann.titleColor||"#1f2937", textAlign: ann.titleAlign||"right"}}>{ann.title}</h1>
                 {ann.pinned && <span className="text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded-full font-bold">📌 مثبت</span>}
               </div>
               <div className="flex gap-2 flex-wrap">
@@ -813,6 +813,29 @@ function loadXLSX() {
     document.head.appendChild(s);
   });
 }
+
+// ================================================================
+// تحميل ملف Excel نموذجي للطلاب (3 مراحل)
+// ================================================================
+async function downloadStudentsTemplate() {
+  await loadXLSX();
+  const wb = window.XLSX.utils.book_new();
+  const levels = [
+    { name:"أول متوسط", sections:["أ","ب","ج","د","هـ"] },
+    { name:"ثاني متوسط", sections:["أ","ب","ج","د","هـ"] },
+    { name:"ثالث متوسط", sections:["أ","ب","ج","د","هـ"] },
+  ];
+  levels.forEach(lvl => {
+    const header = [["اسم الطالب","رقم الهوية الوطنية","الفصل","ملاحظات"]];
+    const examples = lvl.sections.slice(0,3).flatMap(s =>
+      [1,2,3].map(n => [`اسم طالب ${n}`,`10XXXXXXXXX`,`الصف ${lvl.name} / ${s}`,``])
+    );
+    const ws = window.XLSX.utils.aoa_to_sheet([...header, ...examples]);
+    ws["!cols"] = [{wch:30},{wch:18},{wch:22},{wch:20}];
+    window.XLSX.utils.book_append_sheet(wb, ws, lvl.name);
+  });
+  window.XLSX.writeFile(wb, "نموذج_استيراد_الطلاب.xlsx");
+}
 // فتح نافذة طباعة
 function printWindow(html) {
   const w = window.open("", "_blank");
@@ -821,7 +844,7 @@ function printWindow(html) {
   w.document.close();
 }
 
-function PublicAnnouncementsPage({ announcements, siteFont, onLogin, onTeacherPortal, onParentPortal, onStudentRaffle }) {
+function PublicAnnouncementsPage({ announcements, siteFont, onLogin, onTeacherPortal, onParentPortal, onStudentRaffle, onSuggestions }) {
   const cIcons = { "تعاميم": "📜", "إعلانات": "📢", "تدريب": "🎓", "اجتماعات": "🤝" };
   const priorityColor = { "عاجل": "bg-red-100 text-red-700", "مهم": "bg-amber-100 text-amber-700", "عادي": "bg-gray-100 text-gray-600" };
   const [showLogin, setShowLogin] = useState(false);
@@ -882,10 +905,24 @@ function PublicAnnouncementsPage({ announcements, siteFont, onLogin, onTeacherPo
                 <button onClick={onStudentRaffle} className="w-full py-2.5 rounded-xl font-bold text-white text-sm" style={{background:"linear-gradient(135deg,#7c3aed,#db2777,#f59e0b)"}}>
                   🎰 سحب الجوائز
                 </button>
+                <button onClick={onSuggestions} className="w-full py-2.5 rounded-xl font-bold text-white text-sm" style={{background:"linear-gradient(135deg,#064e3b,#0d9488)"}}>
+                  💬 آراء ومقترحات
+                </button>
               </div>
             </div>
           </div>
         )}
+
+        {/* زر آراء ومقترحات - مرئي دائماً */}
+        <button onClick={onSuggestions}
+          className="w-full mb-4 py-4 rounded-2xl font-black text-white text-base shadow-xl flex items-center justify-center gap-3 hover:shadow-2xl transition-all"
+          style={{background:"linear-gradient(135deg,#064e3b,#059669,#0d9488)"}}>
+          <span className="text-2xl">💬</span>
+          <div className="text-right">
+            <div>آراء ومقترحات</div>
+            <div className="text-xs opacity-75 font-normal">شاركنا رأيك — اقتراح، شكوى، أو ملاحظة</div>
+          </div>
+        </button>
 
         {/* الإعلانات */}
         <h2 className="text-white font-black text-base mb-3">📢 آخر الإعلانات</h2>
@@ -901,7 +938,7 @@ function PublicAnnouncementsPage({ announcements, siteFont, onLogin, onTeacherPo
               <div className="flex items-start justify-between gap-2 mb-2">
                 <div className="flex items-center gap-2 flex-1 min-w-0">
                   <span className="text-lg shrink-0">{cIcons[ann.category] || "📢"}</span>
-                  <span className={"font-black truncate " + (ann.titleSize||"text-sm")} style={{color: ann.titleColor||"#1f2937"}}>{ann.title}</span>
+                  <span className={"font-black truncate " + (ann.titleSize||"text-sm")} style={{color: ann.titleColor||"#1f2937", textAlign: ann.titleAlign||"right"}}>{ann.title}</span>
                   {ann.pinned && <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-bold shrink-0">📌 مثبت</span>}
                 </div>
                 <span className={"text-xs px-2 py-0.5 rounded-full font-bold shrink-0 " + (priorityColor[ann.priority] || "bg-gray-100 text-gray-600")}>{ann.priority}</span>
@@ -919,7 +956,7 @@ function PublicAnnouncementsPage({ announcements, siteFont, onLogin, onTeacherPo
   );
 }
 
-function LoginPage({ users, onLogin, siteFont, onParentPortal, onTeacherPortal, onStudentRaffle, onPublicAnnouncements, onExcusePortal, onTeacherProfile }) {
+function LoginPage({ users, onLogin, siteFont, onParentPortal, onTeacherPortal, onStudentRaffle, onPublicAnnouncements, onExcusePortal, onTeacherProfile, onSuggestions }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -4865,7 +4902,7 @@ function StudentExcusePortal({ onBack, siteFont, isAdmin = false }) {
   );
 }
 
-function ParentPortal({ classList, setClassList, saveClass, messages, setMessages, saveMessages, surveys, setSurveys, saveSurveys, siteFont, onBack }) {
+function ParentPortal({ classList, setClassList, saveClass, messages, setMessages, saveMessages, surveys, setSurveys, saveSurveys, siteFont, onBack, onSuggestions }) {
   const [nationalId, setNationalId] = useState("");
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
@@ -4920,6 +4957,11 @@ function ParentPortal({ classList, setClassList, saveClass, messages, setMessage
         <div className="text-5xl mb-3">🏫</div>
         <h1 className="text-2xl font-black mb-1">مدرسة عبيدة بن الحارث المتوسطة</h1>
         <p className="opacity-80 text-sm">بوابة أولياء الأمور — متابعة مستوى الطالب</p>
+        <button onClick={onSuggestions}
+          className="mt-3 inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl font-black text-sm shadow-lg"
+          style={{background:"rgba(255,255,255,0.15)",border:"1px solid rgba(255,255,255,0.3)"}}>
+          💬 آراء ومقترحات
+        </button>
       </div>
 
       <div className="w-full px-2 pb-10 flex-1">
@@ -9081,10 +9123,17 @@ function StudentsPage({ classList, setClassList, saveClass, deleteClass, teacher
             {/* إضافة فصل */}
             <div className="p-2 border-t border-gray-100">
               {!showAddClass ? (
-                <button onClick={() => setShowAddClass(true)}
-                  className="w-full bg-blue-600 text-white py-2 rounded-xl text-xs font-bold hover:bg-blue-700">
-                  + إضافة فصل
-                </button>
+                <div className="flex gap-1.5 mb-1.5">
+                  <button onClick={() => setShowAddClass(true)}
+                    className="flex-1 bg-blue-600 text-white py-2 rounded-xl text-xs font-bold hover:bg-blue-700">
+                    + إضافة فصل
+                  </button>
+                  <button onClick={downloadStudentsTemplate}
+                    className="flex-1 bg-green-600 text-white py-2 rounded-xl text-xs font-bold hover:bg-green-700"
+                    title="تحميل ملف Excel نموذجي بالمراحل الثلاث">
+                    📥 نموذج Excel
+                  </button>
+                </div>
               ) : (
                 <div className="space-y-2">
                   <select value={newLevel} onChange={e => setNewLevel(e.target.value)}
@@ -10018,7 +10067,7 @@ function SurveysPage({ surveys, setSurveys, saveSurveys, isParent }) {
 
 function AnnouncementsPage({ announcements, setAnnouncements, saveAnnouncements, viewMode = "desktop" }) {
   const [showForm, setShowForm] = useState(false);
-  const [newAnn, setNewAnn] = useState({ title: "", content: "", category: "إعلانات", priority: "عادي", bgColor: "", titleColor: "#1f2937", titleSize: "text-xl" });
+  const [newAnn, setNewAnn] = useState({ title: "", content: "", category: "إعلانات", priority: "عادي", bgColor: "", titleColor: "#1f2937", titleSize: "text-xl", titleAlign: "right" });
   const [filter, setFilter] = useState("الكل");
   const [editId, setEditId] = useState(null);
   const [editAnn, setEditAnn] = useState(null);
@@ -10041,7 +10090,7 @@ function AnnouncementsPage({ announcements, setAnnouncements, saveAnnouncements,
     if (!newAnn.title || !newAnn.content) return;
     const u = [{ ...newAnn, id: Date.now(), date: new Date().toLocaleDateString("ar-SA-u-nu-arab", { year: "numeric", month: "2-digit", day: "2-digit" }), pinned: false }, ...announcements];
     setAnnouncements(u); saveAnnouncements(u);
-    setNewAnn({ title: "", content: "", category: "إعلانات", priority: "عادي", bgColor: "", titleColor: "#1f2937", titleSize: "text-xl" }); setShowForm(false);
+    setNewAnn({ title: "", content: "", category: "إعلانات", priority: "عادي", bgColor: "", titleColor: "#1f2937", titleSize: "text-xl", titleAlign: "right" }); setShowForm(false);
   };
   const del = (id) => { const u = announcements.filter(a => a.id !== id); setAnnouncements(u); saveAnnouncements(u); };
   const pin = (id) => { const u = announcements.map(a => a.id === id ? { ...a, pinned: !a.pinned } : a); setAnnouncements(u); saveAnnouncements(u); };
@@ -10302,7 +10351,7 @@ function AnnouncementsPage({ announcements, setAnnouncements, saveAnnouncements,
               style={{ color: newAnn.titleColor || "#1f2937" }} />
             <div className="flex gap-2 flex-wrap items-center">
               <span className="text-xs font-bold text-gray-500">🎨 لون العنوان:</span>
-              {["#1f2937","#0d9488","#dc2626","#7c3aed","#d97706","#2563eb","#059669","#db2777"].map(c => (
+              {["#1f2937","#0d9488","#dc2626","#7c3aed","#d97706","#2563eb","#059669","#db2777","#be123c","#0369a1","#92400e","#166534"].map(c => (
                 <button key={c} onClick={() => setNewAnn(p=>({...p,titleColor:c}))}
                   className={"w-7 h-7 rounded-full border-4 transition-transform hover:scale-110 " + (newAnn.titleColor===c?"border-gray-800 scale-110":"border-transparent")}
                   style={{backgroundColor:c}} />
@@ -10312,6 +10361,13 @@ function AnnouncementsPage({ announcements, setAnnouncements, saveAnnouncements,
                 <button key={s.v} onClick={()=>setNewAnn(p=>({...p,titleSize:s.v}))}
                   className={"px-2 py-1 rounded-lg text-xs font-bold border " + (newAnn.titleSize===s.v?"bg-teal-600 text-white border-teal-600":"bg-white text-gray-600 border-gray-200")}>
                   {s.l}
+                </button>
+              ))}
+              <span className="text-xs font-bold text-gray-500 mr-2">📍 موضع العنوان:</span>
+              {[{l:"▶ يمين",v:"right"},{l:"◉ وسط",v:"center"},{l:"◀ يسار",v:"left"}].map(p=>(
+                <button key={p.v} onClick={()=>setNewAnn(prev=>({...prev,titleAlign:p.v}))}
+                  className={"px-2 py-1 rounded-lg text-xs font-bold border " + ((newAnn.titleAlign||"right")===p.v?"bg-teal-600 text-white border-teal-600":"bg-white text-gray-600 border-gray-200")}>
+                  {p.l}
                 </button>
               ))}
             </div>
@@ -21218,6 +21274,356 @@ function TeacherReportsAdminPage({ teachers, week }) {
 
 
 // ── مؤشر حالة الحفظ (يظهر في رأس الصفحة) ──
+// ================================================================
+// ===== بوابة الآراء والمقترحات =====
+// ================================================================
+function SuggestionsPortal({ siteFont, onBack, classList }) {
+  const [step, setStep] = useState("choice"); // choice | byId | direct
+  const [studentId, setStudentId] = useState("");
+  const [studentFound, setStudentFound] = useState(null);
+  const [idError, setIdError] = useState("");
+
+  // نموذج الاقتراح
+  const [form, setForm] = useState({
+    parentName: "", phone: "", type: "اقتراح", message: ""
+  });
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [submitError, setSubmitError] = useState("");
+
+  const TYPES = ["اقتراح","شكوى","ملاحظة","أخرى"];
+
+  const searchStudent = () => {
+    if (!studentId.trim()) { setIdError("أدخل رقم هوية الطالب"); return; }
+    setIdError("");
+    for (const cls of (classList||[])) {
+      const st = cls.students?.find(s => s.nationalId?.trim() === studentId.trim());
+      if (st) { setStudentFound({ student: st, cls }); setStep("form"); return; }
+    }
+    setIdError("لم يُعثر على الطالب — تأكد من الرقم");
+  };
+
+  const openDirect = () => { setStudentFound(null); setStep("form"); };
+
+  const handleSubmit = async () => {
+    if (!form.message.trim()) { setSubmitError("الرجاء كتابة رسالتك"); return; }
+    setSubmitError("");
+    setSubmitting(true);
+    try {
+      const rec = {
+        id: Date.now(),
+        date: new Date().toLocaleDateString("ar-SA"),
+        time: new Date().toLocaleTimeString("ar-SA-u-nu-latn", {hour:"2-digit",minute:"2-digit"}),
+        parentName: form.parentName || "مجهول",
+        phone: form.phone || "—",
+        type: form.type,
+        message: form.message,
+        studentName: studentFound?.student?.name || "—",
+        studentClass: studentFound ? `${studentFound.cls.level} / ${studentFound.cls.section}` : "—",
+        status: "جديد",
+      };
+      const existing = await DB.get("school-suggestions", []);
+      const updated = [rec, ...(Array.isArray(existing) ? existing : [])];
+      await DB.set("school-suggestions", updated);
+      setSubmitted(true);
+    } catch {
+      setSubmitError("حدث خطأ أثناء الإرسال، حاول مجدداً");
+    }
+    setSubmitting(false);
+  };
+
+  // ── شاشة النجاح ──
+  if (submitted) return (
+    <div dir="rtl" className="min-h-screen flex flex-col items-center justify-center px-4"
+      style={{ fontFamily: siteFont, background:"linear-gradient(135deg,#064e3b,#065f46,#0d9488)" }}>
+      <div className="bg-white rounded-3xl p-10 shadow-2xl text-center max-w-sm w-full">
+        <div className="text-7xl mb-4">✅</div>
+        <h2 className="font-black text-2xl text-gray-800 mb-2">تم الإرسال بنجاح</h2>
+        <p className="text-gray-500 text-sm mb-6">شكراً لمشاركتك — سيتم مراجعة رسالتك من قِبل إدارة المدرسة</p>
+        <button onClick={() => { setSubmitted(false); setStep("choice"); setForm({parentName:"",phone:"",type:"اقتراح",message:""}); setStudentFound(null); setStudentId(""); }}
+          className="w-full py-3 rounded-2xl font-black text-white"
+          style={{background:"linear-gradient(135deg,#0d9488,#059669)"}}>
+          إرسال رسالة أخرى
+        </button>
+        <button onClick={onBack} className="w-full mt-2 py-2.5 rounded-2xl font-bold text-gray-500 text-sm bg-gray-100 hover:bg-gray-200">
+          ← العودة
+        </button>
+      </div>
+    </div>
+  );
+
+  return (
+    <div dir="rtl" className="min-h-screen" style={{ fontFamily: siteFont, background:"linear-gradient(135deg,#064e3b,#065f46,#0d9488)" }}>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;800;900&display=swap');`}</style>
+
+      {/* Header */}
+      <div className="text-center text-white pt-10 pb-6 px-4 relative">
+        <button onClick={onBack} className="absolute right-4 top-4 bg-white/15 hover:bg-white/25 text-white px-3 py-1.5 rounded-xl text-xs font-bold">← رجوع</button>
+        <div className="w-20 h-20 rounded-3xl mx-auto mb-4 flex items-center justify-center text-4xl shadow-xl"
+          style={{background:"rgba(255,255,255,0.15)",backdropFilter:"blur(10px)",border:"1px solid rgba(255,255,255,0.25)"}}>
+          💬
+        </div>
+        <h1 className="text-2xl font-black mb-1">آراء ومقترحات</h1>
+        <p className="opacity-70 text-sm">مدرسة عبيدة بن الحارث المتوسطة</p>
+      </div>
+
+      <div className="px-4 pb-10 max-w-md mx-auto w-full">
+
+        {/* خطوة الاختيار */}
+        {step === "choice" && (
+          <div className="space-y-3">
+            <div className="bg-white/10 rounded-2xl p-4 text-white text-center mb-2">
+              <p className="text-sm opacity-80">يمكنك تقديم رأيك أو اقتراحك أو شكواك مباشرةً لإدارة المدرسة</p>
+            </div>
+            <button onClick={() => setStep("byId")}
+              className="w-full bg-white rounded-2xl p-5 shadow-lg flex items-center gap-4 hover:shadow-xl transition-all">
+              <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl flex-shrink-0" style={{background:"#e0f2fe"}}>🎓</div>
+              <div className="text-right">
+                <div className="font-black text-gray-800">الدخول برقم هوية الطالب</div>
+                <div className="text-xs text-gray-500 mt-0.5">يُضيف اسم الطالب والصف تلقائياً</div>
+              </div>
+              <span className="mr-auto text-gray-400">◄</span>
+            </button>
+            <button onClick={openDirect}
+              className="w-full bg-white rounded-2xl p-5 shadow-lg flex items-center gap-4 hover:shadow-xl transition-all">
+              <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl flex-shrink-0" style={{background:"#f0fdf4"}}>✍️</div>
+              <div className="text-right">
+                <div className="font-black text-gray-800">الإرسال المباشر</div>
+                <div className="text-xs text-gray-500 mt-0.5">بدون إدخال رقم الهوية — اختياري</div>
+              </div>
+              <span className="mr-auto text-gray-400">◄</span>
+            </button>
+          </div>
+        )}
+
+        {/* خطوة البحث برقم الهوية */}
+        {step === "byId" && (
+          <div className="bg-white rounded-3xl p-6 shadow-2xl">
+            <h2 className="font-black text-gray-800 text-center text-lg mb-5">🔍 أدخل رقم هوية الطالب</h2>
+            <input type="text" inputMode="numeric" value={studentId}
+              onChange={e => { setStudentId(e.target.value); setIdError(""); }}
+              onKeyDown={e => e.key==="Enter" && searchStudent()}
+              placeholder="رقم الهوية الوطنية"
+              className="w-full px-4 py-4 rounded-2xl border-2 border-gray-200 focus:border-teal-400 focus:outline-none text-center font-black text-xl tracking-widest mb-3" />
+            {idError && <div className="bg-red-50 text-red-600 text-sm font-bold p-3 rounded-xl text-center mb-3">{idError}</div>}
+            <button onClick={searchStudent}
+              className="w-full py-4 rounded-2xl font-black text-white mb-3"
+              style={{background:"linear-gradient(135deg,#0d9488,#059669)"}}>
+              بحث ◄
+            </button>
+            <button onClick={() => setStep("choice")} className="w-full py-2.5 rounded-xl text-gray-500 font-bold text-sm bg-gray-100">← رجوع</button>
+          </div>
+        )}
+
+        {/* نموذج الإرسال */}
+        {step === "form" && (
+          <div className="bg-white rounded-3xl p-6 shadow-2xl space-y-4">
+            {studentFound && (
+              <div className="bg-teal-50 rounded-2xl p-3 flex items-center gap-3 border border-teal-200">
+                <span className="text-2xl">🎓</span>
+                <div>
+                  <div className="font-black text-teal-800 text-sm">{studentFound.student.name}</div>
+                  <div className="text-xs text-teal-600">{studentFound.cls.level} / شعبة {studentFound.cls.section}</div>
+                </div>
+              </div>
+            )}
+
+            <div>
+              <label className="text-xs font-black text-gray-600 mb-1.5 block">👤 اسم ولي الأمر <span className="font-normal opacity-60">(اختياري)</span></label>
+              <input type="text" value={form.parentName} onChange={e => setForm(p=>({...p,parentName:e.target.value}))}
+                placeholder="أدخل اسمك"
+                className="w-full px-4 py-3 rounded-2xl border-2 border-gray-200 focus:border-teal-400 focus:outline-none text-sm" />
+            </div>
+
+            <div>
+              <label className="text-xs font-black text-gray-600 mb-1.5 block">📱 رقم التواصل <span className="font-normal opacity-60">(اختياري)</span></label>
+              <input type="tel" inputMode="numeric" value={form.phone} onChange={e => setForm(p=>({...p,phone:e.target.value}))}
+                placeholder="05XXXXXXXX"
+                className="w-full px-4 py-3 rounded-2xl border-2 border-gray-200 focus:border-teal-400 focus:outline-none text-sm" />
+            </div>
+
+            <div>
+              <label className="text-xs font-black text-gray-600 mb-1.5 block">📋 نوع الرسالة</label>
+              <select value={form.type} onChange={e => setForm(p=>({...p,type:e.target.value}))}
+                className="w-full px-4 py-3 rounded-2xl border-2 border-gray-200 focus:border-teal-400 focus:outline-none text-sm font-bold bg-white">
+                {TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+
+            <div>
+              <label className="text-xs font-black text-gray-600 mb-1.5 block">✍️ الرسالة <span className="text-red-500">*</span></label>
+              <textarea value={form.message} onChange={e => setForm(p=>({...p,message:e.target.value}))}
+                placeholder="اكتب رأيك أو مقترحك أو ملاحظتك هنا..."
+                rows={5}
+                className="w-full px-4 py-3 rounded-2xl border-2 border-gray-200 focus:border-teal-400 focus:outline-none text-sm resize-none" />
+            </div>
+
+            {submitError && <div className="bg-red-50 text-red-600 text-sm font-bold p-3 rounded-xl text-center">{submitError}</div>}
+
+            <button onClick={handleSubmit} disabled={submitting}
+              className="w-full py-4 rounded-2xl font-black text-white text-base shadow-lg"
+              style={{background: submitting ? "#9ca3af" : "linear-gradient(135deg,#0d9488,#059669)"}}>
+              {submitting ? "⏳ جاري الإرسال..." : "إرسال الرسالة 📤"}
+            </button>
+            <button onClick={() => setStep("choice")} className="w-full py-2.5 rounded-xl text-gray-500 font-bold text-sm bg-gray-100">← رجوع</button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ================================================================
+// ===== صفحة إدارة الآراء والمقترحات (للمدير) =====
+// ================================================================
+function SuggestionsAdminPage() {
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState("الكل");
+  const [search, setSearch] = useState("");
+  const [selected, setSelected] = useState(null);
+
+  const refresh = () => {
+    setLoading(true);
+    DB.get("school-suggestions", []).then(d => {
+      setItems(Array.isArray(d) ? d : []);
+      setLoading(false);
+    });
+  };
+  useEffect(() => { refresh(); }, []);
+
+  const markStatus = async (id, status) => {
+    const updated = items.map(i => i.id === id ? {...i, status} : i);
+    setItems(updated);
+    await DB.set("school-suggestions", updated);
+    if (selected?.id === id) setSelected(prev => ({...prev, status}));
+  };
+
+  const deleteItem = async (id) => {
+    if (!confirm("هل تريد حذف هذا الاقتراح؟")) return;
+    const updated = items.filter(i => i.id !== id);
+    setItems(updated);
+    await DB.set("school-suggestions", updated);
+    setSelected(null);
+  };
+
+  const TYPES = ["الكل","اقتراح","شكوى","ملاحظة","أخرى"];
+  const STATUS_COLORS = { "جديد":"#dc2626", "قيد المراجعة":"#d97706", "تمت المعالجة":"#059669" };
+  const TYPE_ICONS = { "اقتراح":"💡","شكوى":"📢","ملاحظة":"📝","أخرى":"💬" };
+
+  const filtered = items.filter(i =>
+    (filter === "الكل" || i.type === filter) &&
+    (!search || i.parentName?.includes(search) || i.message?.includes(search) || i.studentName?.includes(search))
+  );
+  const counts = { total:items.length, new:items.filter(i=>i.status==="جديد").length };
+
+  if (loading) return <div className="flex items-center justify-center py-20"><div className="text-4xl animate-bounce">💬</div></div>;
+
+  if (selected) return (
+    <div dir="rtl" className="max-w-2xl mx-auto px-3 py-4 space-y-4">
+      <button onClick={() => setSelected(null)} className="text-sm font-bold text-blue-600 hover:underline flex items-center gap-1">← قائمة الرسائل</button>
+      <div className="bg-white rounded-2xl p-5 shadow-sm">
+        <div className="flex items-start justify-between gap-3 mb-4">
+          <div className="flex items-center gap-3">
+            <span className="text-3xl">{TYPE_ICONS[selected.type]||"💬"}</span>
+            <div>
+              <div className="font-black text-gray-800 text-lg">{selected.type}</div>
+              <div className="text-xs text-gray-500">{selected.date} — {selected.time}</div>
+            </div>
+          </div>
+          <span className="text-xs font-black px-3 py-1 rounded-full" style={{background: STATUS_COLORS[selected.status]+"20", color: STATUS_COLORS[selected.status]}}>
+            {selected.status}
+          </span>
+        </div>
+        <div className="grid grid-cols-2 gap-3 mb-4">
+          <div className="bg-gray-50 rounded-xl p-3"><div className="text-xs text-gray-500">ولي الأمر</div><div className="font-black text-sm">{selected.parentName}</div></div>
+          <div className="bg-gray-50 rounded-xl p-3"><div className="text-xs text-gray-500">رقم التواصل</div><div className="font-black text-sm">{selected.phone}</div></div>
+          {selected.studentName !== "—" && <>
+            <div className="bg-blue-50 rounded-xl p-3"><div className="text-xs text-gray-500">الطالب</div><div className="font-black text-sm text-blue-700">{selected.studentName}</div></div>
+            <div className="bg-blue-50 rounded-xl p-3"><div className="text-xs text-gray-500">الصف</div><div className="font-black text-sm text-blue-700">{selected.studentClass}</div></div>
+          </>}
+        </div>
+        <div className="bg-gray-50 rounded-xl p-4 mb-4"><p className="text-sm text-gray-700 leading-relaxed">{selected.message}</p></div>
+        <div className="flex gap-2 flex-wrap">
+          {["جديد","قيد المراجعة","تمت المعالجة"].map(s => (
+            <button key={s} onClick={() => markStatus(selected.id, s)}
+              className="flex-1 py-2 rounded-xl text-xs font-black border-2 transition-all"
+              style={{background: selected.status===s ? STATUS_COLORS[s] : "white", color: selected.status===s ? "white" : STATUS_COLORS[s], borderColor: STATUS_COLORS[s]}}>
+              {s}
+            </button>
+          ))}
+          <button onClick={() => deleteItem(selected.id)} className="px-4 py-2 rounded-xl text-xs font-black bg-red-50 text-red-600 border-2 border-red-200 hover:bg-red-100">🗑️ حذف</button>
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div dir="rtl" className="max-w-3xl mx-auto px-3 py-4 space-y-4">
+      <div className="rounded-2xl p-5 text-white shadow-lg" style={{background:"linear-gradient(135deg,#064e3b,#0d9488)"}}>
+        <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
+          <div className="flex items-center gap-3">
+            <span className="text-3xl">💬</span>
+            <div>
+              <h2 className="font-black text-xl">الآراء والمقترحات</h2>
+              <p className="opacity-70 text-xs">رسائل أولياء الأمور والطلاب</p>
+            </div>
+          </div>
+          <button onClick={refresh} className="px-3 py-2 rounded-xl text-xs font-black bg-white/20 hover:bg-white/30 border border-white/30">🔄 تحديث</button>
+        </div>
+        <div className="grid grid-cols-3 gap-3">
+          {[{v:counts.total,l:"إجمالي",c:"#93c5fd"},{v:counts.new,l:"جديدة",c:"#fca5a5"},{v:items.filter(i=>i.status==="تمت المعالجة").length,l:"معالجة",c:"#86efac"}].map(s=>(
+            <div key={s.l} className="bg-white/15 rounded-xl py-2 text-center">
+              <div className="text-xl font-black" style={{color:s.c}}>{s.v}</div>
+              <div className="text-xs opacity-75">{s.l}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+      <input type="text" value={search} onChange={e=>setSearch(e.target.value)}
+        placeholder="🔍 بحث بالاسم أو الرسالة…"
+        className="w-full px-4 py-3 rounded-2xl border-2 border-gray-200 focus:border-teal-400 focus:outline-none text-sm" />
+      <div className="flex gap-2 flex-wrap">
+        {TYPES.map(t=>(
+          <button key={t} onClick={()=>setFilter(t)}
+            className={"px-3 py-1.5 rounded-xl text-xs font-black border-2 " + (filter===t?"bg-teal-600 text-white border-teal-600":"bg-white text-gray-600 border-gray-200")}>
+            {t==="الكل"?"📋 الكل":TYPE_ICONS[t]+" "+t}
+          </button>
+        ))}
+      </div>
+      {filtered.length === 0 ? (
+        <div className="text-center py-16 text-gray-400"><div className="text-5xl mb-3">💬</div><p className="font-bold">لا توجد رسائل</p></div>
+      ) : (
+        <div className="space-y-2">
+          {filtered.map(item => (
+            <button key={item.id} onClick={() => setSelected(item)}
+              className="w-full bg-white rounded-2xl p-4 shadow-sm border border-gray-100 hover:shadow-md hover:border-teal-200 transition-all text-right">
+              <div className="flex items-center gap-3">
+                <span className="text-2xl flex-shrink-0">{TYPE_ICONS[item.type]||"💬"}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <span className="font-black text-sm text-gray-800 truncate">{item.parentName}</span>
+                    <span className="text-xs font-bold px-2 py-0.5 rounded-full flex-shrink-0" style={{background:STATUS_COLORS[item.status]+"20",color:STATUS_COLORS[item.status]}}>
+                      {item.status}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500 truncate">{item.message}</p>
+                  <div className="flex items-center gap-3 mt-1 text-xs text-gray-400">
+                    <span>{item.type}</span>
+                    {item.studentName !== "—" && <span>• {item.studentName}</span>}
+                    <span>• {item.date}</span>
+                  </div>
+                </div>
+                <span className="text-gray-300 flex-shrink-0">◄</span>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function SyncStatusIndicator() {
   const getQueueLen = () => {
     try { return JSON.parse(localStorage.getItem(DB_QUEUE_KEY) || "[]").length; } catch { return 0; }
@@ -23513,7 +23919,8 @@ export default function SchoolWebsite() {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
   const [parentPortal,        setParentPortal]        = useState(false);
-  const [perfStandardsPortal, setPerfStandardsPortal] = useState(false);
+  const [perfStandardsPortal,  setPerfStandardsPortal]  = useState(false);
+  const [suggestionsPortal,    setSuggestionsPortal]    = useState(false);
 
   // استمع لطلب فتح بوابة التقويم الذاتي من داخل بوابة المعلم
   useEffect(() => {
@@ -23559,7 +23966,7 @@ export default function SchoolWebsite() {
       if (hash.startsWith("ann-")) { setDirectAnnId(hash.replace("ann-","")); return; }
       setDirectAnnId(null);
       if (hash === "teacherportal") { setTeacherProfilePortal(true); return; }
-      if (["home","attendance","announcements","activities","settings","students","messages","surveys","sms","report","gradeanalysis","monthlyreport","teacherprofile","absencestats","attendancereport","student-absence","strategies","calendar","gallery","certificates","poll","raffle","broadcast","groupdivider","quiz","classtimer","luckywheel","exitticket","timetable","honorboard","tasks","dailyquiz","aiteacher","lessonprep","lessonrecommend","officialforms","portfolio","earlywarning","meetings","heatmap","committeemeeting","teachereval","assessment","studentexcuses","perfresults","teacherreports"].includes(hash)) { setTeacherProfilePortal(false); setPage(hash); }
+      if (["home","attendance","announcements","activities","settings","students","messages","surveys","sms","report","gradeanalysis","monthlyreport","teacherprofile","absencestats","attendancereport","student-absence","strategies","calendar","gallery","certificates","poll","raffle","broadcast","groupdivider","quiz","classtimer","luckywheel","exitticket","timetable","honorboard","tasks","dailyquiz","aiteacher","lessonprep","lessonrecommend","officialforms","portfolio","earlywarning","meetings","heatmap","committeemeeting","teachereval","assessment","studentexcuses","perfresults","teacherreports","suggestions"].includes(hash)) { setTeacherProfilePortal(false); setPage(hash); }
     };
     window.addEventListener("hashchange", h); h();
     return () => window.removeEventListener("hashchange", h);
@@ -23796,12 +24203,13 @@ export default function SchoolWebsite() {
 
   if (directAnnId) return <SingleAnnouncementPage announcements={announcements} siteFont={siteFont} annId={directAnnId} />;
   if (excuseFromHash || (!user && excusePortal)) return <StudentExcusePortal onBack={() => { setExcusePortal(false); setExcuseFromHash(false); window.location.hash = ""; }} siteFont={siteFont} isAdmin={false} />;
-  if (!user && publicAnnouncements) return <PublicAnnouncementsPage announcements={announcements} siteFont={siteFont} onBack={() => setPublicAnnouncements(false)} />;
+  if (!user && publicAnnouncements) return <PublicAnnouncementsPage announcements={announcements} siteFont={siteFont} onBack={() => setPublicAnnouncements(false)} onSuggestions={() => setSuggestionsPortal(true)} onLogin={setUser} onTeacherPortal={() => setPerfStandardsPortal(true)} onParentPortal={() => setParentPortal(true)} onStudentRaffle={() => setStudentRaffle(true)} />;
   if (!user && studentRaffle) return <StudentRafflePortal siteFont={siteFont} onBack={() => setStudentRaffle(false)} />;
   if (!user && perfStandardsPortal) return <PerformanceStandardsPortal siteFont={siteFont} onBack={() => setPerfStandardsPortal(false)} />;
+  if (suggestionsPortal) return <SuggestionsPortal siteFont={siteFont} onBack={() => setSuggestionsPortal(false)} classList={classList} />;
   if (teacherProfilePortal) return <TeacherProfilePortal siteFont={siteFont} onBack={() => { setTeacherProfilePortal(false); window.location.hash = user ? "home" : ""; }} attendance={attendance} teachers={teachers} week={week} />;
-  if (!user && parentPortal) return <ParentPortal classList={classList} setClassList={setClassList} saveClass={saveClass} messages={messages} setMessages={setMessages} saveMessages={saveMessages} surveys={surveys} setSurveys={setSurveys} saveSurveys={saveSurveys} siteFont={siteFont} onBack={() => setParentPortal(false)} />;
-  if (!user) return <LoginPage users={users} onLogin={setUser} siteFont={siteFont} onParentPortal={() => setParentPortal(true)} onTeacherPortal={() => setPerfStandardsPortal(true)} onTeacherProfile={() => setTeacherProfilePortal(true)} onStudentRaffle={() => setStudentRaffle(true)} onPublicAnnouncements={() => setPublicAnnouncements(true)} onExcusePortal={() => setExcusePortal(true)} />;
+  if (!user && parentPortal) return <ParentPortal classList={classList} setClassList={setClassList} saveClass={saveClass} messages={messages} setMessages={setMessages} saveMessages={saveMessages} surveys={surveys} setSurveys={setSurveys} saveSurveys={saveSurveys} siteFont={siteFont} onBack={() => setParentPortal(false)} onSuggestions={() => { setParentPortal(false); setSuggestionsPortal(true); }} />;
+  if (!user) return <LoginPage users={users} onLogin={setUser} siteFont={siteFont} onParentPortal={() => setParentPortal(true)} onTeacherPortal={() => setPerfStandardsPortal(true)} onTeacherProfile={() => setTeacherProfilePortal(true)} onStudentRaffle={() => setStudentRaffle(true)} onPublicAnnouncements={() => setPublicAnnouncements(true)} onExcusePortal={() => setExcusePortal(true)} onSuggestions={() => setSuggestionsPortal(true)} />;
 
   const pages = [
     { id: "home",            label: "الرئيسية",        icon: "🏠" },
@@ -23854,7 +24262,8 @@ export default function SchoolWebsite() {
     { id: "lessonprep",    label: "تحضير الدرس الذكي",   icon: "📚" },
     { id: "lessonrecommend",label: "الخطط العلاجية",     icon: "🩺" },
     { id: "teachereval",   label: "قياس أداء المعلم",    icon: "🎯" },
-    { id: "perfresults",   label: "نتائج تقويم الأداء",  icon: "📊" },
+    { id: "perfresults",     label: "نتائج تقويم الأداء",  icon: "📊" },
+    { id: "suggestions",     label: "آراء ومقترحات",         icon: "💬" },
     { id: "teacherreports", label: "ملفات المعلمين الأسبوعية", icon: "📁" },
   ];
 
@@ -24165,9 +24574,12 @@ export default function SchoolWebsite() {
                 {page === "lessonrecommend"&& <LessonRecommendPage classList={classList} />}
                 {page === "teachereval"    && <TeacherEvalPage teachers={teachers} />}
         {page === "perfresults"    && <PerfResultsAdminPage />}
+        {page === "suggestions"    && <SuggestionsAdminPage />}
         {page === "teacherreports" && <TeacherReportsAdminPage teachers={teachers} week={week} />}
                 {page === "teacherreports" && <TeacherReportsAdminPage teachers={teachers} week={week} />}
                 {page === "perfresults"    && <PerfResultsAdminPage />}
+        {page === "suggestions"    && <SuggestionsAdminPage />}
+                {page === "suggestions"    && <SuggestionsAdminPage />}
                 {page === "assessment"     && <AssessmentPage teachers={teachers} />}
                 {page === "studentexcuses" && <StudentExcusePortal isAdmin={true} siteFont={siteFont} />}
                 {page === "settings"       && <SettingsPage teachers={teachers} setTeachers={setTeachers} saveTeachers={saveTeachers} week={week} setWeek={setWeek} saveWeek={saveWeek} users={users} siteFont={siteFont} setSiteFont={setSiteFont} saveSiteFont={saveSiteFont} weekArchive={weekArchive} archiveCurrentWeek={archiveCurrentWeek} />}
@@ -24389,6 +24801,7 @@ export default function SchoolWebsite() {
         {page === "lessonrecommend"&& <LessonRecommendPage classList={classList} />}
         {page === "teachereval"    && <TeacherEvalPage teachers={teachers} />}
         {page === "perfresults"    && <PerfResultsAdminPage />}
+        {page === "suggestions"    && <SuggestionsAdminPage />}
                 {page === "assessment"     && <AssessmentPage teachers={teachers} />}
                 {page === "studentexcuses" && <StudentExcusePortal isAdmin={true} siteFont={siteFont} />}
         {page === "settings"      && <SettingsPage teachers={teachers} setTeachers={setTeachers} saveTeachers={saveTeachers} week={week} setWeek={setWeek} saveWeek={saveWeek} users={users} siteFont={siteFont} setSiteFont={setSiteFont} saveSiteFont={saveSiteFont} weekArchive={weekArchive} archiveCurrentWeek={archiveCurrentWeek} />}
