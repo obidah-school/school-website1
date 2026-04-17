@@ -11869,40 +11869,49 @@ const RichField = ({ label, value, onChange, placeholder, rows }) => {
 };
 
 function ProgramReportPage() {
-  const emptyReport = {
-    // الترويسة
-    schoolName: "مدرسة عبيدة بن الحارث المتوسطة",
-    region: "الإدارة العامة للتعليم بالمنطقة",
-    // بيانات التقرير
-    reportTitle: "",
-    executor: "",
-    participants: "",
-    location: "",
-    duration: "",
-    date: "",
-    beneficiaries: "",
-    field: "",
-    objectives: "",
-    steps: "",
-    // التوقيعات
-    activityLeaderName: "",
-    principalName: "",
-    // الشواهد
-    witnesses: [null, null, null, null],
+  const EMPTY = {
+    acadYear:   "1447هـ",
+    semester:   "الأول",
+    period:     "الأولى",
+    reportTitle:"تقرير تكريم الطلاب المتفوقين في الفترة الأولى للفصل الدراسي الأول لعام 1447هـ",
+    field:      "النشاط الطلابيّ",
+    executor:   "طلال القرني _معيض القرني",
+    targetGroup:"الطلاب",
+    execDate:   "1447/10/24 هـ",
+    intro:      "يُعدّ تكريم الطلاب المتفوقين من أهم الوسائل التي تعزز روح المنافسة والاجتهاد بين الطلبة، حيث يعكس تقدير المجتمع التربوي للجهود المبذولة والإنجازات المحققة.",
+    objectives: "• تحفيز الطلاب على الاجتهاد والسعي نحو التفوق.\n• تقدير جهود الطلاب المتفوقين وتعزيز ثقتهم بأنفسهم.\n• نشر ثقافة التميز والنجاح بين جميع الطلاب.\n• تشجيع المنافسة الإيجابية بين الطلبة.\n• إبراز النماذج المتميزة ليكونوا قدوة لغيرهم.",
+    activities: "تم تنفيذ مجموعة من الأنشطة التي تهدف إلى إبراز جهود الطلاب المتفوقين والاحتفاء بإنجازاتهم، حيث شمل البرنامج حفل تكريم رسمي بحضور الهيئة التعليمية.",
+    results:    "من المتوقع أن يسهم هذا البرنامج في رفع مستوى الدافعية لدى الطلاب وتحفيزهم على تحقيق المزيد من النجاحات. كما يساعد في تعزيز الثقة بالنفس لدى الطلاب المتفوقين.",
+    recommendations: "يوصى بالاستمرار في تنفيذ برامج تكريم الطلاب المتفوقين بشكل دوري لما لها من أثر إيجابي كبير. كما يُفضل تنويع أساليب التكريم لتشمل الجوانب الأكاديمية والسلوكية.",
+    activityLeader: "طلال القرني",
+    activityLeaderTitle: "رائد النشاط",
+    coordinator: "معيض القرني",
+    coordinatorTitle: "منسق الرياضي",
+    principal:  "فارع القرني",
+    witnesses:  [null,null,null,null,null,null],
   };
 
   const [report, setReport] = useState(() => {
-    try { const s = localStorage.getItem("prog_report"); return s ? JSON.parse(s) : emptyReport; } catch { return emptyReport; }
+    try {
+      const s = localStorage.getItem("prog_report_v2");
+      if (!s) return EMPTY;
+      const parsed = JSON.parse(s);
+      // تأكد من وجود 6 شواهد
+      if (!parsed.witnesses || parsed.witnesses.length < 6)
+        parsed.witnesses = [...(parsed.witnesses||[]), null,null,null,null,null,null].slice(0,6);
+      return parsed;
+    } catch { return EMPTY; }
   });
   const [saved, setSaved] = useState(false);
-  const witnessRefs = [useRef(), useRef(), useRef(), useRef()];
+  const witnessRefs = [useRef(),useRef(),useRef(),useRef(),useRef(),useRef()];
 
-  const upd = (field, val) => setReport(p => ({ ...p, [field]: val }));
+  const upd = (k, v) => setReport(p => ({ ...p, [k]: v }));
 
   useEffect(() => {
     try {
-      const toSave = { ...report, witnesses: report.witnesses.map(w => w ? w.dataUrl || null : null) };
-      localStorage.setItem("prog_report", JSON.stringify(toSave)); DB.set("school-prog-report", toSave);
+      const toSave = { ...report, witnesses: report.witnesses.map(w => w ? { dataUrl: w.dataUrl||null, name: w.name||"" } : null) };
+      localStorage.setItem("prog_report_v2", JSON.stringify(toSave));
+      DB.set("school-prog-report", toSave);
     } catch {}
     setSaved(true);
     const t = setTimeout(() => setSaved(false), 1500);
@@ -11911,326 +11920,405 @@ function ProgramReportPage() {
 
   const handleWitness = (idx, file) => {
     if (!file) return;
-    readFileAsync(file, "dataurl").then(dataUrl => { const witnesses = [...report.witnesses]; witnesses[idx] = { dataUrl, name: file.name }; setReport(p => ({ ...p, witnesses })); });
-
-      const witnesses = [...report.witnesses];
-      witnesses[idx] = { dataUrl: e.target.result, name: file.name };
-      setReport(p => ({ ...p, witnesses }));
-    };
+    readFileAsync(file, "dataurl").then(dataUrl => {
+      const w = [...report.witnesses];
+      w[idx] = { dataUrl, name: file.name };
+      setReport(p => ({ ...p, witnesses: w }));
+    });
   };
-
   const removeWitness = (idx) => {
-    const witnesses = [...report.witnesses];
-    witnesses[idx] = null;
-    setReport(p => ({ ...p, witnesses }));
+    const w = [...report.witnesses]; w[idx] = null;
+    setReport(p => ({ ...p, witnesses: w }));
   };
 
-  const downloadWitness = (w) => {
-    const a = document.createElement("a");
-    a.href = w.dataUrl;
-    a.download = w.name || "شاهد.jpg";
-    a.click();
-  };
-
+  /* ─── طباعة / تصدير ─── */
   const printReport = () => {
-    const witnessesHtml = report.witnesses.map((w, i) =>
-      w ? `<div class="witness-item"><img src="${w.dataUrl}" style="max-width:100%;max-height:220px;border-radius:8px;object-fit:contain;" /><div class="witness-label">شاهد ${i+1}</div></div>`
-        : `<div class="witness-item empty"><div class="empty-box">شاهد ${i+1}</div></div>`
+    const wHtml = report.witnesses.map((w,i) =>
+      w ? `<div class="sh-item"><img src="${w.dataUrl}" /><div class="sh-lbl">الشاهد رقم ${i+1}</div></div>`
+        : `<div class="sh-item empty"><div class="sh-empty">الشاهد رقم ${i+1}</div></div>`
     ).join("");
+
+    const formatText = (t) => (t||"").replace(/\n/g,"<br/>");
 
     printWindow(`<!DOCTYPE html>
 <html dir="rtl" lang="ar">
 <head>
 <meta charset="UTF-8">
-<title>${report.reportTitle || "تقرير برنامج"}</title>
+<title>${report.reportTitle||"تقرير برنامج"}</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
 <style>
-  * { margin:0; padding:0; box-sizing:border-box; }
-  body { font-family:'Cairo',sans-serif; background:#fff; color:#1e293b; direction:rtl; font-size:13px; }
-  .page { max-width:800px; margin:0 auto; padding:0; }
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Cairo',sans-serif;background:#fff;color:#1a2035;direction:rtl;font-size:13px}
+.page{max-width:800px;margin:0 auto;border:3px solid #0d3b6e;border-radius:0}
 
-  /* الترويسة */
-  .header { background:linear-gradient(135deg,#0d3b6e,#0d9488); color:white; padding:16px 24px; display:flex; align-items:center; justify-content:space-between; gap:0; }
-  .header-right { text-align:right; flex:1; }
-  .header-right .ministry { font-size:15px; font-weight:900; }
-  .header-right .region { font-size:12px; opacity:.82; margin-top:4px; }
-  .header-center { display:flex; align-items:center; justify-content:center; padding:0 20px; }
-  .logo-img { height:75px; width:auto; }
-  .divider-line { width:1.5px; height:65px; background:rgba(255,255,255,0.3); border-radius:2px; margin:0 16px; }
-  .header-left { text-align:left; flex:1; }
-  .header-left .school-name { font-size:14px; font-weight:900; }
-  .header-left .report-label { font-size:11px; opacity:.75; margin-top:4px; }
-  .header-left .report-title-inline { font-size:12px; font-weight:700; opacity:.9; margin-top:2px; border-bottom:1px solid rgba(255,255,255,0.4); padding-bottom:2px; }
+/* ── الترويسة ── */
+.header{background:linear-gradient(135deg,#0d3b6e 0%,#1a5276 50%,#0d9488 100%);color:#fff;padding:0;display:flex;align-items:stretch;min-height:90px}
+.hcol{flex:1;display:flex;flex-direction:column;justify-content:center;padding:12px 18px}
+.hcol.right{text-align:right;border-left:1px solid rgba(255,255,255,.25)}
+.hcol.center{flex:0 0 120px;align-items:center;border-left:1px solid rgba(255,255,255,.25)}
+.hcol.left{text-align:left}
+.kingdom{font-size:12px;opacity:.8;margin-bottom:2px}
+.ministry{font-size:14px;font-weight:900}
+.dept{font-size:11px;opacity:.8;margin-top:2px}
+.school-name{font-size:13px;font-weight:900}
+.logo-img{height:65px;width:auto;filter:brightness(0) invert(1)}
+.year-row{display:grid;grid-template-columns:1fr 1fr;gap:0;background:rgba(255,255,255,.08);border-top:1px solid rgba(255,255,255,.2)}
+.year-cell{padding:5px 14px;font-size:11px;font-weight:700}
+.year-cell:first-child{border-left:1px solid rgba(255,255,255,.2);text-align:left}
 
-  /* عنوان التقرير */
-  .report-title-bar { background:#1e3a5f; color:white; text-align:center; padding:12px; font-size:17px; font-weight:900; }
+/* ── شريط العنوان ── */
+.title-bar{background:#1a2f5e;color:#fff;text-align:center;padding:12px 16px;font-size:16px;font-weight:900;border-top:4px solid #f59e0b;letter-spacing:.3px}
 
-  /* الجدول */
-  .table-section { padding:0 16px; margin-top:12px; }
-  .row-2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px; }
-  .row-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:10px; }
-  .field-box { border:1.5px solid #0d9488; border-radius:8px; padding:8px 12px; }
-  .field-label { font-size:10px; color:#0d9488; font-weight:700; margin-bottom:4px; }
-  .field-value { font-size:12px; font-weight:600; min-height:20px; white-space:pre-wrap; }
+/* ── بيانات التنفيذ ── */
+.meta-row{display:grid;grid-template-columns:repeat(4,1fr);border-bottom:2px solid #0d9488}
+.meta-cell{padding:7px 10px;border-left:1px solid #c7d2e8;background:#f8fafd}
+.meta-cell:last-child{border-left:none}
+.meta-lbl{font-size:9px;color:#64748b;font-weight:700;margin-bottom:3px;border-bottom:1px solid #e2e8f0;padding-bottom:2px}
+.meta-val{font-size:12px;font-weight:700;color:#1a2035}
 
-  .row-big { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px; }
-  .field-box-big { border:1.5px solid #0d9488; border-radius:8px; padding:10px 12px; min-height:100px; }
+/* ── الأقسام النصية ── */
+.sections{padding:12px 14px;display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.section-full{grid-column:1/-1}
+.section{border:1.5px solid #c7d2e8;border-radius:8px;overflow:hidden}
+.sec-hdr{background:linear-gradient(135deg,#1a2f5e,#1d4ed8);color:#fff;padding:6px 12px;font-size:12px;font-weight:900;display:flex;align-items:center;gap:6px}
+.sec-hdr .icon{font-size:15px}
+.sec-body{padding:10px 12px;font-size:12.5px;line-height:1.8;min-height:70px;color:#1e293b;white-space:pre-wrap}
 
-  /* الشواهد */
-  .witnesses-title { text-align:center; color:#0d9488; font-weight:900; font-size:14px; margin:16px 0 10px; border-top:2px solid #0d9488; padding-top:10px; }
-  .witnesses-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; padding:0 16px; margin-bottom:16px; }
-  .witness-item { border:1.5px solid #0d9488; border-radius:8px; padding:8px; text-align:center; min-height:160px; display:flex; flex-direction:column; align-items:center; justify-content:center; }
-  .witness-label { font-size:11px; color:#0d9488; font-weight:700; margin-top:6px; }
-  .empty-box { color:#ccc; font-size:12px; }
+/* ── التوقيعات ── */
+.sigs{display:grid;grid-template-columns:repeat(3,1fr);gap:0;border-top:2px solid #0d3b6e;margin:0 14px 14px}
+.sig{text-align:center;padding:14px 10px 6px;border-left:1px solid #c7d2e8}
+.sig:first-child{border-left:none}
+.sig-role{font-size:10px;color:#64748b;margin-bottom:6px}
+.sig-name{font-size:12px;font-weight:900;color:#1a2035;border-top:1.5px dashed #0d9488;padding-top:8px;margin-top:14px}
 
-  /* التوقيعات */
-  .signatures { display:grid; grid-template-columns:1fr 1fr; gap:20px; padding:10px 24px 16px; }
-  .sig-box { text-align:center; border-top:1.5px dashed #0d9488; padding-top:8px; }
-  .sig-title { font-size:11px; color:#64748b; }
-  .sig-name { font-size:13px; font-weight:700; margin-top:4px; }
+/* ── الشواهد ── */
+.witnesses-page{page-break-before:always;padding:0}
+.wit-title-bar{background:linear-gradient(135deg,#1a2f5e,#0d9488);color:#fff;text-align:center;padding:11px;font-size:15px;font-weight:900}
+.wit-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:14px}
+.sh-item{border:2px solid #0d3b6e;border-radius:10px;overflow:hidden;text-align:center}
+.sh-item img{width:100%;height:200px;object-fit:cover;display:block}
+.sh-lbl{background:#0d3b6e;color:#fff;font-size:11px;font-weight:700;padding:5px;text-align:center}
+.sh-item.empty{min-height:220px;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#f8fafd}
+.sh-empty{color:#94a3b8;font-size:12px}
 
-  /* الفوتر */
-  .footer { background:#0f2540; color:rgba(255,255,255,.6); text-align:center; padding:8px; font-size:10px; }
+/* ── الفوتر ── */
+.footer{background:#0d1b2e;color:rgba(255,255,255,.55);text-align:center;padding:7px;font-size:10px;margin-top:6px}
 
-  @media print { @page { size:A4; margin:0; } body { -webkit-print-color-adjust:exact; print-color-adjust:exact; } }
+@media print{
+  @page{size:A4;margin:10mm}
+  body{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .witnesses-page{page-break-before:always}
+}
 </style>
 </head>
 <body>
 <div class="page">
+  <!-- الترويسة -->
   <div class="header">
-    <div class="header-right">
+    <div class="hcol right">
+      <div class="kingdom">المملكة العربية السعودية</div>
       <div class="ministry">وزارة التعليم</div>
-      <div class="region">الإدارة العامة للتعليم بمحافظة جدة</div>
+      <div class="dept">إدارة تعليم جدة</div>
     </div>
-    <div class="header-center">
-      <div class="divider-line"></div>
-      <img src="${LOGO_URL}" class="logo-img" alt="شعار وزارة التعليم" />
-      <div class="divider-line"></div>
+    <div class="hcol center">
+      <img src="${LOGO_URL}" class="logo-img" alt="شعار" />
     </div>
-    <div class="header-left">
-      <div class="school-name">مدرسة عبيدة بن الحارث المتوسطة</div>
-      <div class="report-label">تقرير برنامج:</div>
-      <div class="report-title-inline">${report.reportTitle || "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"}</div>
+    <div class="hcol left">
+      <div class="kingdom">مدرسة عبيدة بن الحارث المتوسطة</div>
+      <div class="ministry">العام الدراسي ${report.acadYear}</div>
+      <div class="dept">الفصل الدراسي ${report.semester}</div>
+    </div>
+  </div>
+  <div class="year-row">
+    <div class="year-cell">العام الدراسي ${report.acadYear}</div>
+    <div class="year-cell">الفصل الدراسي ${report.semester}</div>
+  </div>
+
+  <!-- عنوان التقرير -->
+  <div class="title-bar">${report.reportTitle}</div>
+
+  <!-- بيانات التنفيذ -->
+  <div class="meta-row">
+    <div class="meta-cell"><div class="meta-lbl">المجال</div><div class="meta-val">${report.field}</div></div>
+    <div class="meta-cell"><div class="meta-lbl">المنفذ</div><div class="meta-val">${report.executor}</div></div>
+    <div class="meta-cell"><div class="meta-lbl">الفئة المستهدفة</div><div class="meta-val">${report.targetGroup}</div></div>
+    <div class="meta-cell"><div class="meta-lbl">تاريخ التنفيذ</div><div class="meta-val">${report.execDate}</div></div>
+  </div>
+
+  <!-- الأقسام -->
+  <div class="sections">
+    <div class="section section-full">
+      <div class="sec-hdr"><span class="icon">📝</span>المقدمة</div>
+      <div class="sec-body">${formatText(report.intro)}</div>
+    </div>
+    <div class="section">
+      <div class="sec-hdr"><span class="icon">🎯</span>الأهداف</div>
+      <div class="sec-body">${formatText(report.objectives)}</div>
+    </div>
+    <div class="section">
+      <div class="sec-hdr"><span class="icon">⚡</span>الأنشطة المنفذة</div>
+      <div class="sec-body">${formatText(report.activities)}</div>
+    </div>
+    <div class="section">
+      <div class="sec-hdr"><span class="icon">✅</span>النتائج المتوقعة</div>
+      <div class="sec-body">${formatText(report.results)}</div>
+    </div>
+    <div class="section">
+      <div class="sec-hdr"><span class="icon">💡</span>التوصيات</div>
+      <div class="sec-body">${formatText(report.recommendations)}</div>
     </div>
   </div>
 
-  <div class="report-title-bar">${report.reportTitle || "تقرير برنامج"}</div>
-
-  <div class="table-section">
-    <div class="row-2">
-      <div class="field-box"><div class="field-label">المنفذ/ون:</div><div class="field-value">${report.executor}</div></div>
-      <div class="field-box"><div class="field-label">المشارك/ون:</div><div class="field-value">${report.participants}</div></div>
+  <!-- التوقيعات -->
+  <div class="sigs">
+    <div class="sig">
+      <div class="sig-role">${report.activityLeaderTitle} / إسم المعلم</div>
+      <div class="sig-name">${report.activityLeader}</div>
     </div>
-    <div class="row-3">
-      <div class="field-box"><div class="field-label">مكان التنفيذ:</div><div class="field-value">${report.location}</div></div>
-      <div class="field-box"><div class="field-label">مدة التنفيذ:</div><div class="field-value">${report.duration}</div></div>
-      <div class="field-box"><div class="field-label">تاريخ التنفيذ:</div><div class="field-value">${report.date}</div></div>
+    <div class="sig">
+      <div class="sig-role">${report.coordinatorTitle} / إسم المعلم</div>
+      <div class="sig-name">${report.coordinator}</div>
     </div>
-    <div class="row-2">
-      <div class="field-box"><div class="field-label">المستفيدون / العدد:</div><div class="field-value">${report.beneficiaries}</div></div>
-      <div class="field-box"><div class="field-label">المجال:</div><div class="field-value">${report.field}</div></div>
-    </div>
-    <div class="row-big">
-      <div class="field-box-big"><div class="field-label">الأهداف:</div><div class="field-value">${report.objectives}</div></div>
-      <div class="field-box-big"><div class="field-label">خطوات التنفيذ / الوصف:</div><div class="field-value">${report.steps}</div></div>
+    <div class="sig">
+      <div class="sig-role">مدير المدرسة / اسم المدير</div>
+      <div class="sig-name">${report.principal}</div>
     </div>
   </div>
 
-  <div class="witnesses-title">— الشواهد —</div>
-  <div class="witnesses-grid">${witnessesHtml}</div>
-
-  <div class="signatures">
-    <div class="sig-box"><div class="sig-title">رائد النشاط</div><div class="sig-name">${report.activityLeaderName || "الاسم"}</div></div>
-    <div class="sig-box"><div class="sig-title">مدير المدرسة</div><div class="sig-name">${report.principalName || "الاسم"}</div></div>
-  </div>
-
-  <div class="footer">مدرسة عبيدة بن الحارث المتوسطة — بوابة الإدارة المدرسية الإلكترونية</div>
+  <div class="footer">www.edu-forms.com — موقع نماذج تعليمية • صفحة 1 من 2</div>
 </div>
-<script>window.onload=()=>{ window.print(); }</script>
-</body></html>`);
 
-  // حقل نص بسيط أو محرر غني
-  const Field = ({ label, field, placeholder, multiline }) => (
-    <div>
-      {multiline
-        ? <RichField label={label} value={report[field] || ''} onChange={val => upd(field, val)} placeholder={placeholder} />
-        : <>
-            <label className="text-xs font-bold text-teal-700 mb-1 block">{label}</label>
-            <input value={report[field] || ''} onChange={e => upd(field, e.target.value)}
-              className="w-full border-2 border-gray-200 focus:border-teal-400 rounded-xl px-3 py-2 text-sm focus:outline-none"
-              placeholder={placeholder} />
-          </>
-      }
+<!-- ── صفحة الشواهد ── -->
+<div class="page witnesses-page">
+  <!-- ترويسة مكررة -->
+  <div class="header">
+    <div class="hcol right">
+      <div class="kingdom">المملكة العربية السعودية</div>
+      <div class="ministry">وزارة التعليم</div>
+      <div class="dept">إدارة تعليم جدة</div>
+    </div>
+    <div class="hcol center">
+      <img src="${LOGO_URL}" class="logo-img" alt="شعار" />
+    </div>
+    <div class="hcol left">
+      <div class="school-name">مدرسة عبيدة بن الحارث المتوسطة</div>
+      <div class="ministry">العام الدراسي ${report.acadYear}</div>
+      <div class="dept">الفصل الدراسي ${report.semester}</div>
+    </div>
+  </div>
+  <div class="wit-title-bar">شواهد ${report.reportTitle}</div>
+  <div class="wit-grid">${wHtml}</div>
+  <div class="footer">www.edu-forms.com — موقع نماذج تعليمية • صفحة 2 من 2</div>
+</div>
+
+<script>window.onload=()=>window.print();</script>
+</body></html>`);
+  };
+
+  /* ─── حقل نصي قابل للتحرير ─── */
+  const TF = ({ label, field, ph, rows, icon }) => (
+    <div className="space-y-1">
+      <label className="text-xs font-black flex items-center gap-1" style={{color:"#1d4ed8"}}>
+        {icon && <span>{icon}</span>}{label}
+      </label>
+      {rows ? (
+        <textarea value={report[field]||""} onChange={e=>upd(field,e.target.value)} rows={rows}
+          placeholder={ph}
+          className="w-full border-2 rounded-xl px-3 py-2 text-sm focus:outline-none resize-none leading-relaxed"
+          style={{borderColor:"#c7d2e8",fontFamily:"Cairo,sans-serif"}} />
+      ) : (
+        <input value={report[field]||""} onChange={e=>upd(field,e.target.value)}
+          placeholder={ph}
+          className="w-full border-2 rounded-xl px-3 py-2 text-sm focus:outline-none"
+          style={{borderColor:"#c7d2e8"}} />
+      )}
     </div>
   );
 
+  /* ─── بطاقة شاهد ─── */
+  const WitnessCard = ({ idx }) => {
+    const w = report.witnesses[idx];
+    return (
+      <div className="relative rounded-2xl overflow-hidden border-2" style={{borderColor:"#0d3b6e",minHeight:170}}>
+        {w ? (
+          <>
+            <img src={w.dataUrl} alt={`شاهد ${idx+1}`}
+              className="w-full object-cover" style={{height:150}} />
+            <div className="flex items-center justify-between px-3 py-2"
+              style={{background:"linear-gradient(135deg,#0d3b6e,#0d9488)"}}>
+              <span className="text-white text-xs font-black">الشاهد رقم {idx+1}</span>
+              <button onClick={()=>removeWitness(idx)}
+                className="text-white/70 hover:text-red-300 text-xs font-bold px-2 py-0.5 rounded-lg bg-white/10">
+                🗑️ حذف
+              </button>
+            </div>
+          </>
+        ) : (
+          <label className="flex flex-col items-center justify-center h-full cursor-pointer hover:bg-blue-50 transition-all"
+            style={{minHeight:170}}>
+            <div className="text-3xl mb-2">📷</div>
+            <div className="text-xs font-black" style={{color:"#1d4ed8"}}>الشاهد رقم {idx+1}</div>
+            <div className="text-xs text-gray-400 mt-1">اضغط لإضافة صورة</div>
+            <input type="file" accept="image/*" className="hidden" ref={witnessRefs[idx]}
+              onChange={e=>{const f=e.target.files?.[0];if(f)handleWitness(idx,f);e.target.value="";}} />
+          </label>
+        )}
+        {!w && (
+          <input type="file" accept="image/*" className="hidden" ref={witnessRefs[idx]}
+            onChange={e=>{const f=e.target.files?.[0];if(f)handleWitness(idx,f);e.target.value="";}} />
+        )}
+      </div>
+    );
+  };
+
   return (
-    <div className="space-y-5 w-full">
-      {/* ===== ترويسة ===== */}
-      <div className="bg-gradient-to-l from-teal-700 to-blue-900 rounded-2xl overflow-hidden text-white shadow-xl">
-        {/* صف 1: وزارة / شعار / مدرسة */}
-        <div className="flex items-stretch" style={{minHeight:"85px"}}>
-          {/* يمين */}
-          <div className="flex-1 flex flex-col justify-center text-right px-5 py-3">
+    <div dir="rtl" className="max-w-4xl mx-auto space-y-5 pb-10" style={{fontFamily:"'Cairo',sans-serif"}}>
+      <style>{`
+        .report-section-hdr { background: linear-gradient(135deg,#0d3b6e,#1d4ed8); color:#fff; padding:10px 16px; border-radius:12px 12px 0 0; font-weight:900; font-size:14px; display:flex; align-items:center; gap:8px; }
+        .report-card { border:2px solid #c7d2e8; border-radius:14px; overflow:hidden; background:#fff; box-shadow:0 2px 12px rgba(13,59,110,.07); }
+        textarea:focus, input[type=text]:focus { border-color:#1d4ed8 !important; box-shadow:0 0 0 3px rgba(29,78,216,.12); }
+      `}</style>
+
+      {/* ══ ترويسة الصفحة ══ */}
+      <div className="rounded-2xl overflow-hidden shadow-2xl text-white"
+        style={{background:"linear-gradient(135deg,#0d3b6e 0%,#1a5276 50%,#0d9488 100%)"}}>
+        <div className="flex items-stretch" style={{minHeight:90}}>
+          <div className="flex-1 flex flex-col justify-center text-right px-5 py-3 border-l border-white/20">
+            <div className="text-xs opacity-75">المملكة العربية السعودية</div>
             <div className="font-black text-base">وزارة التعليم</div>
-            <div className="text-xs opacity-80 mt-1">الإدارة العامة للتعليم بمحافظة جدة</div>
+            <div className="text-xs opacity-75 mt-1">إدارة تعليم — جدة</div>
           </div>
-          {/* وسط */}
           <div className="flex items-center justify-center px-5 gap-3">
-            <div style={{width:"1.5px",height:"60px",background:"rgba(255,255,255,0.3)",borderRadius:"2px"}}></div>
+            <div style={{width:"1.5px",height:60,background:"rgba(255,255,255,.3)",borderRadius:2}}/>
             <img src={LOGO_URL} alt="شعار" className="h-16 w-auto" style={{filter:"brightness(0) invert(1)"}} />
-            <div style={{width:"1.5px",height:"60px",background:"rgba(255,255,255,0.3)",borderRadius:"2px"}}></div>
+            <div style={{width:"1.5px",height:60,background:"rgba(255,255,255,.3)",borderRadius:2}}/>
           </div>
-          {/* يسار */}
           <div className="flex-1 flex flex-col justify-center text-left px-5 py-3">
             <div className="font-black text-sm">مدرسة عبيدة بن الحارث المتوسطة</div>
-            <div className="text-xs opacity-70 mt-1">المتوسطة — جدة</div>
+            <div className="flex gap-3 mt-2 text-xs opacity-80">
+              <input value={report.acadYear||""} onChange={e=>upd("acadYear",e.target.value)}
+                className="bg-white/15 rounded-lg px-2 py-0.5 text-white placeholder-white/50 text-xs font-bold w-20 focus:outline-none border border-white/30"
+                placeholder="1447هـ" />
+              <select value={report.semester||"الأول"} onChange={e=>upd("semester",e.target.value)}
+                className="bg-white/15 rounded-lg px-2 py-0.5 text-white text-xs font-bold focus:outline-none border border-white/30">
+                <option value="الأول">الفصل الأول</option>
+                <option value="الثاني">الفصل الثاني</option>
+                <option value="الثالث">الفصل الثالث</option>
+              </select>
+            </div>
           </div>
         </div>
-        {/* صف 2: تقرير برنامج + حقل العنوان */}
-        <div className="bg-black bg-opacity-30 flex items-center gap-3 px-6 py-3">
-          <span className="font-black text-base whitespace-nowrap">📋 تقرير برنامج:</span>
-          <input
-            value={report.reportTitle || ""}
-            onChange={e => upd("reportTitle", e.target.value)}
-            className="flex-1 bg-transparent border-b-2 border-white border-opacity-50 text-white placeholder-white placeholder-opacity-40 focus:outline-none focus:border-opacity-90 font-bold text-sm py-0.5"
-            placeholder="اكتب عنوان / اسم البرنامج هنا..."
-            dir="rtl"
-          />
-          {/* أزرار */}
-          <div className="flex gap-2 mr-auto">
-            {saved && <span className="bg-green-500 text-white text-xs font-bold px-3 py-1.5 rounded-xl">✅ حُفظ</span>}
-            <button onClick={printReport} className="bg-white text-teal-700 font-black px-4 py-1.5 rounded-xl text-sm hover:bg-teal-50 flex items-center gap-1.5">🖨️ طباعة</button>
-            <button onClick={() => { setReport(emptyReport); }} className="bg-white bg-opacity-20 text-white font-bold px-3 py-1.5 rounded-xl text-sm hover:bg-opacity-30">🗑️ مسح</button>
+        {/* شريط العنوان */}
+        <div className="px-5 py-3" style={{background:"rgba(0,0,0,.35)"}}>
+          <input value={report.reportTitle||""} onChange={e=>upd("reportTitle",e.target.value)}
+            className="w-full bg-transparent border-b-2 border-white/50 text-white placeholder-white/40 focus:outline-none focus:border-yellow-400 font-black text-base py-1 text-center"
+            placeholder="اكتب عنوان التقرير هنا..." />
+        </div>
+      </div>
+
+      {/* ══ جدول بيانات التنفيذ ══ */}
+      <div className="report-card">
+        <div className="report-section-hdr">📋 بيانات التنفيذ</div>
+        <div className="grid grid-cols-2 gap-4 p-4 lg:grid-cols-4">
+          <TF label="المجال" field="field" ph="النشاط الطلابي..." />
+          <TF label="المنفذ" field="executor" ph="اسم المنفذ..." />
+          <TF label="الفئة المستهدفة" field="targetGroup" ph="الطلاب..." />
+          <TF label="تاريخ التنفيذ" field="execDate" ph="1447/10/24 هـ" />
+        </div>
+      </div>
+
+      {/* ══ المقدمة ══ */}
+      <div className="report-card">
+        <div className="report-section-hdr">📝 المقدمة</div>
+        <div className="p-4">
+          <TF field="intro" ph="اكتب المقدمة هنا..." rows={4} />
+        </div>
+      </div>
+
+      {/* ══ الأهداف والأنشطة ══ */}
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+        <div className="report-card">
+          <div className="report-section-hdr">🎯 الأهداف</div>
+          <div className="p-4">
+            <TF field="objectives" ph="اكتب الأهداف هنا..." rows={6} />
+          </div>
+        </div>
+        <div className="report-card">
+          <div className="report-section-hdr">⚡ الأنشطة المنفذة</div>
+          <div className="p-4">
+            <TF field="activities" ph="اكتب الأنشطة المنفذة هنا..." rows={6} />
+          </div>
+        </div>
+        <div className="report-card">
+          <div className="report-section-hdr">✅ النتائج المتوقعة</div>
+          <div className="p-4">
+            <TF field="results" ph="اكتب النتائج المتوقعة هنا..." rows={6} />
+          </div>
+        </div>
+        <div className="report-card">
+          <div className="report-section-hdr">💡 التوصيات</div>
+          <div className="p-4">
+            <TF field="recommendations" ph="اكتب التوصيات هنا..." rows={6} />
           </div>
         </div>
       </div>
 
-      {/* ===== الترويسة ===== */}
-      <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
-        <h3 className={cx.head3}>
-          <span className="bg-teal-100 text-teal-700 px-3 py-1 rounded-lg text-sm">الترويسة</span>
-        </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Field label="اسم المدرسة" field="schoolName" placeholder="مدرسة عبيدة بن الحارث المتوسطة" />
-          <Field label="الإدارة / المنطقة" field="region" placeholder="الإدارة العامة للتعليم بالمنطقة" />
-        </div>
-      </div>
-
-      {/* ===== عنوان التقرير ===== */}
-      <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
-        <h3 className={cx.head3}>
-          <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-lg text-sm">عنوان التقرير</span>
-        </h3>
-        <input value={report.reportTitle} onChange={e => upd("reportTitle", e.target.value)}
-          className="w-full border-2 border-blue-200 focus:border-blue-500 rounded-xl px-4 py-3 text-base font-bold focus:outline-none text-center"
-          placeholder="مثال: تقرير الاحتفاء باليوم الوطني ٩٥" />
-      </div>
-
-      {/* ===== بيانات التنفيذ ===== */}
-      <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
-        <h3 className={cx.head3}>
-          <span className="bg-teal-100 text-teal-700 px-3 py-1 rounded-lg text-sm">بيانات التنفيذ</span>
-        </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-          <Field label="المنفذ/ون" field="executor" placeholder="جميع منسوبي المدرسة" />
-          <Field label="المشارك/ون" field="participants" placeholder="أولياء الأمور" />
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
-          <Field label="مكان التنفيذ" field="location" placeholder="فناء المدرسة" />
-          <Field label="مدة التنفيذ" field="duration" placeholder="يوم واحد" />
-          <Field label="تاريخ التنفيذ" field="date" placeholder="١/٤/١٤٤٧ هـ" />
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Field label="المستفيدون / العدد" field="beneficiaries" placeholder="منسوبو المدرسة / أولياء الأمور" />
-          <Field label="المجال" field="field" placeholder="المواطنة" />
-        </div>
-      </div>
-
-      {/* ===== الأهداف والخطوات ===== */}
-      <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
-        <h3 className={cx.head3}>
-          <span className="bg-amber-100 text-amber-700 px-3 py-1 rounded-lg text-sm">الأهداف والتنفيذ</span>
-        </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Field label="الأهداف" field="objectives" placeholder="١. تعزيز الهوية الوطنية&#10;٢. تنمية الانتماء&#10;٣. ..." multiline />
-          <Field label="خطوات التنفيذ / الوصف" field="steps" placeholder="١. إذاعة صباحية متنوعة&#10;٢. مسابقات&#10;٣. ..." multiline />
-        </div>
-      </div>
-
-      {/* ===== الشواهد ===== */}
-      <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
-        <h3 className={cx.head3}>
-          <span className="bg-purple-100 text-purple-700 px-3 py-1 rounded-lg text-sm">الشواهد (صور)</span>
-          <span className="text-xs text-gray-400 font-normal">أرفق حتى 4 صور كشواهد للنشاط</span>
-        </h3>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          {report.witnesses.map((w, i) => (
-            <div key={i} className="relative">
-              <div className="text-xs font-bold text-teal-700 mb-1 text-center">شاهد {i + 1}</div>
-              {w ? (
-                <div className="relative group rounded-xl overflow-hidden border-2 border-teal-300" style={{ aspectRatio:"4/3" }}>
-                  <img src={w.dataUrl} alt={`شاهد ${i+1}`} className="w-full h-full object-cover" />
-                  <div className="absolute inset-0 bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-all flex flex-col items-center justify-center gap-2">
-                    <button onClick={() => downloadWitness(w)}
-                      className="bg-white text-teal-700 font-bold text-xs px-3 py-1.5 rounded-lg w-20">⬇️ تحميل</button>
-                    <button onClick={() => removeWitness(i)}
-                      className="bg-red-500 text-white font-bold text-xs px-3 py-1.5 rounded-lg w-20">🗑️ حذف</button>
-                  </div>
-                </div>
+      {/* ══ التوقيعات ══ */}
+      <div className="report-card">
+        <div className="report-section-hdr">✍️ التوقيعات</div>
+        <div className="grid grid-cols-3 gap-4 p-4">
+          {[
+            {roleField:"activityLeaderTitle", nameField:"activityLeader", roleDefault:"رائد النشاط"},
+            {roleField:"coordinatorTitle",   nameField:"coordinator",    roleDefault:"منسق الرياضي"},
+            {roleField:null,                  nameField:"principal",       roleDefault:"مدير المدرسة"},
+          ].map((sig,i)=>(
+            <div key={i} className="text-center p-3 rounded-xl border-2 space-y-2" style={{borderColor:"#c7d2e8"}}>
+              {sig.roleField ? (
+                <input value={report[sig.roleField]||""} onChange={e=>upd(sig.roleField,e.target.value)}
+                  className="w-full text-center text-xs font-black border rounded-lg px-2 py-1 focus:outline-none"
+                  style={{color:"#64748b",borderColor:"#e2e8f0"}} placeholder={sig.roleDefault} />
               ) : (
-                <label className="cursor-pointer block">
-                  <div className="border-2 border-dashed border-gray-300 hover:border-teal-400 rounded-xl flex flex-col items-center justify-center text-gray-400 hover:text-teal-500 transition-all bg-gray-50 hover:bg-teal-50"
-                    style={{ aspectRatio:"4/3" }}>
-                    <span className="text-3xl mb-1">📷</span>
-                    <span className="text-xs font-bold">إرفاق صورة</span>
-                  </div>
-                  <input type="file" accept="image/*" className="hidden"
-                    onChange={e => { if(e.target.files[0]) handleWitness(i, e.target.files[0]); e.target.value=""; }} />
-                </label>
+                <div className="text-xs font-black text-gray-500">مدير المدرسة / اسم المدير</div>
               )}
+              <div style={{height:1,background:"#e2e8f0",margin:"10px 0"}}/>
+              <input value={report[sig.nameField]||""} onChange={e=>upd(sig.nameField,e.target.value)}
+                className="w-full text-center font-black text-sm border-b-2 focus:outline-none bg-transparent"
+                style={{borderColor:"#0d9488",color:"#0d3b6e"}} placeholder="الاسم" />
             </div>
           ))}
         </div>
       </div>
 
-      {/* ===== التوقيعات ===== */}
-      <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
-        <h3 className={cx.head3}>
-          <span className="bg-gray-100 text-gray-700 px-3 py-1 rounded-lg text-sm">التوقيعات</span>
-        </h3>
-        <div className="grid grid-cols-2 gap-6">
-          <div className="text-center">
-            <label className="text-xs font-bold text-gray-500 block mb-1">رائد النشاط</label>
-            <input value={report.activityLeaderName} onChange={e => upd("activityLeaderName", e.target.value)}
-              className="w-full border-b-2 border-dashed border-teal-400 text-center py-2 text-sm font-bold focus:outline-none bg-transparent"
-              placeholder="الاسم" />
-          </div>
-          <div className="text-center">
-            <label className="text-xs font-bold text-gray-500 block mb-1">مدير المدرسة</label>
-            <input value={report.principalName} onChange={e => upd("principalName", e.target.value)}
-              className="w-full border-b-2 border-dashed border-teal-400 text-center py-2 text-sm font-bold focus:outline-none bg-transparent"
-              placeholder="الاسم" />
-          </div>
+      {/* ══ الشواهد (6 صور) ══ */}
+      <div className="report-card">
+        <div className="report-section-hdr">📸 شواهد التقرير</div>
+        <div className="p-4 grid grid-cols-2 gap-4 lg:grid-cols-3">
+          {[0,1,2,3,4,5].map(i => <WitnessCard key={i} idx={i} />)}
         </div>
       </div>
 
-      {/* Preview bar */}
-      <div className="bg-teal-50 border border-teal-200 rounded-2xl px-5 py-4 flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <p className="text-sm font-black text-teal-700">✅ البيانات تُحفظ تلقائياً في المتصفح</p>
-          <p className="text-xs text-teal-500 mt-0.5">اضغط "طباعة / PDF" للحصول على نسخة جاهزة للطباعة أو الحفظ كـ PDF</p>
+      {/* ══ أزرار التحكم ══ */}
+      <div className="flex gap-3 flex-wrap justify-between items-center rounded-2xl p-4 shadow-lg"
+        style={{background:"linear-gradient(135deg,#0d3b6e,#0d9488)"}}>
+        <div className="flex items-center gap-2 text-white text-sm font-black">
+          {saved ? <><span className="text-green-300">✅</span><span>تم الحفظ</span></> : <><span className="animate-pulse">💾</span><span>يحفظ تلقائياً</span></>}
         </div>
-        <button onClick={printReport}
-          className="bg-teal-600 hover:bg-teal-700 text-white font-black px-6 py-2.5 rounded-xl text-sm flex items-center gap-2">
-          🖨️ طباعة / حفظ PDF
-        </button>
+        <div className="flex gap-3">
+          <button onClick={()=>setReport(EMPTY)}
+            className="px-5 py-2.5 rounded-xl font-black text-sm text-white/80 border border-white/30 hover:bg-white/10">
+            🔄 إعادة تعيين
+          </button>
+          <button onClick={printReport}
+            className="px-6 py-2.5 rounded-xl font-black text-sm shadow-lg hover:shadow-xl transition-all"
+            style={{background:"linear-gradient(135deg,#f59e0b,#d97706)",color:"#fff"}}>
+            🖨️ طباعة / PDF
+          </button>
+        </div>
       </div>
     </div>
   );
 }
 
-// ===== التقرير الشهري والفصلي =====
 function MonthlyReportPage({ teachers, attendance, week, weekArchive, classList, announcements, activities }) {
   const [reportType, setReportType] = useState("monthly"); // monthly | semester
   const [selectedMonth, setSelectedMonth] = useState(10);
@@ -21306,7 +21394,8 @@ function SuggestionsPortal({ siteFont, onBack, classList }) {
   const openDirect = () => { setStudentFound(null); setStep("form"); };
 
   const handleSubmit = async () => {
-    if (!form.message.trim()) { setSubmitError("الرجاء كتابة رسالتك"); return; }
+    const msgText = form.message.replace(/<[^>]*>/g,"").trim();
+    if (!msgText) { setSubmitError("الرجاء كتابة رسالتك"); return; }
     setSubmitError("");
     setSubmitting(true);
     try {
@@ -21417,7 +21506,7 @@ function SuggestionsPortal({ siteFont, onBack, classList }) {
 
         {/* نموذج الإرسال */}
         {step === "form" && (
-          <div className="bg-white rounded-3xl p-6 shadow-2xl space-y-4">
+          <div className="bg-white rounded-3xl p-5 shadow-2xl space-y-4">
             {studentFound && (
               <div className="bg-teal-50 rounded-2xl p-3 flex items-center gap-3 border border-teal-200">
                 <span className="text-2xl">🎓</span>
@@ -21452,10 +21541,9 @@ function SuggestionsPortal({ siteFont, onBack, classList }) {
 
             <div>
               <label className="text-xs font-black text-gray-600 mb-1.5 block">✍️ الرسالة <span className="text-red-500">*</span></label>
-              <textarea value={form.message} onChange={e => setForm(p=>({...p,message:e.target.value}))}
-                placeholder="اكتب رأيك أو مقترحك أو ملاحظتك هنا..."
-                rows={5}
-                className="w-full px-4 py-3 rounded-2xl border-2 border-gray-200 focus:border-teal-400 focus:outline-none text-sm resize-none" />
+              <div className="border-2 border-gray-200 rounded-2xl overflow-hidden focus-within:border-teal-400 transition-colors">
+                <RichEditor value={form.message} onChange={v => setForm(p=>({...p,message:v}))} />
+              </div>
             </div>
 
             {submitError && <div className="bg-red-50 text-red-600 text-sm font-bold p-3 rounded-xl text-center">{submitError}</div>}
@@ -24212,60 +24300,63 @@ export default function SchoolWebsite() {
   if (!user) return <LoginPage users={users} onLogin={setUser} siteFont={siteFont} onParentPortal={() => setParentPortal(true)} onTeacherPortal={() => setPerfStandardsPortal(true)} onTeacherProfile={() => setTeacherProfilePortal(true)} onStudentRaffle={() => setStudentRaffle(true)} onPublicAnnouncements={() => setPublicAnnouncements(true)} onExcusePortal={() => setExcusePortal(true)} onSuggestions={() => setSuggestionsPortal(true)} />;
 
   const pages = [
-    { id: "home",            label: "الرئيسية",        icon: "🏠" },
-    { id: "attendance",      label: "غياب المعلمين",  icon: "📋" },
-    { id: "admin-attendance",label: "دوام الإداريين", icon: "🏢" },
+    { id: "home",            label: "الرئيسية",        icon: "🏡" },
+    { id: "attendance",      label: "غياب المعلمين",  icon: "🗓️" },
+    { id: "admin-attendance",label: "دوام الإداريين", icon: "🏛️" },
     { id: "student-absence", label: "غياب الطلاب",   icon: "🎒" },
-    { id: "students",        label: "تقييم الطلاب",  icon: "👨‍🎓" },
-    { id: "announcements", label: "الإعلانات",       icon: "📢" },
-    { id: "activities",    label: "الأنشطة",         icon: "⚡" },
-    { id: "messages",      label: "رسائل الأهالي",  icon: "✉️" },
-    { id: "sms",           label: "رسائل SMS",       icon: "📱" },
-    { id: "perfresults",   label: "تقويم الأداء",   icon: "📊" },
-    { id: "settings",      label: "الإعدادات",       icon: "⚙️" },
+    { id: "students",        label: "تقييم الطلاب",  icon: "🎓" },
+    { id: "announcements", label: "الإعلانات",       icon: "📣" },
+    { id: "activities",    label: "الأنشطة",         icon: "🎯" },
+    { id: "messages",      label: "رسائل الأهالي",  icon: "💌" },
+    { id: "sms",           label: "رسائل SMS",       icon: "📲" },
+    { id: "perfresults",   label: "تقويم الأداء",   icon: "📈" },
+    { id: "settings",      label: "الإعدادات",       icon: "🛠️" },
   ];
 
-  const extraPages = [
-    { id: "strategies",    label: "الاستراتيجيات",   icon: "📚" },
-    { id: "calendar",      label: "التقويم المدرسي", icon: "📅" },
-    { id: "gallery",       label: "معرض الأنشطة",   icon: "🖼" },
-    { id: "certificates",  label: "الشهادات الرقمية",icon: "🏅" },
-    { id: "poll",          label: "تميّز المعلم",    icon: "🏆" },
-    { id: "raffle",        label: "سحب الطلاب",      icon: "🎰" },
-    { id: "surveys",       label: "الاستبيانات",     icon: "📊" },
-    { id: "report",        label: "تقرير برنامج",    icon: "📋" },
-    { id: "broadcast",     label: "الإذاعة المدرسية", icon: "🎙️" },
-    { id: "groupdivider",  label: "تقسيم المجموعات", icon: "👥" },
-    { id: "quiz",          label: "اختبارات الطلاب",  icon: "📝" },
-    { id: "classtimer",    label: "مؤقت الحصة",        icon: "⏱️" },
-    { id: "luckywheel",    label: "عجلة الحظ",          icon: "🎯" },
-    { id: "exitticket",    label: "بطاقة الخروج",       icon: "🚪" },
-    { id: "timetable",     label: "جدول الحصص",         icon: "🗓️" },
-
-    { id: "assessment",    label: "بطاقة التشخيص",      icon: "📊" },
-    { id: "studentexcuses",label: "أعذار الطلاب",       icon: "📋" },
-    { id: "honorboard",    label: "لوحة الشرف",         icon: "🏆" },
-    { id: "tasks",         label: "تتبع المهام",        icon: "✅" },
-    { id: "gradeanalysis",    label: "تحليل درجات الطلاب",     icon: "📊" },
-    { id: "teacherprofile",   label: "ملف المعلم",             icon: "👨‍🏫" },
-    { id: "monthlyreport",    label: "التقرير الشهري/الفصلي",  icon: "📋" },
-    { id: "absencestats",  label: "إحصائيات الغياب",   icon: "📊" },
-    { id: "attendancereport", label: "تحليل الحضور والانصراف", icon: "🗂️" },
-    { id: "officialforms",    label: "النماذج الرسمية",          icon: "📋" },
-    { id: "portfolio",        label: "ملف الطالب الشامل",       icon: "📁" },
-    { id: "earlywarning",     label: "الإنذار المبكر",           icon: "🚨" },
-    { id: "meetings",         label: "الاجتماعات والمواعيد",     icon: "📅" },
-    { id: "heatmap",          label: "خريطة النشاط المدرسي",    icon: "🗺️" },
-    { id: "committeemeeting",  label: "اجتماعات اللجان",           icon: "📋" },
-    { id: "dailyquiz",     label: "الاختبار اليومي",     icon: "🎯" },
-    { id: "aiteacher",     label: "مساعد المعلم الذكي",  icon: "🤖" },
-    { id: "lessonprep",    label: "تحضير الدرس الذكي",   icon: "📚" },
-    { id: "lessonrecommend",label: "الخطط العلاجية",     icon: "🩺" },
-    { id: "teachereval",   label: "قياس أداء المعلم",    icon: "🎯" },
-    { id: "perfresults",     label: "نتائج تقويم الأداء",  icon: "📊" },
-    { id: "suggestions",     label: "آراء ومقترحات",         icon: "💬" },
-    { id: "teacherreports", label: "ملفات المعلمين الأسبوعية", icon: "📁" },
+  // ── أدوات الفصل والتعليم
+  const classToolPages = [
+    { id: "strategies",     label: "الاستراتيجيات",      icon: "🧠" },
+    { id: "broadcast",      label: "الإذاعة المدرسية",   icon: "🎙️" },
+    { id: "groupdivider",   label: "تقسيم المجموعات",    icon: "👥" },
+    { id: "quiz",           label: "اختبارات الطلاب",    icon: "📝" },
+    { id: "classtimer",     label: "مؤقت الحصة",          icon: "⏱️" },
+    { id: "luckywheel",     label: "عجلة الحظ",            icon: "🎡" },
+    { id: "exitticket",     label: "بطاقة الخروج",         icon: "🎫" },
+    { id: "timetable",      label: "جدول الحصص",           icon: "📅" },
+    { id: "dailyquiz",      label: "الاختبار اليومي",      icon: "🎯" },
+    { id: "raffle",         label: "سحب الطلاب",           icon: "🎰" },
+    { id: "aiteacher",      label: "مساعد المعلم الذكي",   icon: "🤖" },
+    { id: "lessonprep",     label: "تحضير الدرس الذكي",    icon: "✏️" },
+    { id: "lessonrecommend",label: "الخطط العلاجية",       icon: "🩺" },
+    { id: "calendar",       label: "التقويم المدرسي",      icon: "🗓️" },
+    { id: "gallery",        label: "معرض الأنشطة",         icon: "🖼️" },
+    { id: "certificates",   label: "الشهادات الرقمية",     icon: "🏅" },
   ];
+  // ── تقارير وإدارة
+  const reportPages = [
+    { id: "poll",           label: "تميّز المعلم",         icon: "🏆" },
+    { id: "surveys",        label: "الاستبيانات",          icon: "📊" },
+    { id: "report",         label: "تقرير برنامج",         icon: "📋" },
+    { id: "assessment",     label: "بطاقة التشخيص",        icon: "🔍" },
+    { id: "studentexcuses", label: "أعذار الطلاب",         icon: "📄" },
+    { id: "honorboard",     label: "لوحة الشرف",           icon: "🌟" },
+    { id: "tasks",          label: "تتبع المهام",           icon: "✅" },
+    { id: "gradeanalysis",  label: "تحليل درجات الطلاب",   icon: "📈" },
+    { id: "teacherprofile", label: "ملف المعلم",            icon: "👨‍🏫" },
+    { id: "monthlyreport",  label: "التقرير الشهري",        icon: "📑" },
+    { id: "absencestats",   label: "إحصائيات الغياب",      icon: "📉" },
+    { id: "attendancereport",label: "تحليل الحضور",        icon: "🗂️" },
+    { id: "officialforms",  label: "النماذج الرسمية",      icon: "📃" },
+    { id: "portfolio",      label: "ملف الطالب الشامل",    icon: "📁" },
+    { id: "earlywarning",   label: "الإنذار المبكر",       icon: "🚨" },
+    { id: "meetings",       label: "الاجتماعات",           icon: "🤝" },
+    { id: "heatmap",        label: "خريطة النشاط",         icon: "🗺️" },
+    { id: "committeemeeting",label: "اجتماعات اللجان",     icon: "👔" },
+    { id: "teachereval",    label: "قياس أداء المعلم",     icon: "🎖️" },
+    { id: "suggestions",    label: "آراء ومقترحات",        icon: "💬" },
+    { id: "teacherreports", label: "ملفات المعلمين",       icon: "🗄️" },
+  ];
+  const extraPages = [...classToolPages, ...reportPages];
 
   return (
     <>
@@ -24684,35 +24775,24 @@ export default function SchoolWebsite() {
                 </button>
               ))}
             </div>
-            {/* الصف الثاني: صفحات إضافية مباشرة */}
+            {/* الصف الثاني: أدوات وتقارير — قائمتان منفصلتان */}
             <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="text-xs font-bold text-purple-300 opacity-60 flex-shrink-0">أدوات:</span>
-              {extraPages.slice(0,9).map(p => (
+              <span className="text-xs font-bold opacity-50 flex-shrink-0" style={{color:"#0d9488"}}>🧰 أدوات:</span>
+              {classToolPages.map(p => (
                 <button key={p.id} onClick={() => { navigate(p.id); setShowExtra(false); }}
                   className={`nav-pill-extra ${page === p.id ? "active" : ""}`}>
                   <span className="nav-pill-icon">{p.icon}</span>
                   {p.label}
                 </button>
               ))}
-              {extraPages.length > 9 && (
-                <div className="relative">
-                  <button onClick={() => setShowExtra(!showExtra)}
-                    className={`nav-pill-extra ${showExtra || extraPages.slice(9).some(p=>p.id===page) ? "active" : ""}`}>
-                    ✨ المزيد {showExtra ? "▴" : "▾"}
-                  </button>
-                  {showExtra && (
-                    <div className="absolute top-full right-0 mt-2 bg-white rounded-2xl shadow-xl border border-gray-100 py-2 z-50 min-w-48">
-                      {extraPages.slice(9).map(p => (
-                        <button key={p.id} onClick={() => { navigate(p.id); setShowExtra(false); }}
-                          className={`w-full text-right px-4 py-2.5 text-sm font-bold hover:bg-purple-50 transition-all flex items-center gap-2 ${page === p.id ? "text-purple-700 bg-purple-50" : "text-gray-700"}`}
-                          style={{fontFamily:"'Cairo', sans-serif"}}>
-                          <span>{p.icon}</span>{p.label}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
+              <span className="text-xs font-bold opacity-50 flex-shrink-0 mr-2" style={{color:"#7c3aed"}}>📋 تقارير:</span>
+              {reportPages.map(p => (
+                <button key={p.id} onClick={() => { navigate(p.id); setShowExtra(false); }}
+                  className={`nav-pill-extra ${page === p.id ? "active" : ""}`}>
+                  <span className="nav-pill-icon">{p.icon}</span>
+                  {p.label}
+                </button>
+              ))}
             </div>
           </div>
 
@@ -24734,18 +24814,35 @@ export default function SchoolWebsite() {
                   </button>
                 ))}
               </div>
-              <div className="text-xs text-purple-500 font-black px-2 mb-1">✨ صفحات إضافية</div>
-              <div className="grid grid-cols-2 gap-2">
-                {extraPages.map(p => (
+              {/* أدوات الفصل */}
+              <div className="text-xs font-black px-2 mb-1.5 flex items-center gap-1.5" style={{color:"#0d9488"}}>🧰 أدوات الفصل</div>
+              <div className="grid grid-cols-2 gap-1.5 mb-3">
+                {classToolPages.map(p => (
                   <button key={p.id} onClick={() => { navigate(p.id); setMenuOpen(false); }}
                     style={{
-                      padding:"8px 12px", borderRadius:"999px", fontSize:"12px", fontWeight:"700",
+                      padding:"8px 10px", borderRadius:"14px", fontSize:"11px", fontWeight:"700",
+                      fontFamily:"'Cairo',sans-serif", textAlign:"right",
+                      background: page===p.id ? "linear-gradient(135deg,#0d9488,#059669)" : "#f0fdf4",
+                      color: page===p.id ? "#fff" : "#0d9488",
+                      border: "1.5px solid #99f6e4",
+                    }}>
+                    <span style={{marginLeft:"3px"}}>{p.icon}</span>{p.label}
+                  </button>
+                ))}
+              </div>
+              {/* تقارير وإدارة */}
+              <div className="text-xs font-black px-2 mb-1.5 flex items-center gap-1.5" style={{color:"#7c3aed"}}>📋 تقارير وإدارة</div>
+              <div className="grid grid-cols-2 gap-1.5">
+                {reportPages.map(p => (
+                  <button key={p.id} onClick={() => { navigate(p.id); setMenuOpen(false); }}
+                    style={{
+                      padding:"8px 10px", borderRadius:"14px", fontSize:"11px", fontWeight:"700",
                       fontFamily:"'Cairo',sans-serif", textAlign:"right",
                       background: page===p.id ? "linear-gradient(135deg,#7c3aed,#6d28d9)" : "#faf5ff",
                       color: page===p.id ? "#fff" : "#7c3aed",
                       border: "1.5px solid #e9d5ff",
                     }}>
-                    <span style={{marginLeft:"4px"}}>{p.icon}</span>{p.label}
+                    <span style={{marginLeft:"3px"}}>{p.icon}</span>{p.label}
                   </button>
                 ))}
               </div>
