@@ -20581,6 +20581,7 @@ function TeacherProfilePortal({ siteFont, onBack, attendance, teachers, week }) 
     { id:"reports",   label:"تقاريري",   icon:"📁" },
     { id:"selfeval",  label:"تقييمي",    icon:"⭐" },
     { id:"analytics", label:"التحليل",   icon:"📈" },
+    { id:"license",   label:"الرخصة المهنية", icon:"🏅" },
   ];
 
   // ════════ شاشة الدخول ════════
@@ -20905,6 +20906,11 @@ function TeacherProfilePortal({ siteFont, onBack, attendance, teachers, week }) 
             totalLateMins={totalLateMins}
             asmPresent={asmPresent} asmAbsent={asmAbsent}
           />
+        )}
+
+        {/* ══ تبويب الرخصة المهنية ══ */}
+        {activeTab==="license" && (
+          <TeacherLicenseTab teacherName={currentTeacher?.name} teacherId={loginId} />
         )}
 
       </div>
@@ -22186,6 +22192,908 @@ function ProfessionalLicensePage() {
               </button>
             );
           })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+
+// ================================================================
+// ===== تبويب الرخصة المهنية داخل بوابة المعلم =====
+// ================================================================
+function TeacherLicenseTab({ teacherName, teacherId }) {
+
+  const SPECIALIZATIONS = [
+    "رياضيات","علوم","لغة عربية","اجتماعيات","تربية إسلامية",
+    "إنجليزي","حاسب وتقنية","تربية بدنية","فنون","كيمياء",
+    "فيزياء","أحياء","جغرافيا","تاريخ","تربية وطنية","أخرى"
+  ];
+
+  const PROGRAMS = [
+    { id:"planning",      label:"التخطيط للتدريس",           icon:"📋" },
+    { id:"strategies",    label:"استراتيجيات التدريس",        icon:"🎯" },
+    { id:"classmanage",   label:"إدارة الصف",                icon:"🏫" },
+    { id:"assessment",    label:"التقويم والقياس",            icon:"📊" },
+    { id:"technology",    label:"توظيف التقنية",              icon:"💻" },
+    { id:"thinking",      label:"تنمية مهارات التفكير",       icon:"🧠" },
+    { id:"relations",     label:"بناء العلاقة مع الطلاب",    icon:"🤝" },
+    { id:"development",   label:"التطوير المهني",             icon:"🌱" },
+    { id:"timemanage",    label:"إدارة الوقت",                icon:"⏱️" },
+    { id:"communication", label:"مهارات التواصل",             icon:"💬" },
+  ];
+
+  const NEED_LEVELS = [
+    { val:"high",   label:"حاجة عالية",    color:"#dc2626", bg:"#fee2e2" },
+    { val:"medium", label:"حاجة متوسطة",   color:"#d97706", bg:"#fef3c7" },
+    { val:"low",    label:"حاجة منخفضة",   color:"#059669", bg:"#d1fae5" },
+  ];
+
+  const DB_KEY = `school-license-${teacherId}`;
+
+  const mkEmpty = () => ({
+    specialization:"", yearsService:"", trainingHours:"",
+    programs: Object.fromEntries(PROGRAMS.map(p=>[p.id,{need:"",notes:""}])),
+    hasLicense:null, licenseReason:"",
+    licenseImages:[null,null],
+    name: teacherName || "",
+  });
+
+  const [rec, setRec]     = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving]   = useState(false);
+  const [lastSaved, setLastSaved] = useState(null);
+  const imgRefs = [useRef(), useRef()];
+  const saveTimer = useRef(null);
+
+  // تحميل البيانات
+  useEffect(() => {
+    if (!teacherId) { setLoading(false); return; }
+    // أولاً: جرّب المفتاح الخاص بهذا المعلم
+    DB.get(DB_KEY, null).then(data => {
+      if (data) {
+        // تأكد من وجود كل الحقول
+        const full = { ...mkEmpty(), ...data };
+        if (!full.programs) full.programs = mkEmpty().programs;
+        if (!full.licenseImages || full.licenseImages.length < 2)
+          full.licenseImages = [null, null];
+        setRec(full);
+      } else {
+        // جرّب من السجل المركزي
+        DB.get("school-license-records", []).then(recs => {
+          const found = Array.isArray(recs) ? recs.find(r => r.name === teacherName) : null;
+          if (found) {
+            const full = { ...mkEmpty(), ...found };
+            setRec(full);
+          } else {
+            setRec(mkEmpty());
+          }
+        });
+      }
+      setLoading(false);
+    });
+  }, [teacherId]);
+
+  // حفظ تلقائي مع debounce
+  const autoSave = (newRec) => {
+    if (!teacherId) return;
+    setSaving(true);
+    clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(async () => {
+      const toSave = {
+        ...newRec,
+        licenseImages: (newRec.licenseImages||[]).map(img => img ? { dataUrl: img.dataUrl, name: img.name } : null),
+        savedAt: new Date().toISOString(),
+        teacherId,
+        name: teacherName,
+      };
+      // احفظ في مفتاح خاص بالمعلم
+      await DB.set(DB_KEY, toSave);
+      // احفظ أيضاً في السجل المركزي
+      const recs = await DB.get("school-license-records", []);
+      const arr = Array.isArray(recs) ? recs : [];
+      const idx = arr.findIndex(r => r.name === teacherName || r.teacherId === teacherId);
+      if (idx >= 0) arr[idx] = toSave;
+      else arr.push(toSave);
+      await DB.set("school-license-records", arr);
+      setSaving(false);
+      setLastSaved(new Date().toLocaleTimeString("ar-SA-u-nu-latn",{hour:"2-digit",minute:"2-digit"}));
+    }, 800);
+  };
+
+  const upd = (field, val) => {
+    const next = { ...rec, [field]: val };
+    setRec(next);
+    autoSave(next);
+  };
+
+  const updProgram = (progId, field, val) => {
+    const next = {
+      ...rec,
+      programs: { ...rec.programs, [progId]: { ...rec.programs[progId], [field]: val } }
+    };
+    setRec(next);
+    autoSave(next);
+  };
+
+  const handleLicenseImg = (imgIdx, file) => {
+    if (!file) return;
+    readFileAsync(file, "dataurl").then(dataUrl => {
+      const imgs = [...(rec.licenseImages||[null,null])];
+      imgs[imgIdx] = { dataUrl, name: file.name };
+      const next = { ...rec, licenseImages: imgs };
+      setRec(next);
+      autoSave(next);
+    });
+  };
+
+  const removeLicenseImg = (imgIdx) => {
+    const imgs = [...(rec.licenseImages||[null,null])];
+    imgs[imgIdx] = null;
+    const next = { ...rec, licenseImages: imgs };
+    setRec(next);
+    autoSave(next);
+  };
+
+  const getNeedLevel = (val) => NEED_LEVELS.find(n => n.val === val);
+
+  const getCompletePct = () => {
+    if (!rec) return 0;
+    let done = 0, total = 5;
+    if (rec.specialization) done++;
+    if (rec.yearsService) done++;
+    if (rec.trainingHours) done++;
+    if (PROGRAMS.some(p => rec.programs?.[p.id]?.need)) done++;
+    if (rec.hasLicense !== null) done++;
+    return Math.round(done / total * 100);
+  };
+
+  if (loading) return (
+    <div className="flex items-center justify-center py-16 text-gray-400">
+      <div className="text-center"><div className="text-4xl mb-2 animate-bounce">🏅</div><p className="text-sm font-bold">جاري تحميل بياناتك…</p></div>
+    </div>
+  );
+
+  if (!rec) return null;
+
+  const pct = getCompletePct();
+
+  return (
+    <div className="space-y-4 pb-6">
+
+      {/* ── شريط الحالة ── */}
+      <div className="rounded-2xl p-4 text-white shadow-lg"
+        style={{background:"linear-gradient(135deg,#4c1d95,#7c3aed)"}}>
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <div className="font-black text-base">🏅 الرخصة المهنية</div>
+            <div className="text-xs opacity-70 mt-0.5">ملف {teacherName}</div>
+          </div>
+          <div className="text-right">
+            {saving ? (
+              <div className="flex items-center gap-1.5 text-xs font-bold">
+                <span className="animate-pulse text-yellow-300">💾</span>
+                <span className="opacity-80">جاري الحفظ…</span>
+              </div>
+            ) : lastSaved ? (
+              <div className="flex items-center gap-1.5 text-xs font-bold">
+                <span className="text-green-300">✅</span>
+                <span className="opacity-80">محفوظ {lastSaved}</span>
+              </div>
+            ) : null}
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="flex-1 bg-white/20 rounded-full h-2.5 overflow-hidden">
+            <div className="h-full rounded-full transition-all duration-500"
+              style={{width:pct+"%", background: pct===100?"#86efac":"#fbbf24"}} />
+          </div>
+          <span className="text-sm font-black">{pct}%</span>
+        </div>
+        <div className="text-xs opacity-60 mt-1">اكتمال ملفك المهني</div>
+      </div>
+
+      {/* ── البيانات الأساسية ── */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="px-4 py-3 font-black text-sm text-white flex items-center gap-2"
+          style={{background:"linear-gradient(135deg,#1e3a5f,#1d4ed8)"}}>
+          <span>👤</span> بياناتك الأساسية
+        </div>
+        <div className="p-4 space-y-3">
+          <div>
+            <label className="text-xs font-black text-gray-600 mb-1.5 block">📚 تخصصك</label>
+            <select value={rec.specialization||""} onChange={e=>upd("specialization",e.target.value)}
+              className="w-full px-3 py-3 rounded-xl border-2 border-gray-200 focus:border-blue-400 focus:outline-none text-sm font-bold bg-white">
+              <option value="">— اختر تخصصك —</option>
+              {SPECIALIZATIONS.map(s=><option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-black text-gray-600 mb-1.5 block">📅 سنوات الخدمة</label>
+              <select value={rec.yearsService||""} onChange={e=>upd("yearsService",e.target.value)}
+                className="w-full px-3 py-3 rounded-xl border-2 border-gray-200 focus:border-blue-400 focus:outline-none text-sm font-bold bg-white">
+                <option value="">— اختر —</option>
+                {Array.from({length:35},(_,i)=>i+1).map(y=>(
+                  <option key={y} value={y}>{y} {y===1?"سنة":"سنوات"}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-black text-gray-600 mb-1.5 block">🎓 ساعات التدريب (تقريباً)</label>
+              <select value={rec.trainingHours||""} onChange={e=>upd("trainingHours",e.target.value)}
+                className="w-full px-3 py-3 rounded-xl border-2 border-gray-200 focus:border-blue-400 focus:outline-none text-sm font-bold bg-white">
+                <option value="">— اختر —</option>
+                {["أقل من 20 ساعة","20–40 ساعة","41–60 ساعة","61–80 ساعة","81–100 ساعة","أكثر من 100 ساعة"].map(s=>(
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── البرامج التدريبية ── */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="px-4 py-3 font-black text-sm text-white flex items-center gap-2"
+          style={{background:"linear-gradient(135deg,#065f46,#0d9488)"}}>
+          <span>📋</span> البرامج التدريبية التي تحتاجها
+        </div>
+        <div className="divide-y divide-gray-100">
+          {PROGRAMS.map(prog => {
+            const pd = rec.programs?.[prog.id] || {need:"",notes:""};
+            const nl = getNeedLevel(pd.need);
+            return (
+              <div key={prog.id} className="p-4 space-y-2">
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl">{prog.icon}</span>
+                    <span className="font-black text-sm text-gray-800">{prog.label}</span>
+                    {nl && (
+                      <span className="text-xs font-black px-2 py-0.5 rounded-full"
+                        style={{background:nl.bg, color:nl.color}}>{nl.label}</span>
+                    )}
+                  </div>
+                  <select value={pd.need||""} onChange={e=>updProgram(prog.id,"need",e.target.value)}
+                    className="px-2 py-2 rounded-xl border-2 border-gray-200 focus:border-teal-400 focus:outline-none text-xs font-bold bg-white"
+                    style={{minWidth:140}}>
+                    <option value="">— درجة الحاجة —</option>
+                    {NEED_LEVELS.map(n=>(
+                      <option key={n.val} value={n.val}>{n.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <input value={pd.notes||""} onChange={e=>updProgram(prog.id,"notes",e.target.value)}
+                  placeholder="أهمية هذا البرنامج أو ملاحظاتك..."
+                  className="w-full px-3 py-2 rounded-xl border border-gray-200 focus:border-teal-400 focus:outline-none text-xs text-gray-700" />
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ── الرخصة المهنية ── */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="px-4 py-3 font-black text-sm text-white flex items-center gap-2"
+          style={{background:"linear-gradient(135deg,#7c3aed,#6d28d9)"}}>
+          <span>🏅</span> حالة الرخصة المهنية
+        </div>
+        <div className="p-4 space-y-4">
+          <div>
+            <label className="text-xs font-black text-gray-600 mb-2 block">هل حصلت على الرخصة المهنية؟</label>
+            <div className="grid grid-cols-2 gap-3">
+              {[{val:true,label:"✅ نعم، حصلت عليها"},{val:false,label:"❌ لا، لم أحصل عليها"}].map(opt=>(
+                <button key={String(opt.val)} onClick={()=>upd("hasLicense",opt.val)}
+                  className="py-3 rounded-2xl font-black text-sm border-2 transition-all"
+                  style={{
+                    background: rec.hasLicense===opt.val ? (opt.val?"#d1fae5":"#fee2e2") : "#f9fafb",
+                    borderColor: rec.hasLicense===opt.val ? (opt.val?"#059669":"#dc2626") : "#e5e7eb",
+                    color: rec.hasLicense===opt.val ? (opt.val?"#065f46":"#991b1b") : "#9ca3af",
+                  }}>
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {rec.hasLicense === false && (
+            <div>
+              <label className="text-xs font-black text-gray-600 mb-1.5 block">سبب عدم الحصول على الرخصة</label>
+              <textarea value={rec.licenseReason||""} onChange={e=>upd("licenseReason",e.target.value)}
+                placeholder="اكتب السبب هنا..." rows={3}
+                className="w-full px-4 py-3 rounded-2xl border-2 border-gray-200 focus:border-purple-400 focus:outline-none text-sm resize-none" />
+            </div>
+          )}
+
+          {rec.hasLicense === true && (
+            <div>
+              <label className="text-xs font-black text-gray-600 mb-3 block">📸 صور الرخصة المهنية</label>
+              <div className="grid grid-cols-2 gap-3">
+                {[0,1].map(imgIdx => {
+                  const img = rec.licenseImages?.[imgIdx];
+                  return (
+                    <div key={imgIdx} className="rounded-2xl overflow-hidden border-2 border-dashed"
+                      style={{borderColor:img?"#7c3aed":"#d1d5db", minHeight:150}}>
+                      {img ? (
+                        <div className="relative">
+                          <img src={img.dataUrl} alt={`رخصة ${imgIdx+1}`}
+                            className="w-full object-cover" style={{height:145}} />
+                          <button onClick={()=>removeLicenseImg(imgIdx)}
+                            className="absolute top-2 left-2 bg-red-500/90 text-white text-xs font-bold px-2 py-1 rounded-lg shadow">
+                            🗑️
+                          </button>
+                          <div className="py-1.5 text-center text-xs font-black text-white"
+                            style={{background:"#7c3aed"}}>صورة رقم {imgIdx+1}</div>
+                        </div>
+                      ) : (
+                        <label className="flex flex-col items-center justify-center cursor-pointer hover:bg-purple-50 transition-all"
+                          style={{minHeight:150}}>
+                          <div className="text-3xl mb-2">📷</div>
+                          <div className="text-xs font-black" style={{color:"#7c3aed"}}>صورة الرخصة {imgIdx+1}</div>
+                          <div className="text-xs text-gray-400 mt-1">اضغط لرفع</div>
+                          <input type="file" accept="image/*" className="hidden"
+                            ref={imgRefs[imgIdx]}
+                            onChange={e=>{const f=e.target.files?.[0];if(f)handleLicenseImg(imgIdx,f);e.target.value="";}} />
+                        </label>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── حفظ يدوي ── */}
+      <div className="flex items-center justify-between px-1">
+        <div className="text-xs text-gray-400">
+          {lastSaved ? `✅ آخر حفظ: ${lastSaved}` : "لم يُحفظ بعد"}
+        </div>
+        <button onClick={()=>autoSave(rec)}
+          disabled={saving}
+          className="px-5 py-2.5 rounded-xl font-black text-sm text-white shadow-md"
+          style={{background: saving ? "#9ca3af" : "linear-gradient(135deg,#4c1d95,#7c3aed)"}}>
+          {saving ? "⏳ جاري الحفظ..." : "💾 حفظ البيانات"}
+        </button>
+      </div>
+
+    </div>
+  );
+}
+
+
+
+// ================================================================
+// ===== صفحة متابعة غياب المعلمين اليومية =====
+// ================================================================
+function DailyAttendanceTrackerPage({ teachers }) {
+
+  // ── ثوابت الأيام والشهور ──
+  const DAYS_AR = ["الأحد","الاثنين","الثلاثاء","الأربعاء","الخميس"];
+
+  const HIJRI_MONTHS = [
+    "محرم","صفر","ربيع الأول","ربيع الآخر","جمادى الأولى","جمادى الآخرة",
+    "رجب","شعبان","رمضان","شوال","ذو القعدة","ذو الحجة"
+  ];
+  const GREG_MONTHS = [
+    "يناير","فبراير","مارس","أبريل","مايو","يونيو",
+    "يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"
+  ];
+
+  // أيام 1-31، شهور، سنوات هجرية 1447-1449، ميلادية 2026-2028
+  const DAYS_LIST   = Array.from({length:31},(_,i)=>i+1);
+  const HIJRI_YEARS = [1447,1448,1449];
+  const GREG_YEARS  = [2026,2027,2028];
+
+  const STATUS_OPTIONS = [
+    { val:"حاضر",    label:"✅ حاضر",    color:"#059669", bg:"#d1fae5" },
+    { val:"غائب",    label:"❌ غائب",    color:"#dc2626", bg:"#fee2e2" },
+    { val:"متأخر",   label:"⏰ متأخر",   color:"#d97706", bg:"#fef3c7" },
+    { val:"مستأذن",  label:"📋 مستأذن", color:"#2563eb", bg:"#dbeafe" },
+    { val:"في_فارس", label:"💻 في فارس", color:"#7c3aed", bg:"#ede9fe" },
+  ];
+
+  // ── الحالة ──
+  const [records, setRecords]   = useState([]);
+  const [loading, setLoading]   = useState(true);
+  const [saving,  setSaving]    = useState(false);
+  const [lastSaved, setLastSaved] = useState(null);
+  const [view, setView]         = useState("entry"); // entry | weekly
+  const [search, setSearch]     = useState("");
+  const [selectedTeacher, setSelectedTeacher] = useState(null);
+
+  // حقول الإدخال
+  const [selDay,      setSelDay]      = useState(DAYS_AR[new Date().getDay() === 0 ? 0 : Math.min(new Date().getDay()-0,4)]);
+  const [selDayNum,   setSelDayNum]   = useState(new Date().getDate());
+  const [selHijriM,   setSelHijriM]   = useState(HIJRI_MONTHS[9]);  // شوال
+  const [selHijriY,   setSelHijriY]   = useState(1447);
+  const [selGregM,    setSelGregM]    = useState(GREG_MONTHS[new Date().getMonth()]);
+  const [selGregY,    setSelGregY]    = useState(2026);
+
+  const dateKey = `${selDayNum}-${selHijriM}-${selHijriY}`;
+
+  // تحميل السجلات
+  useEffect(() => {
+    DB.get("school-daily-attendance", []).then(data => {
+      setRecords(Array.isArray(data) ? data : []);
+      setLoading(false);
+    });
+  }, []);
+
+  const saveRecords = (newRecs) => {
+    setRecords(newRecs);
+    setSaving(true);
+    DB.set("school-daily-attendance", newRecs).then(() => {
+      setSaving(false);
+      setLastSaved(new Date().toLocaleTimeString("ar-SA-u-nu-latn",{hour:"2-digit",minute:"2-digit"}));
+    });
+  };
+
+  // الحصول على حالة معلم في يوم
+  const getStatus = (teacherName) => {
+    const rec = records.find(r => r.teacherName===teacherName && r.dateKey===dateKey);
+    return rec?.status || "";
+  };
+
+  // تحديث الحالة
+  const setStatus = (teacherName, status) => {
+    const existing = records.findIndex(r => r.teacherName===teacherName && r.dateKey===dateKey);
+    const newRec = {
+      teacherName, dateKey, status,
+      day: selDay, dayNum: selDayNum,
+      hijriMonth: selHijriM, hijriYear: selHijriY,
+      gregMonth: selGregM, gregYear: selGregY,
+      updatedAt: new Date().toISOString(),
+    };
+    let newRecs;
+    if (existing >= 0) {
+      newRecs = records.map((r,i) => i===existing ? newRec : r);
+    } else {
+      newRecs = [...records, newRec];
+    }
+    saveRecords(newRecs);
+  };
+
+  // إحصائيات لكل معلم
+  const getTeacherStats = (teacherName) => {
+    const teacherRecs = records.filter(r => r.teacherName===teacherName);
+    const stats = { حاضر:0, غائب:0, متأخر:0, مستأذن:0, في_فارس:0 };
+    teacherRecs.forEach(r => { if (stats[r.status] !== undefined) stats[r.status]++; });
+    return { ...stats, total: teacherRecs.length };
+  };
+
+  // إحصائيات اليوم الحالي
+  const todayStats = {
+    حاضر:    teachers.filter(t => getStatus(t) === "حاضر").length,
+    غائب:    teachers.filter(t => getStatus(t) === "غائب").length,
+    متأخر:   teachers.filter(t => getStatus(t) === "متأخر").length,
+    مستأذن:  teachers.filter(t => getStatus(t) === "مستأذن").length,
+    في_فارس: teachers.filter(t => getStatus(t) === "في_فارس").length,
+    total:   teachers.length,
+  };
+
+  const teacherList = Array.isArray(teachers) ? teachers.map(t => typeof t==="string" ? t : t.name).filter(Boolean) : [];
+  const filteredTeachers = teacherList.filter(t => !search || t.includes(search));
+
+  const getStatusInfo = (val) => STATUS_OPTIONS.find(s => s.val===val);
+
+  const printReport = () => {
+    const rows = filteredTeachers.map(t => {
+      const st = getStatus(t);
+      const si = getStatusInfo(st);
+      return `<tr>
+        <td>${t}</td>
+        <td style="text-align:center;font-weight:900;color:${si?.color||"#64748b"}">
+          ${si?.label || "—"}
+        </td>
+      </tr>`;
+    }).join("");
+
+    printWindow(`<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+<meta charset="UTF-8">
+<title>متابعة الحضور اليومي</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Cairo',sans-serif;direction:rtl;color:#1a2035;font-size:13px}
+.page{max-width:780px;margin:0 auto;border:3px solid #0d3b6e}
+.header{background:linear-gradient(135deg,#0d3b6e,#1a5276,#0d9488);color:#fff;display:flex;align-items:center;padding:0;min-height:85px}
+.hcol{flex:1;padding:12px 18px}
+.hcol.center{flex:0 0 110px;display:flex;align-items:center;justify-content:center;border-right:1px solid rgba(255,255,255,.25);border-left:1px solid rgba(255,255,255,.25)}
+.hcol.right{text-align:right}
+.hcol.left{text-align:left}
+.ministry{font-size:14px;font-weight:900}
+.dept{font-size:11px;opacity:.8;margin-top:3px}
+.logo-img{height:60px;width:auto;filter:brightness(0) invert(1)}
+.title-bar{background:#1a2f5e;color:#fff;text-align:center;padding:11px;font-size:16px;font-weight:900;border-top:4px solid #f59e0b}
+.meta{display:grid;grid-template-columns:repeat(4,1fr);border-bottom:2px solid #0d9488}
+.meta-cell{padding:7px 10px;border-left:1px solid #c7d2e8;background:#f8fafd}
+.meta-cell:last-child{border-left:none}
+.meta-lbl{font-size:9px;color:#64748b;font-weight:700;margin-bottom:3px}
+.meta-val{font-size:12px;font-weight:700;color:#1a2035}
+table{width:100%;border-collapse:collapse;margin:12px 0}
+thead tr{background:linear-gradient(135deg,#0d3b6e,#1d4ed8);color:#fff}
+th,td{padding:8px 12px;border:1px solid #c7d2e8;font-size:12px}
+th{font-weight:900;text-align:center}
+td:first-child{text-align:right}
+tbody tr:nth-child(even){background:#f8fafd}
+.stats{display:grid;grid-template-columns:repeat(5,1fr);gap:0;margin:0 12px 12px;border:2px solid #c7d2e8;border-radius:10px;overflow:hidden}
+.stat{padding:8px;text-align:center;border-left:1px solid #c7d2e8}
+.stat:first-child{border-left:none}
+.stat-n{font-size:20px;font-weight:900}
+.stat-l{font-size:10px;color:#64748b;font-weight:700}
+.sig{display:grid;grid-template-columns:1fr 1fr;gap:0;margin:0 12px 12px;border:2px solid #c7d2e8;border-radius:10px;overflow:hidden}
+.sig-box{padding:14px;text-align:center;border-left:1px solid #c7d2e8}
+.sig-box:first-child{border-left:none}
+.sig-role{font-size:10px;color:#64748b;margin-bottom:10px}
+.sig-line{border-top:1.5px dashed #0d9488;padding-top:6px;font-size:12px;font-weight:900;color:#0d3b6e;margin-top:16px}
+.footer{background:#0d1b2e;color:rgba(255,255,255,.5);text-align:center;padding:7px;font-size:10px}
+@media print{@page{size:A4;margin:8mm}body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="header">
+    <div class="hcol right">
+      <div style="font-size:11px;opacity:.8">المملكة العربية السعودية</div>
+      <div class="ministry">وزارة التعليم</div>
+      <div class="dept">إدارة تعليم جدة</div>
+    </div>
+    <div class="hcol center">
+      <img src="${LOGO_URL}" class="logo-img" alt="شعار" />
+    </div>
+    <div class="hcol left">
+      <div style="font-size:11px;opacity:.8">مدرسة عبيدة بن الحارث المتوسطة</div>
+      <div class="ministry">العام الدراسي 1447هـ</div>
+    </div>
+  </div>
+  <div class="title-bar">كشف متابعة الحضور اليومي للمعلمين</div>
+  <div class="meta">
+    <div class="meta-cell"><div class="meta-lbl">اليوم</div><div class="meta-val">${selDay}</div></div>
+    <div class="meta-cell"><div class="meta-lbl">التاريخ الهجري</div><div class="meta-val">${selDayNum} ${selHijriM} ${selHijriY}هـ</div></div>
+    <div class="meta-cell"><div class="meta-lbl">التاريخ الميلادي</div><div class="meta-val">${selDayNum} ${selGregM} ${selGregY}م</div></div>
+    <div class="meta-cell"><div class="meta-lbl">إجمالي المعلمين</div><div class="meta-val">${teachers.length} معلم</div></div>
+  </div>
+  <div class="stats">
+    <div class="stat"><div class="stat-n" style="color:#059669">${todayStats.حاضر}</div><div class="stat-l">حاضر</div></div>
+    <div class="stat"><div class="stat-n" style="color:#dc2626">${todayStats.غائب}</div><div class="stat-l">غائب</div></div>
+    <div class="stat"><div class="stat-n" style="color:#d97706">${todayStats.متأخر}</div><div class="stat-l">متأخر</div></div>
+    <div class="stat"><div class="stat-n" style="color:#2563eb">${todayStats.مستأذن}</div><div class="stat-l">مستأذن</div></div>
+    <div class="stat"><div class="stat-n" style="color:#7c3aed">${todayStats.في_فارس}</div><div class="stat-l">في فارس</div></div>
+  </div>
+  <table>
+    <thead><tr><th>اسم المعلم</th><th>الحالة</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>
+  <div class="sig">
+    <div class="sig-box">
+      <div class="sig-role">مشرف الحضور / إسم المعلم</div>
+      <div class="sig-line">____________</div>
+    </div>
+    <div class="sig-box">
+      <div class="sig-role">مدير المدرسة</div>
+      <div class="sig-line">فازع عبدالله القرني</div>
+    </div>
+  </div>
+  <div class="footer">مدرسة عبيدة بن الحارث المتوسطة — كشف الحضور اليومي</div>
+</div>
+<script>window.onload=()=>window.print();</script>
+</body></html>`);
+  };
+
+  if (loading) return (
+    <div className="flex items-center justify-center py-20 text-gray-400">
+      <div className="text-center"><div className="text-5xl mb-3 animate-bounce">📅</div><p className="font-bold">جاري التحميل…</p></div>
+    </div>
+  );
+
+  return (
+    <div dir="rtl" className="max-w-4xl mx-auto space-y-4 pb-10" style={{fontFamily:"'Cairo',sans-serif"}}>
+      <style>{`
+        .att-btn { border:2px solid #e2e8f0; border-radius:14px; padding:6px 12px; font-size:11px; font-weight:900; cursor:pointer; transition:all .18s; font-family:'Cairo',sans-serif; background:#f8fafd; color:#475569; }
+        .att-btn:hover { transform:scale(1.04); }
+        .att-btn.active { border-color:transparent; box-shadow:0 3px 12px rgba(0,0,0,.18); }
+        select.att-select { border:2px solid #c7d2e8; border-radius:12px; padding:7px 10px; font-size:12px; font-weight:700; font-family:'Cairo',sans-serif; outline:none; background:#fff; color:#1a2035; }
+        select.att-select:focus { border-color:#1d4ed8; }
+      `}</style>
+
+      {/* ══ ترويسة احترافية ══ */}
+      <div className="rounded-2xl overflow-hidden shadow-2xl text-white"
+        style={{background:"linear-gradient(135deg,#0d3b6e 0%,#1a5276 50%,#0d9488 100%)"}}>
+        <div className="flex items-stretch" style={{minHeight:85}}>
+          <div className="flex-1 flex flex-col justify-center text-right px-5 py-3 border-l border-white/20">
+            <div className="text-xs opacity-70">المملكة العربية السعودية</div>
+            <div className="font-black text-base">وزارة التعليم</div>
+            <div className="text-xs opacity-70 mt-1">إدارة تعليم — جدة</div>
+          </div>
+          <div className="flex items-center justify-center px-5 gap-3">
+            <div style={{width:"1.5px",height:60,background:"rgba(255,255,255,.3)",borderRadius:2}}/>
+            <img src={LOGO_URL} alt="شعار" className="h-16 w-auto" style={{filter:"brightness(0) invert(1)"}} />
+            <div style={{width:"1.5px",height:60,background:"rgba(255,255,255,.3)",borderRadius:2}}/>
+          </div>
+          <div className="flex-1 flex flex-col justify-center text-left px-5 py-3">
+            <div className="font-black text-sm">مدرسة عبيدة بن الحارث المتوسطة</div>
+            <div className="text-xs opacity-70 mt-1">متابعة غياب المعلمين</div>
+          </div>
+        </div>
+        {/* شريط العنوان */}
+        <div className="text-center py-3 font-black text-lg border-t-4" style={{background:"rgba(0,0,0,.3)",borderColor:"#f59e0b"}}>
+          📅 كشف متابعة الحضور اليومي للمعلمين
+        </div>
+      </div>
+
+      {/* ══ تبديل العرض ══ */}
+      <div className="flex gap-2 flex-wrap">
+        {[{id:"entry",label:"📝 إدخال الحضور"},{id:"weekly",label:"📊 الإحصائيات الأسبوعية"}].map(v=>(
+          <button key={v.id} onClick={()=>setView(v.id)}
+            className="px-5 py-2.5 rounded-xl font-black text-sm border-2 transition-all"
+            style={{
+              background: view===v.id ? "linear-gradient(135deg,#0d3b6e,#1d4ed8)" : "#fff",
+              color: view===v.id ? "#fff" : "#475569",
+              borderColor: view===v.id ? "transparent" : "#c7d2e8",
+            }}>
+            {v.label}
+          </button>
+        ))}
+        {view==="entry" && (
+          <>
+            <div className="flex-1"/>
+            <button onClick={printReport}
+              className="px-5 py-2.5 rounded-xl font-black text-sm text-white shadow-md"
+              style={{background:"linear-gradient(135deg,#f59e0b,#d97706)"}}>
+              🖨️ طباعة كشف اليوم
+            </button>
+          </>
+        )}
+      </div>
+
+      {view==="entry" && (<>
+        {/* ══ اختيار اليوم والتاريخ ══ */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="px-5 py-3 font-black text-sm text-white flex items-center gap-2"
+            style={{background:"linear-gradient(135deg,#1e3a5f,#1d4ed8)"}}>
+            <span>📅</span> اليوم والتاريخ
+          </div>
+          <div className="p-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+            {/* اليوم */}
+            <div>
+              <label className="text-xs font-black text-gray-500 mb-1.5 block">اليوم</label>
+              <select value={selDay} onChange={e=>setSelDay(e.target.value)} className="att-select w-full">
+                {DAYS_AR.map(d=><option key={d} value={d}>{d}</option>)}
+              </select>
+            </div>
+            {/* رقم اليوم */}
+            <div>
+              <label className="text-xs font-black text-gray-500 mb-1.5 block">اليوم (رقم)</label>
+              <select value={selDayNum} onChange={e=>setSelDayNum(Number(e.target.value))} className="att-select w-full">
+                {DAYS_LIST.map(d=><option key={d} value={d}>{d}</option>)}
+              </select>
+            </div>
+            {/* الشهر الهجري */}
+            <div>
+              <label className="text-xs font-black text-gray-500 mb-1.5 block">الشهر الهجري</label>
+              <select value={selHijriM} onChange={e=>setSelHijriM(e.target.value)} className="att-select w-full">
+                {HIJRI_MONTHS.map(m=><option key={m} value={m}>{m}</option>)}
+              </select>
+            </div>
+            {/* السنة الهجرية */}
+            <div>
+              <label className="text-xs font-black text-gray-500 mb-1.5 block">السنة الهجرية</label>
+              <select value={selHijriY} onChange={e=>setSelHijriY(Number(e.target.value))} className="att-select w-full">
+                {HIJRI_YEARS.map(y=><option key={y} value={y}>{y}هـ</option>)}
+              </select>
+            </div>
+            {/* الشهر الميلادي */}
+            <div>
+              <label className="text-xs font-black text-gray-500 mb-1.5 block">الشهر الميلادي</label>
+              <select value={selGregM} onChange={e=>setSelGregM(e.target.value)} className="att-select w-full">
+                {GREG_MONTHS.map((m,i)=><option key={m} value={m}>{m} {GREG_YEARS.includes(selGregY)?selGregY:""}</option>)}
+              </select>
+            </div>
+          </div>
+          {/* ملخص التاريخ */}
+          <div className="mx-4 mb-4 rounded-xl px-4 py-2.5 flex items-center gap-3" style={{background:"#eff6ff"}}>
+            <span className="text-xl">📌</span>
+            <span className="font-black text-sm" style={{color:"#1d4ed8"}}>
+              {selDay} — {selDayNum} {selHijriM} {selHijriY}هـ / {selDayNum} {selGregM} {selGregY}م
+            </span>
+            <div className="mr-auto flex items-center gap-1.5 text-xs font-bold" style={{color: saving?"#d97706":"#059669"}}>
+              {saving ? <><span className="animate-pulse">💾</span><span>يحفظ…</span></> :
+               lastSaved ? <><span>✅</span><span>محفوظ {lastSaved}</span></> : null}
+            </div>
+          </div>
+        </div>
+
+        {/* ══ إحصائيات سريعة ══ */}
+        <div className="grid grid-cols-5 gap-2">
+          {STATUS_OPTIONS.map(s => {
+            const cnt = teacherList.filter(t => getStatus(t)===s.val).length;
+            return (
+              <div key={s.val} className="rounded-2xl p-3 text-center shadow-sm"
+                style={{background:s.bg}}>
+                <div className="text-2xl font-black" style={{color:s.color}}>{cnt}</div>
+                <div className="text-xs font-bold mt-0.5" style={{color:s.color}}>
+                  {s.label.split(" ")[1]}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* ══ بحث ══ */}
+        <input value={search} onChange={e=>setSearch(e.target.value)}
+          placeholder="🔍 بحث باسم المعلم..."
+          className="w-full px-4 py-3 rounded-2xl border-2 border-gray-200 focus:border-blue-400 focus:outline-none text-sm" />
+
+        {/* ══ قائمة المعلمين ══ */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="px-5 py-3 font-black text-sm text-white flex items-center justify-between"
+            style={{background:"linear-gradient(135deg,#065f46,#0d9488)"}}>
+            <div className="flex items-center gap-2"><span>👨‍🏫</span> قائمة المعلمين</div>
+            <span className="text-xs opacity-70">{filteredTeachers.length} معلم</span>
+          </div>
+          <div className="divide-y divide-gray-100">
+            {filteredTeachers.map((teacher, i) => {
+              const st = getStatus(teacher);
+              const si = getStatusInfo(st);
+              return (
+                <div key={i} className="px-4 py-3">
+                  <div className="flex items-center gap-3 flex-wrap sm:flex-nowrap">
+                    {/* رقم + اسم */}
+                    <div className="w-7 h-7 rounded-xl flex items-center justify-center text-xs font-black flex-shrink-0"
+                      style={{background:"#f1f5f9",color:"#64748b"}}>{i+1}</div>
+                    <div className="flex-1 font-black text-sm text-gray-800 min-w-0">
+                      <div className="truncate">{teacher}</div>
+                      {si && (
+                        <div className="text-xs font-bold mt-0.5 flex items-center gap-1">
+                          <span className="px-2 py-0.5 rounded-full" style={{background:si.bg,color:si.color}}>
+                            {si.label}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    {/* أزرار الحالة */}
+                    <div className="flex gap-1.5 flex-wrap">
+                      {STATUS_OPTIONS.map(s => (
+                        <button key={s.val} onClick={()=>setStatus(teacher, st===s.val ? "" : s.val)}
+                          className="att-btn"
+                          style={st===s.val ? {
+                            background: s.bg,
+                            color: s.color,
+                            borderColor: s.color,
+                            transform:"scale(1.06)",
+                          } : {}}>
+                          {s.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* ══ التوقيعات ══ */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="px-5 py-3 font-black text-sm text-white"
+            style={{background:"linear-gradient(135deg,#1e3a5f,#1d4ed8)"}}>
+            ✍️ التوقيعات
+          </div>
+          <div className="grid grid-cols-2 gap-0 divide-x divide-x-reverse divide-gray-100">
+            <div className="p-5 text-center">
+              <div className="text-xs text-gray-500 mb-2">مشرف الحضور / إسم المعلم</div>
+              <div className="border-t-2 border-dashed border-teal-400 pt-3 mt-6 font-black text-sm text-gray-700">
+                __________________
+              </div>
+            </div>
+            <div className="p-5 text-center">
+              <div className="text-xs text-gray-500 mb-2">مدير المدرسة</div>
+              <div className="border-t-2 border-dashed border-teal-400 pt-3 mt-6 font-black text-sm"
+                style={{color:"#0d3b6e"}}>
+                فازع عبدالله القرني
+              </div>
+            </div>
+          </div>
+        </div>
+      </>)}
+
+      {/* ══ الإحصائيات الأسبوعية ══ */}
+      {view==="weekly" && (
+        <div className="space-y-4">
+          {/* ملخص عام */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="px-5 py-3 font-black text-sm text-white"
+              style={{background:"linear-gradient(135deg,#4c1d95,#7c3aed)"}}>
+              📊 ملخص الحضور — جميع الأيام المسجّلة
+            </div>
+            <div className="p-4">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+                {STATUS_OPTIONS.map(s => {
+                  const cnt = records.filter(r=>r.status===s.val).length;
+                  return (
+                    <div key={s.val} className="rounded-2xl p-3 text-center" style={{background:s.bg}}>
+                      <div className="text-2xl font-black" style={{color:s.color}}>{cnt}</div>
+                      <div className="text-xs font-bold mt-0.5" style={{color:s.color}}>
+                        {s.label.split(" ")[1]}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="mt-3 text-xs text-gray-400 text-center font-bold">
+                إجمالي السجلات: {records.length} | الأيام المسجّلة: {new Set(records.map(r=>r.dateKey)).size}
+              </div>
+            </div>
+          </div>
+
+          {/* إحصائيات لكل معلم */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="px-5 py-3 font-black text-sm text-white flex items-center justify-between"
+              style={{background:"linear-gradient(135deg,#065f46,#0d9488)"}}>
+              <div className="flex items-center gap-2"><span>👨‍🏫</span> إحصائية كل معلم</div>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr style={{background:"#f8fafd"}}>
+                    <th className="px-4 py-3 text-right font-black text-gray-700 border-b">اسم المعلم</th>
+                    {STATUS_OPTIONS.map(s=>(
+                      <th key={s.val} className="px-3 py-3 text-center font-black border-b" style={{color:s.color}}>{s.label}</th>
+                    ))}
+                    <th className="px-3 py-3 text-center font-black text-gray-600 border-b">الإجمالي</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {teacherList.map((t,i) => {
+                    const st = getTeacherStats(t);
+                    if (st.total === 0) return null;
+                    return (
+                      <tr key={i} className={i%2===0?"bg-white":"bg-gray-50/50"}>
+                        <td className="px-4 py-2.5 font-bold text-gray-700">{t}</td>
+                        {STATUS_OPTIONS.map(s=>(
+                          <td key={s.val} className="px-3 py-2.5 text-center font-black"
+                            style={{color: st[s.val]>0 ? s.color : "#d1d5db"}}>
+                            {st[s.val] > 0 ? st[s.val] : "—"}
+                          </td>
+                        ))}
+                        <td className="px-3 py-2.5 text-center font-black text-blue-600">{st.total}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+              {teacherList.every(t => getTeacherStats(t).total === 0) && (
+                <div className="text-center py-10 text-gray-400">
+                  <div className="text-4xl mb-2">📊</div>
+                  <p className="font-bold text-sm">لا توجد بيانات مسجّلة بعد</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* توقيع مدير المدرسة */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="grid grid-cols-2 divide-x divide-x-reverse divide-gray-100">
+              <div className="p-5 text-center">
+                <div className="text-xs text-gray-500 mb-2">المسؤول عن الحضور</div>
+                <div className="border-t-2 border-dashed border-teal-400 pt-3 mt-8 font-black text-sm text-gray-700">
+                  __________________
+                </div>
+              </div>
+              <div className="p-5 text-center">
+                <div className="text-xs text-gray-500 mb-2">مدير المدرسة</div>
+                <div className="border-t-2 border-dashed border-teal-400 pt-3 mt-8 font-black text-sm"
+                  style={{color:"#0d3b6e"}}>
+                  فازع عبدالله القرني
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -24535,7 +25443,7 @@ export default function SchoolWebsite() {
       if (hash.startsWith("ann-")) { setDirectAnnId(hash.replace("ann-","")); return; }
       setDirectAnnId(null);
       if (hash === "teacherportal") { setTeacherProfilePortal(true); return; }
-      if (["home","attendance","announcements","activities","settings","students","messages","surveys","sms","report","gradeanalysis","monthlyreport","teacherprofile","absencestats","attendancereport","student-absence","strategies","calendar","gallery","certificates","poll","raffle","broadcast","groupdivider","quiz","classtimer","luckywheel","exitticket","timetable","honorboard","tasks","dailyquiz","aiteacher","lessonprep","lessonrecommend","officialforms","portfolio","earlywarning","meetings","heatmap","committeemeeting","teachereval","assessment","studentexcuses","perfresults","teacherreports","suggestions"].includes(hash)) { setTeacherProfilePortal(false); setPage(hash); }
+      if (["home","attendance","announcements","activities","settings","students","messages","surveys","sms","report","gradeanalysis","monthlyreport","teacherprofile","absencestats","attendancereport","student-absence","strategies","calendar","gallery","certificates","poll","raffle","broadcast","groupdivider","quiz","classtimer","luckywheel","exitticket","timetable","honorboard","tasks","dailyquiz","aiteacher","lessonprep","lessonrecommend","officialforms","portfolio","earlywarning","meetings","heatmap","committeemeeting","teachereval","assessment","studentexcuses","perfresults","teacherreports","suggestions","dailyattend"].includes(hash)) { setTeacherProfilePortal(false); setPage(hash); }
     };
     window.addEventListener("hashchange", h); h();
     return () => window.removeEventListener("hashchange", h);
@@ -24782,7 +25690,7 @@ export default function SchoolWebsite() {
 
   const pages = [
     { id: "home",            label: "الرئيسية",        icon: "🏡" },
-    { id: "attendance",      label: "غياب المعلمين",  icon: "🗓️" },
+    { id: "attendance",      label: "الحضور اليومي",  icon: "📅" },
     { id: "admin-attendance",label: "دوام الإداريين", icon: "🏛️" },
     { id: "student-absence", label: "غياب الطلاب",   icon: "🎒" },
     { id: "students",        label: "تقييم الطلاب",  icon: "🎓" },
@@ -25149,14 +26057,19 @@ export default function SchoolWebsite() {
         {page === "perfresults"    && <PerfResultsAdminPage />}
         {page === "suggestions"    && <SuggestionsAdminPage />}
         {page === "prolicense"     && <ProfessionalLicensePage />}
+        {page === "dailyattend"    && <DailyAttendanceTrackerPage teachers={teachers} />}
         {page === "teacherreports" && <TeacherReportsAdminPage teachers={teachers} week={week} />}
                 {page === "teacherreports" && <TeacherReportsAdminPage teachers={teachers} week={week} />}
                 {page === "perfresults"    && <PerfResultsAdminPage />}
         {page === "suggestions"    && <SuggestionsAdminPage />}
         {page === "prolicense"     && <ProfessionalLicensePage />}
+        {page === "dailyattend"    && <DailyAttendanceTrackerPage teachers={teachers} />}
                 {page === "suggestions"    && <SuggestionsAdminPage />}
         {page === "prolicense"     && <ProfessionalLicensePage />}
+        {page === "dailyattend"    && <DailyAttendanceTrackerPage teachers={teachers} />}
                 {page === "prolicense"     && <ProfessionalLicensePage />}
+        {page === "dailyattend"    && <DailyAttendanceTrackerPage teachers={teachers} />}
+                {page === "dailyattend"    && <DailyAttendanceTrackerPage teachers={teachers} />}
                 {page === "assessment"     && <AssessmentPage teachers={teachers} />}
                 {page === "studentexcuses" && <StudentExcusePortal isAdmin={true} siteFont={siteFont} />}
                 {page === "settings"       && <SettingsPage teachers={teachers} setTeachers={setTeachers} saveTeachers={saveTeachers} week={week} setWeek={setWeek} saveWeek={saveWeek} users={users} siteFont={siteFont} setSiteFont={setSiteFont} saveSiteFont={saveSiteFont} weekArchive={weekArchive} archiveCurrentWeek={archiveCurrentWeek} />}
@@ -25386,6 +26299,7 @@ export default function SchoolWebsite() {
         {page === "perfresults"    && <PerfResultsAdminPage />}
         {page === "suggestions"    && <SuggestionsAdminPage />}
         {page === "prolicense"     && <ProfessionalLicensePage />}
+        {page === "dailyattend"    && <DailyAttendanceTrackerPage teachers={teachers} />}
                 {page === "assessment"     && <AssessmentPage teachers={teachers} />}
                 {page === "studentexcuses" && <StudentExcusePortal isAdmin={true} siteFont={siteFont} />}
         {page === "settings"      && <SettingsPage teachers={teachers} setTeachers={setTeachers} saveTeachers={saveTeachers} week={week} setWeek={setWeek} saveWeek={saveWeek} users={users} siteFont={siteFont} setSiteFont={setSiteFont} saveSiteFont={saveSiteFont} weekArchive={weekArchive} archiveCurrentWeek={archiveCurrentWeek} />}
