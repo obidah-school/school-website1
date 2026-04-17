@@ -8008,6 +8008,18 @@ function PerfResultsAdminPage() {
       <div className="text-center"><div className="text-4xl mb-3 animate-bounce">📊</div><p>جاري التحميل…</p></div>
     </div>
   );
+  // إعادة تحميل البيانات
+  const refresh = () => {
+    setLoading(true);
+    Promise.all([
+      DB.get("school-perf-results",  []),
+      DB.get("school-perf-teachers", []),
+    ]).then(([res, tch]) => {
+      setResults( Array.isArray(res) ? res : []);
+      setTeachers(Array.isArray(tch) ? tch : []);
+      setLoading(false);
+    });
+  };
 
   // ── تفاصيل معلم محدد ──
   if (selected) {
@@ -8125,22 +8137,35 @@ function PerfResultsAdminPage() {
     <div dir="rtl" className="max-w-3xl mx-auto px-3 py-4 space-y-4">
       {/* Header */}
       <div className="rounded-2xl p-5 text-white shadow-lg" style={{ background:"linear-gradient(135deg,#1e3a5f,#1d4ed8)" }}>
-        <div className="flex items-center gap-4 mb-4">
-          <div className="text-4xl">📊</div>
-          <div>
-            <h2 className="font-black text-xl">نتائج التقويم الذاتي</h2>
-            <p className="opacity-70 text-sm">عناصر الأداء الوظيفي للمعلمين — {PERFORMANCE_DOMAINS.length} عنصراً من 100 درجة</p>
+        <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
+          <div className="flex items-center gap-3">
+            <div className="text-4xl">📊</div>
+            <div>
+              <h2 className="font-black text-xl">نتائج التقويم الذاتي</h2>
+              <p className="opacity-70 text-xs">عناصر الأداء الوظيفي — {PERFORMANCE_DOMAINS.length} عنصراً من 100 درجة</p>
+            </div>
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            <button onClick={refresh}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-black bg-white/20 hover:bg-white/30 transition-all border border-white/30">
+              🔄 تحديث
+            </button>
+            <button
+              onClick={() => { window.location.href = window.location.href.split('#')[0] + '#teacherportal'; window.location.reload(); }}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-black bg-white/20 hover:bg-white/30 transition-all border border-white/30">
+              👨‍🏫 بوابة المعلم
+            </button>
           </div>
         </div>
         <div className="grid grid-cols-4 gap-3">
           {[
-            { v:results.length,      l:"أكمل التقييم" },
-            { v:pending.length,      l:"لم يُكمل" },
-            { v:teachers.length,     l:"إجمالي" },
-            { v:`${avgScore}/100`,   l:"متوسط الدرجات" },
+            { v:results.length,      l:"أكمل التقييم", color:"#4ade80" },
+            { v:pending.length,      l:"لم يُكمل",      color:"#fbbf24" },
+            { v:teachers.length,     l:"إجمالي",        color:"#93c5fd" },
+            { v:`${avgScore}/100`,   l:"متوسط الدرجات", color:"#c084fc" },
           ].map(s => (
             <div key={s.l} className="bg-white/15 rounded-xl py-2 px-2 text-center">
-              <div className="text-xl font-black">{s.v}</div>
+              <div className="text-xl font-black" style={{color:s.color}}>{s.v}</div>
               <div className="text-xs opacity-75">{s.l}</div>
             </div>
           ))}
@@ -20708,7 +20733,14 @@ function TeacherProfilePortal({ siteFont, onBack, attendance, teachers, week }) 
                 <div className="text-5xl mb-4">⭐</div>
                 <h3 className="font-black text-gray-800 mb-2">لم يُكمل التقييم الذاتي بعد</h3>
                 <p className="text-xs text-gray-500 mb-5">يمكنك إكمال التقييم من بوابة التقويم الذاتي</p>
-                <button onClick={()=>{ onBack(); }}
+                <button onClick={()=>{
+                    // افتح بوابة التقويم الذاتي مباشرة
+                    onBack();
+                    setTimeout(() => {
+                      // أطلق حدث لفتح PerformanceStandardsPortal
+                      window.dispatchEvent(new CustomEvent("open-perf-portal"));
+                    }, 100);
+                  }}
                   className="px-6 py-3 rounded-2xl font-black text-white text-sm" style={{background:"linear-gradient(135deg,#059669,#0d9488)"}}>
                   📊 انتقل لبوابة التقويم الذاتي
                 </button>
@@ -23482,6 +23514,13 @@ export default function SchoolWebsite() {
   const [user, setUser] = useState(null);
   const [parentPortal,        setParentPortal]        = useState(false);
   const [perfStandardsPortal, setPerfStandardsPortal] = useState(false);
+
+  // استمع لطلب فتح بوابة التقويم الذاتي من داخل بوابة المعلم
+  useEffect(() => {
+    const handler = () => { setTeacherProfilePortal(false); setPerfStandardsPortal(true); };
+    window.addEventListener("open-perf-portal", handler);
+    return () => window.removeEventListener("open-perf-portal", handler);
+  }, []);
   const [teacherProfilePortal, setTeacherProfilePortal] = useState(false);
   const [studentRaffle,       setStudentRaffle]       = useState(false);
   const [publicAnnouncements, setPublicAnnouncements] = useState(false);
@@ -23774,7 +23813,7 @@ export default function SchoolWebsite() {
     { id: "activities",    label: "الأنشطة",         icon: "⚡" },
     { id: "messages",      label: "رسائل الأهالي",  icon: "✉️" },
     { id: "sms",           label: "رسائل SMS",       icon: "📱" },
-    { id: "teacherportal", label: "تقويم الأداء",    icon: "📊" },
+    { id: "perfresults",   label: "تقويم الأداء",   icon: "📊" },
     { id: "settings",      label: "الإعدادات",       icon: "⚙️" },
   ];
 
