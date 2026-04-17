@@ -10,7 +10,7 @@ const FIREBASE_URL = "https://school-faza-default-rtdb.firebaseio.com";
 
 const DB_CACHE_PREFIX  = "db_cache_v2_";
 const DB_QUEUE_KEY     = "db_pending_queue_v2";
-const DB_SYNC_INTERVAL = 4000; // إعادة المحاولة كل 4 ثواني
+const DB_SYNC_INTERVAL = 2000; // إعادة المحاولة كل 2 ثانية
 
 // ── قائمة الانتظار ──
 const dbQueue = {
@@ -35,12 +35,15 @@ const dbQueue = {
 // ── الإرسال لـ Firebase مع إعادة المحاولة ──
 async function dbFirebasePut(key, value) {
   try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 10000);
     const r = await fetch(`${FIREBASE_URL}/school/${key}.json`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(value),
-      signal: AbortSignal.timeout(8000), // timeout 8 ثواني
+      signal: controller.signal,
     });
+    clearTimeout(timer);
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     dbQueue.remove(key); // نجح — احذف من قائمة الانتظار
     return true;
@@ -83,51 +86,57 @@ window.addEventListener("online", async () => {
 });
 
 const DB = {
-  // ── قراءة: Firebase أولاً، ثم localStorage كـ fallback ──
+  // ── قراءة: Firebase هو المصدر الوحيد + localStorage كاش احتياطي ──
   async get(key, fallback) {
-    // أولاً: جرّب الكاش المحلي (فوري)
+    // الكاش المحلي كـ fallback فقط
     let cached = null;
     try {
       const raw = localStorage.getItem(DB_CACHE_PREFIX + key);
       if (raw) cached = JSON.parse(raw);
     } catch {}
 
-    // ثانياً: جلب Firebase
+    // جلب من Firebase (المصدر الأساسي)
     try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 8000);
       const r = await fetch(`${FIREBASE_URL}/school/${key}.json`,
-        { signal: AbortSignal.timeout(6000) });
+        { signal: controller.signal });
+      clearTimeout(timer);
       const data = await r.json();
       if (data !== null && data !== undefined) {
-        // حدّث الكاش المحلي
+        // حدّث الكاش المحلي دائماً من Firebase
         try { localStorage.setItem(DB_CACHE_PREFIX + key, JSON.stringify(data)); } catch {}
         return data;
       }
-      // Firebase فارغ — هل عندنا بيانات في الكاش المحلي؟
+      // Firebase فارغ أو null — استخدم الكاش
       return cached !== null ? cached : fallback;
     } catch {
-      // Firebase فشل — استخدم الكاش المحلي
+      // Firebase غير متاح — استخدم الكاش المحلي
       return cached !== null ? cached : fallback;
     }
   },
 
-  // ── كتابة: localStorage أولاً (فوري) + Firebase + queue للفشل ──
+  // ── كتابة: Firebase أولاً (المصدر الوحيد للحقيقة) + localStorage كاش ──
   async set(key, value) {
-    // 1. احفظ محلياً فوراً
+    // 1. احفظ في localStorage كاش فوري
     try { localStorage.setItem(DB_CACHE_PREFIX + key, JSON.stringify(value)); } catch {}
 
-    // 2. أضف لقائمة الانتظار (ضمان الإرسال)
+    // 2. أضف لقائمة الانتظار + أخبر UI
     dbQueue.add(key, value);
-    // أخبر UI فوراً بوجود عملية معلقة
     window.dispatchEvent(new CustomEvent("db-queue-change", { detail: dbQueue.load().length }));
 
-    // 3. حاول الإرسال لـ Firebase الآن
+    // 3. أرسل لـ Firebase (محاولة أولى)
     const ok = await dbFirebasePut(key, value);
     if (ok) {
-      // نجح — أخبر UI بالنجاح وصفّر العداد
       window.dispatchEvent(new CustomEvent("db-save-ok", { detail: key }));
-    } else {
-      // فشل — سيُعاد الإرسال من المزامنة الدورية
       window.dispatchEvent(new CustomEvent("db-queue-change", { detail: dbQueue.load().length }));
+    } else {
+      // 4. محاولة ثانية بعد ثانية واحدة
+      setTimeout(async () => {
+        const ok2 = await dbFirebasePut(key, value);
+        window.dispatchEvent(new CustomEvent("db-queue-change", { detail: dbQueue.load().length }));
+        if (ok2) window.dispatchEvent(new CustomEvent("db-save-ok", { detail: key }));
+      }, 1000);
     }
   },
 };
@@ -1539,11 +1548,10 @@ function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, sa
   });
   const saveAssembly = (data) => {
     setAssembly(data);
-    // حفظ فوري محلياً + Firebase
-    try { localStorage.setItem(DB_CACHE_PREFIX + "school-assembly", JSON.stringify(data)); } catch {}
+    // حفظ فوري محلياً
     try { localStorage.setItem("morning_assembly_v1", JSON.stringify(data)); } catch {}
-    dbQueue.add("school-assembly", data);
-    dbFirebasePut("school-assembly", data);
+    // حفظ عبر DB (يتعامل مع queue + Firebase + إشعار UI)
+    DB.set("school-assembly", data);
   };
   const getAssembly = (di) => assembly[`${week.days[di]?.dateH}_${di}`] ?? null;
   const setAssemblyDay = (di, val) => {
@@ -1558,10 +1566,10 @@ function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, sa
   });
   const saveTeacherAssembly = (data) => {
     setTeacherAssembly(data);
-    try { localStorage.setItem(DB_CACHE_PREFIX + "school-teacher-assembly", JSON.stringify(data)); } catch {}
+    // حفظ فوري محلياً
     try { localStorage.setItem("teacher_assembly_v1", JSON.stringify(data)); } catch {}
-    dbQueue.add("school-teacher-assembly", data);
-    dbFirebasePut("school-teacher-assembly", data);
+    // حفظ عبر DB (يتعامل مع queue + Firebase + إشعار UI)
+    DB.set("school-teacher-assembly", data);
   };
   const getTeacherAssembly = (ti, di) => {
     const key = `${week.days[di]?.dateH}_${di}_${ti}`;
@@ -1619,17 +1627,19 @@ function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, sa
       if (field === "status" && value === "حاضر")    { next[ti][di] = { status: "حاضر" }; }
       if (field === "status" && value === "غائب")    { next[ti][di] = { status: "غائب",    absType: next[ti][di]?.absType || "اضطراري", notes: next[ti][di]?.notes || "" }; }
       if (field === "status" && value === "مستأذن")  { next[ti][di] = { status: "مستأذن",  excuseFrom: "", excuseTo: "", excuseReason: "", notes: next[ti][di]?.notes || "" }; }
-      // ── احفظ فوراً في localStorage (لا ينتظر debounce) ──
-      try { localStorage.setItem(DB_CACHE_PREFIX + "school-attendance", JSON.stringify(next)); } catch {}
-      // ── أرسل لـ Firebase فوراً (بالتوازي مع debounce) ──
-      dbQueue.add("school-attendance", next);
-      dbFirebasePut("school-attendance", next);
+      // ── احفظ عبر DB (localStorage + Firebase + queue + إشعار UI) ──
+      DB.set("school-attendance", next);
       return next;
     });
   };
 
   // debounce احتياطي — الحفظ الفعلي يتم في updateField مباشرة
-  useEffect(() => { if (!attInitialized.current) return; const t = setTimeout(() => saveAttendance(attendance), 3000); return () => clearTimeout(t); }, [attendance]);
+  // debounce 1.5 ثانية احتياطي للتأكد من الحفظ
+  useEffect(() => {
+    if (!attInitialized.current) return;
+    const t = setTimeout(() => saveAttendance(attendance), 1500);
+    return () => clearTimeout(t);
+  }, [attendance]);
 
   // إحصائيات
   const countStatus = (di, st) => teachers.filter((_, ti) => (attendance[ti]?.[di]?.status || "حاضر") === st).length;
@@ -7342,13 +7352,6 @@ function PerformanceStandardsPortal({ siteFont, onBack }) {
   const [savedResult, setSavedResult]     = useState(null);
   const [uploadMsg, setUploadMsg]         = useState("");
   const fileRef = useRef(null);
-
-  useEffect(() => {
-    try {
-      const preferredId = localStorage.getItem("preferred_teacher_eval_id") || "";
-      if (preferredId && !loginId) setLoginId(preferredId);
-    } catch {}
-  }, []);
 
   useEffect(() => {
     (async () => {
@@ -20320,7 +20323,7 @@ function PageVisitorCounter({ pageKey, label = "زيارة" }) {
 // ═══════════════════════════════════════════════════════════
 // بوابة المعلم الموحدة — دخول واحد يفتح لوحة شاملة
 // ═══════════════════════════════════════════════════════════
-function TeacherProfilePortal({ siteFont, onBack, onOpenSelfEval, attendance, teachers, week }) {
+function TeacherProfilePortal({ siteFont, onBack, attendance, teachers, week }) {
   const [step, setStep]             = useState("login");
   const [loginId, setLoginId]       = useState("");
   const [loginError, setLoginError] = useState("");
@@ -20331,15 +20334,6 @@ function TeacherProfilePortal({ siteFont, onBack, onOpenSelfEval, attendance, te
   const [perfResults, setPerfResults] = useState([]);
   const [tAssembly, setTAssembly]   = useState({});
   const [activeTab, setActiveTab]   = useState("summary"); // summary | attendance | assembly | reports | selfeval | analytics
-  const [saveBadge, setSaveBadge]   = useState("");
-
-  const flashSaved = (msg = "تم الحفظ فورًا") => {
-    setSaveBadge(msg);
-    try { clearTimeout(window.__teacherPortalSaveBadgeTimer); } catch {}
-    try {
-      window.__teacherPortalSaveBadgeTimer = setTimeout(() => setSaveBadge(""), 1600);
-    } catch {}
-  };
 
   const weekKey = week?.days?.[0]?.dateH || "unknown";
 
@@ -20388,19 +20382,6 @@ function TeacherProfilePortal({ siteFont, onBack, onOpenSelfEval, attendance, te
     const key = `${d.dateH}_${di}_${teacherIdx}`;
     return { name: d.name, date: d.dateH, val: tAssembly[key] };
   });
-
-  const saveTeacherAssemblyImmediate = async (di, val) => {
-    if (teacherIdx < 0 || !week?.days?.[di]) return;
-    const key = `${week.days[di].dateH}_${di}_${teacherIdx}`;
-    const next = { ...tAssembly, [key]: val };
-    setTAssembly(next);
-    try { localStorage.setItem("teacher_assembly_v1", JSON.stringify(next)); } catch {}
-    try { localStorage.setItem(DB_CACHE_PREFIX + "school-teacher-assembly", JSON.stringify(next)); } catch {}
-    try { dbQueue.add("school-teacher-assembly", next); } catch {}
-    try { dbFirebasePut("school-teacher-assembly", next); } catch {}
-    try { await DB.set("school-teacher-assembly", next); } catch {}
-    flashSaved(val === true ? "تم حفظ حضور الطابور مباشرة" : "تم حفظ غياب الطابور مباشرة");
-  };
 
   // ── تقارير المدير ──
   const myReports = weekReports?.[weekKey]?.[currentTeacher?.id] || {};
@@ -20492,34 +20473,18 @@ function TeacherProfilePortal({ siteFont, onBack, onOpenSelfEval, attendance, te
         </div>
 
         {/* تبويبات */}
-        <div className="flex overflow-x-auto px-2 pb-2 gap-2 scrollbar-hide">
+        <div className="flex overflow-x-auto px-2 pb-2 gap-1 scrollbar-hide">
           {TABS.map(tab=>(
             <button key={tab.id} onClick={()=>setActiveTab(tab.id)}
-              className="flex-shrink-0 flex items-center gap-2 px-3.5 py-2 rounded-2xl text-xs font-black transition-all border"
+              className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black transition-all"
               style={{
-                background: activeTab===tab.id ? "linear-gradient(135deg,#ffffff,#e0f2fe)" : "rgba(255,255,255,0.08)",
-                color:      activeTab===tab.id ? "#0f172a" : "rgba(255,255,255,0.82)",
-                borderColor: activeTab===tab.id ? "rgba(255,255,255,0.75)" : "rgba(255,255,255,0.14)",
-                boxShadow: activeTab===tab.id ? "0 8px 22px rgba(15,23,42,.18)" : "none",
-                transform: activeTab===tab.id ? "translateY(-1px)" : "translateY(0)",
+                background: activeTab===tab.id ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.1)",
+                color:      activeTab===tab.id ? "#1e3a5f"               : "rgba(255,255,255,0.7)",
               }}>
-              <span className="w-7 h-7 rounded-xl flex items-center justify-center text-sm"
-                style={{
-                  background: activeTab===tab.id ? "linear-gradient(135deg,#1d4ed8,#0d9488)" : "rgba(255,255,255,0.12)",
-                  color: "#fff",
-                  boxShadow: activeTab===tab.id ? "0 6px 14px rgba(29,78,216,.28)" : "none",
-                }}>{tab.icon}</span>
-              <span>{tab.label}</span>
+              <span>{tab.icon}</span><span>{tab.label}</span>
             </button>
           ))}
         </div>
-        {saveBadge && (
-          <div className="px-3 pb-3">
-            <div className="mx-auto max-w-xs rounded-2xl px-3 py-2 text-center text-xs font-black text-emerald-800 bg-emerald-50 border border-emerald-200 shadow-sm">
-              ✅ {saveBadge}
-            </div>
-          </div>
-        )}
       </div>
 
       <div className="max-w-xl mx-auto px-3 pt-4 space-y-4">
@@ -20743,12 +20708,8 @@ function TeacherProfilePortal({ siteFont, onBack, onOpenSelfEval, attendance, te
                 <div className="text-5xl mb-4">⭐</div>
                 <h3 className="font-black text-gray-800 mb-2">لم يُكمل التقييم الذاتي بعد</h3>
                 <p className="text-xs text-gray-500 mb-5">يمكنك إكمال التقييم من بوابة التقويم الذاتي</p>
-                <button onClick={()=>{
-                    try { localStorage.setItem("preferred_teacher_eval_id", String(currentTeacher?.id || loginId || "")); } catch {}
-                    if (onOpenSelfEval) onOpenSelfEval();
-                    else onBack();
-                  }}
-                  className="px-6 py-3 rounded-2xl font-black text-white text-sm shadow-lg" style={{background:"linear-gradient(135deg,#059669,#0d9488)"}}>
+                <button onClick={()=>{ onBack(); }}
+                  className="px-6 py-3 rounded-2xl font-black text-white text-sm" style={{background:"linear-gradient(135deg,#059669,#0d9488)"}}>
                   📊 انتقل لبوابة التقويم الذاتي
                 </button>
               </div>
@@ -22342,744 +22303,6 @@ function TimetablePage({ teachers }) {
 }
 
 // ===== سجل الزيارات الصفية =====
-function ClassVisitsPage({ teachers, classList }) {
-  // --- حالات الصفحة ---
-  const [tab,         setTab]         = useState("list");   // list | new | view
-  const [visits,      setVisits]      = useState([]);
-  const [viewVisit,   setViewVisit]   = useState(null);
-  const [teacherAccounts, setTeacherAccounts] = useState([]);
-
-  // البيانات الأساسية
-  const emptyForm = () => ({
-    // هوية
-    teacherName:"", teacherNationalId:"", nationality:"سعودي",
-    qualification:"بكالوريوس جامعي", qualYear:"", specialization:"",
-    teachField:"", startDate:"", visitDate:"",
-    visitNo:"", visitClass:"", visitPeriod:"", subject:"",
-    lessonTitle:"", studentCount:"", present:"", absent:"",
-    visitPurpose:"زيارة إشرافية", visitType:"حضوري", isNewOnSubject:"لا",
-    // أساليب المشرف
-    methods:{ classVisit:false, activities:false, preparation:false,
-      principalDiscuss:false, shortTest:false, homework:false,
-      studentGuide:false, assessment:false, other:"" },
-    // المحاور (مصفوفة درجات)
-    responsibility:[null],
-    communication:[null, null],
-    professional:[null, null, null],
-    planning:[null, null],
-    strategies:[null, null, null, null, null, null, null],
-    applications:[null, null],
-    evaluation:[null, null, null],
-    environment:[null, null, null],
-    achievement:[null, null],
-    // التوصيات والدعم
-    prevRecsLevel:"", strengths:"", supervisorSupport:"", recommendations:"",
-    // الاحتياجات
-    needs:[
-      {need:"",program:""},
-      {need:"",program:""},
-      {need:"",program:""},
-      {need:"",program:""},
-      {need:"",program:""},
-      {need:"",program:""},
-    ],
-    benefitFrom:"", finalRecs:"",
-    // اطلاع المعلم
-    teacherInformed:"لا",
-    // تواقيع
-    principalName:"", supervisorName:"",
-  });
-
-  const [form, setForm] = useState(emptyForm());
-
-  useEffect(() => {
-    DB.get("school-class-visits", []).then(d => setVisits(Array.isArray(d)?d:[]));
-    DB.get("school-teacher-accounts", []).then(d => setTeacherAccounts(Array.isArray(d)?d:[]));
-  }, []);
-
-  const saveVisits = (v) => { setVisits(v); DB.set("school-class-visits", v); };
-
-  const upd = (field, val) => setForm(f => ({...f, [field]: val}));
-  const updNested = (parent, field, val) => setForm(f => ({...f, [parent]:{...f[parent],[field]:val}}));
-  const updScore = (axis, idx, val) => setForm(f => {
-    const arr = [...f[axis]]; arr[idx] = val; return {...f, [axis]: arr};
-  });
-  const updNeed = (idx, field, val) => setForm(f => {
-    const needs = f.needs.map((n,i) => i===idx ? {...n,[field]:val} : n);
-    return {...f, needs};
-  });
-
-  // حساب الدرجات
-  const calcScore = (arr) => arr.filter(v => v !== null).reduce((s,v) => s + (v||0), 0);
-  const AXES = [
-    { key:"responsibility", label:"المسؤولية",                   color:"#7c3aed", items:["تطبيق قواعد السلوك الوظيفي وأخلاقيات مهنة التعليم"] },
-    { key:"communication",  label:"التواصل والتعاون",            color:"#0891b2", items:["التعاون الإيجابي في بيئة العمل","الالتزام بآداب الحوار شفهياً وكتابياً"] },
-    { key:"professional",   label:"التطوير المهني",              color:"#059669", items:["الالتزام بخطة التطوير المهني","تبادل الخبرات المهنية والتخصصية مع زملائه وتفعيل مجتمعات التعلم المهنية","تقديم إنتاج معرفي"] },
-    { key:"planning",       label:"التخطيط والإعداد للدرس",     color:"#d97706", items:["تصميم خطة فصلية للمقرر","التخطيط للدرس وفق منهجية علمية واضحة"] },
-    { key:"strategies",     label:"تطبيق استراتيجيات التعلم",   color:"#dc2626", items:["التهيئة المناسبة لدعم أهداف التعلم","تنفيذ درس يحقق أهداف التعلم","توظيف تقنيات ووسائل تعليمية تحقق أهداف التعلم","استخدام منصات وتطبيقات التعليم عن بعد مع ربطها بأنماط الطالب واحتياجاتهم","تقديم مادة علمية صحيحة ترتبط بأهداف التعلم وتناسب خبرات الطالب","تطبيق استراتيجيات تعليمية متنوعة تحقق أهداف التعلم بما يناسب أنماط الطالب المختلفة","ربط الدرس بواقع الحياة وتكامله مع المواد الأخرى"] },
-    { key:"applications",   label:"تطبيقات التعلم",              color:"#6366f1", items:["طرح أسئلة صفية مناسبة مع مراعاتها للفروق الفردية","إشراك الطالب في أنشطة الدرس بما يحقق العدالة بينهم"] },
-    { key:"evaluation",     label:"تقويم التعلم",                color:"#0d9488", items:["تشخيص مستويات الطالب بأساليب وأدوات متنوعة","بناء خطة متكاملة لتعزيز الطالب وفق احتياجهم مع مراعاة التميز ومعالجة الضعف","توظيف التطبيقات الصفية والمنزلية في تقويم الطالب مع مراعاة مستوياتهم"] },
-    { key:"environment",    label:"بيئة التعلم",                 color:"#7c3aed", items:["تهيئة بيئة تعليمية مناسبة بنائية ومعززة ومحفزة للتعلم","إدارة مشاركات واستفسارات الطالب الصوتية والمكتوبة بفاعلية","إدارة واستثمار وقت التعلم بكفاءة عالية"] },
-    { key:"achievement",    label:"التحصيل الدراسي",             color:"#b45309", items:["مستوى تفاعل الطالب خلال الدرس","مستوى تحصيل الطالب العلمي"] },
-  ];
-
-  const SCORE_LABELS = { 5:"ممتاز", 4:"جيد جداً", 3:"جيد", 2:"مقبول", 1:"ضعيف" };
-  const SCORE_COLORS = { 5:"#059669", 4:"#0891b2", 3:"#d97706", 2:"#f59e0b", 1:"#ef4444" };
-
-  const totalScore = AXES.reduce((s, ax) => s + calcScore(form[ax.key]), 0);
-  const maxScore   = AXES.reduce((s, ax) => s + ax.items.length * 5, 0);
-  const pct = maxScore > 0 ? Math.round(totalScore / maxScore * 100) : 0;
-
-  const SUBJECTS = ["القرآن الكريم","التربية الإسلامية","اللغة العربية","الرياضيات","العلوم","الاجتماعيات","اللغة الإنجليزية","الحاسب والتقنية","الفنون","التربية البدنية","أخرى"];
-  const PERIODS_T2 = ["الأولى","الثانية","الثالثة","الرابعة","الخامسة","السادسة","السابعة"];
-  const H_MONTHS = ["محرم","صفر","ربيع الأول","ربيع الثاني","جمادى الأولى","جمادى الثانية","رجب","شعبان","رمضان","شوال","ذو القعدة","ذو الحجة"];
-
-  const ic = "w-full px-3 py-2 rounded-xl border-2 border-gray-200 focus:border-amber-400 focus:outline-none text-sm";
-  const st = { fontFamily:"inherit" };
-
-  // اختيار المعلم يملأ بياناته تلقائياً
-  const handleTeacherSelect = (name) => {
-    const acc = teacherAccounts.find(a => a.name === name);
-    upd("teacherName", name);
-    if (acc) upd("teacherNationalId", acc.id || "");
-  };
-
-  // حفظ الزيارة
-  const saveVisit = () => {
-    if (!form.teacherName) { alert("اختر المعلم"); return; }
-    const entry = { ...form, id: Date.now(), savedAt: new Date().toLocaleDateString("ar-SA") };
-    const updated = [entry, ...visits];
-    saveVisits(updated);
-    setForm(emptyForm());
-    setTab("list");
-    alert("✅ تم حفظ الزيارة بنجاح");
-  };
-
-  // طباعة الزيارة
-  const printVisit = (v) => {
-    const axesHTML = AXES.map(ax => {
-      const score = calcScore(v[ax.key]);
-      const max   = ax.items.length * 5;
-      return `
-      <div class="axis-section" style="border-right:4px solid ${ax.color};padding-right:12px;margin-bottom:16px;">
-        <div class="axis-title" style="color:${ax.color};font-size:14px;font-weight:900;margin-bottom:8px;display:flex;justify-content:space-between">
-          <span>${ax.label}</span>
-          <span class="score-badge" style="background:${ax.color};color:#fff;padding:2px 12px;border-radius:20px;font-size:12px">الدرجة: ${score} / ${max}</span>
-        </div>
-        <table style="width:100%;border-collapse:collapse;font-size:11px">
-          <thead>
-            <tr style="background:${ax.color}15">
-              <th style="padding:5px 8px;text-align:right;border:1px solid ${ax.color}33">البند</th>
-              ${[1,2,3,4,5].map(n=>`<th style="width:40px;text-align:center;border:1px solid ${ax.color}33;color:${ax.color}">${n}</th>`).join("")}
-              <th style="width:70px;text-align:center;border:1px solid ${ax.color}33;color:${ax.color}">التقدير</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${ax.items.map((item,i) => {
-              const sc = v[ax.key][i];
-              return `<tr>
-                <td style="padding:5px 8px;border:1px solid #e5e7eb">${item}</td>
-                ${[1,2,3,4,5].map(n=>`<td style="text-align:center;border:1px solid #e5e7eb;background:${sc===n?ax.color+"22":""}">${sc===n?'●':''}</td>`).join("")}
-                <td style="text-align:center;border:1px solid #e5e7eb;font-weight:bold;color:${SCORE_COLORS[sc]||'#666'}">${SCORE_LABELS[sc]||'—'}</td>
-              </tr>`;
-            }).join("")}
-          </tbody>
-        </table>
-      </div>`;
-    }).join("");
-
-    const methodsHTML = [
-      ["classVisit","الزيارة الصفية والاجتماع بالمعلم"],
-      ["activities","الاطلاع على مدى مشاركته في النشاطات الخارجية للمادة"],
-      ["preparation","الاطلاع على الإعداد للدرس"],
-      ["principalDiscuss","مناقشة مدير المدرسة"],
-      ["shortTest","إجراء اختبار قصير للطالب"],
-      ["homework","الاطلاع على الواجبات والتطبيقات"],
-      ["studentGuide","زيارة الموجه الطلابي"],
-      ["assessment","الاطلاع على التقويم والاختبارات"],
-    ].map(([k,l]) => `<div style="display:flex;gap:8px;align-items:center;margin:4px 0;font-size:11px">
-      <span style="width:20px;height:20px;border-radius:4px;border:1.5px solid ${v.methods[k]?'#059669':'#ccc'};background:${v.methods[k]?'#059669':'#fff'};display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;flex-shrink:0">${v.methods[k]?'✓':''}</span>
-      <span>${l}</span>
-    </div>`).join("");
-
-    const needsHTML = v.needs.filter(n=>n.need).map((n,i)=>`
-      <tr>
-        <td style="padding:5px 8px;border:1px solid #e5e7eb;text-align:center">${i+1}</td>
-        <td style="padding:5px 8px;border:1px solid #e5e7eb">${n.need}</td>
-        <td style="padding:5px 8px;border:1px solid #e5e7eb">${n.program}</td>
-      </tr>`).join("");
-
-    const totalSc = AXES.reduce((s,ax)=>s+calcScore(v[ax.key]),0);
-    const maxSc   = AXES.reduce((s,ax)=>s+ax.items.length*5,0);
-    const pctPrint = maxSc>0 ? Math.round(totalSc/maxSc*100) : 0;
-    const overallColor = pctPrint>=90?"#059669":pctPrint>=75?"#0891b2":pctPrint>=60?"#d97706":"#ef4444";
-
-    printWindow(`<!DOCTYPE html><html dir="rtl" lang="ar">
-<head><meta charset="UTF-8">
-<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
-<style>
-  *{margin:0;padding:0;box-sizing:border-box}
-  body{font-family:'Cairo',sans-serif;direction:rtl;background:#fff;color:#1a1a1a;font-size:12px}
-  .page{width:210mm;margin:0 auto;padding:8mm 10mm}
-  .header{display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid #b45309;padding-bottom:8px;margin-bottom:12px}
-  .header-center{text-align:center}
-  .header-center h1{font-size:16px;font-weight:900;color:#b45309}
-  .header-center h2{font-size:13px;color:#555;margin-top:2px}
-  .logo{width:50px}
-  .ministry-text{font-size:11px;color:#b45309;font-weight:700;text-align:right;line-height:1.7}
-  .info-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:12px}
-  .info-box{border:1px solid #e5e7eb;border-radius:6px;overflow:hidden}
-  .info-label{background:#b4530915;color:#b45309;font-size:9px;font-weight:700;padding:3px 8px}
-  .info-val{font-size:11px;font-weight:600;padding:4px 8px;min-height:22px}
-  .methods-box{border:1px solid #e5e7eb;border-radius:8px;padding:10px;margin-bottom:12px}
-  .methods-title{color:#b45309;font-weight:900;font-size:12px;margin-bottom:8px;border-right:3px solid #b45309;padding-right:8px}
-  .total-box{display:flex;align-items:center;justify-content:center;gap:16px;margin:12px 0;padding:10px;border-radius:12px;background:${overallColor}11;border:2px solid ${overallColor}33}
-  .total-num{font-size:28px;font-weight:900;color:${overallColor}}
-  .total-label{font-size:11px;color:#666}
-  .needs-table{width:100%;border-collapse:collapse;margin-bottom:10px;font-size:11px}
-  .needs-table th{background:#b45309;color:#fff;padding:5px 8px;text-align:right}
-  .recs-box{border:1px solid #e5e7eb;border-radius:6px;padding:8px 12px;margin-bottom:8px}
-  .recs-label{color:#b45309;font-weight:900;font-size:11px;margin-bottom:4px}
-  .recs-val{font-size:11px;line-height:1.7;min-height:20px}
-  .sigs{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:14px;padding-top:10px;border-top:2px solid #b45309}
-  .sig-box{text-align:center;border-top:1.5px dashed #b45309;padding-top:6px}
-  .sig-title{font-size:10px;color:#666;margin-bottom:4px}
-  .sig-name{font-size:11px;font-weight:700}
-  .informed-badge{display:inline-block;padding:3px 14px;border-radius:20px;font-size:11px;font-weight:700;background:${v.teacherInformed==="نعم"?"#dcfce7":"#fee2e2"};color:${v.teacherInformed==="نعم"?"#166534":"#991b1b"};border:1px solid ${v.teacherInformed==="نعم"?"#86efac":"#fca5a5"}}
-  @media print{@page{size:A4;margin:8mm 10mm}body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
-</style>
-</head><body><div class="page">
-
-<div class="header">
-  <div class="ministry-text">الإدارة العامة للتعليم<br>مدرسة عبيدة بن الحارث المتوسطة</div>
-  <div class="header-center">
-    <h1>وزارة التعليم</h1>
-    <h2>بطاقة الزيارة الفنية للمعلم</h2>
-    <h2>Ministry of Education</h2>
-  </div>
-  <div style="text-align:left;font-size:11px;color:#888">زيارة رقم: ${v.visitNo||"—"}<br>${v.visitDate||""}</div>
-</div>
-
-<div class="info-grid">
-  <div class="info-box"><div class="info-label">اسم المعلم</div><div class="info-val" style="font-weight:900">${v.teacherName}</div></div>
-  <div class="info-box"><div class="info-label">رقم الهوية</div><div class="info-val">${v.teacherNationalId||"—"}</div></div>
-  <div class="info-box"><div class="info-label">الجنسية</div><div class="info-val">${v.nationality}</div></div>
-  <div class="info-box"><div class="info-label">المؤهل وتاريخه</div><div class="info-val">${v.qualification} ${v.qualYear?"/"+v.qualYear:""}</div></div>
-  <div class="info-box"><div class="info-label">التخصص</div><div class="info-val">${v.specialization||"—"}</div></div>
-  <div class="info-box"><div class="info-label">مجال التدريس</div><div class="info-val">${v.teachField||"—"}</div></div>
-  <div class="info-box"><div class="info-label">الفصل / الحصة</div><div class="info-val">${v.visitClass} / ${v.visitPeriod}</div></div>
-  <div class="info-box"><div class="info-label">المادة</div><div class="info-val">${v.subject}</div></div>
-  <div class="info-box"><div class="info-label">عنوان الدرس</div><div class="info-val">${v.lessonTitle||"—"}</div></div>
-  <div class="info-box"><div class="info-label">عدد الطلاب / الحضور / الغياب</div><div class="info-val">${v.studentCount||"—"} / ${v.present||"—"} / ${v.absent||"—"}</div></div>
-  <div class="info-box"><div class="info-label">نوع الزيارة</div><div class="info-val">${v.visitType}</div></div>
-  <div class="info-box"><div class="info-label">جديد على المادة؟</div><div class="info-val">${v.isNewOnSubject}</div></div>
-</div>
-
-<div class="methods-box">
-  <div class="methods-title">الأساليب التي اتبعها المشرف للتعرف على المستوى</div>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px">
-    ${methodsHTML}
-    ${v.methods.other ? `<div style="font-size:11px;color:#666;grid-column:span 2">أساليب أخرى: ${v.methods.other}</div>` : ""}
-  </div>
-</div>
-
-<div class="total-box">
-  <div><div class="total-num">${totalSc}</div><div class="total-label">من ${maxSc}</div></div>
-  <div style="width:1px;height:40px;background:#ddd"></div>
-  <div><div class="total-num" style="font-size:22px">${pctPrint}%</div><div class="total-label">النسبة الكلية</div></div>
-  <div style="width:1px;height:40px;background:#ddd"></div>
-  <div><div class="total-num" style="font-size:18px">${pctPrint>=90?"ممتاز":pctPrint>=75?"جيد جداً":pctPrint>=60?"جيد":pctPrint>=50?"مقبول":"ضعيف"}</div><div class="total-label">التقدير العام</div></div>
-</div>
-
-${axesHTML}
-
-<div class="recs-box"><div class="recs-label">مستوى تنفيذ التوصيات السابقة</div><div class="recs-val">${v.prevRecsLevel||"&nbsp;"}</div></div>
-<div class="recs-box"><div class="recs-label">مواطن القوة والتميز</div><div class="recs-val">${v.strengths||"&nbsp;"}</div></div>
-<div class="recs-box"><div class="recs-label">الدعم والخبرات المقدمة من المشرف</div><div class="recs-val">${v.supervisorSupport||"&nbsp;"}</div></div>
-<div class="recs-box"><div class="recs-label">التوصيات</div><div class="recs-val">${v.recommendations||"&nbsp;"}</div></div>
-
-${v.needs.filter(n=>n.need).length>0?`
-<table class="needs-table">
-  <thead><tr><th style="width:30px">م</th><th>الاحتياجات</th><th>البرامج المقترحة / للمتابعة / للتطوير</th></tr></thead>
-  <tbody>${needsHTML}</tbody>
-</table>`:""}
-
-<div class="recs-box"><div class="recs-label">يستفاد من المعلم في</div><div class="recs-val">${v.benefitFrom||"&nbsp;"}</div></div>
-<div class="recs-box"><div class="recs-label">توصيات</div><div class="recs-val">${v.finalRecs||"&nbsp;"}</div></div>
-
-<div style="display:flex;align-items:center;gap:12px;margin:10px 0;font-size:11px">
-  <span style="font-weight:700">اطلاع المعلم على نتيجة الزيارة:</span>
-  <span class="informed-badge">${v.teacherInformed}</span>
-</div>
-
-<div class="sigs">
-  <div class="sig-box"><div class="sig-title">المعلم</div><div class="sig-name">${v.teacherName}</div></div>
-  <div class="sig-box"><div class="sig-title">مدير المدرسة</div><div class="sig-name">${v.principalName||"________________"}</div></div>
-  <div class="sig-box"><div class="sig-title">المشرف التربوي</div><div class="sig-name">${v.supervisorName||"________________"}</div></div>
-</div>
-
-</div><script>window.onload=()=>window.print()</script></body></html>`);
-  };
-
-  // --- واجهة القائمة ---
-  if (tab === "list") return (
-    <div className="space-y-4">
-      <div className="rounded-b-2xl p-6 text-white shadow-xl relative overflow-hidden"
-        style={{background:"linear-gradient(135deg,#7c2d12,#b45309,#d97706)"}}>
-        <div style={{position:"absolute",inset:0,background:"linear-gradient(120deg,transparent 40%,rgba(255,255,255,.08) 60%,transparent 80%)"}} />
-        <div className="relative flex items-center justify-between flex-wrap gap-3">
-          <div>
-            <h2 className="text-2xl font-black mb-1">👁️ الزيارات الفنية للمعلمين</h2>
-            <p className="opacity-75 text-sm">بطاقة الزيارة الفنية الرسمية — وزارة التعليم</p>
-          </div>
-          <button onClick={() => setTab("new")}
-            className="px-6 py-3 rounded-2xl font-black text-sm shadow-lg transition-all hover:shadow-xl"
-            style={{background:"rgba(255,255,255,.2)",border:"1.5px solid rgba(255,255,255,.4)",color:"#fff"}}>
-            + زيارة جديدة
-          </button>
-        </div>
-      </div>
-
-      {visits.length === 0 ? (
-        <div className="bg-white rounded-2xl p-12 text-center shadow-sm border border-gray-100">
-          <div className="text-5xl mb-3">📋</div>
-          <div className="font-black text-gray-400 text-lg">لا توجد زيارات مسجلة</div>
-          <div className="text-sm text-gray-300 mt-1">اضغط "زيارة جديدة" لبدء التسجيل</div>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {visits.map(v => {
-            const totalSc = AXES.reduce((s,ax)=>s+calcScore(v[ax.key]),0);
-            const maxSc   = AXES.reduce((s,ax)=>s+ax.items.length*5,0);
-            const pctV    = maxSc>0 ? Math.round(totalSc/maxSc*100) : 0;
-            const col     = pctV>=90?"#059669":pctV>=75?"#0891b2":pctV>=60?"#d97706":"#ef4444";
-            return (
-              <div key={v.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                <div className="flex items-center justify-between px-5 py-3 border-b border-gray-50"
-                  style={{background:(col)+"08"}}>
-                  <div>
-                    <div className="font-black text-gray-800 text-base">{v.teacherName}</div>
-                    <div className="text-xs text-gray-400 mt-0.5">
-                      {v.subject} · {v.visitClass} · {v.visitDate} · زيارة رقم {v.visitNo||"—"}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="text-center">
-                      <div className="text-xl font-black" style={{color:col}}>{pctV}%</div>
-                      <div className="text-xs text-gray-400">{totalSc}/{maxSc}</div>
-                    </div>
-                    <div className="flex gap-1.5">
-                      <button onClick={() => { setViewVisit(v); setTab("view"); }}
-                        className="text-xs px-3 py-1.5 rounded-xl font-bold bg-blue-50 text-blue-600 hover:bg-blue-100">👁 عرض</button>
-                      <button onClick={() => printVisit(v)}
-                        className="text-xs px-3 py-1.5 rounded-xl font-bold bg-amber-50 text-amber-600 hover:bg-amber-100">🖨 طباعة</button>
-                      <button onClick={() => { if(window.confirm("حذف الزيارة؟")) saveVisits(visits.filter(x=>x.id!==v.id)); }}
-                        className="text-xs px-3 py-1.5 rounded-xl font-bold bg-red-50 text-red-500 hover:bg-red-100">🗑</button>
-                    </div>
-                  </div>
-                </div>
-                <div className="px-5 py-2.5 flex flex-wrap gap-2">
-                  {AXES.map(ax => {
-                    const sc = calcScore(v[ax.key]);
-                    const mx = ax.items.length * 5;
-                    return (
-                      <span key={ax.key} className="text-xs px-2.5 py-0.5 rounded-full font-bold"
-                        style={{background:ax.color+"15",color:ax.color}}>
-                        {ax.label}: {sc}/{mx}
-                      </span>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-
-  // --- واجهة العرض التفصيلي ---
-  if (tab === "view" && viewVisit) {
-    const v = viewVisit;
-    const totalSc = AXES.reduce((s,ax)=>s+calcScore(v[ax.key]),0);
-    const maxSc   = AXES.reduce((s,ax)=>s+ax.items.length*5,0);
-    const pctV    = maxSc>0 ? Math.round(totalSc/maxSc*100) : 0;
-    const col     = pctV>=90?"#059669":pctV>=75?"#0891b2":pctV>=60?"#d97706":"#ef4444";
-    return (
-      <div className="space-y-4 w-full">
-        <div className="flex items-center gap-3">
-          <button onClick={() => setTab("list")} className="text-amber-600 font-black text-sm hover:underline">← القائمة</button>
-          <span className="text-gray-300">/</span>
-          <span className="font-black text-gray-700">{v.teacherName}</span>
-          <button onClick={() => printVisit(v)} className="mr-auto px-4 py-2 rounded-xl font-black text-sm bg-amber-600 text-white hover:bg-amber-700">🖨️ طباعة</button>
-        </div>
-
-        {/* الدرجة الكلية */}
-        <div className="rounded-2xl p-5 text-white shadow-lg" style={{background:`linear-gradient(135deg,${col},${col}cc)`}}>
-          <div className="flex items-center justify-between flex-wrap gap-4">
-            <div>
-              <div className="text-4xl font-black">{pctV}%</div>
-              <div className="opacity-80 text-sm mt-1">{totalSc} من {maxSc} درجة</div>
-              <div className="text-xl font-black mt-1">{pctV>=90?"ممتاز":pctV>=75?"جيد جداً":pctV>=60?"جيد":pctV>=50?"مقبول":"ضعيف"}</div>
-            </div>
-            <div className="text-right">
-              <div className="font-black text-xl">{v.teacherName}</div>
-              <div className="opacity-75 text-sm">{v.subject} · {v.visitClass} · {v.visitDate}</div>
-              <div className="mt-2">
-                <span className="text-xs px-3 py-1 rounded-full font-bold"
-                  style={{background:"rgba(255,255,255,.2)",border:"1px solid rgba(255,255,255,.3)"}}>
-                  اطلاع المعلم: {v.teacherInformed}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* المحاور */}
-        {AXES.map(ax => {
-          const sc = calcScore(v[ax.key]);
-          const mx = ax.items.length * 5;
-          return (
-            <div key={ax.key} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className="flex items-center justify-between px-4 py-3 border-b"
-                style={{borderRight:`4px solid ${ax.color}`,background:(ax.color)+"08"}}>
-                <span className="font-black text-sm" style={{color:ax.color}}>{ax.label}</span>
-                <span className="text-xs px-3 py-1 rounded-full font-black text-white" style={{background:ax.color}}>
-                  {sc} / {mx}
-                </span>
-              </div>
-              <div className="divide-y divide-gray-50">
-                {ax.items.map((item, i) => {
-                  const score = v[ax.key][i];
-                  return (
-                    <div key={i} className="flex items-center gap-3 px-4 py-2.5">
-                      <div className="flex-1 text-sm text-gray-700">{item}</div>
-                      {[1,2,3,4,5].map(n => (
-                        <div key={n} className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-black"
-                          style={{background:score===n?ax.color:"#f5f5f5",color:score===n?"#fff":"#aaa"}}>
-                          {n}
-                        </div>
-                      ))}
-                      <div className="w-20 text-xs font-bold text-center" style={{color:SCORE_COLORS[score]||"#aaa"}}>
-                        {SCORE_LABELS[score]||"—"}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })}
-
-        {/* التوصيات */}
-        {[["مواطن القوة والتميز",v.strengths],["التوصيات",v.recommendations],["يستفاد من المعلم في",v.benefitFrom]].filter(([,val])=>val).map(([label,val])=>(
-          <div key={label} className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
-            <div className="text-xs font-black text-amber-700 mb-1">{label}</div>
-            <div className="text-sm text-gray-700">{val}</div>
-          </div>
-        ))}
-      </div>
-    );
-  }
-
-  // --- نموذج الإدخال ---
-  const SectionHeader = ({title, color="#b45309", score, max}) => (
-    <div className="flex items-center justify-between px-4 py-3 rounded-t-2xl text-white font-black text-sm"
-      style={{background:`linear-gradient(135deg,${color},${color}cc)`}}>
-      <span>{title}</span>
-      {max !== undefined && <span className="bg-white bg-opacity-20 px-3 py-0.5 rounded-full text-xs">{score} / {max}</span>}
-    </div>
-  );
-
-  const ScoreRow = ({label, axisKey, idx}) => {
-    const score = form[axisKey][idx];
-    const ax = AXES.find(a=>a.key===axisKey);
-    return (
-      <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-50 last:border-0">
-        <div className="flex-1 text-sm text-gray-700 leading-snug">{label}</div>
-        <div className="flex gap-1 flex-shrink-0">
-          {[1,2,3,4,5].map(n=>(
-            <button key={n} onClick={() => updScore(axisKey, idx, n)}
-              className="w-9 h-9 rounded-xl text-sm font-black transition-all hover:scale-105"
-              style={{background:score===n?ax.color:"#f5f5f5",color:score===n?"#fff":"#999",
-                boxShadow:score===n?`0 3px 10px ${ax.color}55`:"none"}}>
-              {n}
-            </button>
-          ))}
-          <div className="w-20 flex items-center justify-center text-xs font-bold"
-            style={{color:SCORE_COLORS[score]||"#ccc"}}>{SCORE_LABELS[score]||"—"}</div>
-        </div>
-      </div>
-    );
-  };
-
-  return (
-    <div className="space-y-5 w-full">
-      <div className="flex items-center gap-3">
-        <button onClick={() => setTab("list")} className="text-amber-600 font-black text-sm hover:underline">← القائمة</button>
-        <h2 className="font-black text-gray-800">بطاقة زيارة فنية جديدة</h2>
-      </div>
-
-      {/* الدرجة المحسوبة لحظياً */}
-      <div className="rounded-2xl p-4 border-2 flex items-center gap-4" style={{borderColor:"#b4530944",background:"#fffbeb"}}>
-        <div className="text-center">
-          <div className="text-3xl font-black" style={{color:pct>=90?"#059669":pct>=75?"#0891b2":pct>=60?"#d97706":"#ef4444"}}>{pct}%</div>
-          <div className="text-xs text-gray-400">{totalScore}/{maxScore}</div>
-        </div>
-        <div className="flex-1 h-3 rounded-full bg-gray-100 overflow-hidden">
-          <div className="h-3 rounded-full transition-all"
-            style={{width:pct+"%",background:pct>=90?"#059669":pct>=75?"#0891b2":pct>=60?"#d97706":"#ef4444"}} />
-        </div>
-        <div className="font-black text-sm" style={{color:pct>=90?"#059669":pct>=75?"#0891b2":pct>=60?"#d97706":"#ef4444"}}>
-          {pct>=90?"ممتاز":pct>=75?"جيد جداً":pct>=60?"جيد":pct>=50?"مقبول":"ضعيف"}
-        </div>
-      </div>
-
-      {/* البيانات الأساسية */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <SectionHeader title="📋 البيانات الأساسية" />
-        <div className="p-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-          <div className="col-span-2 sm:col-span-1">
-            <label className="text-xs font-bold text-gray-500 block mb-1">اسم المعلم</label>
-            <select value={form.teacherName} onChange={e=>handleTeacherSelect(e.target.value)} className={ic} style={st}>
-              <option value="">اختر المعلم</option>
-              {teachers.map(t=><option key={t} value={t}>{t}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="text-xs font-bold text-gray-500 block mb-1">رقم الهوية</label>
-            <input value={form.teacherNationalId} onChange={e=>upd("teacherNationalId",e.target.value)} className={ic} style={st} placeholder="تلقائي عند الاختيار" />
-          </div>
-          <div>
-            <label className="text-xs font-bold text-gray-500 block mb-1">الجنسية</label>
-            <select value={form.nationality} onChange={e=>upd("nationality",e.target.value)} className={ic} style={st}>
-              {["سعودي","غير سعودي"].map(v=><option key={v}>{v}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="text-xs font-bold text-gray-500 block mb-1">المؤهل</label>
-            <select value={form.qualification} onChange={e=>upd("qualification",e.target.value)} className={ic} style={st}>
-              {["بكالوريوس جامعي","ماجستير","دكتوراه","دبلوم","ثانوية"].map(v=><option key={v}>{v}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="text-xs font-bold text-gray-500 block mb-1">سنة المؤهل</label>
-            <input value={form.qualYear} onChange={e=>upd("qualYear",e.target.value)} className={ic} style={st} placeholder="مثال: 1422" />
-          </div>
-          <div>
-            <label className="text-xs font-bold text-gray-500 block mb-1">التخصص</label>
-            <select value={form.specialization} onChange={e=>upd("specialization",e.target.value)} className={ic} style={st}>
-              <option value="">اختر</option>
-              {SUBJECTS.map(v=><option key={v}>{v}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="text-xs font-bold text-gray-500 block mb-1">مجال التدريس</label>
-            <select value={form.teachField} onChange={e=>upd("teachField",e.target.value)} className={ic} style={st}>
-              <option value="">اختر</option>
-              {SUBJECTS.map(v=><option key={v}>{v}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="text-xs font-bold text-gray-500 block mb-1">تاريخ الزيارة</label>
-            <input value={form.visitDate} onChange={e=>upd("visitDate",e.target.value)} className={ic} style={st} placeholder="مثال: 13/10/1447" />
-          </div>
-          <div>
-            <label className="text-xs font-bold text-gray-500 block mb-1">رقم الزيارة</label>
-            <input value={form.visitNo} onChange={e=>upd("visitNo",e.target.value)} className={ic} style={st} placeholder="1" />
-          </div>
-          <div>
-            <label className="text-xs font-bold text-gray-500 block mb-1">الفصل</label>
-            <input value={form.visitClass} onChange={e=>upd("visitClass",e.target.value)} className={ic} style={st} placeholder="مثال: أول أ" />
-          </div>
-          <div>
-            <label className="text-xs font-bold text-gray-500 block mb-1">الحصة</label>
-            <select value={form.visitPeriod} onChange={e=>upd("visitPeriod",e.target.value)} className={ic} style={st}>
-              <option value="">اختر</option>
-              {PERIODS_T2.map(p=><option key={p} value={p}>{p}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="text-xs font-bold text-gray-500 block mb-1">المادة</label>
-            <select value={form.subject} onChange={e=>upd("subject",e.target.value)} className={ic} style={st}>
-              <option value="">اختر</option>
-              {SUBJECTS.map(v=><option key={v}>{v}</option>)}
-            </select>
-          </div>
-          <div className="col-span-2">
-            <label className="text-xs font-bold text-gray-500 block mb-1">عنوان الدرس</label>
-            <input value={form.lessonTitle} onChange={e=>upd("lessonTitle",e.target.value)} className={ic} style={st} placeholder="اكتب عنوان الدرس" />
-          </div>
-          <div>
-            <label className="text-xs font-bold text-gray-500 block mb-1">عدد طلاب الفصل</label>
-            <input type="number" value={form.studentCount} onChange={e=>upd("studentCount",e.target.value)} className={ic} style={st} />
-          </div>
-          <div>
-            <label className="text-xs font-bold text-gray-500 block mb-1">عدد الحضور</label>
-            <input type="number" value={form.present} onChange={e=>upd("present",e.target.value)} className={ic} style={st} />
-          </div>
-          <div>
-            <label className="text-xs font-bold text-gray-500 block mb-1">عدد الغياب</label>
-            <input type="number" value={form.absent} onChange={e=>upd("absent",e.target.value)} className={ic} style={st} />
-          </div>
-          <div>
-            <label className="text-xs font-bold text-gray-500 block mb-1">نوع الزيارة</label>
-            <select value={form.visitType} onChange={e=>upd("visitType",e.target.value)} className={ic} style={st}>
-              {["حضوري","عن بعد"].map(v=><option key={v}>{v}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="text-xs font-bold text-gray-500 block mb-1">جديد على المادة؟</label>
-            <select value={form.isNewOnSubject} onChange={e=>upd("isNewOnSubject",e.target.value)} className={ic} style={st}>
-              {["لا","نعم"].map(v=><option key={v}>{v}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="text-xs font-bold text-gray-500 block mb-1">الغرض من الزيارة</label>
-            <select value={form.visitPurpose} onChange={e=>upd("visitPurpose",e.target.value)} className={ic} style={st}>
-              {["زيارة إشرافية","متابعة تطوير","زيارة تشخيصية","زيارة دعم"].map(v=><option key={v}>{v}</option>)}
-            </select>
-          </div>
-        </div>
-      </div>
-
-      {/* الأساليب */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <SectionHeader title="🔍 الأساليب التي اتبعها المشرف للتعرف على المستوى" color="#64748b" />
-        <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-2">
-          {[
-            ["classVisit","الزيارة الصفية والاجتماع بالمعلم"],
-            ["activities","الاطلاع على مدى مشاركته في النشاطات الخارجية"],
-            ["preparation","الاطلاع على الإعداد للدرس"],
-            ["principalDiscuss","مناقشة مدير المدرسة"],
-            ["shortTest","إجراء اختبار قصير للطالب"],
-            ["homework","الاطلاع على الواجبات والتطبيقات"],
-            ["studentGuide","زيارة الموجه الطلابي"],
-            ["assessment","الاطلاع على التقويم والاختبارات"],
-          ].map(([key, label]) => (
-            <label key={key} className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-gray-50 transition-colors">
-              <div onClick={() => updNested("methods", key, !form.methods[key])}
-                className="w-6 h-6 rounded-lg border-2 flex items-center justify-center flex-shrink-0 transition-all cursor-pointer"
-                style={{borderColor:form.methods[key]?"#059669":"#d1d5db",
-                  background:form.methods[key]?"#059669":"#fff",color:"#fff",fontWeight:900}}>
-                {form.methods[key]?"✓":""}
-              </div>
-              <span className="text-sm text-gray-700">{label}</span>
-            </label>
-          ))}
-          <div className="sm:col-span-2">
-            <label className="text-xs font-bold text-gray-500 block mb-1">أساليب أخرى اتبعها المشرف</label>
-            <input value={form.methods.other} onChange={e=>updNested("methods","other",e.target.value)}
-              className={ic} style={st} placeholder="اذكر أساليب أخرى..." />
-          </div>
-        </div>
-      </div>
-
-      {/* محاور التقييم */}
-      {AXES.map(ax => {
-        const sc = calcScore(form[ax.key]);
-        const mx = ax.items.length * 5;
-        return (
-          <div key={ax.key} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-            <SectionHeader title={ax.label} color={ax.color} score={sc} max={mx} />
-            <div className="divide-y divide-gray-50">
-              {ax.items.map((item, i) => (
-                <ScoreRow key={i} label={item} axisKey={ax.key} idx={i} />
-              ))}
-            </div>
-          </div>
-        );
-      })}
-
-      {/* التوصيات والدعم */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <SectionHeader title="📝 التوصيات والدعم" color="#0d9488" />
-        <div className="p-4 space-y-3">
-          {[
-            ["prevRecsLevel","مستوى تنفيذ التوصيات السابقة","نص حر..."],
-            ["strengths","مواطن القوة والتميز","اذكر نقاط القوة..."],
-            ["supervisorSupport","الدعم والخبرات المقدمة من المشرف","..."],
-            ["recommendations","التوصيات","اكتب التوصيات..."],
-          ].map(([field, label, ph]) => (
-            <div key={field}>
-              <label className="text-xs font-bold text-gray-500 block mb-1">{label}</label>
-              <textarea value={form[field]} onChange={e=>upd(field,e.target.value)} rows={2}
-                placeholder={ph} className={ic + " resize-none"} style={st} />
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* الاحتياجات */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <SectionHeader title="📌 الاحتياجات" color="#7c3aed" />
-        <div className="p-4 space-y-2">
-          {form.needs.map((n, i) => (
-            <div key={i} className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black text-white flex-shrink-0"
-                style={{background:"#7c3aed"}}>{i+1}</div>
-              <input value={n.need} onChange={e=>updNeed(i,"need",e.target.value)}
-                placeholder="الاحتياج" className="flex-1 px-3 py-2 rounded-xl border-2 border-gray-200 text-sm focus:outline-none focus:border-purple-400" style={st} />
-              <input value={n.program} onChange={e=>updNeed(i,"program",e.target.value)}
-                placeholder="البرامج المقترحة" className="flex-1 px-3 py-2 rounded-xl border-2 border-gray-200 text-sm focus:outline-none focus:border-purple-400" style={st} />
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* يستفاد من المعلم + توصيات */}
-      <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 space-y-3">
-        <div>
-          <label className="text-xs font-bold text-gray-500 block mb-1">يستفاد من المعلم في</label>
-          <textarea value={form.benefitFrom} onChange={e=>upd("benefitFrom",e.target.value)} rows={2}
-            className={ic + " resize-none"} style={st} placeholder="..." />
-        </div>
-        <div>
-          <label className="text-xs font-bold text-gray-500 block mb-1">توصيات</label>
-          <textarea value={form.finalRecs} onChange={e=>upd("finalRecs",e.target.value)} rows={2}
-            className={ic + " resize-none"} style={st} placeholder="..." />
-        </div>
-      </div>
-
-      {/* اطلاع المعلم + التواقيع */}
-      <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 space-y-4">
-        <div>
-          <label className="text-xs font-bold text-gray-500 block mb-2">اطلاع المعلم على نتيجة الزيارة</label>
-          <div className="flex gap-3">
-            {["نعم","لا"].map(v=>(
-              <button key={v} onClick={()=>upd("teacherInformed",v)}
-                className="px-6 py-2.5 rounded-2xl font-black text-sm transition-all"
-                style={{background:form.teacherInformed===v?(v==="نعم"?"#dcfce7":"#fee2e2"):"#f5f5f5",
-                  color:form.teacherInformed===v?(v==="نعم"?"#166534":"#991b1b"):"#666",
-                  border:`2px solid ${form.teacherInformed===v?(v==="نعم"?"#86efac":"#fca5a5"):"#e5e7eb"}`}}>
-                {v}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="text-xs font-bold text-gray-500 block mb-1">مدير المدرسة</label>
-            <input value={form.principalName} onChange={e=>upd("principalName",e.target.value)} className={ic} style={st} placeholder="الاسم" />
-          </div>
-          <div>
-            <label className="text-xs font-bold text-gray-500 block mb-1">المشرف التربوي</label>
-            <input value={form.supervisorName} onChange={e=>upd("supervisorName",e.target.value)} className={ic} style={st} placeholder="الاسم" />
-          </div>
-        </div>
-      </div>
-
-      {/* زر الحفظ */}
-      <button onClick={saveVisit}
-        className="w-full py-4 rounded-2xl text-white font-black text-base shadow-xl transition-all hover:shadow-2xl"
-        style={{background:"linear-gradient(135deg,#7c2d12,#b45309,#d97706)"}}>
-        💾 حفظ الزيارة الفنية
-      </button>
-    </div>
-  );
-}
-
-// ===== لوحة الشرف =====
 function HonorBoardPage({ classList }) {
   const [honorStudents, setHonorStudents] = useState([]);
   const [form, setForm] = useState({ name:"", class:"", reason:"", badge:"🏆" });
@@ -24296,14 +23519,21 @@ export default function SchoolWebsite() {
       setExcuseFromHash(false);
       if (hash.startsWith("ann-")) { setDirectAnnId(hash.replace("ann-","")); return; }
       setDirectAnnId(null);
-      if (["home","attendance","announcements","activities","settings","students","messages","surveys","sms","report","gradeanalysis","monthlyreport","teacherprofile","absencestats","attendancereport","student-absence","strategies","calendar","gallery","certificates","poll","raffle","broadcast","groupdivider","quiz","classtimer","luckywheel","exitticket","timetable","classvisits","honorboard","tasks","dailyquiz","aiteacher","lessonprep","lessonrecommend","officialforms","portfolio","earlywarning","meetings","heatmap","committeemeeting","teachereval","assessment","studentexcuses","perfresults","teacherreports"].includes(hash)) setPage(hash);
+      if (hash === "teacherportal") { setTeacherProfilePortal(true); return; }
+      if (["home","attendance","announcements","activities","settings","students","messages","surveys","sms","report","gradeanalysis","monthlyreport","teacherprofile","absencestats","attendancereport","student-absence","strategies","calendar","gallery","certificates","poll","raffle","broadcast","groupdivider","quiz","classtimer","luckywheel","exitticket","timetable","honorboard","tasks","dailyquiz","aiteacher","lessonprep","lessonrecommend","officialforms","portfolio","earlywarning","meetings","heatmap","committeemeeting","teachereval","assessment","studentexcuses","perfresults","teacherreports"].includes(hash)) { setTeacherProfilePortal(false); setPage(hash); }
     };
     window.addEventListener("hashchange", h); h();
     return () => window.removeEventListener("hashchange", h);
   }, []);
 
   const navigate = (p) => {
-    if (p === "teacherportal") { setPerfStandardsPortal(true); setMenuOpen(false); return; }
+    if (p === "teacherportal") {
+      setTeacherProfilePortal(true);
+      window.location.hash = "teacherportal";
+      setMenuOpen(false);
+      return;
+    }
+    setTeacherProfilePortal(false);
     setPage(p); window.location.hash = p; setMenuOpen(false);
   };
   const toggleViewMode = (m) => { setViewMode(m); localStorage.setItem("school-view-mode", m); };
@@ -24471,10 +23701,10 @@ export default function SchoolWebsite() {
   const saveTeachers = (v) => DB.set("school-teachers", v);
   const saveWeek = (v) => DB.set("school-week", v);
   const saveAttendance = (v) => {
-    try { localStorage.setItem(DB_CACHE_PREFIX + "school-attendance", JSON.stringify(v)); } catch {}
+    // نسخة احتياطية محلية فورية
     try { localStorage.setItem("attendance_cache_v1", JSON.stringify(v)); } catch {}
-    dbQueue.add("school-attendance", v);
-    dbFirebasePut("school-attendance", v);
+    // حفظ عبر DB (يتعامل مع queue + Firebase + إشعار UI)
+    DB.set("school-attendance", v);
   };
   const saveAnnouncements = (v) => DB.set("school-announcements", v);
   const saveActivities = (v) => DB.set("school-activities", v);
@@ -24530,7 +23760,7 @@ export default function SchoolWebsite() {
   if (!user && publicAnnouncements) return <PublicAnnouncementsPage announcements={announcements} siteFont={siteFont} onBack={() => setPublicAnnouncements(false)} />;
   if (!user && studentRaffle) return <StudentRafflePortal siteFont={siteFont} onBack={() => setStudentRaffle(false)} />;
   if (!user && perfStandardsPortal) return <PerformanceStandardsPortal siteFont={siteFont} onBack={() => setPerfStandardsPortal(false)} />;
-  if (!user && teacherProfilePortal) return <TeacherProfilePortal siteFont={siteFont} onBack={() => setTeacherProfilePortal(false)} onOpenSelfEval={() => { setTeacherProfilePortal(false); setPerfStandardsPortal(true); }} attendance={attendance} teachers={teachers} week={week} />;
+  if (teacherProfilePortal) return <TeacherProfilePortal siteFont={siteFont} onBack={() => { setTeacherProfilePortal(false); window.location.hash = user ? "home" : ""; }} attendance={attendance} teachers={teachers} week={week} />;
   if (!user && parentPortal) return <ParentPortal classList={classList} setClassList={setClassList} saveClass={saveClass} messages={messages} setMessages={setMessages} saveMessages={saveMessages} surveys={surveys} setSurveys={setSurveys} saveSurveys={saveSurveys} siteFont={siteFont} onBack={() => setParentPortal(false)} />;
   if (!user) return <LoginPage users={users} onLogin={setUser} siteFont={siteFont} onParentPortal={() => setParentPortal(true)} onTeacherPortal={() => setPerfStandardsPortal(true)} onTeacherProfile={() => setTeacherProfilePortal(true)} onStudentRaffle={() => setStudentRaffle(true)} onPublicAnnouncements={() => setPublicAnnouncements(true)} onExcusePortal={() => setExcusePortal(true)} />;
 
@@ -24564,7 +23794,7 @@ export default function SchoolWebsite() {
     { id: "luckywheel",    label: "عجلة الحظ",          icon: "🎯" },
     { id: "exitticket",    label: "بطاقة الخروج",       icon: "🚪" },
     { id: "timetable",     label: "جدول الحصص",         icon: "🗓️" },
-    { id: "classvisits",   label: "الزيارات الفنية",    icon: "👁" },
+
     { id: "assessment",    label: "بطاقة التشخيص",      icon: "📊" },
     { id: "studentexcuses",label: "أعذار الطلاب",       icon: "📋" },
     { id: "honorboard",    label: "لوحة الشرف",         icon: "🏆" },
@@ -24877,7 +24107,6 @@ export default function SchoolWebsite() {
                 {page === "luckywheel"     && <LuckyWheelPage />}
                 {page === "exitticket"     && <ExitTicketPage />}
                 {page === "timetable"      && <TimetablePage teachers={teachers} />}
-                {page === "classvisits"    && <ClassVisitsPage teachers={teachers} classList={classList} />}
                 {page === "honorboard"     && <HonorBoardPage classList={classList} />}
                 {page === "tasks"          && <TasksPage teachers={teachers} />}
                 {page === "absencestats"   && <AbsenceStatsPage teachers={teachers} attendance={attendance} week={week} weekArchive={weekArchive} />}
@@ -25102,7 +24331,6 @@ export default function SchoolWebsite() {
         {page === "luckywheel"    && <LuckyWheelPage />}
         {page === "exitticket"    && <ExitTicketPage />}
         {page === "timetable"     && <TimetablePage teachers={teachers} />}
-        {page === "classvisits"   && <ClassVisitsPage teachers={teachers} classList={classList} />}
         {page === "honorboard"    && <HonorBoardPage classList={classList} />}
         {page === "tasks"         && <TasksPage teachers={teachers} />}
         {page === "absencestats"  && <AbsenceStatsPage teachers={teachers} attendance={attendance} week={week} weekArchive={weekArchive} />}
