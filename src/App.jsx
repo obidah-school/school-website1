@@ -22570,59 +22570,49 @@ function TeacherLicenseTab({ teacherName, teacherId }) {
 // ================================================================
 function DailyAttendanceTrackerPage({ teachers }) {
 
-  // ── ثوابت الأيام والشهور ──
-  const DAYS_AR = ["الأحد","الاثنين","الثلاثاء","الأربعاء","الخميس"];
-
-  const HIJRI_MONTHS = [
-    "محرم","صفر","ربيع الأول","ربيع الآخر","جمادى الأولى","جمادى الآخرة",
-    "رجب","شعبان","رمضان","شوال","ذو القعدة","ذو الحجة"
-  ];
-  const GREG_MONTHS = [
-    "يناير","فبراير","مارس","أبريل","مايو","يونيو",
-    "يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"
-  ];
-
-  // أيام 1-31، شهور، سنوات هجرية 1447-1449، ميلادية 2026-2028
-  const DAYS_LIST   = Array.from({length:31},(_,i)=>i+1);
-  const HIJRI_YEARS = [1447,1448,1449];
-  const GREG_YEARS  = [2026,2027,2028];
+  const DAYS_AR      = ["الأحد","الاثنين","الثلاثاء","الأربعاء","الخميس"];
+  const HIJRI_MONTHS = ["محرم","صفر","ربيع الأول","ربيع الآخر","جمادى الأولى","جمادى الآخرة","رجب","شعبان","رمضان","شوال","ذو القعدة","ذو الحجة"];
+  const GREG_MONTHS  = ["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"];
+  const DAYS_LIST    = Array.from({length:31},(_,i)=>i+1);
+  const HIJRI_YEARS  = [1447,1448,1449];
 
   const STATUS_OPTIONS = [
-    { val:"حاضر",    label:"✅ حاضر",    color:"#059669", bg:"#d1fae5" },
-    { val:"غائب",    label:"❌ غائب",    color:"#dc2626", bg:"#fee2e2" },
-    { val:"متأخر",   label:"⏰ متأخر",   color:"#d97706", bg:"#fef3c7" },
-    { val:"مستأذن",  label:"📋 مستأذن", color:"#2563eb", bg:"#dbeafe" },
-    { val:"في_فارس", label:"💻 في فارس", color:"#7c3aed", bg:"#ede9fe" },
+    { val:"حاضر",   label:"✅ حاضر",   color:"#059669", bg:"#d1fae5" },
+    { val:"غائب",   label:"❌ غائب",   color:"#dc2626", bg:"#fee2e2" },
+    { val:"متأخر",  label:"⏰ متأخر",  color:"#d97706", bg:"#fef3c7" },
+    { val:"مستأذن", label:"📋 مستأذن",color:"#2563eb", bg:"#dbeafe" },
   ];
 
-  // ── الحالة ──
-  const [records, setRecords]   = useState([]);
-  const [loading, setLoading]   = useState(true);
-  const [saving,  setSaving]    = useState(false);
-  const [lastSaved, setLastSaved] = useState(null);
-  const [view, setView]         = useState("entry"); // entry | weekly
-  const [search, setSearch]     = useState("");
-  const [selectedTeacher, setSelectedTeacher] = useState(null);
+  const ABSENCE_TYPES = [
+    {val:"اضطراري",      icon:"🔴"}, {val:"مرضي",         icon:"🏥"},
+    {val:"اعتيادي",      icon:"📋"}, {val:"وفاة",          icon:"🖤"},
+    {val:"موعد مستشفى", icon:"🩺"}, {val:"أخرى",          icon:"📌"},
+  ];
 
-  // حقول الإدخال
-  const [selDay,      setSelDay]      = useState(DAYS_AR[new Date().getDay() === 0 ? 0 : Math.min(new Date().getDay()-0,4)]);
-  const [selDayNum,   setSelDayNum]   = useState(new Date().getDate());
-  const [selHijriM,   setSelHijriM]   = useState(HIJRI_MONTHS[9]);  // شوال
-  const [selHijriY,   setSelHijriY]   = useState(1447);
-  const [selGregM,    setSelGregM]    = useState(GREG_MONTHS[new Date().getMonth()]);
-  const [selGregY,    setSelGregY]    = useState(2026);
+  // ── state ──
+  const [records,   setRecords]   = useState([]);
+  const [loading,   setLoading]   = useState(true);
+  const [saving,    setSaving]    = useState(false);
+  const [lastSaved, setLastSaved] = useState(null);
+  const [view,      setView]      = useState("entry");
+  const [search,    setSearch]    = useState("");
+  const [selDay,    setSelDay]    = useState(DAYS_AR[0]);
+  const [selDayNum, setSelDayNum] = useState(new Date().getDate());
+  const [selHijriM, setSelHijriM] = useState(HIJRI_MONTHS[9]);
+  const [selHijriY, setSelHijriY] = useState(1447);
+  const [selGregM,  setSelGregM]  = useState(GREG_MONTHS[new Date().getMonth()]);
+  const [selGregY,  setSelGregY]  = useState(2026);
 
   const dateKey = `${selDayNum}-${selHijriM}-${selHijriY}`;
 
-  // تحميل السجلات
   useEffect(() => {
-    DB.get("school-daily-attendance", []).then(data => {
-      setRecords(Array.isArray(data) ? data : []);
+    DB.get("school-daily-attendance", []).then(d => {
+      setRecords(Array.isArray(d) ? d : []);
       setLoading(false);
     });
   }, []);
 
-  const saveRecords = (newRecs) => {
+  const persist = (newRecs) => {
     setRecords(newRecs);
     setSaving(true);
     DB.set("school-daily-attendance", newRecs).then(() => {
@@ -22631,153 +22621,90 @@ function DailyAttendanceTrackerPage({ teachers }) {
     });
   };
 
-  // الحصول على حالة معلم في يوم
-  const getStatus = (teacherName) => {
-    const rec = records.find(r => r.teacherName===teacherName && r.dateKey===dateKey);
-    return rec?.status || "";
-  };
+  const getRec  = (name) => records.find(r => r.teacherName===name && r.dateKey===dateKey) || {};
+  const getStatus = (name) => getRec(name).status || "";
 
-  // تحديث الحالة
-  const setStatus = (teacherName, status) => {
-    const existing = records.findIndex(r => r.teacherName===teacherName && r.dateKey===dateKey);
-    const newRec = {
-      teacherName, dateKey, status,
-      day: selDay, dayNum: selDayNum,
-      hijriMonth: selHijriM, hijriYear: selHijriY,
-      gregMonth: selGregM, gregYear: selGregY,
-      updatedAt: new Date().toISOString(),
+  // تحديث أي حقل لسجل معلم في اليوم المحدد
+  const patch = (name, fields) => {
+    const idx = records.findIndex(r => r.teacherName===name && r.dateKey===dateKey);
+    const base = {
+      teacherName:name, dateKey,
+      day:selDay, dayNum:selDayNum,
+      hijriMonth:selHijriM, hijriYear:selHijriY,
+      gregMonth:selGregM, gregYear:selGregY,
     };
-    let newRecs;
-    if (existing >= 0) {
-      newRecs = records.map((r,i) => i===existing ? newRec : r);
-    } else {
-      newRecs = [...records, newRec];
-    }
-    saveRecords(newRecs);
+    const prev = idx >= 0 ? records[idx] : base;
+    const next = {...prev, ...fields, updatedAt:new Date().toISOString()};
+    persist(idx>=0 ? records.map((r,i)=>i===idx?next:r) : [...records, next]);
   };
 
-  // إحصائيات لكل معلم
-  const getTeacherStats = (teacherName) => {
-    const teacherRecs = records.filter(r => r.teacherName===teacherName);
-    const stats = { حاضر:0, غائب:0, متأخر:0, مستأذن:0, في_فارس:0 };
-    teacherRecs.forEach(r => { if (stats[r.status] !== undefined) stats[r.status]++; });
-    return { ...stats, total: teacherRecs.length };
+  const setStatus = (name, val) => {
+    // عند اختيار نفس الحالة → مسح
+    if (val === getStatus(name)) patch(name, {status:"", absenceType:"", farisEntered:null});
+    else if (val !== "غائب")     patch(name, {status:val, absenceType:"", farisEntered:null});
+    else                          patch(name, {status:"غائب"});
   };
 
-  // إحصائيات اليوم الحالي
-  const todayStats = {
-    حاضر:    teachers.filter(t => getStatus(t) === "حاضر").length,
-    غائب:    teachers.filter(t => getStatus(t) === "غائب").length,
-    متأخر:   teachers.filter(t => getStatus(t) === "متأخر").length,
-    مستأذن:  teachers.filter(t => getStatus(t) === "مستأذن").length,
-    في_فارس: teachers.filter(t => getStatus(t) === "في_فارس").length,
-    total:   teachers.length,
+  const getStatusInfo   = (val) => STATUS_OPTIONS.find(s=>s.val===val);
+  const getAbsTypeInfo  = (val) => ABSENCE_TYPES.find(a=>a.val===val);
+
+  const teacherList = Array.isArray(teachers)
+    ? teachers.map(t=>typeof t==="string"?t:t.name).filter(Boolean) : [];
+  const filtered = teacherList.filter(t=>!search||t.includes(search));
+
+  // إحصائيات اليوم
+  const dayStat = (key) => teacherList.filter(t=>getStatus(t)===key).length;
+
+  const getTeacherStats = (name) => {
+    const recs = records.filter(r=>r.teacherName===name);
+    const s = {حاضر:0,غائب:0,متأخر:0,مستأذن:0};
+    recs.forEach(r=>{if(s[r.status]!==undefined)s[r.status]++;});
+    return {...s, total:recs.length};
   };
-
-  const teacherList = Array.isArray(teachers) ? teachers.map(t => typeof t==="string" ? t : t.name).filter(Boolean) : [];
-  const filteredTeachers = teacherList.filter(t => !search || t.includes(search));
-
-  const getStatusInfo = (val) => STATUS_OPTIONS.find(s => s.val===val);
 
   const printReport = () => {
-    const rows = filteredTeachers.map(t => {
-      const st = getStatus(t);
-      const si = getStatusInfo(st);
+    const rows = filtered.map(t=>{
+      const r=getRec(t), si=getStatusInfo(r.status||""), at=getAbsTypeInfo(r.absenceType||"");
       return `<tr>
         <td>${t}</td>
-        <td style="text-align:center;font-weight:900;color:${si?.color||"#64748b"}">
-          ${si?.label || "—"}
-        </td>
+        <td style="text-align:center;font-weight:900;color:${si?.color||"#94a3b8"}">${si?.label||"—"}</td>
+        <td style="text-align:center;color:#7c3aed">${at?at.icon+" "+at.val:"—"}</td>
+        <td style="text-align:center;font-weight:900;color:${r.farisEntered?"#059669":r.farisEntered===false?"#dc2626":"#94a3b8"}">${r.farisEntered===true?"✅ نعم":r.farisEntered===false?"❌ لا":"—"}</td>
       </tr>`;
     }).join("");
 
-    printWindow(`<!DOCTYPE html>
-<html dir="rtl" lang="ar">
-<head>
-<meta charset="UTF-8">
-<title>متابعة الحضور اليومي</title>
+    const st = {حاضر:dayStat("حاضر"),غائب:dayStat("غائب"),متأخر:dayStat("متأخر"),مستأذن:dayStat("مستأذن")};
+    printWindow(`<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="UTF-8">
+<title>كشف الحضور اليومي</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap" rel="stylesheet">
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'Cairo',sans-serif;direction:rtl;color:#1a2035;font-size:13px}
-.page{max-width:780px;margin:0 auto;border:3px solid #0d3b6e}
-.header{background:linear-gradient(135deg,#0d3b6e,#1a5276,#0d9488);color:#fff;display:flex;align-items:center;padding:0;min-height:85px}
-.hcol{flex:1;padding:12px 18px}
-.hcol.center{flex:0 0 110px;display:flex;align-items:center;justify-content:center;border-right:1px solid rgba(255,255,255,.25);border-left:1px solid rgba(255,255,255,.25)}
-.hcol.right{text-align:right}
-.hcol.left{text-align:left}
-.ministry{font-size:14px;font-weight:900}
-.dept{font-size:11px;opacity:.8;margin-top:3px}
-.logo-img{height:60px;width:auto;filter:brightness(0) invert(1)}
-.title-bar{background:#1a2f5e;color:#fff;text-align:center;padding:11px;font-size:16px;font-weight:900;border-top:4px solid #f59e0b}
-.meta{display:grid;grid-template-columns:repeat(4,1fr);border-bottom:2px solid #0d9488}
-.meta-cell{padding:7px 10px;border-left:1px solid #c7d2e8;background:#f8fafd}
-.meta-cell:last-child{border-left:none}
-.meta-lbl{font-size:9px;color:#64748b;font-weight:700;margin-bottom:3px}
-.meta-val{font-size:12px;font-weight:700;color:#1a2035}
-table{width:100%;border-collapse:collapse;margin:12px 0}
-thead tr{background:linear-gradient(135deg,#0d3b6e,#1d4ed8);color:#fff}
-th,td{padding:8px 12px;border:1px solid #c7d2e8;font-size:12px}
-th{font-weight:900;text-align:center}
-td:first-child{text-align:right}
-tbody tr:nth-child(even){background:#f8fafd}
-.stats{display:grid;grid-template-columns:repeat(5,1fr);gap:0;margin:0 12px 12px;border:2px solid #c7d2e8;border-radius:10px;overflow:hidden}
-.stat{padding:8px;text-align:center;border-left:1px solid #c7d2e8}
-.stat:first-child{border-left:none}
-.stat-n{font-size:20px;font-weight:900}
-.stat-l{font-size:10px;color:#64748b;font-weight:700}
-.sig{display:grid;grid-template-columns:1fr 1fr;gap:0;margin:0 12px 12px;border:2px solid #c7d2e8;border-radius:10px;overflow:hidden}
-.sig-box{padding:14px;text-align:center;border-left:1px solid #c7d2e8}
-.sig-box:first-child{border-left:none}
-.sig-role{font-size:10px;color:#64748b;margin-bottom:10px}
-.sig-line{border-top:1.5px dashed #0d9488;padding-top:6px;font-size:12px;font-weight:900;color:#0d3b6e;margin-top:16px}
-.footer{background:#0d1b2e;color:rgba(255,255,255,.5);text-align:center;padding:7px;font-size:10px}
-@media print{@page{size:A4;margin:8mm}body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
-</style>
-</head>
-<body>
+<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Cairo',sans-serif;direction:rtl;font-size:12px;color:#1a2035}.page{max-width:760px;margin:0 auto;border:3px solid #0d3b6e}.hdr{background:linear-gradient(135deg,#0d3b6e,#1a5276,#0d9488);color:#fff;display:flex;align-items:stretch;min-height:78px}.hc{flex:1;padding:10px 15px;display:flex;flex-direction:column;justify-content:center}.hc.c{flex:0 0 95px;align-items:center;border-right:1px solid rgba(255,255,255,.25);border-left:1px solid rgba(255,255,255,.25)}.hc.r{text-align:right}.hc.l{text-align:left}.logo{height:55px;filter:brightness(0) invert(1)}.tb{background:#1a2f5e;color:#fff;text-align:center;padding:9px;font-size:14px;font-weight:900;border-top:4px solid #f59e0b}.meta{display:grid;grid-template-columns:repeat(4,1fr);border-bottom:2px solid #0d9488}.mc{padding:6px 10px;border-left:1px solid #c7d2e8;background:#f8fafd}.mc:last-child{border-left:none}.ml{font-size:9px;color:#64748b;font-weight:700;margin-bottom:2px}.mv{font-size:11px;font-weight:700}.stats{display:grid;grid-template-columns:repeat(4,1fr);margin:8px 12px;border:2px solid #c7d2e8;border-radius:8px;overflow:hidden}.st{padding:7px;text-align:center;border-left:1px solid #c7d2e8}.st:first-child{border-left:none}.stn{font-size:17px;font-weight:900}.stl{font-size:9px;color:#64748b;font-weight:700}table{width:100%;border-collapse:collapse;margin:0 0 8px}thead tr{background:linear-gradient(135deg,#0d3b6e,#1d4ed8);color:#fff}th,td{padding:6px 10px;border:1px solid #c7d2e8;font-size:11px}th{font-weight:900;text-align:center}td:first-child{text-align:right}tbody tr:nth-child(even){background:#f8fafd}.sig{display:grid;grid-template-columns:1fr 1fr;margin:0 12px 8px;border:2px solid #c7d2e8;border-radius:8px;overflow:hidden}.sb{padding:10px;text-align:center;border-left:1px solid #c7d2e8}.sb:first-child{border-left:none}.sr{font-size:9px;color:#64748b;margin-bottom:6px}.sn{border-top:1.5px dashed #0d9488;padding-top:5px;font-size:11px;font-weight:900;color:#0d3b6e;margin-top:12px}.footer{background:#0d1b2e;color:rgba(255,255,255,.5);text-align:center;padding:5px;font-size:9px}
+@media print{@page{size:A4;margin:8mm}body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}</style></head><body>
 <div class="page">
-  <div class="header">
-    <div class="hcol right">
-      <div style="font-size:11px;opacity:.8">المملكة العربية السعودية</div>
-      <div class="ministry">وزارة التعليم</div>
-      <div class="dept">إدارة تعليم جدة</div>
-    </div>
-    <div class="hcol center">
-      <img src="${LOGO_URL}" class="logo-img" alt="شعار" />
-    </div>
-    <div class="hcol left">
-      <div style="font-size:11px;opacity:.8">مدرسة عبيدة بن الحارث المتوسطة</div>
-      <div class="ministry">العام الدراسي 1447هـ</div>
-    </div>
+  <div class="hdr">
+    <div class="hc r"><div style="font-size:10px;opacity:.8">المملكة العربية السعودية</div><div style="font-size:13px;font-weight:900">وزارة التعليم</div><div style="font-size:10px;opacity:.8">إدارة تعليم جدة</div></div>
+    <div class="hc c"><img src="${LOGO_URL}" class="logo"/></div>
+    <div class="hc l"><div style="font-size:11px;opacity:.8">مدرسة عبيدة بن الحارث المتوسطة</div><div style="font-size:12px;font-weight:900">العام الدراسي 1447هـ</div></div>
   </div>
-  <div class="title-bar">كشف متابعة الحضور اليومي للمعلمين</div>
+  <div class="tb">كشف متابعة الحضور اليومي للمعلمين</div>
   <div class="meta">
-    <div class="meta-cell"><div class="meta-lbl">اليوم</div><div class="meta-val">${selDay}</div></div>
-    <div class="meta-cell"><div class="meta-lbl">التاريخ الهجري</div><div class="meta-val">${selDayNum} ${selHijriM} ${selHijriY}هـ</div></div>
-    <div class="meta-cell"><div class="meta-lbl">التاريخ الميلادي</div><div class="meta-val">${selDayNum} ${selGregM} ${selGregY}م</div></div>
-    <div class="meta-cell"><div class="meta-lbl">إجمالي المعلمين</div><div class="meta-val">${teachers.length} معلم</div></div>
+    <div class="mc"><div class="ml">اليوم</div><div class="mv">${selDay}</div></div>
+    <div class="mc"><div class="ml">التاريخ الهجري</div><div class="mv">${selDayNum} ${selHijriM} ${selHijriY}هـ</div></div>
+    <div class="mc"><div class="ml">التاريخ الميلادي</div><div class="mv">${selDayNum} ${selGregM} ${selGregY}م</div></div>
+    <div class="mc"><div class="ml">إجمالي المعلمين</div><div class="mv">${teacherList.length} معلم</div></div>
   </div>
   <div class="stats">
-    <div class="stat"><div class="stat-n" style="color:#059669">${todayStats.حاضر}</div><div class="stat-l">حاضر</div></div>
-    <div class="stat"><div class="stat-n" style="color:#dc2626">${todayStats.غائب}</div><div class="stat-l">غائب</div></div>
-    <div class="stat"><div class="stat-n" style="color:#d97706">${todayStats.متأخر}</div><div class="stat-l">متأخر</div></div>
-    <div class="stat"><div class="stat-n" style="color:#2563eb">${todayStats.مستأذن}</div><div class="stat-l">مستأذن</div></div>
-    <div class="stat"><div class="stat-n" style="color:#7c3aed">${todayStats.في_فارس}</div><div class="stat-l">في فارس</div></div>
+    <div class="st"><div class="stn" style="color:#059669">${st.حاضر}</div><div class="stl">حاضر</div></div>
+    <div class="st"><div class="stn" style="color:#dc2626">${st.غائب}</div><div class="stl">غائب</div></div>
+    <div class="st"><div class="stn" style="color:#d97706">${st.متأخر}</div><div class="stl">متأخر</div></div>
+    <div class="st"><div class="stn" style="color:#2563eb">${st.مستأذن}</div><div class="stl">مستأذن</div></div>
   </div>
   <table>
-    <thead><tr><th>اسم المعلم</th><th>الحالة</th></tr></thead>
+    <thead><tr><th>اسم المعلم</th><th>الحالة</th><th>نوع الغياب</th><th>إدخال فارس</th></tr></thead>
     <tbody>${rows}</tbody>
   </table>
   <div class="sig">
-    <div class="sig-box">
-      <div class="sig-role">مشرف الحضور / إسم المعلم</div>
-      <div class="sig-line">____________</div>
-    </div>
-    <div class="sig-box">
-      <div class="sig-role">مدير المدرسة</div>
-      <div class="sig-line">فازع عبدالله القرني</div>
-    </div>
+    <div class="sb"><div class="sr">مشرف الحضور / إسم المعلم</div><div class="sn">______________</div></div>
+    <div class="sb"><div class="sr">مدير المدرسة</div><div class="sn">فازع عبدالله القرني</div></div>
   </div>
   <div class="footer">مدرسة عبيدة بن الحارث المتوسطة — كشف الحضور اليومي</div>
 </div>
@@ -22786,256 +22713,274 @@ tbody tr:nth-child(even){background:#f8fafd}
   };
 
   if (loading) return (
-    <div className="flex items-center justify-center py-20 text-gray-400">
-      <div className="text-center"><div className="text-5xl mb-3 animate-bounce">📅</div><p className="font-bold">جاري التحميل…</p></div>
+    <div className="flex items-center justify-center py-20">
+      <div className="text-center text-gray-400"><div className="text-5xl mb-3 animate-bounce">📅</div><p className="font-bold">جاري التحميل…</p></div>
     </div>
   );
 
   return (
     <div dir="rtl" className="max-w-4xl mx-auto space-y-4 pb-10" style={{fontFamily:"'Cairo',sans-serif"}}>
       <style>{`
-        .att-btn { border:2px solid #e2e8f0; border-radius:14px; padding:6px 12px; font-size:11px; font-weight:900; cursor:pointer; transition:all .18s; font-family:'Cairo',sans-serif; background:#f8fafd; color:#475569; }
-        .att-btn:hover { transform:scale(1.04); }
-        .att-btn.active { border-color:transparent; box-shadow:0 3px 12px rgba(0,0,0,.18); }
-        select.att-select { border:2px solid #c7d2e8; border-radius:12px; padding:7px 10px; font-size:12px; font-weight:700; font-family:'Cairo',sans-serif; outline:none; background:#fff; color:#1a2035; }
-        select.att-select:focus { border-color:#1d4ed8; }
+        .sb2{border:2px solid #e2e8f0;border-radius:10px;padding:5px 10px;font-size:11px;font-weight:900;cursor:pointer;background:#f8fafd;color:#475569;font-family:'Cairo',sans-serif;transition:all .15s;white-space:nowrap;}
+        .sb2:hover{transform:scale(1.04);}
+        .sb2.on{border-color:transparent!important;box-shadow:0 2px 10px rgba(0,0,0,.15);}
+        .tb2{border:2px solid #e9d5ff;border-radius:9px;padding:5px 11px;font-size:11px;font-weight:900;cursor:pointer;background:#faf5ff;color:#7c3aed;font-family:'Cairo',sans-serif;transition:all .15s;white-space:nowrap;}
+        .tb2:hover{background:#ede9fe;transform:scale(1.03);}
+        .tb2.on{background:linear-gradient(135deg,#7c3aed,#6d28d9);color:#fff;border-color:transparent;box-shadow:0 2px 8px rgba(124,58,237,.3);}
+        .fb2{border-radius:999px;padding:4px 12px;font-size:11px;font-weight:900;cursor:pointer;font-family:'Cairo',sans-serif;transition:all .15s;border:2px solid;}
+        .fb2:hover{transform:scale(1.04);}
       `}</style>
 
-      {/* ══ ترويسة احترافية ══ */}
-      <div className="rounded-2xl overflow-hidden shadow-2xl text-white"
+      {/* ── ترويسة ── */}
+      <div className="rounded-2xl overflow-hidden shadow-xl text-white"
         style={{background:"linear-gradient(135deg,#0d3b6e 0%,#1a5276 50%,#0d9488 100%)"}}>
-        <div className="flex items-stretch" style={{minHeight:85}}>
+        <div className="flex items-stretch" style={{minHeight:80}}>
           <div className="flex-1 flex flex-col justify-center text-right px-5 py-3 border-l border-white/20">
             <div className="text-xs opacity-70">المملكة العربية السعودية</div>
-            <div className="font-black text-base">وزارة التعليم</div>
-            <div className="text-xs opacity-70 mt-1">إدارة تعليم — جدة</div>
+            <div className="font-black text-sm">وزارة التعليم</div>
+            <div className="text-xs opacity-70 mt-0.5">إدارة تعليم — جدة</div>
           </div>
-          <div className="flex items-center justify-center px-5 gap-3">
-            <div style={{width:"1.5px",height:60,background:"rgba(255,255,255,.3)",borderRadius:2}}/>
-            <img src={LOGO_URL} alt="شعار" className="h-16 w-auto" style={{filter:"brightness(0) invert(1)"}} />
-            <div style={{width:"1.5px",height:60,background:"rgba(255,255,255,.3)",borderRadius:2}}/>
+          <div className="flex items-center justify-center px-4 gap-3">
+            <div style={{width:"1.5px",height:52,background:"rgba(255,255,255,.3)",borderRadius:2}}/>
+            <img src={LOGO_URL} alt="" className="h-13 w-auto" style={{filter:"brightness(0) invert(1)",height:52}} />
+            <div style={{width:"1.5px",height:52,background:"rgba(255,255,255,.3)",borderRadius:2}}/>
           </div>
           <div className="flex-1 flex flex-col justify-center text-left px-5 py-3">
             <div className="font-black text-sm">مدرسة عبيدة بن الحارث المتوسطة</div>
-            <div className="text-xs opacity-70 mt-1">متابعة غياب المعلمين</div>
+            <div className="text-xs opacity-70 mt-0.5">متابعة الحضور اليومي</div>
           </div>
         </div>
-        {/* شريط العنوان */}
-        <div className="text-center py-3 font-black text-lg border-t-4" style={{background:"rgba(0,0,0,.3)",borderColor:"#f59e0b"}}>
+        <div className="text-center py-2.5 font-black text-base border-t-4" style={{background:"rgba(0,0,0,.28)",borderColor:"#f59e0b"}}>
           📅 كشف متابعة الحضور اليومي للمعلمين
         </div>
       </div>
 
-      {/* ══ تبديل العرض ══ */}
-      <div className="flex gap-2 flex-wrap">
-        {[{id:"entry",label:"📝 إدخال الحضور"},{id:"weekly",label:"📊 الإحصائيات الأسبوعية"}].map(v=>(
+      {/* ── تبديل العرض ── */}
+      <div className="flex gap-2 flex-wrap items-center">
+        {[{id:"entry",label:"📝 إدخال الحضور"},{id:"weekly",label:"📊 الإحصائيات"}].map(v=>(
           <button key={v.id} onClick={()=>setView(v.id)}
             className="px-5 py-2.5 rounded-xl font-black text-sm border-2 transition-all"
-            style={{
-              background: view===v.id ? "linear-gradient(135deg,#0d3b6e,#1d4ed8)" : "#fff",
-              color: view===v.id ? "#fff" : "#475569",
-              borderColor: view===v.id ? "transparent" : "#c7d2e8",
-            }}>
+            style={{background:view===v.id?"linear-gradient(135deg,#0d3b6e,#1d4ed8)":"#fff",color:view===v.id?"#fff":"#475569",borderColor:view===v.id?"transparent":"#c7d2e8"}}>
             {v.label}
           </button>
         ))}
+        <div className="flex-1"/>
         {view==="entry" && (
-          <>
-            <div className="flex-1"/>
-            <button onClick={printReport}
-              className="px-5 py-2.5 rounded-xl font-black text-sm text-white shadow-md"
-              style={{background:"linear-gradient(135deg,#f59e0b,#d97706)"}}>
-              🖨️ طباعة كشف اليوم
-            </button>
-          </>
+          <button onClick={printReport}
+            className="px-5 py-2.5 rounded-xl font-black text-sm text-white"
+            style={{background:"linear-gradient(135deg,#f59e0b,#d97706)"}}>
+            🖨️ طباعة
+          </button>
         )}
       </div>
 
       {view==="entry" && (<>
-        {/* ══ اختيار اليوم والتاريخ ══ */}
+
+        {/* ── اليوم والتاريخ ── */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="px-5 py-3 font-black text-sm text-white flex items-center gap-2"
             style={{background:"linear-gradient(135deg,#1e3a5f,#1d4ed8)"}}>
             <span>📅</span> اليوم والتاريخ
           </div>
           <div className="p-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-            {/* اليوم */}
-            <div>
-              <label className="text-xs font-black text-gray-500 mb-1.5 block">اليوم</label>
-              <select value={selDay} onChange={e=>setSelDay(e.target.value)} className="att-select w-full">
-                {DAYS_AR.map(d=><option key={d} value={d}>{d}</option>)}
-              </select>
-            </div>
-            {/* رقم اليوم */}
-            <div>
-              <label className="text-xs font-black text-gray-500 mb-1.5 block">اليوم (رقم)</label>
-              <select value={selDayNum} onChange={e=>setSelDayNum(Number(e.target.value))} className="att-select w-full">
-                {DAYS_LIST.map(d=><option key={d} value={d}>{d}</option>)}
-              </select>
-            </div>
-            {/* الشهر الهجري */}
-            <div>
-              <label className="text-xs font-black text-gray-500 mb-1.5 block">الشهر الهجري</label>
-              <select value={selHijriM} onChange={e=>setSelHijriM(e.target.value)} className="att-select w-full">
-                {HIJRI_MONTHS.map(m=><option key={m} value={m}>{m}</option>)}
-              </select>
-            </div>
-            {/* السنة الهجرية */}
-            <div>
-              <label className="text-xs font-black text-gray-500 mb-1.5 block">السنة الهجرية</label>
-              <select value={selHijriY} onChange={e=>setSelHijriY(Number(e.target.value))} className="att-select w-full">
-                {HIJRI_YEARS.map(y=><option key={y} value={y}>{y}هـ</option>)}
-              </select>
-            </div>
-            {/* الشهر الميلادي */}
-            <div>
-              <label className="text-xs font-black text-gray-500 mb-1.5 block">الشهر الميلادي</label>
-              <select value={selGregM} onChange={e=>setSelGregM(e.target.value)} className="att-select w-full">
-                {GREG_MONTHS.map((m,i)=><option key={m} value={m}>{m} {GREG_YEARS.includes(selGregY)?selGregY:""}</option>)}
-              </select>
-            </div>
-          </div>
-          {/* ملخص التاريخ */}
-          <div className="mx-4 mb-4 rounded-xl px-4 py-2.5 flex items-center gap-3" style={{background:"#eff6ff"}}>
-            <span className="text-xl">📌</span>
-            <span className="font-black text-sm" style={{color:"#1d4ed8"}}>
-              {selDay} — {selDayNum} {selHijriM} {selHijriY}هـ / {selDayNum} {selGregM} {selGregY}م
-            </span>
-            <div className="mr-auto flex items-center gap-1.5 text-xs font-bold" style={{color: saving?"#d97706":"#059669"}}>
-              {saving ? <><span className="animate-pulse">💾</span><span>يحفظ…</span></> :
-               lastSaved ? <><span>✅</span><span>محفوظ {lastSaved}</span></> : null}
-            </div>
-          </div>
-        </div>
-
-        {/* ══ إحصائيات سريعة ══ */}
-        <div className="grid grid-cols-5 gap-2">
-          {STATUS_OPTIONS.map(s => {
-            const cnt = teacherList.filter(t => getStatus(t)===s.val).length;
-            return (
-              <div key={s.val} className="rounded-2xl p-3 text-center shadow-sm"
-                style={{background:s.bg}}>
-                <div className="text-2xl font-black" style={{color:s.color}}>{cnt}</div>
-                <div className="text-xs font-bold mt-0.5" style={{color:s.color}}>
-                  {s.label.split(" ")[1]}
-                </div>
+            {[
+              {label:"اليوم",        val:selDay,    set:setSelDay,    opts:DAYS_AR.map(d=>({v:d,l:d}))},
+              {label:"رقم اليوم",    val:selDayNum, set:e=>setSelDayNum(Number(e)), opts:DAYS_LIST.map(d=>({v:d,l:d}))},
+              {label:"الشهر الهجري", val:selHijriM, set:setSelHijriM, opts:HIJRI_MONTHS.map(m=>({v:m,l:m}))},
+              {label:"السنة الهجرية",val:selHijriY, set:e=>setSelHijriY(Number(e)), opts:HIJRI_YEARS.map(y=>({v:y,l:y+"هـ"}))},
+              {label:"الشهر الميلادي",val:selGregM, set:setSelGregM, opts:GREG_MONTHS.map(m=>({v:m,l:m}))},
+            ].map(f=>(
+              <div key={f.label}>
+                <label className="text-xs font-black text-gray-500 mb-1.5 block">{f.label}</label>
+                <select value={f.val} onChange={e=>f.set(e.target.value)}
+                  className="w-full px-3 py-2.5 rounded-xl border-2 border-gray-200 focus:border-blue-400 focus:outline-none text-sm font-bold bg-white">
+                  {f.opts.map(o=><option key={o.v} value={o.v}>{o.l}</option>)}
+                </select>
               </div>
-            );
-          })}
+            ))}
+          </div>
+          <div className="mx-4 mb-4 rounded-xl px-4 py-2.5 flex items-center justify-between gap-3" style={{background:"#eff6ff"}}>
+            <span className="font-black text-sm" style={{color:"#1d4ed8"}}>
+              📌 {selDay} — {selDayNum} {selHijriM} {selHijriY}هـ / {selDayNum} {selGregM} {selGregY}م
+            </span>
+            <span className="text-xs font-bold" style={{color:saving?"#d97706":"#059669"}}>
+              {saving?"💾 يحفظ…":lastSaved?`✅ محفوظ ${lastSaved}`:""}
+            </span>
+          </div>
         </div>
 
-        {/* ══ بحث ══ */}
+        {/* ── إحصائيات اليوم ── */}
+        <div className="grid grid-cols-4 gap-2">
+          {STATUS_OPTIONS.map(s=>(
+            <div key={s.val} className="rounded-2xl p-3 text-center shadow-sm" style={{background:s.bg}}>
+              <div className="text-2xl font-black" style={{color:s.color}}>{dayStat(s.val)}</div>
+              <div className="text-xs font-bold mt-0.5" style={{color:s.color}}>{s.val}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* ── بحث ── */}
         <input value={search} onChange={e=>setSearch(e.target.value)}
           placeholder="🔍 بحث باسم المعلم..."
           className="w-full px-4 py-3 rounded-2xl border-2 border-gray-200 focus:border-blue-400 focus:outline-none text-sm" />
 
-        {/* ══ قائمة المعلمين ══ */}
+        {/* ── قائمة المعلمين ── */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="px-5 py-3 font-black text-sm text-white flex items-center justify-between"
             style={{background:"linear-gradient(135deg,#065f46,#0d9488)"}}>
             <div className="flex items-center gap-2"><span>👨‍🏫</span> قائمة المعلمين</div>
-            <span className="text-xs opacity-70">{filteredTeachers.length} معلم</span>
+            <span className="text-xs opacity-70">{filtered.length} معلم</span>
           </div>
+
           <div className="divide-y divide-gray-100">
-            {filteredTeachers.map((teacher, i) => {
-              const st = getStatus(teacher);
-              const si = getStatusInfo(st);
+            {filtered.map((teacher, i) => {
+              const rec = getRec(teacher);
+              const st  = rec.status || "";
+              const si  = getStatusInfo(st);
+              const at  = getAbsTypeInfo(rec.absenceType || "");
+              const fi  = rec.farisEntered; // true | false | null/undefined
+
               return (
-                <div key={i} className="px-4 py-3">
-                  <div className="flex items-center gap-3 flex-wrap sm:flex-nowrap">
-                    {/* رقم + اسم */}
-                    <div className="w-7 h-7 rounded-xl flex items-center justify-center text-xs font-black flex-shrink-0"
+                <div key={i} className="p-4 space-y-3">
+
+                  {/* ── صف الاسم + أزرار الحالة ── */}
+                  <div className="flex items-start gap-3 flex-wrap sm:flex-nowrap">
+                    <div className="w-7 h-7 rounded-xl flex items-center justify-center text-xs font-black flex-shrink-0 mt-1"
                       style={{background:"#f1f5f9",color:"#64748b"}}>{i+1}</div>
-                    <div className="flex-1 font-black text-sm text-gray-800 min-w-0">
-                      <div className="truncate">{teacher}</div>
-                      {si && (
-                        <div className="text-xs font-bold mt-0.5 flex items-center gap-1">
-                          <span className="px-2 py-0.5 rounded-full" style={{background:si.bg,color:si.color}}>
-                            {si.label}
-                          </span>
-                        </div>
-                      )}
+                    <div className="flex-1 min-w-0 mt-0.5">
+                      <div className="font-black text-sm text-gray-800">{teacher}</div>
                     </div>
-                    {/* أزرار الحالة */}
-                    <div className="flex gap-1.5 flex-wrap">
-                      {STATUS_OPTIONS.map(s => (
-                        <button key={s.val} onClick={()=>setStatus(teacher, st===s.val ? "" : s.val)}
-                          className="att-btn"
-                          style={st===s.val ? {
-                            background: s.bg,
-                            color: s.color,
-                            borderColor: s.color,
-                            transform:"scale(1.06)",
-                          } : {}}>
+                    <div className="flex gap-1.5 flex-wrap items-center">
+                      {STATUS_OPTIONS.map(s=>(
+                        <button key={s.val} onClick={()=>setStatus(teacher, s.val)}
+                          className={`sb2${st===s.val?" on":""}`}
+                          style={st===s.val?{background:s.bg,color:s.color,borderColor:s.color}:{}}>
                           {s.label}
                         </button>
                       ))}
                     </div>
                   </div>
+
+                  {/* ── تفاصيل الغياب — تظهر فقط عند اختيار غائب ── */}
+                  {st === "غائب" && (
+                    <div className="mr-10 rounded-2xl border-2 border-red-100 overflow-hidden"
+                      style={{background:"#fff8f8"}}>
+
+                      {/* نوع الغياب */}
+                      <div className="px-4 pt-3 pb-2">
+                        <div className="text-xs font-black text-red-700 mb-2 flex items-center gap-1">
+                          <span>📋</span> نوع الغياب
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {ABSENCE_TYPES.map(a=>(
+                            <button key={a.val}
+                              onClick={()=>patch(teacher,{absenceType: rec.absenceType===a.val?"":a.val})}
+                              className={`tb2${rec.absenceType===a.val?" on":""}`}>
+                              {a.icon} {a.val}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* إدخال في فارس */}
+                      <div className="px-4 pb-3 border-t border-red-100 pt-2 mt-1">
+                        <div className="text-xs font-black text-red-700 mb-2 flex items-center gap-1">
+                          <span>💻</span> هل تم إدخال الغياب في فارس؟
+                        </div>
+                        <div className="flex gap-2">
+                          <button onClick={()=>patch(teacher,{farisEntered: fi===true ? null : true})}
+                            className="fb2"
+                            style={{
+                              background: fi===true ? "#d1fae5" : "#f8fafd",
+                              color:      fi===true ? "#065f46" : "#6b7280",
+                              borderColor:fi===true ? "#6ee7b7" : "#e2e8f0",
+                              fontWeight:900, fontSize:12,
+                            }}>
+                            ✅ نعم، تم الإدخال
+                          </button>
+                          <button onClick={()=>patch(teacher,{farisEntered: fi===false ? null : false})}
+                            className="fb2"
+                            style={{
+                              background: fi===false ? "#fee2e2" : "#f8fafd",
+                              color:      fi===false ? "#991b1b" : "#6b7280",
+                              borderColor:fi===false ? "#fca5a5" : "#e2e8f0",
+                              fontWeight:900, fontSize:12,
+                            }}>
+                            ❌ لا، لم يُدخَل بعد
+                          </button>
+                        </div>
+                        {fi === true && (
+                          <div className="mt-2 text-xs font-black text-green-700 flex items-center gap-1">
+                            <span>✅</span> تم تسجيل إدخال الغياب في فارس
+                          </div>
+                        )}
+                        {fi === false && (
+                          <div className="mt-2 text-xs font-black text-red-600 flex items-center gap-1 animate-pulse">
+                            <span>⚠️</span> الغياب لم يُدخَل في فارس بعد
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ملخص سريع إذا كانت هناك بيانات ولم يكن الصندوق مفتوحاً */}
+                  {st !== "غائب" && st && (
+                    <div className="mr-10 flex flex-wrap gap-2">
+                      <span className="text-xs font-black px-2.5 py-1 rounded-full"
+                        style={{background:si?.bg||"#f1f5f9",color:si?.color||"#475569"}}>
+                        {si?.label}
+                      </span>
+                    </div>
+                  )}
+
                 </div>
               );
             })}
           </div>
         </div>
 
-        {/* ══ التوقيعات ══ */}
+        {/* ── التوقيعات ── */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="px-5 py-3 font-black text-sm text-white"
-            style={{background:"linear-gradient(135deg,#1e3a5f,#1d4ed8)"}}>
-            ✍️ التوقيعات
-          </div>
-          <div className="grid grid-cols-2 gap-0 divide-x divide-x-reverse divide-gray-100">
+          <div className="grid grid-cols-2 divide-x divide-x-reverse divide-gray-100">
             <div className="p-5 text-center">
-              <div className="text-xs text-gray-500 mb-2">مشرف الحضور / إسم المعلم</div>
-              <div className="border-t-2 border-dashed border-teal-400 pt-3 mt-6 font-black text-sm text-gray-700">
-                __________________
-              </div>
+              <div className="text-xs text-gray-400 mb-2">مشرف الحضور / إسم المعلم</div>
+              <div className="border-t-2 border-dashed border-teal-400 pt-3 mt-8 font-black text-sm text-gray-600">__________________</div>
             </div>
             <div className="p-5 text-center">
-              <div className="text-xs text-gray-500 mb-2">مدير المدرسة</div>
-              <div className="border-t-2 border-dashed border-teal-400 pt-3 mt-6 font-black text-sm"
-                style={{color:"#0d3b6e"}}>
-                فازع عبدالله القرني
-              </div>
+              <div className="text-xs text-gray-400 mb-2">مدير المدرسة</div>
+              <div className="border-t-2 border-dashed border-teal-400 pt-3 mt-8 font-black text-sm" style={{color:"#0d3b6e"}}>فازع عبدالله القرني</div>
             </div>
           </div>
         </div>
+
       </>)}
 
-      {/* ══ الإحصائيات الأسبوعية ══ */}
+      {/* ── الإحصائيات ── */}
       {view==="weekly" && (
         <div className="space-y-4">
-          {/* ملخص عام */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-            <div className="px-5 py-3 font-black text-sm text-white"
-              style={{background:"linear-gradient(135deg,#4c1d95,#7c3aed)"}}>
+            <div className="px-5 py-3 font-black text-sm text-white" style={{background:"linear-gradient(135deg,#4c1d95,#7c3aed)"}}>
               📊 ملخص الحضور — جميع الأيام المسجّلة
             </div>
-            <div className="p-4">
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-                {STATUS_OPTIONS.map(s => {
-                  const cnt = records.filter(r=>r.status===s.val).length;
-                  return (
-                    <div key={s.val} className="rounded-2xl p-3 text-center" style={{background:s.bg}}>
-                      <div className="text-2xl font-black" style={{color:s.color}}>{cnt}</div>
-                      <div className="text-xs font-bold mt-0.5" style={{color:s.color}}>
-                        {s.label.split(" ")[1]}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-              <div className="mt-3 text-xs text-gray-400 text-center font-bold">
-                إجمالي السجلات: {records.length} | الأيام المسجّلة: {new Set(records.map(r=>r.dateKey)).size}
-              </div>
+            <div className="p-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {STATUS_OPTIONS.map(s=>{
+                const cnt=records.filter(r=>r.status===s.val).length;
+                return (
+                  <div key={s.val} className="rounded-2xl p-3 text-center" style={{background:s.bg}}>
+                    <div className="text-2xl font-black" style={{color:s.color}}>{cnt}</div>
+                    <div className="text-xs font-bold mt-0.5" style={{color:s.color}}>{s.val}</div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="pb-3 text-xs text-gray-400 text-center font-bold">
+              إجمالي السجلات: {records.length} | الأيام: {new Set(records.map(r=>r.dateKey)).size}
             </div>
           </div>
 
-          {/* إحصائيات لكل معلم */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-            <div className="px-5 py-3 font-black text-sm text-white flex items-center justify-between"
-              style={{background:"linear-gradient(135deg,#065f46,#0d9488)"}}>
-              <div className="flex items-center gap-2"><span>👨‍🏫</span> إحصائية كل معلم</div>
+            <div className="px-5 py-3 font-black text-sm text-white" style={{background:"linear-gradient(135deg,#065f46,#0d9488)"}}>
+              👨‍🏫 إحصائية كل معلم
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
@@ -23045,20 +22990,20 @@ tbody tr:nth-child(even){background:#f8fafd}
                     {STATUS_OPTIONS.map(s=>(
                       <th key={s.val} className="px-3 py-3 text-center font-black border-b" style={{color:s.color}}>{s.label}</th>
                     ))}
-                    <th className="px-3 py-3 text-center font-black text-gray-600 border-b">الإجمالي</th>
+                    <th className="px-3 py-3 text-center font-black text-gray-600 border-b">المجموع</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {teacherList.map((t,i) => {
-                    const st = getTeacherStats(t);
-                    if (st.total === 0) return null;
+                  {teacherList.map((t,i)=>{
+                    const st=getTeacherStats(t);
+                    if(st.total===0) return null;
                     return (
                       <tr key={i} className={i%2===0?"bg-white":"bg-gray-50/50"}>
                         <td className="px-4 py-2.5 font-bold text-gray-700">{t}</td>
                         {STATUS_OPTIONS.map(s=>(
                           <td key={s.val} className="px-3 py-2.5 text-center font-black"
-                            style={{color: st[s.val]>0 ? s.color : "#d1d5db"}}>
-                            {st[s.val] > 0 ? st[s.val] : "—"}
+                            style={{color:st[s.val]>0?s.color:"#d1d5db"}}>
+                            {st[s.val]>0?st[s.val]:"—"}
                           </td>
                         ))}
                         <td className="px-3 py-2.5 text-center font-black text-blue-600">{st.total}</td>
@@ -23067,31 +23012,18 @@ tbody tr:nth-child(even){background:#f8fafd}
                   })}
                 </tbody>
               </table>
-              {teacherList.every(t => getTeacherStats(t).total === 0) && (
+              {teacherList.every(t=>getTeacherStats(t).total===0)&&(
                 <div className="text-center py-10 text-gray-400">
-                  <div className="text-4xl mb-2">📊</div>
-                  <p className="font-bold text-sm">لا توجد بيانات مسجّلة بعد</p>
+                  <div className="text-4xl mb-2">📊</div><p className="font-bold text-sm">لا توجد بيانات بعد</p>
                 </div>
               )}
             </div>
           </div>
 
-          {/* توقيع مدير المدرسة */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
             <div className="grid grid-cols-2 divide-x divide-x-reverse divide-gray-100">
-              <div className="p-5 text-center">
-                <div className="text-xs text-gray-500 mb-2">المسؤول عن الحضور</div>
-                <div className="border-t-2 border-dashed border-teal-400 pt-3 mt-8 font-black text-sm text-gray-700">
-                  __________________
-                </div>
-              </div>
-              <div className="p-5 text-center">
-                <div className="text-xs text-gray-500 mb-2">مدير المدرسة</div>
-                <div className="border-t-2 border-dashed border-teal-400 pt-3 mt-8 font-black text-sm"
-                  style={{color:"#0d3b6e"}}>
-                  فازع عبدالله القرني
-                </div>
-              </div>
+              <div className="p-5 text-center"><div className="text-xs text-gray-400 mb-2">مشرف الحضور</div><div className="border-t-2 border-dashed border-teal-400 pt-3 mt-8 font-black text-sm text-gray-600">__________________</div></div>
+              <div className="p-5 text-center"><div className="text-xs text-gray-400 mb-2">مدير المدرسة</div><div className="border-t-2 border-dashed border-teal-400 pt-3 mt-8 font-black text-sm" style={{color:"#0d3b6e"}}>فازع عبدالله القرني</div></div>
             </div>
           </div>
         </div>
@@ -23099,7 +23031,6 @@ tbody tr:nth-child(even){background:#f8fafd}
     </div>
   );
 }
-
 
 function SyncStatusIndicator() {
   const getQueueLen = () => {
