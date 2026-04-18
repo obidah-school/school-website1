@@ -4912,6 +4912,7 @@ function ParentPortal({ classList, setClassList, saveClass, messages, setMessage
   const [replying, setReplying] = useState({});
   const [editingPhone, setEditingPhone] = useState(false);
   const [phoneInput, setPhoneInput] = useState("");
+  const [portalLightbox, setPortalLightbox] = useState(null); // {src,name}
 
   const saveParentPhone = (phone) => {
     if (!result || !setClassList) return;
@@ -5148,7 +5149,12 @@ function ParentPortal({ classList, setClassList, saveClass, messages, setMessage
                               <div className="mb-3 space-y-2">
                                 {note.attachments.map((att, i) => (
                                   att.type && att.type.startsWith("image") ? (
-                                    <img key={i} src={att.data} alt={att.name} className="max-w-full rounded-xl border border-amber-200 shadow-sm" style={{maxHeight:220,objectFit:"contain"}} />
+                                    <div key={i} className="relative cursor-zoom-in group" onClick={()=>setPortalLightbox({src:att.data,name:att.name})}>
+                                      <img src={att.data} alt={att.name} className="max-w-full rounded-xl border border-amber-200 shadow-sm hover:shadow-lg transition-all" style={{maxHeight:220,objectFit:"contain"}} />
+                                      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all">
+                                        <span className="bg-black bg-opacity-50 text-white text-xs font-black px-3 py-1.5 rounded-full">🔍 اضغط للتكبير</span>
+                                      </div>
+                                    </div>
                                   ) : (
                                     <a key={i} href={att.data} download={att.name} target="_blank" rel="noreferrer"
                                       className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-sm font-bold text-red-700 hover:bg-red-100 transition-all">
@@ -5224,8 +5230,41 @@ function ParentPortal({ classList, setClassList, saveClass, messages, setMessage
               const lastEval = evals[evals.length - 1];
               const lastLv = LMAP[lastEval?.level];
 
+              const studentPhotos = result.student.photos || [];
+              const studentPdfs  = result.student.pdfs  || [];
+
               return (
                 <>
+                  {/* صور الطالب — قابلة للتكبير */}
+                  {studentPhotos.length > 0 && (
+                    <div className={cx.cardXl}>
+                      <div className="px-4 py-3 font-black text-white text-sm" style={{ background: "linear-gradient(135deg,#7c3aed,#4f46e5)" }}>🖼️ صور الطالب</div>
+                      <div className="p-4 flex gap-3 flex-wrap">
+                        {studentPhotos.map((ph,i) => (
+                          <div key={i} className="relative cursor-zoom-in group" onClick={()=>setPortalLightbox({src:ph.data,name:ph.name})}>
+                            <img src={ph.data} alt={ph.name}
+                              className="w-28 h-28 object-cover rounded-2xl border-2 border-purple-200 shadow-md hover:shadow-xl hover:border-purple-400 transition-all"
+                            />
+                            <div className="absolute inset-0 rounded-2xl flex items-center justify-center bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all">
+                              <span className="text-white text-2xl opacity-0 group-hover:opacity-100 transition-all drop-shadow-lg">🔍</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      {studentPdfs.length > 0 && (
+                        <div className="px-4 pb-4 space-y-2">
+                          {studentPdfs.map((pdf,i)=>(
+                            <a key={i} href={pdf.data} download={pdf.name} target="_blank" rel="noreferrer"
+                              className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-3 py-2.5 text-sm font-bold text-red-700 hover:bg-red-100 transition-all">
+                              📄 {pdf.name}
+                              <span className="mr-auto text-xs bg-red-200 px-2 py-0.5 rounded-full">⬇️ تحميل</span>
+                            </a>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {lastLv && (
                     <div className={cx.cardXl}>
                       <div className="px-4 py-3 font-black text-white text-sm" style={{ background: "#1B3A6B" }}>⭐ آخر تقييم أسبوعي</div>
@@ -5279,7 +5318,12 @@ function ParentPortal({ classList, setClassList, saveClass, messages, setMessage
                             <div className="text-xs font-black text-gray-500">📎 مرفقات التقييم</div>
                             {lastEval.attachments.map((att, i) => (
                               att.type && att.type.startsWith("image") ? (
-                                <img key={i} src={att.data} alt={att.name} className="max-w-full rounded-xl border border-gray-200 shadow-sm" style={{maxHeight:200,objectFit:"contain"}} />
+                                <div key={i} className="relative cursor-zoom-in group" onClick={()=>setPortalLightbox({src:att.data,name:att.name})}>
+                                  <img src={att.data} alt={att.name} className="max-w-full rounded-xl border border-gray-200 shadow-sm hover:shadow-lg transition-all" style={{maxHeight:200,objectFit:"contain"}} />
+                                  <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all">
+                                    <span className="bg-black bg-opacity-50 text-white text-xs font-black px-3 py-1.5 rounded-full">🔍 اضغط للتكبير</span>
+                                  </div>
+                                </div>
                               ) : (
                                 <a key={i} href={att.data} download={att.name} target="_blank" rel="noreferrer"
                                   className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-xs font-bold text-red-700">
@@ -5350,6 +5394,8 @@ function ParentPortal({ classList, setClassList, saveClass, messages, setMessage
           <button onClick={onBack} className="text-white opacity-70 hover:opacity-100 text-sm font-bold underline">← العودة إلى صفحة الدخول</button>
         </div>
       </div>
+      {/* Lightbox مكبّر الصور — ولي الأمر */}
+      {portalLightbox && <ImageLightbox src={portalLightbox.src} name={portalLightbox.name} onClose={()=>setPortalLightbox(null)} />}
     </div>
   );
 }
@@ -8377,6 +8423,7 @@ function newEval() {
 }
 
 // ضغط وتحويل الصورة إلى base64
+// للمرفقات — تصغير وضغط (توفير مساحة Firebase)
 async function compressImageToBase64(file, maxW = 900) {
   return new Promise((resolve) => {
     if (file.type === "application/pdf") {
@@ -8400,6 +8447,59 @@ async function compressImageToBase64(file, maxW = 900) {
   });
 }
 
+// لصور ملف الطالب — الحجم الأصلي الكامل بدون أي تصغير
+async function readImageFullRes(file) {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => resolve({
+      type: file.type,
+      name: file.name,
+      data: e.target.result,            // base64 كامل بدون ضغط
+      originalSize: file.size,
+    });
+    reader.readAsDataURL(file);
+  });
+}
+
+// ─── Lightbox (مكبّر الصور) ─── يُعرض فوق كل شيء
+function ImageLightbox({ src, name, onClose }) {
+  useEffect(() => {
+    const close = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", close);
+    return () => window.removeEventListener("keydown", close);
+  }, []);
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position:"fixed", inset:0, background:"rgba(0,0,0,0.92)",
+        zIndex:99999, display:"flex", flexDirection:"column",
+        alignItems:"center", justifyContent:"center", padding:16, cursor:"zoom-out",
+      }}>
+      <img
+        src={src} alt={name}
+        onClick={e => e.stopPropagation()}
+        style={{
+          maxWidth:"95vw", maxHeight:"88vh",
+          objectFit:"contain", borderRadius:12,
+          boxShadow:"0 8px 60px rgba(0,0,0,0.7)",
+          cursor:"default",
+        }}
+      />
+      <div style={{color:"#cbd5e1",marginTop:10,fontSize:13,fontWeight:700}}>{name}</div>
+      <button
+        onClick={onClose}
+        style={{
+          position:"fixed", top:16, left:16,
+          background:"rgba(255,255,255,0.15)", border:"none",
+          borderRadius:"50%", width:40, height:40,
+          color:"#fff", fontSize:22, cursor:"pointer",
+          display:"flex", alignItems:"center", justifyContent:"center",
+        }}>✕</button>
+    </div>
+  );
+}
+
 // مكوّن التقييم الأسبوعي للطالب
 function StudentEvalCard({ student, onUpdate, onDelete, onSendNote, messages }) {
   const [expanded, setExpanded] = useState(false);
@@ -8412,6 +8512,7 @@ function StudentEvalCard({ student, onUpdate, onDelete, onSendNote, messages }) 
   const [showShareLink, setShowShareLink] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
   const [noteAttachments, setNoteAttachments] = useState([]);
+  const [lightbox, setLightbox] = useState(null); // {src, name}
 
   const siteUrl = "https://school-website1.vercel.app";
   const shareUrl = student.nationalId ? `${siteUrl}/#parent-${student.nationalId}` : "";
@@ -8639,7 +8740,7 @@ ${link}
       .cat-label{font-weight:900;color:#374151}
       .cat-text{color:#4b5563;flex:1}
       .cat-face{font-size:18px}
-      .ev-img{max-width:100%;max-height:180px;object-fit:contain;display:block;margin:8px 14px;border-radius:8px;border:1px solid #e5e7eb}
+      .ev-img{max-width:100%;max-height:320px;object-fit:contain;display:block;margin:10px 14px;border-radius:10px;border:2px solid #e5e7eb;box-shadow:0 2px 8px rgba(0,0,0,.08)}
       /* ─── ملاحظات المعلم ─── */
       .note-card{margin-bottom:16px;border-radius:14px;overflow:hidden;border:2px solid #fde68a}
       .note-card.replied{border-color:#93c5fd}
@@ -8647,15 +8748,15 @@ ${link}
       .note-sender{font-weight:900;font-size:14px;color:#92400e}
       .note-date{font-size:12px;color:#a16207}
       .note-text{padding:14px;font-size:15px;line-height:1.7;color:#1e293b;background:#fffbeb}
-      .note-img{max-width:100%;max-height:200px;object-fit:contain;display:block;margin:10px 14px;border-radius:10px;border:1px solid #fde68a}
+      .note-img{max-width:100%;max-height:360px;object-fit:contain;display:block;margin:12px 14px;border-radius:12px;border:2px solid #fde68a;box-shadow:0 2px 10px rgba(0,0,0,.08)}
       .parent-reply{background:linear-gradient(135deg,#eff6ff,#dbeafe);border-top:2px solid #93c5fd;padding:14px}
       .reply-label{font-size:13px;font-weight:900;color:#1d4ed8;margin-bottom:6px}
       .reply-text{font-size:15px;color:#1e3a8a;line-height:1.7;font-weight:700}
       .no-reply{background:#f9fafb;border-top:1px dashed #d1d5db;padding:10px 14px;font-size:12px;color:#9ca3af;font-style:italic}
       .no-notes{color:#9ca3af;font-size:14px;padding:16px;text-align:center}
       /* ─── الصور ─── */
-      .photos-grid{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:8px}
-      .student-photo{width:200px;height:200px;object-fit:cover;border-radius:14px;border:3px solid #e2e8f0;box-shadow:0 2px 8px rgba(0,0,0,.1)}
+      .photos-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;margin-bottom:12px}
+      .student-photo{width:100%;max-height:340px;object-fit:contain;border-radius:14px;border:3px solid #e2e8f0;box-shadow:0 4px 16px rgba(0,0,0,.12);background:#f8fafc}
       /* ─── PDF ─── */
       .pdfs-list{display:flex;flex-direction:column;gap:8px;margin-bottom:8px}
       .pdf-item,.pdf-link{background:#fef2f2;border:1px solid #fecaca;border-radius:10px;padding:10px 14px;font-size:13px;font-weight:700;color:#991b1b}
@@ -9104,7 +9205,9 @@ ${link}
               <div className="flex gap-2 flex-wrap">
                 {(student.photos||[]).map((ph,i)=>(
                   <div key={i} className="relative group">
-                    <img src={ph.data} alt={ph.name} className="w-24 h-24 object-cover rounded-xl border-2 border-gray-200 shadow-sm" />
+                    <img src={ph.data} alt={ph.name}
+                      onClick={()=>setLightbox({src:ph.data,name:ph.name})}
+                      className="w-24 h-24 object-cover rounded-xl border-2 border-gray-200 shadow-sm cursor-zoom-in hover:border-blue-400 hover:shadow-md transition-all" />
                     <button onClick={()=>onUpdate({...student,photos:(student.photos||[]).filter((_,j)=>j!==i)})}
                       className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red-500 text-white text-xs font-black flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all shadow">✕</button>
                     <div className="text-xs text-gray-400 text-center mt-0.5 truncate max-w-24">{ph.name}</div>
@@ -9117,7 +9220,7 @@ ${link}
                     <input type="file" accept="image/*" className="hidden" onChange={async e=>{
                       const f=e.target.files[0]; if(!f) return;
                       if(f.size>6*1024*1024){alert("الصورة كبيرة جداً، الحد 6 ميجا");return;}
-                      const att=await compressImageToBase64(f,1200);
+                      const att=await readImageFullRes(f); // الحجم الأصلي كاملاً
                       onUpdate({...student,photos:[...(student.photos||[]),att]});
                       e.target.value="";
                     }}/>
@@ -9285,6 +9388,8 @@ ${link}
         </div>
       )}
     </div>
+    {/* Lightbox مكبّر الصور */}
+    {lightbox && <ImageLightbox src={lightbox.src} name={lightbox.name} onClose={()=>setLightbox(null)} />}
   );
 }
 
