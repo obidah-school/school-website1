@@ -8517,6 +8517,197 @@ ${link}
   const lastEval = evals[evals.length - 1];
   const lastLevel = lastEval ? EVAL_LEVELS.find(l => l.value === lastEval.level) : null;
 
+  // طباعة ملف الطالب الكامل
+  const handleStudentPrint = (stu, notes) => {
+    const evs = stu.evals || [];
+    const photos = stu.photos || [];
+    const pdfs = stu.pdfs || [];
+
+    // ملخص آخر مستوى لكل مادة
+    const subjRows = SUBJECTS.map(subj => {
+      const last = [...evs].reverse().find(e=>e.subject===subj.key);
+      if(!last) return "";
+      const lv = EVAL_LEVELS.find(l=>l.value===last.level)||EVAL_LEVELS[0];
+      return `<div class="subj-cell" style="border-color:${subj.color}44">
+        <div class="subj-head" style="background:${subj.bg};color:${subj.color}">${subj.icon} ${subj.label}</div>
+        <div class="subj-lv" style="background:${lv.bg||'#f5f5f5'};color:${lv.color||'#333'}">${lv.label||"—"}</div>
+        <div class="subj-cnt">${evs.filter(e=>e.subject===subj.key).length} تقييم</div>
+      </div>`;
+    }).join("");
+
+    // سجل التقييمات
+    const evalRows = [...evs].reverse().map(ev=>{
+      const lv = EVAL_LEVELS.find(l=>l.value===ev.level)||EVAL_LEVELS[0];
+      const subj = SUBJECTS.find(s=>s.key===ev.subject);
+      const cats = EVAL_CATEGORIES.map(cat=>{
+        const d=ev.categories?.[cat.key];
+        if(!d?.text&&!d?.face) return "";
+        return `<div class="cat-row" style="background:${d.color||'#f9fafb'}">
+          <span class="cat-icon">${cat.icon}</span>
+          <span class="cat-label">${cat.label}:</span>
+          <span class="cat-text">${d.text||""}</span>
+          ${d.face?`<span class="cat-face">${d.face}</span>`:""}
+        </div>`;
+      }).join("");
+      const attHtml = (ev.attachments||[]).map(att=>
+        att.type&&att.type.startsWith("image")
+          ? `<img src="${att.data}" class="ev-img"/>`
+          : `<div class="pdf-link">📄 ${att.name}</div>`
+      ).join("");
+      return `<div class="eval-card" style="border-right:5px solid ${lv.bg||'#e5e7eb'}">
+        <div class="eval-head" style="background:${lv.bg||'#f5f5f5'};color:${lv.color||'#333'}">
+          ${subj?`<span class="subj-badge" style="background:${subj.bg};color:${subj.color};border:1px solid ${subj.color}44">${subj.icon} ${subj.label}</span>`:""}
+          <strong>${lv.label||"—"}</strong>
+          <span class="ev-date">${ev.day||""} ${ev.dateH||""}</span>
+        </div>
+        ${cats}${attHtml}
+      </div>`;
+    }).join("");
+
+    // ملاحظات المعلم وردود ولي الأمر
+    const notesHtml = notes.length===0
+      ? `<div class="no-notes">لا توجد ملاحظات</div>`
+      : [...notes].reverse().map(note=>{
+          const atts = (note.attachments||[]).map(att=>
+            att.type&&att.type.startsWith("image")
+              ? `<img src="${att.data}" class="note-img"/>`
+              : `<div class="pdf-link">📄 ${att.name}</div>`
+          ).join("");
+          const replyHtml = note.reply
+            ? `<div class="parent-reply">
+                <div class="reply-label">💬 ردّ ولي الأمر — ${note.repliedAt}</div>
+                <div class="reply-text">${note.reply}</div>
+              </div>`
+            : `<div class="no-reply">⏳ لم يردّ ولي الأمر بعد</div>`;
+          return `<div class="note-card ${note.reply?'replied':''}">
+            <div class="note-meta">
+              <span class="note-sender">👨‍🏫 المعلم</span>
+              <span class="note-date">${note.date} · ${note.time||""}</span>
+            </div>
+            <div class="note-text">${note.text}</div>
+            ${atts}
+            ${replyHtml}
+          </div>`;
+        }).join("");
+
+    // الصور
+    const photosHtml = photos.length===0 ? ""
+      : `<div class="section-title">🖼️ صور الطالب</div>
+         <div class="photos-grid">${photos.map(p=>`<img src="${p.data}" class="student-photo" alt="${p.name}"/>`).join("")}</div>`;
+
+    // ملفات PDF
+    const pdfsHtml = pdfs.length===0 ? ""
+      : `<div class="section-title">📄 المستندات</div>
+         <div class="pdfs-list">${pdfs.map(p=>`<div class="pdf-item">📄 ${p.name}</div>`).join("")}</div>`;
+
+    const lastLv = lastLevel ? lastLevel : {label:"—",bg:"#f5f5f5",color:"#333"};
+
+    const w = window.open("","_blank");
+    w.document.write(`<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8">
+    <title>ملف الطالب — ${stu.name}</title>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;800;900&display=swap');
+      *{margin:0;padding:0;box-sizing:border-box}
+      body{font-family:'Tajawal',Arial,sans-serif;direction:rtl;background:#fff;color:#1e293b;font-size:14px;padding:24px}
+      /* ─── رأس الصفحة ─── */
+      .header{background:linear-gradient(135deg,#1B3A6B,#2E6DA4);color:#fff;border-radius:16px;padding:20px 24px;margin-bottom:20px;display:flex;align-items:center;gap:16px}
+      .header-icon{font-size:48px}
+      .header-school{font-size:14px;opacity:.85;margin-bottom:4px}
+      .header-name{font-size:24px;font-weight:900;margin-bottom:4px}
+      .header-meta{font-size:13px;opacity:.8}
+      .level-badge{display:inline-block;padding:6px 18px;border-radius:999px;font-weight:900;font-size:16px;margin-top:8px}
+      /* ─── بطاقة المعلومات ─── */
+      .info-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+      .info-box{background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:12px;text-align:center}
+      .info-label{font-size:11px;color:#64748b;font-weight:700;margin-bottom:4px}
+      .info-val{font-size:15px;font-weight:900;color:#1e293b}
+      /* ─── عنوان قسم ─── */
+      .section-title{font-size:16px;font-weight:900;color:#1B3A6B;margin:20px 0 10px;padding:8px 14px;background:#f0f7ff;border-radius:10px;border-right:4px solid #1B3A6B}
+      /* ─── شبكة المواد ─── */
+      .subj-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:4px}
+      .subj-cell{border-radius:12px;overflow:hidden;border:2px solid #e5e7eb}
+      .subj-head{padding:6px 8px;font-size:12px;font-weight:900}
+      .subj-lv{padding:8px;text-align:center;font-weight:900;font-size:13px}
+      .subj-cnt{text-align:center;font-size:11px;color:#6b7280;padding:4px}
+      /* ─── التقييمات ─── */
+      .eval-card{margin-bottom:14px;border-radius:12px;overflow:hidden;border:1px solid #e2e8f0}
+      .eval-head{padding:10px 14px;display:flex;align-items:center;gap:8px;font-size:14px;font-weight:700;flex-wrap:wrap}
+      .subj-badge{padding:3px 10px;border-radius:999px;font-size:12px;font-weight:900}
+      .ev-date{font-size:12px;margin-right:auto;opacity:.75}
+      .cat-row{display:flex;align-items:center;gap:6px;padding:8px 14px;border-top:1px solid rgba(0,0,0,.05);font-size:13px}
+      .cat-icon{font-size:16px;flex-shrink:0}
+      .cat-label{font-weight:900;color:#374151}
+      .cat-text{color:#4b5563;flex:1}
+      .cat-face{font-size:18px}
+      .ev-img{max-width:100%;max-height:180px;object-fit:contain;display:block;margin:8px 14px;border-radius:8px;border:1px solid #e5e7eb}
+      /* ─── ملاحظات المعلم ─── */
+      .note-card{margin-bottom:16px;border-radius:14px;overflow:hidden;border:2px solid #fde68a}
+      .note-card.replied{border-color:#93c5fd}
+      .note-meta{background:#fef3c7;padding:10px 14px;display:flex;align-items:center;justify-content:space-between}
+      .note-sender{font-weight:900;font-size:14px;color:#92400e}
+      .note-date{font-size:12px;color:#a16207}
+      .note-text{padding:14px;font-size:15px;line-height:1.7;color:#1e293b;background:#fffbeb}
+      .note-img{max-width:100%;max-height:200px;object-fit:contain;display:block;margin:10px 14px;border-radius:10px;border:1px solid #fde68a}
+      .parent-reply{background:linear-gradient(135deg,#eff6ff,#dbeafe);border-top:2px solid #93c5fd;padding:14px}
+      .reply-label{font-size:13px;font-weight:900;color:#1d4ed8;margin-bottom:6px}
+      .reply-text{font-size:15px;color:#1e3a8a;line-height:1.7;font-weight:700}
+      .no-reply{background:#f9fafb;border-top:1px dashed #d1d5db;padding:10px 14px;font-size:12px;color:#9ca3af;font-style:italic}
+      .no-notes{color:#9ca3af;font-size:14px;padding:16px;text-align:center}
+      /* ─── الصور ─── */
+      .photos-grid{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:8px}
+      .student-photo{width:200px;height:200px;object-fit:cover;border-radius:14px;border:3px solid #e2e8f0;box-shadow:0 2px 8px rgba(0,0,0,.1)}
+      /* ─── PDF ─── */
+      .pdfs-list{display:flex;flex-direction:column;gap:8px;margin-bottom:8px}
+      .pdf-item,.pdf-link{background:#fef2f2;border:1px solid #fecaca;border-radius:10px;padding:10px 14px;font-size:13px;font-weight:700;color:#991b1b}
+      /* ─── توقيعات ─── */
+      .sigs{display:flex;gap:40px;margin-top:28px;padding-top:20px;border-top:2px dashed #e5e7eb;font-size:13px}
+      .sig{text-align:center;flex:1}
+      .sig-label{color:#6b7280;font-weight:700;margin-bottom:24px}
+      .sig-line{border-top:1px solid #374151;padding-top:6px;font-weight:900}
+      .footer{text-align:center;margin-top:20px;font-size:11px;color:#9ca3af}
+      @page{size:A4;margin:1.5cm}
+      @media print{body{padding:0}}
+    </style>
+    </head><body>
+
+    <!-- رأس الصفحة -->
+    <div class="header">
+      <div class="header-icon">👨‍🎓</div>
+      <div>
+        <div class="header-school">مدرسة عبيدة بن الحارث المتوسطة — إدارة تعليم جدة</div>
+        <div class="header-name">${stu.name || "—"}</div>
+        <div class="header-meta">رقم الهوية: ${stu.nationalId||"—"} · جوال ولي الأمر: ${stu.parentPhone||"—"}</div>
+        ${lastLv&&lastLv.value?`<span class="level-badge" style="background:${lastLv.bg};color:${lastLv.color}">آخر مستوى: ${lastLv.label}</span>`:""}
+      </div>
+    </div>
+
+    ${photosHtml}
+    ${pdfsHtml}
+
+    <!-- ملخص المواد -->
+    ${subjRows?`<div class="section-title">📊 آخر مستوى لكل مادة</div><div class="subj-grid">${subjRows}</div>`:""}
+
+    <!-- التقييمات -->
+    ${evs.length?`<div class="section-title">📋 سجل التقييمات الأسبوعية (${evs.length} تقييم)</div>${evalRows}`:""}
+
+    <!-- ملاحظات المعلم وردود ولي الأمر -->
+    <div class="section-title">📨 ملاحظات المعلم وردود ولي الأمر (${notes.length})</div>
+    ${notesHtml}
+
+    <!-- التوقيعات -->
+    <div class="sigs">
+      <div class="sig"><div class="sig-label">توقيع المعلم</div><div class="sig-line">__________________</div></div>
+      <div class="sig"><div class="sig-label">توقيع مدير المدرسة</div><div class="sig-line">فازع القرني</div></div>
+      <div class="sig"><div class="sig-label">توقيع ولي الأمر</div><div class="sig-line">__________________</div></div>
+      <div class="sig"><div class="sig-label">التاريخ</div><div class="sig-line">__________________</div></div>
+    </div>
+    <div class="footer">بوابة مدرسة عبيدة بن الحارث الإلكترونية © ١٤٤٧هـ</div>
+
+    <script>window.onload=()=>{ window.print(); }</script>
+    </body></html>`);
+    w.document.close();
+  };
+
   const toggleCat = (key) => setOpenCats(p => ({ ...p, [key]: !p[key] }));
 
   const updateDraftCat = (key, field, val) => {
@@ -8896,6 +9087,74 @@ ${link}
               </button>
             </div>
           )}
+
+          {/* ===== ملف الطالب: 3 صور + 2 PDF ===== */}
+          <div className="px-4 pt-3 pb-2">
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-xs font-black text-gray-600">🖼️ ملف الطالب — الصور والمستندات</div>
+              <button onClick={() => handleStudentPrint(student, (messages||[]).filter(m=>m.type==="teacher_note"&&m.studentId===student.nationalId))}
+                className="flex items-center gap-1 text-xs font-black px-3 py-1.5 rounded-xl bg-gray-800 text-white hover:bg-gray-900 transition-all">
+                🖨️ طباعة ملف الطالب
+              </button>
+            </div>
+
+            {/* الصور — حد أقصى 3 */}
+            <div className="mb-2">
+              <div className="text-xs font-bold text-gray-500 mb-1.5">📷 الصور (حد أقصى 3)</div>
+              <div className="flex gap-2 flex-wrap">
+                {(student.photos||[]).map((ph,i)=>(
+                  <div key={i} className="relative group">
+                    <img src={ph.data} alt={ph.name} className="w-24 h-24 object-cover rounded-xl border-2 border-gray-200 shadow-sm" />
+                    <button onClick={()=>onUpdate({...student,photos:(student.photos||[]).filter((_,j)=>j!==i)})}
+                      className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red-500 text-white text-xs font-black flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all shadow">✕</button>
+                    <div className="text-xs text-gray-400 text-center mt-0.5 truncate max-w-24">{ph.name}</div>
+                  </div>
+                ))}
+                {(student.photos||[]).length < 3 && (
+                  <label className="w-24 h-24 rounded-xl border-2 border-dashed border-purple-300 flex flex-col items-center justify-center cursor-pointer hover:bg-purple-50 transition-all text-purple-500">
+                    <span className="text-2xl">+</span>
+                    <span className="text-xs font-bold mt-0.5">صورة</span>
+                    <input type="file" accept="image/*" className="hidden" onChange={async e=>{
+                      const f=e.target.files[0]; if(!f) return;
+                      if(f.size>6*1024*1024){alert("الصورة كبيرة جداً، الحد 6 ميجا");return;}
+                      const att=await compressImageToBase64(f,1200);
+                      onUpdate({...student,photos:[...(student.photos||[]),att]});
+                      e.target.value="";
+                    }}/>
+                  </label>
+                )}
+              </div>
+            </div>
+
+            {/* ملفات PDF — حد أقصى 2 */}
+            <div>
+              <div className="text-xs font-bold text-gray-500 mb-1.5">📄 ملفات PDF (حد أقصى 2)</div>
+              <div className="space-y-1.5">
+                {(student.pdfs||[]).map((pdf,i)=>(
+                  <div key={i} className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-3 py-2">
+                    <span className="text-xl">📄</span>
+                    <span className="flex-1 text-xs font-bold text-red-800 truncate">{pdf.name}</span>
+                    <a href={pdf.data} download={pdf.name} target="_blank" rel="noreferrer"
+                      className="text-xs bg-red-100 hover:bg-red-200 text-red-700 px-2 py-1 rounded-lg font-bold transition-all">⬇️</a>
+                    <button onClick={()=>onUpdate({...student,pdfs:(student.pdfs||[]).filter((_,j)=>j!==i)})}
+                      className="text-red-400 hover:text-red-600 text-xs font-black px-1">✕</button>
+                  </div>
+                ))}
+                {(student.pdfs||[]).length < 2 && (
+                  <label className="flex items-center gap-2 py-2 px-3 rounded-xl border-2 border-dashed border-red-300 text-red-600 text-xs font-black cursor-pointer hover:bg-red-50 transition-all">
+                    <span>📎 إضافة PDF</span>
+                    <input type="file" accept=".pdf,application/pdf" className="hidden" onChange={async e=>{
+                      const f=e.target.files[0]; if(!f) return;
+                      if(f.size>8*1024*1024){alert("الملف كبير جداً، الحد 8 ميجا");return;}
+                      const att=await compressImageToBase64(f);
+                      onUpdate({...student,pdfs:[...(student.pdfs||[]),att]});
+                      e.target.value="";
+                    }}/>
+                  </label>
+                )}
+              </div>
+            </div>
+          </div>
 
           {/* ===== ملاحظات ولي الأمر ===== */}
           {onSendNote && (() => {
