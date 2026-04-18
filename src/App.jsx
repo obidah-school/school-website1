@@ -25962,6 +25962,684 @@ function AttendanceAnalysisPage() {
   );
 }
 
+
+
+
+// ===== صفحة استخراج الغياب والتأخر من ملفات Excel =====
+function TeacherAbsenceExtractPage() {
+
+  // ─── State ───
+  const [teachers, setTeachers]   = useState([]); // [{name,id,role,files:[],records:[],stats}]
+  const [selIdx,   setSelIdx]     = useState(0);
+  const [loading,  setLoading]    = useState(false);
+  const [loadMsg,  setLoadMsg]    = useState("");
+  const [workStart,setWorkStart]  = useState("07:00");
+  const [workEnd,  setWorkEnd]    = useState("14:00");
+  const [activeTab,setActiveTab]  = useState("absences");
+  const [dragOver, setDragOver]   = useState(false);
+
+  // ─── Helpers ───
+  const toMins = t => {
+    if (!t || t==="-" || t==="00:00") return null;
+    const [h,m] = t.split(":").map(Number);
+    return isNaN(h)||isNaN(m) ? null : h*60+m;
+  };
+
+  const parseDateNum = s => {
+    const m = s.match(/(\d{2})-(\d{2})-(\d{2})/);
+    return m ? parseInt("20"+m[3]+m[2]+m[1]) : 0;
+  };
+
+  const fmtLate = mins => {
+    if (!mins) return "—";
+    const h=Math.floor(mins/60), m=mins%60;
+    return h>0 ? h+"س "+m+"د" : m+"د";
+  };
+
+  // ─── قراءة ملف Excel ───
+  const parseFile = async (file, wsM, weM) => {
+    const buf  = await file.arrayBuffer();
+    const XLSX = window.XLSX;
+    const wb   = XLSX.read(new Uint8Array(buf), { type:"array" });
+    const ws   = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, { header:1, defval:"" });
+
+    // معلومات الموظف
+    let empName="", empId="", empRole="", period="";
+    for (let i=0; i<Math.min(5,rows.length); i++) {
+      const cell = rows[i].find(c => typeof c==="string" && c.includes("من:"));
+      if (cell) {
+        const lines = cell.split("\n");
+        period = (lines.find(l=>l.includes("من:")) || "").trim();
+        const info = lines.find(l=>l.includes("-")&&!l.includes("من:")) || "";
+        const p = info.split("-").map(s=>s.trim());
+        empName=p[0]||""; empId=p[1]||""; empRole=p[2]||"";
+        break;
+      }
+    }
+
+    // رأس الجدول
+    let hRow=-1;
+    for (let i=0; i<rows.length; i++) {
+      if (rows[i].some(c=>String(c).includes("التاريخ"))) { hRow=i; break; }
+    }
+    if (hRow===-1) return null;
+
+    const H = rows[hRow];
+    const col = {
+      date:      H.findIndex(h=>String(h).includes("التاريخ")),
+      status:    H.findIndex(h=>String(h).includes("حالة")),
+      arrival:   H.findIndex(h=>String(h).includes("توقيت الحضور")),
+      departure: H.findIndex(h=>String(h).includes("توقيت الإنصراف")||String(h).includes("الانصراف")),
+      hours:     H.findIndex(h=>String(h).includes("الفعلي")),
+    };
+
+    const records = [];
+    for (let i=hRow+1; i<rows.length; i++) {
+      const row    = rows[i];
+      const date   = String(row[col.date]||"").trim();
+      if (!date||date.includes("المجموع")) continue;
+      const status = String(row[col.status]||"").trim();
+      const arr    = String(row[col.arrival]||"").trim();
+      const dep    = String(row[col.departure]||"").trim();
+      const hrs    = String(row[col.hours]||"").trim();
+
+      const isWknd = date.includes("الجمعة")||date.includes("السبت");
+      const isAbs  = status.includes("غياب");
+      const isAuto = status.includes("تلقائي");
+      const isPerm = status.includes("إذن")||status.includes("استئذان")||status.includes("إجازة");
+      const arrM   = toMins(arr);
+      const depM   = toMins(dep);
+      const lateM  = (!isAbs&&!isWknd&&arrM!==null) ? Math.max(0,arrM-wsM) : 0;
+      const earlyM = (!isAuto&&!isAbs&&!isWknd&&depM!==null&&depM<weM) ? weM-depM : 0;
+
+      records.push({
+        date, dateNum:parseDateNum(date), status, arr, dep, hrs,
+        isWknd, isAbs, isAuto, isPerm,
+        lateM, earlyM, period, file:file.name,
+      });
+    }
+    return { empName, empId, empRole, period, fileName:file.name, records };
+  };
+
+  // ─── حساب الإحصاءات ───
+  const calcStats = recs => {
+    const work   = recs.filter(r=>!r.isWknd);
+    const abs    = work.filter(r=>r.isAbs);
+    const late   = work.filter(r=>r.lateM>0);
+    const early  = work.filter(r=>r.earlyM>0);
+    const auto   = work.filter(r=>r.isAuto);
+    const pres   = work.filter(r=>!r.isAbs);
+    const totLat = late.reduce((s,r)=>s+r.lateM,0);
+    const totEar = early.reduce((s,r)=>s+r.earlyM,0);
+    return {
+      total:work.length, pres:pres.length, abs:abs.length,
+      late:late.length,  totLat, avgLat:late.length?Math.round(totLat/late.length):0,
+      early:early.length,totEar, auto:auto.length,
+      rate: work.length ? Math.round(pres.length/work.length*100) : 0,
+      absList:abs, lateList:late,
+    };
+  };
+
+  // ─── إضافة ملفات لمعلم ───
+  const addFilesToTeacher = async (tIdx, newFiles) => {
+    setLoading(true);
+    await loadXLSX();
+    const wsM = toMins(workStart)||420, weM = toMins(workEnd)||840;
+    const parsed = [];
+    for (let i=0; i<newFiles.length; i++) {
+      setLoadMsg(`⏳ جاري تحليل ${newFiles[i].name}…`);
+      const res = await parseFile(newFiles[i], wsM, weM);
+      if (res) parsed.push(res);
+    }
+    setTeachers(prev => {
+      const next = [...prev];
+      const t    = { ...next[tIdx] };
+      // تجنب التكرار
+      const newF = parsed.filter(p => !t.files.some(f=>f.fileName===p.fileName));
+      t.files   = [...t.files, ...newF];
+      // دمج وترتيب
+      t.records = [...t.files.flatMap(f=>f.records)].sort((a,b)=>a.dateNum-b.dateNum);
+      t.stats   = calcStats(t.records);
+      // استخراج اسم الموظف من أول ملف
+      if (!t.name && newF[0]) { t.name=newF[0].empName; t.id=newF[0].empId; t.role=newF[0].empRole; }
+      next[tIdx] = t;
+      return next;
+    });
+    setLoading(false); setLoadMsg("");
+  };
+
+  const addTeacher = () => {
+    setTeachers(prev => [...prev, { name:"", id:"", role:"", files:[], records:[], stats:calcStats([]) }]);
+    setSelIdx(teachers.length);
+  };
+
+  const removeTeacher = idx => {
+    setTeachers(prev => prev.filter((_,i)=>i!==idx));
+    setSelIdx(Math.max(0, selIdx-(selIdx>=idx?1:0)));
+  };
+
+  const removeFile = (tIdx, fName) => {
+    setTeachers(prev => {
+      const next = [...prev];
+      const t    = { ...next[tIdx] };
+      t.files   = t.files.filter(f=>f.fileName!==fName);
+      t.records = [...t.files.flatMap(f=>f.records)].sort((a,b)=>a.dateNum-b.dateNum);
+      t.stats   = calcStats(t.records);
+      next[tIdx] = t;
+      return next;
+    });
+  };
+
+  const emp = teachers[selIdx] || null;
+  const st  = emp?.stats;
+
+  // ─── رسم خريطة الحرارة (الأيام) ───
+  const HeatCell = ({r}) => {
+    const bg = r.isWknd  ? "#f3f4f6"
+      : r.isAbs           ? "#fca5a5"
+      : r.lateM >= 60     ? "#f97316"
+      : r.lateM > 0       ? "#fcd34d"
+      : r.isAuto          ? "#93c5fd"
+      : "#bbf7d0";
+    const label = r.date.split(" ")[0];
+    return (
+      <div title={`${r.date}\n${r.status}${r.lateM>0?" — تأخر "+r.lateM+"د":""}`}
+        style={{background:bg, width:32, height:32, borderRadius:6, display:"flex",
+          alignItems:"center", justifyContent:"center", fontSize:9, fontWeight:700,
+          color:"#374151", cursor:"default", border:"1px solid rgba(0,0,0,.06)"}}>
+        {label.slice(0,3)}
+      </div>
+    );
+  };
+
+  // ─── طباعة ───
+  const handlePrint = () => {
+    if (!emp) return;
+    const periods = emp.files.map(f=>f.period).join(" · ");
+    const absRows = st.absList.map((r,i)=>`
+      <tr class="${i%2?"":"alt"}">
+        <td>${i+1}</td><td class="rt">${r.date}</td>
+        <td><span class="badge abs">غياب ❌</span></td>
+        <td>—</td><td>—</td><td class="sm">${r.period}</td>
+      </tr>`).join("");
+    const lateRows = st.lateList.map((r,i)=>{
+      const lh=Math.floor(r.lateM/60), lm=r.lateM%60;
+      return `<tr class="${i%2?"":"alt"}">
+        <td>${i+1}</td><td class="rt">${r.date}</td>
+        <td><span class="time">${r.arr||"—"}</span></td>
+        <td><span class="time grn">${workStart}</span></td>
+        <td><span class="badge lat">${lh>0?lh+"س "+lm+"د":lm+"د"}</span></td>
+        <td class="time">${r.dep||"—"}${r.isAuto?" (تلقائي)":""}</td>
+        <td class="sm">${r.period}</td>
+      </tr>`;}).join("");
+    const w=window.open("","_blank");
+    w.document.write(`<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8">
+    <title>تقرير غياب وتأخر — ${emp.name||"المعلم"}</title>
+    <style>
+      *{margin:0;padding:0;box-sizing:border-box}
+      body{font-family:Arial,sans-serif;direction:rtl;padding:20px;font-size:12px;color:#111}
+      .hdr{background:linear-gradient(135deg,#1B3A6B,#2E6DA4);color:#fff;border-radius:12px;padding:18px 22px;margin-bottom:16px}
+      .hdr h1{font-size:18px;font-weight:900;margin-bottom:4px}
+      .hdr p{opacity:.85;font-size:11px;margin-top:3px}
+      .kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:16px}
+      .kpi{border-radius:10px;padding:10px;text-align:center;border:2px solid}
+      .kpi .v{font-size:22px;font-weight:900} .kpi .l{font-size:9px;margin-top:2px;font-weight:700}
+      .red{border-color:#fca5a5;background:#fff1f2} .red .v{color:#dc2626}
+      .amb{border-color:#fcd34d;background:#fffbeb} .amb .v{color:#d97706}
+      .grn{border-color:#6ee7b7;background:#f0fdf4} .grn .v,.grn{color:#059669}
+      .blu{border-color:#93c5fd;background:#eff6ff} .blu .v{color:#2563eb}
+      .gry{border-color:#d1d5db;background:#f9fafb} .gry .v{color:#374151}
+      .sec{margin-bottom:18px}
+      .sec-ttl{font-weight:900;font-size:13px;padding:9px 14px;border-radius:9px;margin-bottom:9px;color:#fff}
+      .abs-h{background:linear-gradient(135deg,#dc2626,#991b1b)}
+      .lat-h{background:linear-gradient(135deg,#d97706,#92400e)}
+      table{width:100%;border-collapse:collapse}
+      th{padding:7px 6px;font-size:10px;font-weight:800;text-align:center}
+      .abs-th{background:#dc2626;color:#fff} .lat-th{background:#d97706;color:#fff}
+      td{padding:6px;font-size:11px;text-align:center;border-bottom:1px solid #f0f0f0}
+      .rt{text-align:right} .alt td{background:#fafafa}
+      .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-weight:800;font-size:10px}
+      .abs{background:#fee2e2;color:#991b1b} .lat{background:#fef3c7;color:#92400e}
+      .time{font-family:monospace} .sm{font-size:9px;color:#9ca3af}
+      .tf-abs{background:linear-gradient(135deg,#dc2626,#991b1b);color:#fff;font-weight:900}
+      .tf-lat{background:linear-gradient(135deg,#d97706,#92400e);color:#fff;font-weight:900}
+      .sigs{display:flex;gap:36px;margin-top:22px;padding-top:14px;border-top:2px dashed #e5e7eb}
+      .sig{text-align:center;flex:1}
+      .sig-l{color:#6b7280;font-size:10px;margin-bottom:22px}
+      .sig-n{border-top:1px solid #374151;padding-top:4px;font-weight:900;font-size:11px}
+      .footer{text-align:center;margin-top:14px;font-size:9px;color:#9ca3af}
+      @page{size:A4;margin:1.2cm}
+    </style></head><body>
+    <div class="hdr">
+      <h1>📊 تقرير استخراج الغياب والتأخر</h1>
+      <p>مدرسة عبيدة بن الحارث المتوسطة — إدارة تعليم جدة</p>
+      <p style="margin-top:8px;font-size:14px;font-weight:900">${emp.name||"—"} &nbsp;·&nbsp; ${emp.id||""} &nbsp;·&nbsp; ${emp.role||""}</p>
+      <p style="margin-top:3px;opacity:.75">الفترات: ${periods||"—"}</p>
+      <p style="opacity:.65">عدد الملفات: ${emp.files.length} · إجمالي أيام الدوام: ${st.total}</p>
+    </div>
+    <div class="kpis">
+      <div class="kpi red"><div class="v">${st.abs}</div><div class="l">أيام الغياب</div></div>
+      <div class="kpi amb"><div class="v">${st.late}</div><div class="l">أيام التأخر</div></div>
+      <div class="kpi amb"><div class="v">${st.totLat}</div><div class="l">إجمالي دقائق التأخر</div></div>
+      <div class="kpi grn"><div class="v">${st.rate}%</div><div class="l">نسبة الحضور</div></div>
+      <div class="kpi gry"><div class="v">${st.total}</div><div class="l">أيام الدوام</div></div>
+    </div>
+    ${st.absList.length?`
+    <div class="sec">
+      <div class="sec-ttl abs-h">❌ أيام الغياب (${st.abs} يوم) — من الأقدم إلى الأحدث</div>
+      <table><thead><tr class="abs-th"><th>م</th><th>اليوم والتاريخ</th><th>الحالة</th><th>حضور</th><th>انصراف</th><th>الفترة</th></tr></thead>
+      <tbody>${absRows}</tbody>
+      <tfoot><tr class="tf-abs"><td colspan="5" class="rt">الإجمالي</td><td>${st.abs} يوم</td></tr></tfoot>
+      </table></div>`:""}
+    ${st.lateList.length?`
+    <div class="sec">
+      <div class="sec-ttl lat-h">⚠️ أيام التأخر (${st.late} يوم) — من الأقدم إلى الأحدث</div>
+      <table><thead><tr class="lat-th"><th>م</th><th>اليوم والتاريخ</th><th>وقت الحضور</th><th>المفترض</th><th>مدة التأخر</th><th>وقت الانصراف</th><th>الفترة</th></tr></thead>
+      <tbody>${lateRows}</tbody>
+      <tfoot><tr class="tf-lat"><td colspan="4" class="rt">المجموع</td><td>${st.totLat} دقيقة</td><td colspan="2">متوسط ${st.avgLat}د/يوم</td></tr></tfoot>
+      </table></div>`:""}
+    <div class="sigs">
+      <div class="sig"><div class="sig-l">توقيع الموظف</div><div class="sig-n">__________________</div></div>
+      <div class="sig"><div class="sig-l">مدير المدرسة</div><div class="sig-n">فازع القرني</div></div>
+      <div class="sig"><div class="sig-l">التاريخ</div><div class="sig-n">__________________</div></div>
+    </div>
+    <div class="footer">بوابة مدرسة عبيدة بن الحارث الإلكترونية © ١٤٤٧هـ</div>
+    <script>window.onload=()=>{window.print();}</script>
+    </body></html>`);
+    w.document.close();
+  };
+
+  // ────────────────── JSX ──────────────────
+  return (
+    <div className="p-4 max-w-6xl mx-auto" dir="rtl">
+
+      {/* رأس */}
+      <div className="rounded-2xl mb-5 overflow-hidden shadow-xl"
+        style={{background:"linear-gradient(135deg,#7c3aed,#1B3A6B)"}}>
+        <div className="p-6 text-white">
+          <h2 className="text-2xl font-black mb-1">📋 استخراج الغياب والتأخر</h2>
+          <p className="opacity-80 text-sm">ارفع ملفات Excel لكل معلم — تُدمج وتُرتب من الأقدم إلى الأحدث مع رسوم بيانية ملونة</p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
+            {[
+              {icon:"👨‍🏫", label:"عدد المعلمين", val:teachers.length},
+              {icon:"📊", label:"إجمالي الملفات", val:teachers.reduce((s,t)=>s+t.files.length,0)},
+              {icon:"❌", label:"إجمالي الغياب",  val:teachers.reduce((s,t)=>s+(t.stats?.abs||0),0)},
+              {icon:"⚠️", label:"إجمالي التأخر",  val:teachers.reduce((s,t)=>s+(t.stats?.late||0),0)},
+            ].map(s=>(
+              <div key={s.label} className="bg-white bg-opacity-10 rounded-2xl p-3 text-center">
+                <div className="text-2xl mb-1">{s.icon}</div>
+                <div className="text-2xl font-black">{s.val}</div>
+                <div className="text-xs opacity-75 mt-0.5">{s.label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* إعدادات الدوام */}
+      <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 mb-4 flex flex-wrap gap-4 items-end">
+        <div>
+          <label className={cx.label}>⏰ بداية الدوام</label>
+          <input type="time" value={workStart} onChange={e=>setWorkStart(e.target.value)}
+            className="px-3 py-2 rounded-xl border-2 border-gray-200 focus:border-purple-400 focus:outline-none text-sm font-bold" />
+        </div>
+        <div>
+          <label className={cx.label}>🏁 نهاية الدوام</label>
+          <input type="time" value={workEnd} onChange={e=>setWorkEnd(e.target.value)}
+            className="px-3 py-2 rounded-xl border-2 border-gray-200 focus:border-purple-400 focus:outline-none text-sm font-bold" />
+        </div>
+        <p className="text-xs text-purple-600 bg-purple-50 rounded-xl px-3 py-2 font-bold">
+          💡 التأخر = وقت الحضور أكبر من وقت بداية الدوام
+        </p>
+      </div>
+
+      <div className="flex gap-4">
+        {/* ═══ قائمة المعلمين (يسار) ═══ */}
+        <div className="w-48 shrink-0 space-y-2">
+          <div className="text-xs font-black text-gray-500 mb-2 px-1">👨‍🏫 المعلمون</div>
+          {teachers.map((t,i)=>(
+            <div key={i} onClick={()=>setSelIdx(i)}
+              className={"relative rounded-2xl p-3 cursor-pointer border-2 transition-all " +
+                (selIdx===i ? "border-purple-500 bg-purple-50 shadow-md" : "border-gray-200 bg-white hover:border-purple-300")}>
+              <div className="font-black text-xs text-gray-800 truncate">{t.name||`معلم ${i+1}`}</div>
+              <div className="text-xs text-gray-400 mt-0.5 truncate">{t.role}</div>
+              <div className="flex gap-1 mt-1.5 flex-wrap">
+                <span className="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full font-black">{t.stats?.abs||0} غ</span>
+                <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-black">{t.stats?.late||0} ت</span>
+              </div>
+              <button onClick={e=>{e.stopPropagation();removeTeacher(i);}}
+                className="absolute top-1 left-1 w-4 h-4 rounded-full bg-red-100 hover:bg-red-500 hover:text-white text-red-400 text-xs font-black flex items-center justify-center transition-all">✕</button>
+            </div>
+          ))}
+          <button onClick={addTeacher}
+            className="w-full py-2.5 rounded-2xl border-2 border-dashed border-purple-300 text-purple-600 text-xs font-black hover:bg-purple-50 transition-all">
+            + إضافة معلم
+          </button>
+        </div>
+
+        {/* ═══ المنطقة الرئيسية (يمين) ═══ */}
+        <div className="flex-1 min-w-0">
+          {!emp ? (
+            <div className="bg-white rounded-2xl p-14 text-center border-2 border-dashed border-purple-200">
+              <div className="text-5xl mb-3">👨‍🏫</div>
+              <p className="font-black text-gray-500">اضغط "+ إضافة معلم" لبدء الرفع</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+
+              {/* ─── رفع الملفات ─── */}
+              <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <p className="font-black text-gray-800">{emp.name||`معلم ${selIdx+1}`}</p>
+                    {emp.role && <p className="text-xs text-gray-400">{emp.role} · {emp.id}</p>}
+                    {emp.files.length>0 && <p className="text-xs text-purple-600 font-bold mt-0.5">{emp.files.length} ملف · {emp.records.length} سجل يومي</p>}
+                  </div>
+                  <label className="cursor-pointer"
+                    onDragOver={e=>{e.preventDefault();setDragOver(true);}}
+                    onDragLeave={()=>setDragOver(false)}
+                    onDrop={e=>{e.preventDefault();setDragOver(false);addFilesToTeacher(selIdx,Array.from(e.dataTransfer.files));}}>
+                    <span className={"px-4 py-2 rounded-xl font-black text-sm transition-all " + (dragOver?"bg-purple-700 text-white":"bg-purple-600 text-white hover:bg-purple-700")}>
+                      {dragOver?"أفلت الملفات هنا":"📂 + إضافة ملفات"}
+                    </span>
+                    <input type="file" accept=".xlsx,.xls" multiple className="hidden"
+                      onChange={e=>addFilesToTeacher(selIdx,Array.from(e.target.files))} />
+                  </label>
+                </div>
+
+                {loading && <div className="text-purple-600 font-bold text-sm animate-pulse mb-2">{loadMsg}</div>}
+
+                {emp.files.length===0 ? (
+                  <label className="block cursor-pointer"
+                    onDragOver={e=>{e.preventDefault();setDragOver(true);}}
+                    onDragLeave={()=>setDragOver(false)}
+                    onDrop={e=>{e.preventDefault();setDragOver(false);addFilesToTeacher(selIdx,Array.from(e.dataTransfer.files));}}>
+                    <div className={"border-2 border-dashed rounded-2xl p-8 text-center transition-all " +
+                      (dragOver?"border-purple-500 bg-purple-50":"border-purple-200 hover:border-purple-400 hover:bg-purple-50")}>
+                      <div className="text-4xl mb-2">📥</div>
+                      <p className="font-black text-gray-600 mb-1">اسحب الملفات هنا أو اضغط للاختيار</p>
+                      <p className="text-xs text-gray-400">ملفات Excel من نظام نور — يمكن رفع عدة ملفات لفترات مختلفة</p>
+                      <input type="file" accept=".xlsx,.xls" multiple className="hidden"
+                        onChange={e=>addFilesToTeacher(selIdx,Array.from(e.target.files))} />
+                    </div>
+                  </label>
+                ) : (
+                  <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                    {emp.files.map((f,fi)=>{
+                      const fA=f.records.filter(r=>r.isAbs).length;
+                      const fL=f.records.filter(r=>r.lateM>0).length;
+                      const fD=f.records.filter(r=>!r.isWknd).length;
+                      return (
+                        <div key={fi} className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2">
+                          <span className="text-lg">📊</span>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-xs font-black text-gray-700 truncate">{f.fileName}</div>
+                            <div className="text-xs text-gray-400 truncate">{f.period} · {fD} يوم</div>
+                          </div>
+                          <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-black shrink-0">{fA} غ</span>
+                          <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-black shrink-0">{fL} ت</span>
+                          <button onClick={()=>removeFile(selIdx,f.fileName)}
+                            className="text-red-400 hover:text-red-600 font-black text-sm shrink-0">✕</button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {emp.records.length>0 && (<>
+
+              {/* ─── بطاقات الإحصاء ─── */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {[
+                  {icon:"❌",label:"أيام الغياب",      val:st.abs,    sub:st.total>0?Math.round(st.abs/st.total*100)+"%":"",  bg:"bg-red-50",    border:"border-red-200",    text:"text-red-700"},
+                  {icon:"⚠️",label:"أيام التأخر",       val:st.late,   sub:st.totLat+" دقيقة إجمالي",                          bg:"bg-amber-50",  border:"border-amber-200",  text:"text-amber-700"},
+                  {icon:"⏱️",label:"متوسط التأخر",       val:st.avgLat+"د",sub:"لكل يوم تأخر",                                 bg:"bg-orange-50", border:"border-orange-200", text:"text-orange-700"},
+                  {icon:"✅",label:"نسبة الحضور",       val:st.rate+"%",sub:st.pres+" يوم حضور",                               bg:"bg-green-50",  border:"border-green-200",  text:"text-green-700"},
+                  {icon:"📅",label:"أيام الدوام",        val:st.total,  sub:emp.files.length+" ملف",                            bg:"bg-blue-50",   border:"border-blue-200",   text:"text-blue-700"},
+                  {icon:"🔄",label:"انصراف تلقائي",     val:st.auto,   sub:"",                                                  bg:"bg-indigo-50", border:"border-indigo-200", text:"text-indigo-700"},
+                  {icon:"🏃",label:"انصراف مبكر",       val:st.early,  sub:st.totEar+"د إجمالي",                               bg:"bg-purple-50", border:"border-purple-200", text:"text-purple-700"},
+                  {icon:"📊",label:"أيام الحضور",       val:st.pres,   sub:"",                                                  bg:"bg-teal-50",   border:"border-teal-200",   text:"text-teal-700"},
+                ].map(s=>(
+                  <div key={s.label} className={`${s.bg} ${s.border} border-2 rounded-2xl p-3`}>
+                    <div className="text-lg mb-0.5">{s.icon}</div>
+                    <div className={`text-2xl font-black ${s.text}`}>{s.val}</div>
+                    <div className={`text-xs font-black ${s.text} opacity-80`}>{s.label}</div>
+                    {s.sub&&<div className="text-xs text-gray-400 mt-0.5">{s.sub}</div>}
+                  </div>
+                ))}
+              </div>
+
+              {/* ─── خريطة الحرارة ─── */}
+              <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+                <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+                  <h4 className="font-black text-gray-700 text-sm">🗓️ خريطة الحضور اليومية</h4>
+                  <div className="flex gap-2 text-xs flex-wrap">
+                    {[["#bbf7d0","حضور"],["#fcd34d","تأخر"],["#f97316","تأخر +ساعة"],["#fca5a5","غياب"],["#93c5fd","تلقائي"],["#f3f4f6","عطلة"]].map(([c,l])=>(
+                      <span key={l} className="flex items-center gap-1">
+                        <span style={{width:12,height:12,borderRadius:3,background:c,display:"inline-block",border:"1px solid rgba(0,0,0,.1)"}}/>
+                        <span className="text-gray-500 font-bold">{l}</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {emp.records.map((r,i)=><HeatCell key={i} r={r}/>)}
+                </div>
+              </div>
+
+              {/* ─── الرسم البياني للتأخر ─── */}
+              {st.late>0 && (
+                <div className="bg-white rounded-2xl p-4 shadow-sm border border-amber-100">
+                  <h4 className="font-black text-amber-700 mb-3 text-sm">📊 توزيع دقائق التأخر (من الأقدم إلى الأحدث)</h4>
+                  <div className="space-y-2">
+                    {st.lateList.map((r,i)=>{
+                      const max=Math.max(...st.lateList.map(x=>x.lateM));
+                      const pct=max>0?Math.round(r.lateM/max*100):0;
+                      const clr=r.lateM>=60?"linear-gradient(to left,#dc2626,#ef4444)":"linear-gradient(to left,#f59e0b,#fbbf24)";
+                      return (
+                        <div key={i} className="flex items-center gap-2">
+                          <span className="text-xs text-gray-400 whitespace-nowrap w-36 text-right shrink-0 font-bold">{r.date}</span>
+                          <div className="flex-1 h-6 bg-amber-50 rounded-full overflow-hidden border border-amber-100">
+                            <div style={{width:pct+"%",minWidth:40,height:"100%",borderRadius:999,background:clr,display:"flex",alignItems:"center",justifyContent:"flex-end",paddingRight:8}}>
+                              <span style={{color:"#fff",fontSize:11,fontWeight:900}}>{r.lateM}د</span>
+                            </div>
+                          </div>
+                          <span className="text-xs text-gray-400 w-12 shrink-0">{r.arr}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* ─── تبويبات الجداول ─── */}
+              <div className="flex gap-2 flex-wrap">
+                {[
+                  {id:"absences",label:"❌ الغياب فقط",   badge:st.abs,  bc:"bg-red-500"},
+                  {id:"lateonly", label:"⚠️ التأخر فقط",   badge:st.late, bc:"bg-amber-500"},
+                  {id:"all",      label:"📋 السجل الكامل", badge:0},
+                ].map(t=>(
+                  <button key={t.id} onClick={()=>setActiveTab(t.id)}
+                    className={"relative px-4 py-2.5 rounded-xl font-bold text-sm border-2 transition-all "+
+                      (activeTab===t.id?"bg-purple-600 text-white border-purple-600 shadow":"bg-white text-gray-600 border-gray-200 hover:border-purple-300")}>
+                    {t.label}
+                    {t.badge>0&&<span className={"absolute -top-2 -right-2 min-w-5 h-5 rounded-full text-white text-xs font-black flex items-center justify-center px-1 "+t.bc}>{t.badge}</span>}
+                  </button>
+                ))}
+                <button onClick={handlePrint}
+                  className="px-4 py-2.5 rounded-xl font-bold text-sm bg-gray-800 text-white hover:bg-gray-900 border-2 border-gray-800 transition-all">
+                  🖨️ طباعة التقرير
+                </button>
+              </div>
+
+              {/* ─── جدول الغياب ─── */}
+              {activeTab==="absences" && (
+                st.abs===0
+                ? <div className="bg-green-50 border-2 border-green-200 rounded-2xl p-10 text-center">
+                    <div className="text-5xl mb-2">🎉</div>
+                    <p className="font-black text-green-700">لا يوجد غياب مسجّل في جميع الفترات</p>
+                  </div>
+                : <div className="bg-white rounded-2xl border-2 border-red-100 overflow-hidden shadow-sm">
+                    <div className="px-5 py-3 flex items-center gap-3" style={{background:"linear-gradient(135deg,#dc2626,#991b1b)"}}>
+                      <span className="text-xl">❌</span>
+                      <span className="font-black text-white">أيام الغياب — من الأقدم إلى الأحدث</span>
+                      <span className="bg-white text-red-700 text-xs font-black px-2 py-0.5 rounded-full">{st.abs} يوم</span>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="bg-red-50">
+                            {["م","اليوم والتاريخ","الحالة","وقت الحضور","وقت الانصراف","الفترة/الملف"].map(h=>(
+                              <th key={h} className="px-4 py-3 font-black text-red-800 text-sm whitespace-nowrap text-right">{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {st.absList.map((r,i)=>(
+                            <tr key={i} className={i%2===0?"bg-red-50/40":"bg-white"}>
+                              <td className="px-4 py-3 text-right font-black text-red-400 text-sm">{i+1}</td>
+                              <td className="px-4 py-3 text-right font-bold text-gray-800 whitespace-nowrap">{r.date}</td>
+                              <td className="px-4 py-3 text-right"><span className="bg-red-100 text-red-700 font-black text-xs px-3 py-1 rounded-full">غياب ❌</span></td>
+                              <td className="px-4 py-3 text-center text-gray-300 font-bold">—</td>
+                              <td className="px-4 py-3 text-center text-gray-300 font-bold">—</td>
+                              <td className="px-4 py-3 text-right text-xs text-gray-400 font-bold max-w-36 truncate">{r.period}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot>
+                          <tr style={{background:"linear-gradient(135deg,#dc2626,#991b1b)"}}>
+                            <td colSpan={2} className="px-4 py-3 text-right font-black text-white">الإجمالي</td>
+                            <td colSpan={4} className="px-4 py-3 text-right font-black text-white text-lg">{st.abs} يوم غياب</td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  </div>
+              )}
+
+              {/* ─── جدول التأخر ─── */}
+              {activeTab==="lateonly" && (
+                st.late===0
+                ? <div className="bg-green-50 border-2 border-green-200 rounded-2xl p-10 text-center">
+                    <div className="text-5xl mb-2">✅</div>
+                    <p className="font-black text-green-700">لا يوجد تأخر مسجّل في جميع الفترات</p>
+                  </div>
+                : <div className="bg-white rounded-2xl border-2 border-amber-100 overflow-hidden shadow-sm">
+                    <div className="px-5 py-3 flex items-center gap-3" style={{background:"linear-gradient(135deg,#d97706,#92400e)"}}>
+                      <span className="text-xl">⚠️</span>
+                      <span className="font-black text-white">أيام التأخر — من الأقدم إلى الأحدث</span>
+                      <span className="bg-white text-amber-700 text-xs font-black px-2 py-0.5 rounded-full">{st.late} يوم</span>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="bg-amber-50">
+                            {["م","اليوم والتاريخ","وقت الحضور",`المفترض (${workStart})`,"مدة التأخر","وقت الانصراف","ساعات الدوام","الفترة"].map(h=>(
+                              <th key={h} className="px-4 py-3 font-black text-amber-800 text-sm whitespace-nowrap text-right">{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {st.lateList.map((r,i)=>{
+                            const lh=Math.floor(r.lateM/60), lm=r.lateM%60;
+                            return (
+                              <tr key={i} className={i%2===0?"bg-amber-50/50":"bg-white"}>
+                                <td className="px-4 py-3 text-right font-black text-amber-400 text-sm">{i+1}</td>
+                                <td className="px-4 py-3 text-right font-bold text-gray-800 whitespace-nowrap">{r.date}</td>
+                                <td className="px-4 py-3 text-right">
+                                  <span className="bg-amber-100 text-amber-800 font-black text-sm px-2 py-0.5 rounded-lg">{r.arr||"—"}</span>
+                                </td>
+                                <td className="px-4 py-3 text-right font-bold text-green-600">{workStart}</td>
+                                <td className="px-4 py-3 text-right">
+                                  <span className={`font-black px-3 py-1 rounded-full text-sm ${r.lateM>=60?"bg-red-100 text-red-700":"bg-amber-100 text-amber-800"}`}>
+                                    {lh>0?lh+"س "+lm+"د":lm+"د"}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-3 text-right font-bold text-gray-600 whitespace-nowrap">
+                                  {r.dep&&r.dep!=="-"?r.dep:"—"}
+                                  {r.isAuto&&<span className="block text-xs text-blue-500">تلقائي</span>}
+                                </td>
+                                <td className="px-4 py-3 text-right font-bold text-gray-500">{r.hrs&&r.hrs!=="00:00"?r.hrs:"—"}</td>
+                                <td className="px-4 py-3 text-right text-xs text-gray-400 font-bold max-w-28 truncate">{r.period}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                        <tfoot>
+                          <tr style={{background:"linear-gradient(135deg,#d97706,#92400e)"}}>
+                            <td colSpan={4} className="px-4 py-3 text-right font-black text-white">المجموع</td>
+                            <td className="px-4 py-3 text-right font-black text-white text-lg">{st.totLat} دقيقة</td>
+                            <td colSpan={3} className="px-4 py-3 text-right font-black text-white opacity-80">متوسط {st.avgLat}د / يوم تأخر</td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  </div>
+              )}
+
+              {/* ─── السجل الكامل ─── */}
+              {activeTab==="all" && (
+                <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
+                  <div className="px-5 py-3 flex items-center gap-2" style={{background:"linear-gradient(135deg,#1e40af,#1B3A6B)"}}>
+                    <span className="font-black text-white">السجل الكامل اليومي — من الأقدم إلى الأحدث</span>
+                    <span className="text-xs text-blue-200">{emp.records.length} سجل</span>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="bg-slate-50">
+                          {["م","التاريخ","الحالة","وقت الحضور","تأخر","وقت الانصراف","ساعات الدوام","الفترة"].map(h=>(
+                            <th key={h} className="px-3 py-3 text-right font-black text-gray-700 whitespace-nowrap">{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {emp.records.map((r,i)=>{
+                          const bg = r.isWknd?"bg-gray-50 text-gray-400":r.isAbs?"bg-red-50":r.lateM>0?"bg-amber-50":r.isAuto?"bg-blue-50/40":i%2?"bg-slate-50/50":"";
+                          return (
+                            <tr key={i} className={bg}>
+                              <td className="px-3 py-2.5 text-right font-bold text-gray-400">{i+1}</td>
+                              <td className="px-3 py-2.5 text-right font-bold whitespace-nowrap">{r.date}</td>
+                              <td className="px-3 py-2.5 text-right">
+                                {r.isWknd?<span className="px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 font-bold">عطلة</span>
+                                :r.isAbs?<span className="px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-bold">غياب ❌</span>
+                                :r.isAuto?<span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-bold">تلقائي</span>
+                                :r.isPerm?<span className="px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 font-bold">استئذان</span>
+                                :<span className="px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-bold">مكتمل ✅</span>}
+                              </td>
+                              <td className="px-3 py-2.5 text-right font-bold">
+                                {!r.arr||r.arr==="-"?<span className="text-gray-300">—</span>:<span className={r.lateM>0?"text-amber-600":"text-green-600"}>{r.arr}</span>}
+                              </td>
+                              <td className="px-3 py-2.5 text-right font-black">
+                                {r.isWknd||r.isAbs?<span className="text-gray-300">—</span>
+                                :r.lateM>0?<span className="text-amber-600">⚠️ {r.lateM}د</span>
+                                :<span className="text-green-500">✅</span>}
+                              </td>
+                              <td className="px-3 py-2.5 text-right font-bold">
+                                {!r.dep||r.dep==="-"?<span className="text-gray-300">—</span>:<span className={r.isAuto?"text-blue-600":"text-gray-700"}>{r.dep}</span>}
+                              </td>
+                              <td className="px-3 py-2.5 text-right font-bold text-gray-500">{r.hrs&&r.hrs!=="00:00"?r.hrs:"—"}</td>
+                              <td className="px-3 py-2.5 text-right text-gray-400 truncate max-w-28">{r.period}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              </>)}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function SchoolWebsite() {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
@@ -26048,7 +26726,7 @@ export default function SchoolWebsite() {
       if (hash.startsWith("ann-")) { setDirectAnnId(hash.replace("ann-","")); return; }
       setDirectAnnId(null);
       if (hash === "teacherportal") { setTeacherProfilePortal(true); return; }
-      if (["home","attendance","announcements","activities","settings","students","messages","surveys","sms","report","gradeanalysis","monthlyreport","teacherprofile","absencestats","attendancereport","student-absence","strategies","calendar","gallery","certificates","poll","raffle","broadcast","groupdivider","quiz","classtimer","luckywheel","exitticket","timetable","honorboard","tasks","dailyquiz","aiteacher","lessonprep","lessonrecommend","officialforms","portfolio","earlywarning","meetings","heatmap","committeemeeting","teachereval","assessment","studentexcuses","perfresults","teacherreports","suggestions","dailyattend"].includes(hash)) { setTeacherProfilePortal(false); setPage(hash); }
+      if (["home","attendance","announcements","activities","settings","students","messages","surveys","sms","report","gradeanalysis","monthlyreport","teacherprofile","absencestats","attendancereport","absenceextract","student-absence","strategies","calendar","gallery","certificates","poll","raffle","broadcast","groupdivider","quiz","classtimer","luckywheel","exitticket","timetable","honorboard","tasks","dailyquiz","aiteacher","lessonprep","lessonrecommend","officialforms","portfolio","earlywarning","meetings","heatmap","committeemeeting","teachereval","assessment","studentexcuses","perfresults","teacherreports","suggestions","dailyattend"].includes(hash)) { setTeacherProfilePortal(false); setPage(hash); }
     };
     window.addEventListener("hashchange", h); h();
     return () => window.removeEventListener("hashchange", h);
@@ -26348,6 +27026,7 @@ export default function SchoolWebsite() {
     { id: "monthlyreport",  label: "التقرير الشهري",        icon: "📑" },
     { id: "absencestats",   label: "إحصائيات الغياب",      icon: "📉" },
     { id: "attendancereport",label: "تحليل الحضور",        icon: "🗂️" },
+      { id: "absenceextract",  label: "استخراج الغياب والتأخر", icon: "📋" },
     { id: "officialforms",  label: "النماذج الرسمية",      icon: "📃" },
     { id: "portfolio",      label: "ملف الطالب الشامل",    icon: "📁" },
     { id: "earlywarning",   label: "الإنذار المبكر",       icon: "🚨" },
@@ -26656,6 +27335,7 @@ export default function SchoolWebsite() {
                 {page === "gradeanalysis"  && <GradeAnalysisPage />}
                 {page === "teacherprofile" && <TeacherProfilePage teachers={teachers} attendance={attendance} week={week} weekArchive={weekArchive} classList={classList} />}
                 {page === "attendancereport"&& <AttendanceAnalysisPage />}
+                {page === "absenceextract"  && <TeacherAbsenceExtractPage />}
                 {page === "dailyquiz"      && <DailyQuizPage classList={classList} />}
                 {page === "officialforms"  && <OfficialFormsPage teachers={teachers} attendance={attendance} week={week} />}
                 {page === "portfolio"      && <StudentPortfolioPage classList={classList} weekArchive={weekArchive} attendance={attendance} week={week} teachers={teachers} />}
