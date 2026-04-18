@@ -23708,6 +23708,7 @@ function DailyAttendanceTrackerPage({ teachers }) {
                         {STATUS_OPTIONS.map(s=>(
                           <th key={s.val} className="px-3 py-2.5 text-center font-black border-b" style={{color:s.color}}>{s.label}</th>
                         ))}
+                        <th className="px-3 py-2.5 text-center font-black border-b" style={{color:"#7c3aed"}}>إدخال فارس</th>
                         <th className="px-3 py-2.5 text-center font-black text-blue-600 border-b">الإجمالي</th>
                       </tr>
                     </thead>
@@ -23717,6 +23718,7 @@ function DailyAttendanceTrackerPage({ teachers }) {
                         const info = records.find(r=>r.dateKey===key);
                         const dayLabel = info ? `${info.day||""}` : "—";
                         const dateLabel = info ? `${info.dayNum||""} ${info.gregMonth||""} ${info.gregYear||""}م` : key;
+                        const faris = rec?.farisEntered;
                         return (
                           <tr key={ki} className={ki%2===0?"bg-white":"bg-gray-50/50"}>
                             <td className="px-3 py-2 font-bold text-gray-700">{dayLabel}</td>
@@ -23728,6 +23730,13 @@ function DailyAttendanceTrackerPage({ teachers }) {
                                   : <span className="text-gray-300">—</span>}
                               </td>
                             ))}
+                            <td className="px-3 py-2 text-center font-black">
+                              {faris===true
+                                ? <span className="px-2 py-0.5 rounded-full text-xs font-black" style={{background:"#d1fae5",color:"#059669"}}>✅ نعم</span>
+                                : faris===false
+                                  ? <span className="px-2 py-0.5 rounded-full text-xs font-black" style={{background:"#fee2e2",color:"#dc2626"}}>❌ لا</span>
+                                  : <span className="text-gray-300">—</span>}
+                            </td>
                             <td className="px-3 py-2 text-center font-black text-blue-600">
                               {rec?.status ? 1 : <span className="text-gray-300">—</span>}
                             </td>
@@ -23745,6 +23754,9 @@ function DailyAttendanceTrackerPage({ teachers }) {
                             {stats[s.val]>0?stats[s.val]:"—"}
                           </td>
                         ))}
+                        <td className="px-3 py-2.5 text-center font-black" style={{color:"#7c3aed"}}>
+                          {(()=>{const fc=teacherRecs.filter(r=>r.farisEntered===true).length;return fc>0?fc:"—";})()}
+                        </td>
                         <td className="px-3 py-2.5 text-center font-black text-blue-700">{stats.total}</td>
                       </tr>
                     </tfoot>
