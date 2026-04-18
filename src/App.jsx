@@ -23349,7 +23349,6 @@ function DailyAttendanceTrackerPage({ teachers }) {
   <div class="tb">كشف متابعة الحضور اليومي للمعلمين</div>
   <div class="meta">
     <div class="mc"><div class="ml">اليوم</div><div class="mv">${selDay}</div></div>
-    <div class="mc"><div class="ml">التاريخ الهجري</div><div class="mv">${selDayNum} ${selHijriM} ${selHijriY}هـ</div></div>
     <div class="mc"><div class="ml">التاريخ الميلادي</div><div class="mv">${selDayNum} ${selGregM} ${selGregY}م</div></div>
     <div class="mc"><div class="ml">إجمالي المعلمين</div><div class="mv">${teacherList.length} معلم</div></div>
   </div>
@@ -23443,7 +23442,7 @@ function DailyAttendanceTrackerPage({ teachers }) {
             style={{background:"linear-gradient(135deg,#1e3a5f,#1d4ed8)"}}>
             <span>📅</span> اليوم والتاريخ
           </div>
-          <div className="p-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+          <div className="p-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
             {/* اليوم */}
             <div>
               <label className="text-xs font-black text-gray-500 mb-1.5 block">اليوم</label>
@@ -23455,33 +23454,15 @@ function DailyAttendanceTrackerPage({ teachers }) {
             {/* رقم اليوم */}
             <div>
               <label className="text-xs font-black text-gray-500 mb-1.5 block">رقم اليوم</label>
-              <select value={selDayNum} onChange={e=>{const v=Number(e.target.value);setSelDayNum(v);updateGregFromHijri(v,selHijriM,selHijriY);}}
+              <select value={selDayNum} onChange={e=>setSelDayNum(Number(e.target.value))}
                 className="w-full px-3 py-2.5 rounded-xl border-2 border-gray-200 focus:border-blue-400 focus:outline-none text-sm font-bold bg-white">
                 {DAYS_LIST.map(d=><option key={d} value={d}>{d}</option>)}
               </select>
             </div>
-            {/* الشهر الهجري */}
-            <div>
-              <label className="text-xs font-black mb-1.5 block" style={{color:"#b45309"}}>{"🌙 الشهر الهجري"}</label>
-              <select value={selHijriM} onChange={e=>{setSelHijriM(e.target.value);updateGregFromHijri(selDayNum,e.target.value,selHijriY);}}
-                className="w-full px-3 py-2.5 rounded-xl border-2 focus:outline-none text-sm font-bold bg-white"
-                style={{borderColor:"#fde68a"}}>
-                {HIJRI_MONTHS.map(m=><option key={m} value={m}>{m}</option>)}
-              </select>
-            </div>
-            {/* السنة الهجرية */}
-            <div>
-              <label className="text-xs font-black mb-1.5 block" style={{color:"#b45309"}}>{"🌙 السنة الهجرية"}</label>
-              <select value={selHijriY} onChange={e=>{const v=Number(e.target.value);setSelHijriY(v);updateGregFromHijri(selDayNum,selHijriM,v);}}
-                className="w-full px-3 py-2.5 rounded-xl border-2 focus:outline-none text-sm font-bold bg-white"
-                style={{borderColor:"#fde68a"}}>
-                {HIJRI_YEARS.map(y=><option key={y} value={y}>{y+"هـ"}</option>)}
-              </select>
-            </div>
             {/* الشهر الميلادي */}
             <div>
-              <label className="text-xs font-black mb-1.5 block" style={{color:"#0369a1"}}>{"☀️ الشهر الميلادي"}</label>
-              <select value={selGregM} onChange={e=>{setSelGregM(e.target.value);updateHijriFromGreg(selDayNum,e.target.value,selGregY);}}
+              <label className="text-xs font-black mb-1.5 block" style={{color:"#0369a1"}}>الشهر الميلادي</label>
+              <select value={selGregM} onChange={e=>setSelGregM(e.target.value)}
                 className="w-full px-3 py-2.5 rounded-xl border-2 focus:outline-none text-sm font-bold bg-white"
                 style={{borderColor:"#bae6fd"}}>
                 {GREG_MONTHS.map(m=><option key={m} value={m}>{m}</option>)}
@@ -23489,8 +23470,8 @@ function DailyAttendanceTrackerPage({ teachers }) {
             </div>
             {/* السنة الميلادية */}
             <div>
-              <label className="text-xs font-black mb-1.5 block" style={{color:"#0369a1"}}>{"☀️ السنة الميلادية"}</label>
-              <select value={selGregY} onChange={e=>{const v=Number(e.target.value);setSelGregY(v);updateHijriFromGreg(selDayNum,selGregM,v);}}
+              <label className="text-xs font-black mb-1.5 block" style={{color:"#0369a1"}}>السنة الميلادية</label>
+              <select value={selGregY} onChange={e=>setSelGregY(Number(e.target.value))}
                 className="w-full px-3 py-2.5 rounded-xl border-2 focus:outline-none text-sm font-bold bg-white"
                 style={{borderColor:"#bae6fd"}}>
                 {Array.from({length:10},(_,i)=>2023+i).map(y=><option key={y} value={y}>{y+"م"}</option>)}
@@ -23499,7 +23480,7 @@ function DailyAttendanceTrackerPage({ teachers }) {
           </div>
           <div className="mx-4 mb-4 rounded-xl px-4 py-2.5 flex items-center justify-between gap-3" style={{background:"#eff6ff"}}>
             <span className="font-black text-sm" style={{color:"#1d4ed8"}}>
-              📌 {selDay} — {selDayNum} {selHijriM} {selHijriY}هـ / {selDayNum} {selGregM} {selGregY}م
+              {"📌 "}{selDay} — {selDayNum} {selGregM} {selGregY}م
             </span>
             <span className="text-xs font-bold" style={{color:saving?"#d97706":"#059669"}}>
               {saving?"💾 يحفظ…":lastSaved?`✅ محفوظ ${lastSaved}`:""}
