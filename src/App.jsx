@@ -4902,8 +4902,8 @@ function StudentExcusePortal({ onBack, siteFont, isAdmin = false }) {
   );
 }
 
-function ParentPortal({ classList, setClassList, saveClass, messages, setMessages, saveMessages, surveys, setSurveys, saveSurveys, siteFont, onBack, onSuggestions }) {
-  const [nationalId, setNationalId] = useState("");
+function ParentPortal({ classList, setClassList, saveClass, messages, setMessages, saveMessages, surveys, setSurveys, saveSurveys, siteFont, onBack, onSuggestions, initialStudentId }) {
+  const [nationalId, setNationalId] = useState(initialStudentId || "");
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
   const [searched, setSearched] = useState(false);
@@ -4926,15 +4926,15 @@ function ParentPortal({ classList, setClassList, saveClass, messages, setMessage
     setEditingPhone(false);
   };
 
-  const handleSearch = () => {
-    if (!nationalId.trim()) { setError("أدخل رقم الهوية"); return; }
+  const handleSearch = (idOverride) => {
+    const id = (idOverride !== undefined ? idOverride : nationalId).trim();
+    if (!id) { setError("أدخل رقم الهوية"); return; }
     setSearched(true);
     setError("");
     for (const cls of classList) {
-      const student = cls.students?.find(s => s.nationalId && s.nationalId.trim() === nationalId.trim());
+      const student = cls.students?.find(s => s.nationalId && s.nationalId.trim() === id);
       if (student) {
         setResult({ student, cls });
-        // إذا كانت هناك ملاحظات غير مقروءة من المعلم، انتقل إليها مباشرة
         const hasUnread = messages.some(m => m.type === "teacher_note" && m.studentId === student.nationalId && !m.read);
         setTab(hasUnread ? "notes" : "grades");
         return;
@@ -4943,6 +4943,13 @@ function ParentPortal({ classList, setClassList, saveClass, messages, setMessage
     setResult(null);
     setError("لم يتم العثور على طالب بهذا الرقم. تأكد من صحة رقم الهوية.");
   };
+
+  // بحث تلقائي إذا وصل ولي الأمر عبر رابط مخصص
+  useEffect(() => {
+    if (initialStudentId && classList.length > 0) {
+      handleSearch(initialStudentId);
+    }
+  }, [classList.length]);
 
   const gradeCount = result ? Object.values(result.student.grades || {}).reduce((acc, g) => { if (g) acc[g] = (acc[g] || 0) + 1; return acc; }, {}) : {};
   const totalGraded = Object.values(gradeCount).reduce((a, b) => a + b, 0);
@@ -5136,6 +5143,22 @@ function ParentPortal({ classList, setClassList, saveClass, messages, setMessage
                             <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-gray-800 leading-relaxed mb-3">
                               {note.text}
                             </div>
+                            {/* مرفقات الملاحظة */}
+                            {note.attachments && note.attachments.length > 0 && (
+                              <div className="mb-3 space-y-2">
+                                {note.attachments.map((att, i) => (
+                                  att.type && att.type.startsWith("image") ? (
+                                    <img key={i} src={att.data} alt={att.name} className="max-w-full rounded-xl border border-amber-200 shadow-sm" style={{maxHeight:220,objectFit:"contain"}} />
+                                  ) : (
+                                    <a key={i} href={att.data} download={att.name} target="_blank" rel="noreferrer"
+                                      className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-sm font-bold text-red-700 hover:bg-red-100 transition-all">
+                                      <span>📄 {att.name}</span>
+                                      <span className="mr-auto text-xs bg-red-200 px-2 py-0.5 rounded-full">تحميل PDF</span>
+                                    </a>
+                                  )
+                                ))}
+                              </div>
+                            )}
                             {/* الرد */}
                             {note.reply ? (
                               <div className="flex gap-2 items-start">
@@ -5250,6 +5273,22 @@ function ParentPortal({ classList, setClassList, saveClass, messages, setMessage
                             </div>
                           );
                         })}
+                        {/* مرفقات التقييم */}
+                        {lastEval.attachments && lastEval.attachments.length > 0 && (
+                          <div className="mt-2 space-y-2">
+                            <div className="text-xs font-black text-gray-500">📎 مرفقات التقييم</div>
+                            {lastEval.attachments.map((att, i) => (
+                              att.type && att.type.startsWith("image") ? (
+                                <img key={i} src={att.data} alt={att.name} className="max-w-full rounded-xl border border-gray-200 shadow-sm" style={{maxHeight:200,objectFit:"contain"}} />
+                              ) : (
+                                <a key={i} href={att.data} download={att.name} target="_blank" rel="noreferrer"
+                                  className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-xs font-bold text-red-700">
+                                  📄 {att.name}
+                                </a>
+                              )
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
@@ -8333,7 +8372,32 @@ function newEval() {
     subject: "",
     level: "",
     categories: {},
+    attachments: [], // صور أو PDF مرفقة
   };
+}
+
+// ضغط وتحويل الصورة إلى base64
+async function compressImageToBase64(file, maxW = 900) {
+  return new Promise((resolve) => {
+    if (file.type === "application/pdf") {
+      const reader = new FileReader();
+      reader.onload = (e) => resolve({ type: file.type, name: file.name, data: e.target.result });
+      reader.readAsDataURL(file);
+      return;
+    }
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const scale = Math.min(1, maxW / img.width);
+      const canvas = document.createElement("canvas");
+      canvas.width = img.width * scale;
+      canvas.height = img.height * scale;
+      canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(url);
+      resolve({ type: file.type, name: file.name, data: canvas.toDataURL("image/jpeg", 0.75) });
+    };
+    img.src = url;
+  });
 }
 
 // مكوّن التقييم الأسبوعي للطالب
@@ -8345,30 +8409,88 @@ function StudentEvalCard({ student, onUpdate, onDelete, onSendNote, messages }) 
   const [showNoteForm, setShowNoteForm] = useState(false);
   const [noteText, setNoteText] = useState("");
   const [noteSent, setNoteSent] = useState(false);
+  const [showShareLink, setShowShareLink] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
+  const [noteAttachments, setNoteAttachments] = useState([]);
 
-  const handleSendNote = async () => {
+  const siteUrl = "https://school-website1.vercel.app";
+  const shareUrl = student.nationalId ? `${siteUrl}/#parent-${student.nationalId}` : "";
+
+  const copyShareLink = () => {
+    if (!shareUrl) return;
+    navigator.clipboard.writeText(shareUrl).then(() => {
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2500);
+    });
+  };
+
+  const sendShareViaWhatsApp = () => {
+    if (!student.parentPhone) { alert("أضف رقم جوال ولي الأمر أولاً"); return; }
+    const phone = student.parentPhone.trim().replace(/^0/, "966");
+    const msg = encodeURIComponent(
+      `السلام عليكم ورحمة الله وبركاته
+ولي أمر الطالب / ${student.name}
+
+يمكنك متابعة مستوى ابنك والاطلاع على ملاحظات المعلم ومراسلته مباشرةً عبر الرابط التالي:
+${shareUrl}
+
+مع تحيات إدارة مدرسة عبيدة بن الحارث المتوسطة`
+    );
+    window.open("https://wa.me/" + phone + "?text=" + msg, "_blank");
+  };
+
+  const sendShareViaSMS = () => {
+    if (!student.parentPhone) { alert("أضف رقم جوال ولي الأمر أولاً"); return; }
+    const phone = student.parentPhone.trim();
+    const msg = encodeURIComponent(
+      `مدرسة عبيدة بن الحارث - رابط متابعة الطالب ${student.name}: ${shareUrl}`
+    );
+    window.open("sms:" + phone + "?body=" + msg);
+  };
+
+  const handleNoteAttachment = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) { alert("حجم الملف كبير جداً (الحد الأقصى 5 ميجا)"); return; }
+    const att = await compressImageToBase64(file);
+    setNoteAttachments(p => [...p, att]);
+    e.target.value = "";
+  };
+
+  const handleEvalAttachment = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) { alert("حجم الملف كبير جداً (الحد الأقصى 5 ميجا)"); return; }
+    const att = await compressImageToBase64(file);
+    setDraft(p => ({ ...p, attachments: [...(p.attachments || []), att] }));
+    e.target.value = "";
+  };
+
+  const handleSendNote = async (sendMethod) => {
     if (!noteText.trim()) { alert("اكتب الملاحظة أولاً"); return; }
-    if (onSendNote) await onSendNote(student, noteText.trim());
-    setNoteText(""); setShowNoteForm(false);
+    if (onSendNote) await onSendNote(student, noteText.trim(), noteAttachments);
+    setNoteText(""); setNoteAttachments([]); setShowNoteForm(false);
     setNoteSent(true); setTimeout(() => setNoteSent(false), 4000);
-    // فتح واتساب إذا يوجد رقم جوال
-    if (student.parentPhone && student.parentPhone.trim()) {
-      const phone = student.parentPhone.trim().replace(/^0/, "966");
-      const siteUrl = "https://school-website1.vercel.app";
-      const msg = encodeURIComponent(
-        `السلام عليكم ورحمة الله وبركاته
+    const parentLink = shareUrl || "https://school-website1.vercel.app";
+    const waMsg = encodeURIComponent(
+      `السلام عليكم ورحمة الله وبركاته
 ولي أمر الطالب / ${student.name}
 
 نُفيدكم بوجود ملاحظة من معلم ابنكم.
-يرجى الاطلاع عليها والرد من خلال بوابة أولياء الأمور:
-${siteUrl}
-
-📌 أدخل رقم هوية الطالب: ${student.nationalId || "—"}
-ثم اختر تبويب 🔔 ملاحظات المعلم
+يمكن الاطلاع عليها والرد مباشرةً عبر الرابط:
+${parentLink}
 
 مع تحيات إدارة مدرسة عبيدة بن الحارث المتوسطة`
-      );
-      window.open(`https://wa.me/${phone}?text=${msg}`, "_blank");
+    );
+    if (sendMethod === "sms") {
+      if (student.parentPhone) {
+        window.open("sms:" + student.parentPhone.trim() + "?body=" + encodeURIComponent(
+          `مدرسة عبيدة بن الحارث - يوجد ملاحظة من المعلم للطالب ${student.name}. الرابط: ${parentLink}`
+        ));
+      }
+    } else if (student.parentPhone && student.parentPhone.trim()) {
+      const phone = student.parentPhone.trim().replace(/^0/, "966");
+      window.open("https://wa.me/" + phone + "?text=" + waMsg, "_blank");
     }
   };
 
@@ -8378,21 +8500,17 @@ ${siteUrl}
       return;
     }
     const phone = student.parentPhone.trim().replace(/^0/, "966");
-    const siteUrl = "https://school-website1.vercel.app";
+    const link = shareUrl || "https://school-website1.vercel.app";
     const msg = encodeURIComponent(
       `السلام عليكم ورحمة الله وبركاته
 ولي أمر الطالب / ${student.name}
 
-نُفيدكم بوجود ملاحظة من معلم ابنكم.
-يرجى الاطلاع عليها والرد من خلال بوابة أولياء الأمور:
-${siteUrl}
-
-📌 أدخل رقم هوية الطالب: ${student.nationalId || "—"}
-ثم اختر تبويب 🔔 ملاحظات المعلم
+يمكنك متابعة مستوى ابنك والتواصل مع المعلم من خلال الرابط المباشر:
+${link}
 
 مع تحيات إدارة مدرسة عبيدة بن الحارث المتوسطة`
     );
-    window.open(`https://wa.me/${phone}?text=${msg}`, "_blank");
+    window.open("https://wa.me/" + phone + "?text=" + msg, "_blank");
   };
 
   const evals = student.evals || [];
@@ -8459,11 +8577,52 @@ ${siteUrl}
             style={{ filter: student.parentPhone ? "none" : "grayscale(1) opacity(0.4)" }}>
             📱
           </span>
+          {/* زر الرابط المباشر */}
+          {student.nationalId && (
+            <button onClick={e => { e.stopPropagation(); setShowShareLink(p => !p); setExpanded(true); }}
+              title="رابط مخصص لولي الأمر"
+              className={"text-sm px-2 py-1 rounded-lg font-black transition-all " + (showShareLink ? "bg-blue-600 text-white" : "bg-blue-50 text-blue-600 hover:bg-blue-100")}>
+              🔗
+            </button>
+          )}
           <button onClick={e => { e.stopPropagation(); onDelete(student.id); }}
             className="text-red-300 hover:text-red-500 text-sm px-1 font-bold">✕</button>
           <span className="text-gray-400 text-lg">{expanded ? "▲" : "▼"}</span>
         </div>
       </div>
+
+      {/* لوحة الرابط المباشر */}
+      {showShareLink && student.nationalId && (
+        <div className="border-t border-blue-100 bg-gradient-to-l from-blue-50 to-indigo-50 px-4 py-3 space-y-2">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-base">🔗</span>
+            <span className="font-black text-blue-800 text-sm">رابط ولي الأمر المخصص — {student.name}</span>
+          </div>
+          {/* عرض الرابط */}
+          <div className="flex items-center gap-2 bg-white border border-blue-200 rounded-xl px-3 py-2">
+            <span className="flex-1 text-xs text-blue-700 font-mono truncate">{shareUrl}</span>
+            <button onClick={copyShareLink}
+              className={"text-xs font-black px-3 py-1.5 rounded-lg transition-all " + (linkCopied ? "bg-green-500 text-white" : "bg-blue-600 text-white hover:bg-blue-700")}>
+              {linkCopied ? "✅ تم النسخ" : "📋 نسخ"}
+            </button>
+          </div>
+          <p className="text-xs text-blue-600 opacity-75">📌 يفتح هذا الرابط مباشرةً على بيانات الطالب بدون الحاجة لإدخال رقم الهوية</p>
+          {/* أزرار الإرسال */}
+          <div className="flex gap-2 flex-wrap">
+            <button onClick={sendShareViaWhatsApp}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-green-500 hover:bg-green-600 text-white text-xs font-black transition-all">
+              📲 إرسال عبر واتساب
+            </button>
+            <button onClick={sendShareViaSMS}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-indigo-500 hover:bg-indigo-600 text-white text-xs font-black transition-all">
+              📱 إرسال رسالة نصية
+            </button>
+          </div>
+          {!student.parentPhone && (
+            <p className="text-xs text-amber-600 font-bold text-center">⚠️ أضف رقم جوال ولي الأمر أدناه لتفعيل الإرسال</p>
+          )}
+        </div>
+      )}
 
       {/* تفاصيل الطالب */}
       {expanded && (
@@ -8567,6 +8726,22 @@ ${siteUrl}
                         </div>
                       );
                     })}
+                    {/* مرفقات التقييم */}
+                    {ev.attachments && ev.attachments.length > 0 && (
+                      <div className="px-3 py-2 border-t border-gray-50 space-y-2">
+                        <div className="text-xs font-black text-gray-500 mb-1">📎 مرفقات</div>
+                        {ev.attachments.map((att, i) => (
+                          att.type && att.type.startsWith("image") ? (
+                            <img key={i} src={att.data} alt={att.name} className="max-w-full rounded-xl border border-gray-200" style={{maxHeight:180,objectFit:"contain"}} />
+                          ) : (
+                            <a key={i} href={att.data} download={att.name} target="_blank" rel="noreferrer"
+                              className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-xs font-bold text-red-700 hover:bg-red-100 transition-all">
+                              📄 {att.name}
+                            </a>
+                          )
+                        ))}
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -8682,6 +8857,31 @@ ${siteUrl}
                 })}
               </div>
 
+              {/* المرفقات */}
+              <div className="mb-3">
+                <label className={cx.label}>📎 إضافة صورة أو ملف PDF (اختياري)</label>
+                <label className="flex items-center gap-2 w-full py-2.5 px-4 rounded-xl border-2 border-dashed border-purple-300 text-purple-700 text-xs font-black cursor-pointer hover:bg-purple-50 transition-all">
+                  <span>📁 اختر صورة أو PDF</span>
+                  <input type="file" accept="image/*,.pdf" className="hidden" onChange={handleEvalAttachment} />
+                </label>
+                {(draft.attachments || []).length > 0 && (
+                  <div className="mt-2 space-y-2">
+                    {draft.attachments.map((att, i) => (
+                      <div key={i} className="flex items-center gap-2 bg-purple-50 border border-purple-200 rounded-xl px-3 py-2">
+                        {att.type && att.type.startsWith("image") ? (
+                          <img src={att.data} alt={att.name} className="h-12 w-16 object-cover rounded-lg" />
+                        ) : (
+                          <span className="text-2xl">📄</span>
+                        )}
+                        <span className="flex-1 text-xs text-purple-800 font-bold truncate">{att.name}</span>
+                        <button onClick={() => setDraft(p => ({ ...p, attachments: p.attachments.filter((_, j) => j !== i) }))}
+                          className="text-red-400 hover:text-red-600 text-xs font-black px-1">✕</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               <div className="flex gap-2">
                 <button onClick={saveEval} className="flex-1 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-black hover:bg-blue-700">💾 حفظ التقييم</button>
                 <button onClick={() => { setAddingEval(false); setDraft(newEval()); setOpenCats({}); }}
@@ -8782,16 +8982,42 @@ ${siteUrl}
                       className="w-full px-3 py-2.5 rounded-xl border-2 border-amber-200 focus:border-amber-400 focus:outline-none text-sm resize-none bg-white"
                       style={{fontFamily:"inherit"}}
                     />
-                    <div className="flex gap-2">
-                      <button onClick={handleSendNote}
-                        className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-sm font-black transition-all">
-                        📤 إرسال
+                    {/* إضافة مرفق للملاحظة */}
+                    <div>
+                      <label className="flex items-center gap-2 py-2 px-3 rounded-xl border-2 border-dashed border-amber-300 text-amber-700 text-xs font-black cursor-pointer hover:bg-amber-100 transition-all">
+                        <span>📎 إرفاق صورة أو PDF</span>
+                        <input type="file" accept="image/*,.pdf" className="hidden" onChange={handleNoteAttachment} />
+                      </label>
+                      {noteAttachments.length > 0 && (
+                        <div className="mt-2 space-y-1.5">
+                          {noteAttachments.map((att, i) => (
+                            <div key={i} className="flex items-center gap-2 bg-white border border-amber-200 rounded-xl px-3 py-1.5">
+                              {att.type && att.type.startsWith("image") ? (
+                                <img src={att.data} alt={att.name} className="h-10 w-14 object-cover rounded-lg" />
+                              ) : <span className="text-xl">📄</span>}
+                              <span className="flex-1 text-xs font-bold text-amber-800 truncate">{att.name}</span>
+                              <button onClick={() => setNoteAttachments(p => p.filter((_, j) => j !== i))}
+                                className="text-red-400 hover:text-red-600 font-black text-xs">✕</button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    {/* أزرار الإرسال */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <button onClick={() => handleSendNote("whatsapp")}
+                        className="py-2.5 rounded-xl bg-green-500 hover:bg-green-600 text-white text-xs font-black transition-all flex items-center justify-center gap-1">
+                        📲 واتساب
                       </button>
-                      <button onClick={() => { setShowNoteForm(false); setNoteText(""); }}
-                        className="px-4 py-2.5 rounded-xl bg-gray-100 text-gray-600 text-sm font-bold hover:bg-gray-200">
-                        إلغاء
+                      <button onClick={() => handleSendNote("sms")}
+                        className="py-2.5 rounded-xl bg-indigo-500 hover:bg-indigo-600 text-white text-xs font-black transition-all flex items-center justify-center gap-1">
+                        📱 رسالة نصية
                       </button>
                     </div>
+                    <button onClick={() => { setShowNoteForm(false); setNoteText(""); setNoteAttachments([]); }}
+                      className="w-full py-2 rounded-xl bg-gray-100 text-gray-600 text-sm font-bold hover:bg-gray-200">
+                      إلغاء
+                    </button>
                   </div>
                 )}
               </div>
@@ -25427,6 +25653,12 @@ export default function SchoolWebsite() {
     window.location.hash.replace("#","") === "excuses"
   );
 
+  // فتح بوابة أولياء الأمور مباشرة عبر رابط #parent-{nationalId}
+  const [parentStudentId, setParentStudentId] = useState(() => {
+    const h = window.location.hash.replace("#","");
+    return h.startsWith("parent-") ? h.replace("parent-","") : null;
+  });
+
   // Handle ?survey=ID URL param
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -25441,6 +25673,12 @@ export default function SchoolWebsite() {
       const hash = window.location.hash.replace("#","") || "home";
       if (hash === "excuses") { setExcuseFromHash(true); return; }
       setExcuseFromHash(false);
+      if (hash.startsWith("parent-")) {
+        const sid = hash.replace("parent-","");
+        setParentStudentId(sid);
+        setParentPortal(true);
+        return;
+      }
       if (hash.startsWith("ann-")) { setDirectAnnId(hash.replace("ann-","")); return; }
       setDirectAnnId(null);
       if (hash === "teacherportal") { setTeacherProfilePortal(true); return; }
@@ -25649,7 +25887,7 @@ export default function SchoolWebsite() {
   };
 
   // إرسال ملاحظة المعلم لولي الأمر
-  const handleSendNote = async (student, noteText) => {
+  const handleSendNote = async (student, noteText, attachments) => {
     const newMsg = {
       id: Date.now(),
       type: "teacher_note",
@@ -25657,6 +25895,7 @@ export default function SchoolWebsite() {
       studentId: student.nationalId || "",
       name: "المعلم",
       text: noteText,
+      attachments: attachments || [],
       date: new Date().toLocaleDateString("ar-SA"),
       time: new Date().toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit" }),
       read: false,
@@ -25692,7 +25931,7 @@ export default function SchoolWebsite() {
     <SurveyRespond survey={urlSurvey} onClose={()=>setUrlSurvey(null)} />
   );
   if (teacherProfilePortal) return <TeacherProfilePortal siteFont={siteFont} onBack={() => { setTeacherProfilePortal(false); window.location.hash = user ? "home" : ""; }} attendance={attendance} teachers={teachers} week={week} />;
-  if (!user && parentPortal) return <ParentPortal classList={classList} setClassList={setClassList} saveClass={saveClass} messages={messages} setMessages={setMessages} saveMessages={saveMessages} surveys={surveys} setSurveys={setSurveys} saveSurveys={saveSurveys} siteFont={siteFont} onBack={() => setParentPortal(false)} onSuggestions={() => { setParentPortal(false); setSuggestionsPortal(true); }} />;
+  if (!user && parentPortal) return <ParentPortal classList={classList} setClassList={setClassList} saveClass={saveClass} messages={messages} setMessages={setMessages} saveMessages={saveMessages} surveys={surveys} setSurveys={setSurveys} saveSurveys={saveSurveys} siteFont={siteFont} initialStudentId={parentStudentId} onBack={() => { setParentPortal(false); setParentStudentId(null); window.location.hash = ""; }} onSuggestions={() => { setParentPortal(false); setSuggestionsPortal(true); }} />;
   if (!user) return <LoginPage users={users} onLogin={setUser} siteFont={siteFont} onParentPortal={() => setParentPortal(true)} onTeacherPortal={() => setPerfStandardsPortal(true)} onTeacherProfile={() => setTeacherProfilePortal(true)} onStudentRaffle={() => setStudentRaffle(true)} onPublicAnnouncements={() => setPublicAnnouncements(true)} onExcusePortal={() => setExcusePortal(true)} onSuggestions={() => setSuggestionsPortal(true)} />;
 
   const pages = [
