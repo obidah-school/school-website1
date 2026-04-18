@@ -23635,8 +23635,23 @@ function DailyAttendanceTrackerPage({ teachers }) {
       </>)}
 
       {/* ── الإحصائيات ── */}
-      {view==="weekly" && (
+      {view==="weekly" && (()=>{
+        // جمع كل المفاتيح الزمنية المسجّلة ومعلوماتها
+        const allKeys = [...new Set(records.map(r=>r.dateKey))].sort((a,b)=>{
+          const ra=records.find(r=>r.dateKey===a), rb=records.find(r=>r.dateKey===b);
+          const da=`${ra?.gregYear||""}-${GREG_MONTHS.indexOf(ra?.gregMonth||"")+1}-${String(ra?.dayNum||"").padStart(2,"0")}`;
+          const db=`${rb?.gregYear||""}-${GREG_MONTHS.indexOf(rb?.gregMonth||"")+1}-${String(rb?.dayNum||"").padStart(2,"0")}`;
+          return da.localeCompare(db);
+        });
+
+        const keyInfo = (key) => {
+          const r = records.find(rr=>rr.dateKey===key);
+          return r ? `${r.day||""} ${r.dayNum||""} ${r.gregMonth||""} ${r.gregYear||""}م` : key;
+        };
+
+        return (
         <div className="space-y-4">
+          {/* ملخص عام */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
             <div className="px-5 py-3 font-black text-sm text-white" style={{background:"linear-gradient(135deg,#4c1d95,#7c3aed)"}}>
               📊 ملخص الحضور — جميع الأيام المسجّلة
@@ -23653,51 +23668,98 @@ function DailyAttendanceTrackerPage({ teachers }) {
               })}
             </div>
             <div className="pb-3 text-xs text-gray-400 text-center font-bold">
-              إجمالي السجلات: {records.length} | الأيام: {new Set(records.map(r=>r.dateKey)).size}
+              إجمالي السجلات: {records.length} | الأيام: {allKeys.length}
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-            <div className="px-5 py-3 font-black text-sm text-white" style={{background:"linear-gradient(135deg,#065f46,#0d9488)"}}>
-              👨‍🏫 إحصائية كل معلم
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr style={{background:"#f8fafd"}}>
-                    <th className="px-4 py-3 text-right font-black text-gray-700 border-b">اسم المعلم</th>
+          {/* جدول تفصيلي لكل معلم */}
+          {teacherList.filter(t=>getTeacherStats(t).total>0).map((teacher,ti)=>{
+            const teacherRecs = records.filter(r=>r.teacherName===teacher);
+            const stats = getTeacherStats(teacher);
+            return (
+              <div key={ti} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                {/* رأس المعلم */}
+                <div className="px-5 py-3 font-black text-sm text-white flex items-center justify-between"
+                  style={{background:"linear-gradient(135deg,#065f46,#0d9488)"}}>
+                  <div className="flex items-center gap-2">
+                    <span>👨‍🏫</span>
+                    <span>{teacher}</span>
+                  </div>
+                  <div className="flex gap-3 text-xs">
                     {STATUS_OPTIONS.map(s=>(
-                      <th key={s.val} className="px-3 py-3 text-center font-black border-b" style={{color:s.color}}>{s.label}</th>
+                      <span key={s.val} className="px-2 py-0.5 rounded-full font-black"
+                        style={{background:"rgba(255,255,255,0.2)"}}>
+                        {s.val}: {stats[s.val]}
+                      </span>
                     ))}
-                    <th className="px-3 py-3 text-center font-black text-gray-600 border-b">المجموع</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {teacherList.map((t,i)=>{
-                    const st=getTeacherStats(t);
-                    if(st.total===0) return null;
-                    return (
-                      <tr key={i} className={i%2===0?"bg-white":"bg-gray-50/50"}>
-                        <td className="px-4 py-2.5 font-bold text-gray-700">{t}</td>
+                    <span className="px-2 py-0.5 rounded-full font-black" style={{background:"rgba(255,255,255,0.3)"}}>
+                      المجموع: {stats.total}
+                    </span>
+                  </div>
+                </div>
+
+                {/* جدول الأيام */}
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr style={{background:"#f8fafd"}}>
+                        <th className="px-3 py-2.5 text-right font-black text-gray-600 border-b">اليوم</th>
+                        <th className="px-3 py-2.5 text-center font-black text-gray-600 border-b">التاريخ</th>
+                        {STATUS_OPTIONS.map(s=>(
+                          <th key={s.val} className="px-3 py-2.5 text-center font-black border-b" style={{color:s.color}}>{s.label}</th>
+                        ))}
+                        <th className="px-3 py-2.5 text-center font-black text-blue-600 border-b">الإجمالي</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {allKeys.map((key,ki)=>{
+                        const rec = teacherRecs.find(r=>r.dateKey===key);
+                        const info = records.find(r=>r.dateKey===key);
+                        const dayLabel = info ? `${info.day||""}` : "—";
+                        const dateLabel = info ? `${info.dayNum||""} ${info.gregMonth||""} ${info.gregYear||""}م` : key;
+                        return (
+                          <tr key={ki} className={ki%2===0?"bg-white":"bg-gray-50/50"}>
+                            <td className="px-3 py-2 font-bold text-gray-700">{dayLabel}</td>
+                            <td className="px-3 py-2 text-center font-bold text-gray-600">{dateLabel}</td>
+                            {STATUS_OPTIONS.map(s=>(
+                              <td key={s.val} className="px-3 py-2 text-center font-black">
+                                {rec?.status===s.val
+                                  ? <span className="px-2 py-0.5 rounded-full text-xs font-black" style={{background:s.bg,color:s.color}}>1</span>
+                                  : <span className="text-gray-300">—</span>}
+                              </td>
+                            ))}
+                            <td className="px-3 py-2 text-center font-black text-blue-600">
+                              {rec?.status ? 1 : <span className="text-gray-300">—</span>}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                    {/* صف الإجماليات */}
+                    <tfoot>
+                      <tr style={{background:"#f0fdf4",borderTop:"2px solid #d1fae5"}}>
+                        <td className="px-3 py-2.5 font-black text-gray-700" colSpan={2}>الإجمالي</td>
                         {STATUS_OPTIONS.map(s=>(
                           <td key={s.val} className="px-3 py-2.5 text-center font-black"
-                            style={{color:st[s.val]>0?s.color:"#d1d5db"}}>
-                            {st[s.val]>0?st[s.val]:"—"}
+                            style={{color:stats[s.val]>0?s.color:"#d1d5db"}}>
+                            {stats[s.val]>0?stats[s.val]:"—"}
                           </td>
                         ))}
-                        <td className="px-3 py-2.5 text-center font-black text-blue-600">{st.total}</td>
+                        <td className="px-3 py-2.5 text-center font-black text-blue-700">{stats.total}</td>
                       </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-              {teacherList.every(t=>getTeacherStats(t).total===0)&&(
-                <div className="text-center py-10 text-gray-400">
-                  <div className="text-4xl mb-2">📊</div><p className="font-bold text-sm">لا توجد بيانات بعد</p>
+                    </tfoot>
+                  </table>
                 </div>
-              )}
+              </div>
+            );
+          })}
+
+          {teacherList.every(t=>getTeacherStats(t).total===0) && (
+            <div className="text-center py-16 text-gray-400 bg-white rounded-2xl border border-gray-100">
+              <div className="text-5xl mb-3">📊</div>
+              <p className="font-bold text-sm">لا توجد بيانات بعد — ابدأ بتسجيل الحضور</p>
             </div>
-          </div>
+          )}
 
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
             <div className="grid grid-cols-2 divide-x divide-x-reverse divide-gray-100">
@@ -23706,7 +23768,8 @@ function DailyAttendanceTrackerPage({ teachers }) {
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
