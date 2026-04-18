@@ -1242,9 +1242,9 @@ function HomePage({ teachers, announcements, activities, navigate, attendance, w
         ].map(p=>(
           <button key={p.id} onClick={()=>navigate(p.id)}
             className="rounded-2xl flex flex-col items-center gap-2 transition-all relative overflow-hidden group"
-            style={{background:"#fff",padding:"14px 8px",border:"1px solid #f0f0f0",boxShadow:"0 2px 12px "+p.glow}}>
+            style={{background:"#fff",padding:"14px 8px",border:"1px solid #f0f0f0",boxShadow:`0 2px 12px ${p.glow}`}}>
             <div style={{position:"absolute",inset:0,background:p.grad,opacity:0,transition:"opacity .25s",zIndex:0}} className="group-hover:opacity-100" />
-            <div style={{width:44,height:44,borderRadius:14,background:p.grad,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,position:"relative",zIndex:1,boxShadow:"0 4px 14px "+p.glow,transition:"transform .25s"}} className="group-hover:scale-110">{p.icon}</div>
+            <div style={{width:44,height:44,borderRadius:14,background:p.grad,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,position:"relative",zIndex:1,boxShadow:`0 4px 14px ${p.glow}`,transition:"transform .25s"}} className="group-hover:scale-110">{p.icon}</div>
             <span style={{fontSize:10,fontWeight:900,fontFamily:"Cairo,sans-serif",position:"relative",zIndex:1,transition:"color .25s",color:"#374151"}} className="group-hover:text-white">{p.label}</span>
           </button>
         ))}
@@ -2728,7 +2728,7 @@ function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, sa
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-screen overflow-y-auto" dir="rtl">
 
               {/* رأس النافذة */}
-              <div style={{ background:"linear-gradient(135deg,"+accentColor+","+isLate?"#b45309":"#b91c1c"+")",
+              <div style={{ background:`linear-gradient(135deg,${accentColor},${isLate?"#b45309":"#b91c1c"})`,
                 borderRadius:"16px 16px 0 0", padding:"16px 20px" }}>
                 <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
                   <div>
@@ -2790,7 +2790,7 @@ function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, sa
                   </label>
                   <select value={form.reason}
                     onChange={e => setF("reason", e.target.value)}
-                    style={{ width:"100%", padding:"9px 12px", borderRadius:10, border:"2px solid "+accentColor+"66",
+                    style={{ width:"100%", padding:"9px 12px", borderRadius:10, border:`2px solid ${accentColor}66`,
                              fontSize:12, fontFamily:"'Cairo',sans-serif", outline:"none", background:accentBg,
                              color:"#374151", boxSizing:"border-box" }}>
                     {reasons.map(r => <option key={r} value={r}>{r}</option>)}
@@ -4496,7 +4496,7 @@ function StudentExcusePortal({ onBack, siteFont, isAdmin = false }) {
                 {pageData.map(ex => {
                   const sc = statusColor(ex.status);
                   return (
-                    <div key={ex.id} style={{ ...S.card, padding:"14px", borderRight:"4px solid "+sc.border }}>
+                    <div key={ex.id} style={{ ...S.card, padding:"14px", borderRight:`4px solid ${sc.border}` }}>
                       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", flexWrap:"wrap", gap:8 }}>
                         <div style={{ display:"flex", alignItems:"center", gap:10 }}>
                           <div style={{ width:42, height:42, borderRadius:12, flexShrink:0,
@@ -6821,7 +6821,7 @@ function TeacherSelfEval({ teacherInfo, onDone }) {
     const lvl = levelInfo(pct);
     return (
       <div dir="rtl" style={{ fontFamily:"'Cairo','Noto Naskh Arabic',sans-serif", padding:16 }}>
-        <div style={{ background:"linear-gradient(135deg,"+lvl.color+","+lvl.color+"99)",
+        <div style={{ background:`linear-gradient(135deg,${lvl.color},${lvl.color}99)`,
           borderRadius:24, padding:28, textAlign:"center", color:"#fff", marginBottom:16 }}>
           <div style={{ fontSize:60, marginBottom:12 }}>✅</div>
           <div style={{ fontWeight:900, fontSize:20, marginBottom:6 }}>تم إرسال تقييمك بنجاح!</div>
@@ -6879,7 +6879,7 @@ function TeacherSelfEval({ teacherInfo, onDone }) {
   return (
     <div dir="rtl" style={{ fontFamily:"'Cairo','Noto Naskh Arabic',sans-serif" }}>
       {/* رأس */}
-      <div style={{ background:"linear-gradient(135deg,"+sec.color+","+sec.color+"cc)",
+      <div style={{ background:`linear-gradient(135deg,${sec.color},${sec.color}cc)`,
         borderRadius:20, padding:"16px 18px 12px", marginBottom:14, color:"#fff" }}>
         <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:10 }}>
           <div style={{ display:"flex", alignItems:"center", gap:10 }}>
@@ -7649,7 +7649,7 @@ function PerformanceStandardsPortal({ siteFont, onBack }) {
     const lvl = levelInfo(totalFrom100);
     return (
       <div dir="rtl" className="min-h-screen pb-16" style={{ fontFamily:siteFont, background:"linear-gradient(135deg,#f8fafc,#eff6ff)" }}>
-        <div className="sticky top-0 z-40 shadow-lg" style={{ background:"linear-gradient(135deg,"+lvl.color+","+lvl.color+"bb)" }}>
+        <div className="sticky top-0 z-40 shadow-lg" style={{ background:`linear-gradient(135deg,${lvl.color},${lvl.color}bb)` }}>
           <div className="flex items-center justify-between px-4 h-14 text-white">
             <div className="flex items-center gap-3">
               <span className="text-xl">✅</span>
@@ -7664,7 +7664,7 @@ function PerformanceStandardsPortal({ siteFont, onBack }) {
 
         <div className="max-w-2xl mx-auto px-3 pt-5 space-y-4">
           {/* بطاقة النتيجة الإجمالية */}
-          <div className="rounded-3xl p-7 text-white text-center shadow-2xl" style={{ background:"linear-gradient(135deg,"+lvl.color+","+lvl.color+"99)" }}>
+          <div className="rounded-3xl p-7 text-white text-center shadow-2xl" style={{ background:`linear-gradient(135deg,${lvl.color},${lvl.color}99)` }}>
             <div className="text-5xl mb-3">✅</div>
             <h2 className="font-black text-xl mb-1">تم إرسال تقييمك بنجاح</h2>
             <p className="opacity-75 text-sm mb-6">بتاريخ {date} — سيطّلع عليه المدير</p>
@@ -7784,7 +7784,7 @@ function PerformanceStandardsPortal({ siteFont, onBack }) {
   return (
     <div dir="rtl" className="min-h-screen pb-16" style={{ fontFamily:siteFont, background:"linear-gradient(135deg,#f8fafc,#eff6ff)" }}>
       {/* شريط التنقل */}
-      <div className="sticky top-0 z-40 shadow-lg" style={{ background:"linear-gradient(135deg,"+domain.color+","+domain.color+"cc)" }}>
+      <div className="sticky top-0 z-40 shadow-lg" style={{ background:`linear-gradient(135deg,${domain.color},${domain.color}cc)` }}>
         <div className="flex items-center justify-between px-4 h-14 text-white">
           <div className="flex items-center gap-3">
             <span className="text-xl">{domain.icon}</span>
@@ -7805,7 +7805,7 @@ function PerformanceStandardsPortal({ siteFont, onBack }) {
 
       <div className="max-w-xl mx-auto px-3 pt-5 space-y-4">
         {/* بطاقة المعلم + التقدم */}
-        <div className="rounded-2xl p-4 text-white shadow-lg" style={{ background:"linear-gradient(135deg,"+domain.color+","+domain.color+"99)" }}>
+        <div className="rounded-2xl p-4 text-white shadow-lg" style={{ background:`linear-gradient(135deg,${domain.color},${domain.color}99)` }}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center font-black text-lg">{currentTeacher?.name?.charAt(0)}</div>
@@ -7947,7 +7947,7 @@ function PerformanceStandardsPortal({ siteFont, onBack }) {
           {activeDomain < total - 1 ? (
             <button onClick={() => { setActiveDomain(a => a+1); window.scrollTo(0,0); }}
               className="flex-1 py-3.5 rounded-2xl font-black text-white text-sm shadow-lg transition-all"
-              style={{ background:"linear-gradient(135deg,"+domain.color+","+domain.color+"cc)" }}>
+              style={{ background:`linear-gradient(135deg,${domain.color},${domain.color}cc)` }}>
               التالي ◄
             </button>
           ) : (
@@ -8072,7 +8072,7 @@ function PerfResultsAdminPage() {
         <button onClick={() => setSelected(null)} className="text-sm font-bold text-blue-600 hover:underline flex items-center gap-1">← قائمة النتائج</button>
 
         {/* بطاقة المعلم */}
-        <div className="rounded-2xl p-6 text-white shadow-xl" style={{ background:"linear-gradient(135deg,"+lvl.color+","+lvl.color+"99)" }}>
+        <div className="rounded-2xl p-6 text-white shadow-xl" style={{ background:`linear-gradient(135deg,${lvl.color},${lvl.color}99)` }}>
           <div className="text-2xl mb-2">📊</div>
           <h2 className="font-black text-xl">{teacherName}</h2>
           <p className="opacity-70 text-xs mb-5">رقم الهوية: {teacherId} — بتاريخ: {date}</p>
@@ -8238,7 +8238,7 @@ function PerfResultsAdminPage() {
                 style={{ borderColor:(lvl.color)+"25" }}>
                 <div className="flex items-center gap-3">
                   <div className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-sm"
-                    style={{ background:"linear-gradient(135deg,"+lvl.color+","+lvl.color+"88)" }}>
+                    style={{ background:`linear-gradient(135deg,${lvl.color},${lvl.color}88)` }}>
                     <div className="text-center text-white">
                       <div className="text-lg font-black">{rec.totalFrom5||0}</div>
                       <div className="text-xs opacity-80">/5</div>
@@ -8424,7 +8424,7 @@ ${siteUrl}
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden mb-3">
       {/* رأس الطالب */}
       <div className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-gray-50 transition-all"
-        style={{ borderRight: "4px solid "+lastLevel ? lastLevel.bg : "#e5e7eb" }}
+        style={{ borderRight: `4px solid ${lastLevel ? lastLevel.bg : "#e5e7eb"}` }}
         onClick={() => setExpanded(p => !p)}>
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-full flex items-center justify-center font-black text-sm"
@@ -8541,7 +8541,7 @@ ${siteUrl}
                           const subj = SUBJECTS.find(s=>s.key===ev.subject);
                           return subj ? (
                             <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-black"
-                              style={{background:subj.bg, color:subj.color, border:"1px solid "+subj.color+"44"}}>
+                              style={{background:subj.bg, color:subj.color, border:`1px solid ${subj.color}44`}}>
                               {subj.icon} {subj.label}
                             </span>
                           ) : null;
@@ -9511,148 +9511,149 @@ const SURVEY_Q_TYPES = [
 ];
 
 // ── الألوان الزاهية ──
-// ============================================================
-// ===== نظام الاستبيانات الجديد =====
-// ============================================================
-
-const HIJRI_MONTHS_SV = ["محرم","صفر","ربيع الأول","ربيع الآخر","جمادى الأولى","جمادى الآخرة","رجب","شعبان","رمضان","شوال","ذو القعدة","ذو الحجة"];
-const HIJRI_YEARS_SV  = ["1446هـ","1447هـ","1448هـ","1449هـ"];
-const DAYS_SV         = Array.from({length:31},(_,i)=>i+1);
-
-const SV_COLORS = [
-  {name:"زهري",     h:"#be185d", h2:"#ec4899", bg:"#fdf2f8", lt:"#fce7f3", br:"#f9a8d4"},
-  {name:"بنفسجي",  h:"#5b21b6", h2:"#8b5cf6", bg:"#f5f3ff", lt:"#ede9fe", br:"#c4b5fd"},
-  {name:"أزرق",    h:"#1e40af", h2:"#3b82f6", bg:"#eff6ff", lt:"#dbeafe", br:"#93c5fd"},
-  {name:"أخضر",    h:"#065f46", h2:"#10b981", bg:"#ecfdf5", lt:"#d1fae5", br:"#6ee7b7"},
-  {name:"برتقالي", h:"#92400e", h2:"#f59e0b", bg:"#fffbeb", lt:"#fef3c7", br:"#fcd34d"},
-  {name:"أحمر",    h:"#991b1b", h2:"#ef4444", bg:"#fef2f2", lt:"#fee2e2", br:"#fca5a5"},
-  {name:"تيل",     h:"#134e4a", h2:"#14b8a6", bg:"#f0fdfa", lt:"#ccfbf1", br:"#5eead4"},
-  {name:"توت",     h:"#4c0519", h2:"#f43f5e", bg:"#fff1f2", lt:"#ffe4e6", br:"#fda4af"},
+const SURVEY_PALETTES = [
+  { name:"زهري",      h1:"#be185d", h2:"#ec4899", bg:"#fdf2f8", light:"#fce7f3", border:"#f9a8d4" },
+  { name:"بنفسجي",   h1:"#5b21b6", h2:"#8b5cf6", bg:"#f5f3ff", light:"#ede9fe", border:"#c4b5fd" },
+  { name:"أزرق",     h1:"#1e40af", h2:"#3b82f6", bg:"#eff6ff", light:"#dbeafe", border:"#93c5fd" },
+  { name:"أخضر",     h1:"#065f46", h2:"#10b981", bg:"#ecfdf5", light:"#d1fae5", border:"#6ee7b7" },
+  { name:"برتقالي",  h1:"#92400e", h2:"#f59e0b", bg:"#fffbeb", light:"#fef3c7", border:"#fcd34d" },
+  { name:"أحمر",     h1:"#991b1b", h2:"#ef4444", bg:"#fef2f2", light:"#fee2e2", border:"#fca5a5" },
+  { name:"تيل",      h1:"#134e4a", h2:"#14b8a6", bg:"#f0fdfa", light:"#ccfbf1", border:"#5eead4" },
+  { name:"توت",      h1:"#4c0519", h2:"#f43f5e", bg:"#fff1f2", light:"#ffe4e6", border:"#fda4af" },
 ];
 
-const SV_Q_TYPES = [
-  {val:"radio",    label:"اختيار واحد",  icon:"🔘"},
-  {val:"checkbox", label:"اختيار متعدد", icon:"☑️"},
-  {val:"text",     label:"نص حر",        icon:"✍️"},
-  {val:"scale5",   label:"مقياس 1–5",   icon:"⭐"},
-  {val:"yesno",    label:"نعم / لا",     icon:"✅"},
-];
+const SURVEY_EMOJIS = ["😊","😁","🙂","😐","😕","😞","⭐","👍","👎","💪","🔥","💯","🌟","🎯","📚","🏫","🤝","💡","🎓","✅","❤️","🌈"];
 
-const SV_TARGETS = ["الطلاب","أولياء الأمور","المعلمون","الإداريون","الجميع"];
-
-const SV_EMOJIS = ["😊","😁","🙂","😐","😕","⭐","👍","👎","💪","🔥","💯","🌟","🎯","📚","🏫","🤝","💡","🎓","✅","❤️"];
-
-function svMkSurvey() {
+function mkSurvey() {
   return {
     id: Date.now(),
     title: "",
     dayNum: new Date().getDate(),
-    hijriMonth: HIJRI_MONTHS_SV[9],
+    hijriMonth: SURVEY_HIJRI_MONTHS[new Date().getMonth()],
     hijriYear: "1447هـ",
     target: "الجميع",
-    color: 0,
+    palette: 0,
     questions: [],
     active: true,
     responses: [],
-    accessType: "free",
     createdAt: new Date().toLocaleDateString("ar-SA"),
+    accessType: "free", // free | id
   };
 }
 
-function svMkQuestion() {
+function mkQuestion() {
   return {
-    id: Date.now() + Math.random()*999|0,
+    id: Date.now() + Math.random() * 1000 | 0,
     type: "radio",
     text: "",
-    emoji: "",
-    options: ["خيار 1","خيار 2","خيار 3"],
+    emoji: "🔘",
+    options: ["خيار 1", "خيار 2", "خيار 3"],
     required: true,
   };
 }
 
-// ─── منشئ الاستبيان ───
+// ================================================================
+// ===== صانع الاستبيان =====
+// ================================================================
 function SurveyBuilder({ survey, onSave, onCancel }) {
-  const [s, setS] = useState({...survey});
-  const c = SV_COLORS[s.color || 0];
+  const [s, setS] = useState({ ...survey });
+  const pal = SURVEY_PALETTES[s.palette ?? 0];
 
-  const addQ   = () => setS(p => ({...p, questions:[...p.questions, svMkQuestion()]}));
-  const updQ   = (id,ch) => setS(p => ({...p, questions:p.questions.map(q=>q.id===id?{...q,...ch}:q)}));
-  const delQ   = (id) => setS(p => ({...p, questions:p.questions.filter(q=>q.id!==id)}));
-  const moveQ  = (id,d) => {
-    const a=[...s.questions], i=a.findIndex(q=>q.id===id);
-    if(i+d<0||i+d>=a.length) return;
-    [a[i],a[i+d]]=[a[i+d],a[i]]; setS(p=>({...p,questions:a}));
+  const addQ = () => {
+    const q = mkQuestion();
+    setS(p => ({ ...p, questions: [...p.questions, q] }));
   };
-  const addOpt = (qid) => { const q=s.questions.find(q=>q.id===qid); updQ(qid,{options:[...q.options,`خيار ${q.options.length+1}`]}); };
-  const updOpt = (qid,oi,v) => { const o=[...s.questions.find(q=>q.id===qid).options]; o[oi]=v; updQ(qid,{options:o}); };
-  const delOpt = (qid,oi) => updQ(qid,{options:s.questions.find(q=>q.id===qid).options.filter((_,i)=>i!==oi)});
 
-  const bg1 = "linear-gradient(135deg,"+c.h+","+c.h2+")";
+  const updQ = (id, changes) =>
+    setS(p => ({ ...p, questions: p.questions.map(q => q.id===id ? {...q,...changes} : q) }));
+
+  const delQ = (id) =>
+    setS(p => ({ ...p, questions: p.questions.filter(q => q.id !== id) }));
+
+  const moveQ = (id, dir) => {
+    const arr = [...s.questions];
+    const i = arr.findIndex(q => q.id===id);
+    if (i+dir < 0 || i+dir >= arr.length) return;
+    [arr[i], arr[i+dir]] = [arr[i+dir], arr[i]];
+    setS(p => ({ ...p, questions: arr }));
+  };
+
+  const addOpt = (qid) => updQ(qid, { options: [...s.questions.find(q=>q.id===qid).options, `خيار ${s.questions.find(q=>q.id===qid).options.length+1}`] });
+  const updOpt = (qid, oi, val) => {
+    const opts = [...s.questions.find(q=>q.id===qid).options];
+    opts[oi] = val;
+    updQ(qid, { options: opts });
+  };
+  const delOpt = (qid, oi) => {
+    const opts = s.questions.find(q=>q.id===qid).options.filter((_,i)=>i!==oi);
+    updQ(qid, { options: opts });
+  };
 
   return (
     <div dir="rtl" style={{fontFamily:"'Cairo',sans-serif"}}>
-      {/* ─ شريط الأدوات ─ */}
-      <div className="rounded-2xl overflow-hidden shadow-xl mb-4" style={{background:bg1}}>
-        <div className="flex items-center justify-between px-4 py-3">
-          <span className="font-black text-white text-base">🛠️ {s.title||"استبيان جديد"}</span>
+      <style>{`
+        .sq-card{background:#fff;border-radius:16px;border:2px solid ${pal.border};margin-bottom:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.07);}
+        .sq-hdr{padding:10px 14px;font-weight:900;font-size:13px;color:#fff;display:flex;align-items:center;justify-content:space-between;background:linear-gradient(135deg,${pal.h1},${pal.h2});}
+        input.sq-in,textarea.sq-ta{border:2px solid ${pal.border};border-radius:10px;padding:8px 12px;font-size:13px;font-family:'Cairo',sans-serif;width:100%;outline:none;}
+        input.sq-in:focus,textarea.sq-ta:focus{border-color:${pal.h2};}
+        .sq-btn{border:none;border-radius:10px;padding:7px 16px;font-weight:900;font-size:12px;cursor:pointer;font-family:'Cairo',sans-serif;transition:all .15s;}
+      `}</style>
+
+      {/* رأس البناء */}
+      <div className="rounded-2xl overflow-hidden shadow-xl mb-4" style={{background:"linear-gradient(135deg,"+pal.h1+","+pal.h2+")"}}>
+        <div className="flex items-center justify-between px-5 py-4">
+          <span className="font-black text-white text-lg">🛠️ {s.id===survey.id && s.title ? "تعديل الاستبيان" : "استبيان جديد"}</span>
           <div className="flex gap-2">
             <button onClick={addQ}
-              className="flex items-center gap-1 px-3 py-2 rounded-xl font-black text-white text-xs"
+              className="sq-btn text-white flex items-center gap-1.5"
               style={{background:"rgba(255,255,255,.2)",border:"1.5px solid rgba(255,255,255,.4)"}}>
               ➕ إضافة سؤال
             </button>
             <button onClick={()=>onSave(s)}
-              className="px-4 py-2 rounded-xl font-black text-white text-xs"
-              style={{background:"#22c55e"}}>
-              💾 حفظ
-            </button>
+              className="sq-btn" style={{background:"#22c55e",color:"#fff"}}>💾 حفظ</button>
             <button onClick={onCancel}
-              className="px-3 py-2 rounded-xl font-black text-xs"
-              style={{background:"rgba(255,255,255,.2)",color:"#fff",border:"1px solid rgba(255,255,255,.3)"}}>
-              ✕
-            </button>
+              className="sq-btn" style={{background:"rgba(255,255,255,.2)",color:"#fff",border:"1.5px solid rgba(255,255,255,.3)"}}>✕</button>
           </div>
         </div>
 
-        {/* ─ إعدادات ─ */}
-        <div className="px-4 pb-4 space-y-3" style={{background:"rgba(0,0,0,.22)"}}>
-          {/* العنوان */}
+        {/* إعدادات عامة */}
+        <div className="px-5 pb-5 space-y-3" style={{background:"rgba(0,0,0,.2)"}}>
           <input value={s.title} onChange={e=>setS(p=>({...p,title:e.target.value}))}
             placeholder="✏️ عنوان الاستبيان *"
-            className="w-full rounded-xl px-4 py-3 font-black text-base focus:outline-none"
-            style={{background:"rgba(255,255,255,.15)",border:"1.5px solid rgba(255,255,255,.3)",color:"#fff",fontFamily:"'Cairo',sans-serif"}} />
+            className="sq-in text-white font-black text-base placeholder-white/50"
+            style={{background:"rgba(255,255,255,.12)",borderColor:"rgba(255,255,255,.3)",color:"#fff"}} />
 
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {/* اليوم */}
             <div>
-              <div className="text-xs font-bold text-white opacity-70 mb-1">اليوم</div>
-              <select value={s.dayNum||1} onChange={e=>setS(p=>({...p,dayNum:+e.target.value}))}
-                className="w-full rounded-xl px-2 py-2 text-xs font-bold focus:outline-none"
-                style={{background:"rgba(255,255,255,.15)",border:"1px solid rgba(255,255,255,.3)",color:"#fff"}}>
-                {DAYS_SV.map(d=><option key={d} value={d} style={{color:"#000"}}>{d}</option>)}
+              <label className="text-xs font-bold text-white/70 mb-1 block">اليوم</label>
+              <select value={s.dayNum||1} onChange={e=>setS(p=>({...p,dayNum:Number(e.target.value)}))}
+                className="w-full px-3 py-2 rounded-xl border border-white/30 bg-white/15 text-white text-xs font-bold focus:outline-none">
+                {SURVEY_DAYS.map(d=><option key={d} value={d} style={{color:"#000"}}>{d}</option>)}
               </select>
             </div>
+            {/* الشهر الهجري */}
             <div>
-              <div className="text-xs font-bold text-white opacity-70 mb-1">الشهر الهجري</div>
-              <select value={s.hijriMonth} onChange={e=>setS(p=>({...p,hijriMonth:e.target.value}))}
-                className="w-full rounded-xl px-2 py-2 text-xs font-bold focus:outline-none"
-                style={{background:"rgba(255,255,255,.15)",border:"1px solid rgba(255,255,255,.3)",color:"#fff"}}>
-                {HIJRI_MONTHS_SV.map(m=><option key={m} value={m} style={{color:"#000"}}>{m}</option>)}
+              <label className="text-xs font-bold text-white/70 mb-1 block">الشهر الهجري</label>
+              <select value={s.hijriMonth||"شوال"} onChange={e=>setS(p=>({...p,hijriMonth:e.target.value}))}
+                className="w-full px-3 py-2 rounded-xl border border-white/30 bg-white/15 text-white text-xs font-bold focus:outline-none">
+                {SURVEY_HIJRI_MONTHS.map(m=><option key={m} value={m} style={{color:"#000"}}>{m}</option>)}
               </select>
             </div>
+            {/* السنة */}
             <div>
-              <div className="text-xs font-bold text-white opacity-70 mb-1">السنة</div>
-              <select value={s.hijriYear} onChange={e=>setS(p=>({...p,hijriYear:e.target.value}))}
-                className="w-full rounded-xl px-2 py-2 text-xs font-bold focus:outline-none"
-                style={{background:"rgba(255,255,255,.15)",border:"1px solid rgba(255,255,255,.3)",color:"#fff"}}>
-                {HIJRI_YEARS_SV.map(y=><option key={y} value={y} style={{color:"#000"}}>{y}</option>)}
+              <label className="text-xs font-bold text-white/70 mb-1 block">السنة الهجرية</label>
+              <select value={s.hijriYear||"1447هـ"} onChange={e=>setS(p=>({...p,hijriYear:e.target.value}))}
+                className="w-full px-3 py-2 rounded-xl border border-white/30 bg-white/15 text-white text-xs font-bold focus:outline-none">
+                {SURVEY_HIJRI_YEARS.map(y=><option key={y} value={y} style={{color:"#000"}}>{y}</option>)}
               </select>
             </div>
+            {/* الفئة المستهدفة */}
             <div>
-              <div className="text-xs font-bold text-white opacity-70 mb-1">الفئة</div>
-              <select value={s.target} onChange={e=>setS(p=>({...p,target:e.target.value}))}
-                className="w-full rounded-xl px-2 py-2 text-xs font-bold focus:outline-none"
-                style={{background:"rgba(255,255,255,.15)",border:"1px solid rgba(255,255,255,.3)",color:"#fff"}}>
-                {SV_TARGETS.map(t=><option key={t} value={t} style={{color:"#000"}}>{t}</option>)}
+              <label className="text-xs font-bold text-white/70 mb-1 block">الفئة المستهدفة</label>
+              <select value={s.target||"الجميع"} onChange={e=>setS(p=>({...p,target:e.target.value}))}
+                className="w-full px-3 py-2 rounded-xl border border-white/30 bg-white/15 text-white text-xs font-bold focus:outline-none">
+                {["الطلاب","أولياء الأمور","المعلمون","الإداريون","الجميع"].map(t=><option key={t} value={t} style={{color:"#000"}}>{t}</option>)}
               </select>
             </div>
           </div>
@@ -9660,33 +9661,25 @@ function SurveyBuilder({ survey, onSave, onCancel }) {
           <div className="grid grid-cols-2 gap-3">
             {/* نوع الوصول */}
             <div>
-              <div className="text-xs font-bold text-white opacity-70 mb-1">🔐 نوع الوصول</div>
+              <label className="text-xs font-bold text-white/70 mb-1 block">🔐 نوع الوصول</label>
               <div className="flex gap-2">
-                {[{v:"free",l:"🔓 مفتوح"},{v:"id",l:"🪪 برقم الهوية"}].map(o=>(
-                  <button key={o.v} onClick={()=>setS(p=>({...p,accessType:o.v}))}
-                    className="flex-1 py-2 rounded-xl text-xs font-black transition-all"
-                    style={{
-                      background: s.accessType===o.v ? "rgba(255,255,255,.3)" : "transparent",
-                      color:"#fff",
-                      border: s.accessType===o.v ? "2px solid rgba(255,255,255,.7)" : "2px solid rgba(255,255,255,.2)"
-                    }}>
-                    {o.l}
+                {[{val:"free",l:"🔓 مفتوح (بدون هوية)"},{val:"id",l:"🪪 برقم الهوية"}].map(opt=>(
+                  <button key={opt.val} onClick={()=>setS(p=>({...p,accessType:opt.val}))}
+                    className="flex-1 py-2 rounded-xl text-xs font-black border-2 transition-all"
+                    style={{background:s.accessType===opt.val?"rgba(255,255,255,.25)":"transparent",color:"#fff",borderColor:s.accessType===opt.val?"rgba(255,255,255,.6)":"rgba(255,255,255,.2)"}}>
+                    {opt.l}
                   </button>
                 ))}
               </div>
             </div>
-            {/* الألوان */}
+            {/* اللون */}
             <div>
-              <div className="text-xs font-bold text-white opacity-70 mb-1">🎨 لون الاستبيان</div>
+              <label className="text-xs font-bold text-white/70 mb-1 block">🎨 لون الاستبيان</label>
               <div className="flex gap-1.5 flex-wrap">
-                {SV_COLORS.map((cl,i)=>(
-                  <button key={i} onClick={()=>setS(p=>({...p,color:i}))}
-                    className="w-7 h-7 rounded-full transition-all hover:scale-110"
-                    style={{
-                      background:"linear-gradient(135deg,"+cl.h+","+cl.h2+")",
-                      border: s.color===i ? "3px solid #fff" : "3px solid transparent",
-                      boxShadow: s.color===i ? "0 0 0 2px "+cl.h : "none"
-                    }} />
+                {SURVEY_PALETTES.map((p,i)=>(
+                  <button key={i} onClick={()=>setS(prev=>({...prev,palette:i}))}
+                    className="w-7 h-7 rounded-full border-4 transition-transform hover:scale-110"
+                    style={{background:"linear-gradient(135deg,"+p.h1+","+p.h2+")",borderColor:s.palette===i?"#fff":"transparent"}} />
                 ))}
               </div>
             </div>
@@ -9694,60 +9687,59 @@ function SurveyBuilder({ survey, onSave, onCancel }) {
         </div>
       </div>
 
-      {/* ─ الأسئلة ─ */}
-      {s.questions.length===0 && (
-        <div className="text-center py-12 rounded-2xl border-2 border-dashed mb-3"
-          style={{borderColor:c.br, background:c.lt}}>
-          <div className="text-4xl mb-2">❓</div>
-          <div className="font-black text-sm" style={{color:c.h}}>لا توجد أسئلة — اضغط "إضافة سؤال" في الأعلى</div>
-        </div>
-      )}
-
+      {/* الأسئلة */}
       <div className="space-y-3">
-        {s.questions.map((q,qi)=>(
-          <div key={q.id} className="rounded-2xl overflow-hidden border-2" style={{borderColor:c.br}}>
-            {/* رأس السؤال */}
-            <div className="flex items-center justify-between px-4 py-2.5 text-white"
-              style={{background:"linear-gradient(135deg,"+c.h+","+c.h2+")"}}>
-              <div className="flex items-center gap-2 text-sm font-black">
-                <span>{SV_Q_TYPES.find(t=>t.val===q.type)?.icon}</span>
-                <span>س{qi+1}:</span>
-                <span className="opacity-80 font-normal truncate max-w-48">{q.text||"سؤال جديد"}</span>
-                {q.required && <span className="text-xs bg-white bg-opacity-20 px-2 py-0.5 rounded-full">إجباري</span>}
+        {s.questions.length === 0 && (
+          <div className="text-center py-10 rounded-2xl border-2 border-dashed" style={{borderColor:pal.border,background:pal.light}}>
+            <div className="text-4xl mb-2">❓</div>
+            <div className="font-black text-sm" style={{color:pal.h1}}>لا توجد أسئلة بعد</div>
+            <div className="text-xs opacity-60 mt-1">اضغط "➕ إضافة سؤال" في الأعلى</div>
+          </div>
+        )}
+
+        {s.questions.map((q, qi) => (
+          <div key={q.id} className="sq-card">
+            <div className="sq-hdr">
+              <div className="flex items-center gap-2">
+                <span className="text-lg">{SURVEY_Q_TYPES.find(t=>t.val===q.type)?.icon}</span>
+                <span>س{qi+1}: {q.text || "سؤال جديد"}</span>
+                {q.required && <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full">إجباري</span>}
               </div>
               <div className="flex gap-1">
-                <button onClick={()=>moveQ(q.id,-1)} className="text-white opacity-70 hover:opacity-100 px-1.5">↑</button>
-                <button onClick={()=>moveQ(q.id, 1)} className="text-white opacity-70 hover:opacity-100 px-1.5">↓</button>
-                <button onClick={()=>delQ(q.id)} className="text-white opacity-70 hover:text-red-300 px-1.5">🗑️</button>
+                <button onClick={()=>moveQ(q.id,-1)} className="text-white/70 hover:text-white px-1.5 text-sm">↑</button>
+                <button onClick={()=>moveQ(q.id, 1)} className="text-white/70 hover:text-white px-1.5 text-sm">↓</button>
+                <button onClick={()=>delQ(q.id)} className="text-white/70 hover:text-red-300 px-1.5 text-sm">🗑️</button>
               </div>
             </div>
 
-            {/* تفاصيل السؤال */}
-            <div className="p-4 space-y-3" style={{background:c.bg}}>
+            <div className="p-4 space-y-3" style={{background:pal.bg}}>
+              {/* نص السؤال */}
               <input value={q.text} onChange={e=>updQ(q.id,{text:e.target.value})}
-                placeholder="اكتب نص السؤال..."
-                className="w-full rounded-xl px-3 py-2.5 font-bold text-sm focus:outline-none"
-                style={{border:"2px solid "+c.br, background:"#fff", fontFamily:"'Cairo',sans-serif"}} />
+                placeholder="اكتب نص السؤال هنا..."
+                className="sq-in font-bold" />
 
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {/* نوع الإجابة */}
                 <div>
-                  <div className="text-xs font-black text-gray-500 mb-1">نوع الإجابة</div>
+                  <label className="text-xs font-black text-gray-500 mb-1 block">نوع الإجابة</label>
                   <select value={q.type} onChange={e=>updQ(q.id,{type:e.target.value})}
-                    className="w-full rounded-xl px-2 py-2 text-xs font-bold focus:outline-none bg-white"
-                    style={{border:"2px solid "+c.br}}>
-                    {SV_Q_TYPES.map(t=><option key={t.val} value={t.val}>{t.icon} {t.label}</option>)}
+                    className="w-full px-3 py-2 rounded-xl border-2 text-xs font-bold focus:outline-none bg-white"
+                    style={{borderColor:pal.border}}>
+                    {SURVEY_Q_TYPES.map(t=><option key={t.val} value={t.val}>{t.icon} {t.label}</option>)}
                   </select>
                 </div>
+                {/* إيموجي */}
                 <div>
-                  <div className="text-xs font-black text-gray-500 mb-1">إيموجي</div>
+                  <label className="text-xs font-black text-gray-500 mb-1 block">رمز تعبيري</label>
                   <select value={q.emoji||""} onChange={e=>updQ(q.id,{emoji:e.target.value})}
-                    className="w-full rounded-xl px-2 py-2 text-sm font-bold focus:outline-none bg-white"
-                    style={{border:"2px solid "+c.br}}>
+                    className="w-full px-3 py-2 rounded-xl border-2 text-sm font-bold focus:outline-none bg-white"
+                    style={{borderColor:pal.border}}>
                     <option value="">بدون</option>
-                    {SV_EMOJIS.map(e=><option key={e} value={e}>{e}</option>)}
+                    {SURVEY_EMOJIS.map(e=><option key={e} value={e}>{e}</option>)}
                   </select>
                 </div>
-                <div className="flex items-end pb-0.5">
+                {/* إجباري */}
+                <div className="flex items-end pb-1">
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input type="checkbox" checked={q.required} onChange={e=>updQ(q.id,{required:e.target.checked})} className="w-4 h-4" />
                     <span className="text-xs font-black text-gray-600">إجباري</span>
@@ -9755,20 +9747,24 @@ function SurveyBuilder({ survey, onSave, onCancel }) {
                 </div>
               </div>
 
-              {(q.type==="radio"||q.type==="checkbox") && (
+              {/* خيارات radio/checkbox */}
+              {(q.type==="radio" || q.type==="checkbox") && (
                 <div>
-                  <div className="text-xs font-black text-gray-500 mb-2">الخيارات</div>
+                  <label className="text-xs font-black text-gray-500 mb-2 block">الخيارات</label>
                   <div className="space-y-2">
-                    {(q.options||[]).map((o,oi)=>(
+                    {(q.options||[]).map((opt,oi)=>(
                       <div key={oi} className="flex gap-2 items-center">
-                        <span className="text-xs font-black w-5 text-center" style={{color:c.h2}}>{oi+1}</span>
-                        <input value={o} onChange={e=>updOpt(q.id,oi,e.target.value)}
-                          className="flex-1 px-3 py-1.5 rounded-lg text-sm focus:outline-none bg-white"
-                          style={{border:"2px solid "+c.br}} />
-                        <button onClick={()=>delOpt(q.id,oi)} className="text-red-400 hover:text-red-600 px-1">✕</button>
+                        <span className="text-xs font-black w-5 text-center" style={{color:pal.h2}}>{oi+1}</span>
+                        <input value={opt} onChange={e=>updOpt(q.id,oi,e.target.value)}
+                          className="flex-1 px-3 py-1.5 rounded-lg border-2 text-sm focus:outline-none bg-white"
+                          style={{borderColor:pal.border}} />
+                        <button onClick={()=>delOpt(q.id,oi)} className="text-red-400 hover:text-red-600 text-sm px-1">✕</button>
                       </div>
                     ))}
-                    <button onClick={()=>addOpt(q.id)} className="text-xs font-black hover:underline" style={{color:c.h2}}>➕ إضافة خيار</button>
+                    <button onClick={()=>addOpt(q.id)}
+                      className="text-xs font-black hover:underline mt-1" style={{color:pal.h2}}>
+                      ➕ إضافة خيار
+                    </button>
                   </div>
                 </div>
               )}
@@ -9777,10 +9773,11 @@ function SurveyBuilder({ survey, onSave, onCancel }) {
         ))}
       </div>
 
-      {s.questions.length>0 && (
+      {/* زر إضافة سؤال في الأسفل */}
+      {s.questions.length > 0 && (
         <button onClick={addQ}
-          className="w-full py-3 rounded-2xl border-2 border-dashed font-black text-sm mt-2"
-          style={{borderColor:c.h2, color:c.h2, background:c.lt}}>
+          className="w-full py-3 rounded-2xl border-2 border-dashed font-black text-sm mt-2 hover:opacity-80 transition-all"
+          style={{borderColor:pal.h2,color:pal.h2,background:pal.light}}>
           ➕ إضافة سؤال جديد
         </button>
       )}
@@ -9788,95 +9785,127 @@ function SurveyBuilder({ survey, onSave, onCancel }) {
   );
 }
 
-// ─── ملء الاستبيان ───
-function SurveyRespond({ survey, onClose }) {
-  const c = SV_COLORS[survey.color||0];
-  const [responderId, setResponderId] = useState("");
-  const [idErr, setIdErr] = useState("");
-  const [step, setStep] = useState(survey.accessType==="free"?"form":"login");
+// ================================================================
+// ===== ملء الاستبيان (للطلاب / أولياء الأمور / المعلمين) =====
+// ================================================================
+function SurveyRespond({ survey, onClose, prefillId }) {
+  const pal = SURVEY_PALETTES[survey.palette ?? 0];
+  const [responderId, setResponderId] = useState(prefillId || "");
+  const [step, setStep] = useState(survey.accessType === "free" ? "form" : "login");
+  const [idError, setIdError] = useState("");
   const [answers, setAnswers] = useState({});
-  const [busy, setBusy] = useState(false);
-  const [done, setDone] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
 
-  const survDate = (survey.dayNum||"")+" "+(survey.hijriMonth||"")+" "+(survey.hijriYear||"");
-  const bg1 = "linear-gradient(135deg,"+c.h+","+c.h2+")";
+  const surveyDate = `${survey.dayNum||""} ${survey.hijriMonth||""} ${survey.hijriYear||""}`;
 
-  const setAns = (qid,val) => setAnswers(p=>({...p,[qid]:val}));
-  const toggleChk = (qid,opt) => {
-    const cur=answers[qid]||[];
-    setAns(qid, cur.includes(opt)?cur.filter(x=>x!==opt):[...cur,opt]);
+  const setAns = (qid, val) => setAnswers(p=>({...p,[qid]:val}));
+  const toggleCheck = (qid, opt) => {
+    const cur = answers[qid] || [];
+    setAns(qid, cur.includes(opt) ? cur.filter(x=>x!==opt) : [...cur, opt]);
+  };
+
+  const handleLogin = () => {
+    if (!responderId.trim()) { setIdError("أدخل رقم هويتك"); return; }
+    setIdError("");
+    setStep("form");
   };
 
   const submit = async () => {
-    const missing = survey.questions.filter(q=>q.required&&(
-      answers[q.id]===undefined||answers[q.id]===""||
-      (Array.isArray(answers[q.id])&&answers[q.id].length===0)
+    const missing = survey.questions.filter(q => q.required && (
+      answers[q.id] === undefined || answers[q.id] === "" ||
+      (Array.isArray(answers[q.id]) && answers[q.id].length === 0)
     ));
-    if(missing.length) { alert("يرجى الإجابة على جميع الأسئلة الإجبارية"); return; }
-    setBusy(true);
+    if (missing.length > 0) {
+      alert(`يرجى الإجابة على: ${missing.map((q,i)=>`س${survey.questions.indexOf(q)+1}`).join("، ")}`);
+      return;
+    }
+    setSubmitting(true);
     try {
-      const all = await DB.get("school-surveys",[]);
-      const arr = Array.isArray(all)?all:[];
-      const upd = arr.map(sv=>{
-        if(sv.id!==survey.id) return sv;
-        return {...sv, responses:[...(sv.responses||[]),{id:Date.now(),responderId:responderId||"مجهول",answers,at:new Date().toISOString()}]};
+      const existing = await DB.get("school-surveys", []);
+      const arr = Array.isArray(existing) ? existing : [];
+      const updated = arr.map(s => {
+        if (s.id !== survey.id) return s;
+        const resp = {
+          id: Date.now(),
+          responderId: responderId || "مجهول",
+          answers,
+          submittedAt: new Date().toISOString(),
+        };
+        return { ...s, responses: [...(s.responses||[]), resp] };
       });
-      await DB.set("school-surveys",upd);
-      setDone(true);
-    } catch { alert("خطأ في الإرسال، حاول مجدداً"); }
-    setBusy(false);
+      await DB.set("school-surveys", updated);
+      setSubmitted(true);
+    } catch { alert("حدث خطأ، حاول مجدداً"); }
+    setSubmitting(false);
   };
 
-  if(done) return (
+  if (submitted) return (
     <div className="min-h-screen flex items-center justify-center p-4"
-      style={{background:bg1, fontFamily:"'Cairo',sans-serif"}}>
+      style={{background:"linear-gradient(135deg,"+pal.h1+","+pal.h2+")"}}>
       <div className="bg-white rounded-3xl p-10 shadow-2xl text-center max-w-sm w-full">
         <div className="text-7xl mb-4">🎉</div>
-        <h3 className="font-black text-2xl mb-2">شكراً لمشاركتك!</h3>
-        <p className="text-gray-500 text-sm mb-6">تم إرسال إجابتك بنجاح</p>
-        <button onClick={onClose} className="w-full py-3 rounded-2xl font-black text-white" style={{background:bg1}}>العودة</button>
+        <h3 className="font-black text-2xl text-gray-800 mb-2">شكراً لمشاركتك!</h3>
+        <p className="text-gray-500 text-sm mb-6">تم استلام إجابتك بنجاح</p>
+        <button onClick={onClose}
+          className="w-full py-3 rounded-2xl font-black text-white"
+          style={{background:"linear-gradient(135deg,"+pal.h1+","+pal.h2+")"}}>
+          العودة
+        </button>
       </div>
     </div>
   );
 
   return (
-    <div dir="rtl" className="min-h-screen" style={{background:"linear-gradient(160deg,"+c.h+" 0%,"+c.h2+" 60%,"+c.bg+" 100%)", fontFamily:"'Cairo',sans-serif"}}>
+    <div className="min-h-screen" dir="rtl"
+      style={{background:"linear-gradient(160deg,"+pal.h1+" 0%,"+pal.h2+" 60%,"+pal.bg+" 100%)",fontFamily:"'Cairo',sans-serif"}}>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;800;900&display=swap');`}</style>
+
+      {/* رأس الصفحة */}
       <div className="text-center text-white pt-10 pb-6 px-4 relative">
-        <button onClick={onClose} className="absolute right-4 top-4 text-xs font-bold px-3 py-1.5 rounded-xl" style={{background:"rgba(255,255,255,.2)"}}>← رجوع</button>
-        <div className="w-20 h-20 rounded-3xl mx-auto mb-3 flex items-center justify-center text-4xl shadow-xl" style={{background:"rgba(255,255,255,.18)"}}>📊</div>
-        <h1 className="text-xl font-black mb-1">{survey.title}</h1>
-        <div className="flex justify-center gap-3 text-xs opacity-75 mt-1 flex-wrap">
+        <button onClick={onClose} className="absolute right-4 top-4 bg-white/20 text-white px-3 py-1.5 rounded-xl text-xs font-bold">← رجوع</button>
+        <div className="w-20 h-20 rounded-3xl mx-auto mb-3 flex items-center justify-center text-4xl shadow-xl"
+          style={{background:"rgba(255,255,255,.18)",backdropFilter:"blur(10px)"}}>
+          📊
+        </div>
+        <h1 className="text-2xl font-black mb-1">{survey.title}</h1>
+        <div className="flex justify-center gap-3 text-xs opacity-75 mt-2 flex-wrap">
           <span>👥 {survey.target}</span>
-          <span>📅 {survDate}</span>
+          <span>📅 {surveyDate}</span>
           <span>❓ {survey.questions.length} سؤال</span>
         </div>
       </div>
 
       <div className="px-4 pb-10 max-w-lg mx-auto">
-        {step==="login" && (
+
+        {/* شاشة تسجيل الدخول برقم الهوية */}
+        {step === "login" && (
           <div className="bg-white rounded-3xl p-7 shadow-2xl">
-            <h2 className="font-black text-center text-lg mb-5">🪪 أدخل رقم هويتك للمشاركة</h2>
+            <h2 className="font-black text-center text-gray-800 text-lg mb-5">🪪 أدخل رقم هويتك للمشاركة</h2>
             <input type="text" inputMode="numeric" value={responderId}
-              onChange={e=>{setResponderId(e.target.value);setIdErr("");}}
-              onKeyDown={e=>e.key==="Enter"&&(responderId.trim()?setStep("form"):setIdErr("أدخل رقم الهوية"))}
+              onChange={e=>{setResponderId(e.target.value);setIdError("");}}
+              onKeyDown={e=>e.key==="Enter"&&handleLogin()}
               placeholder="رقم الهوية الوطنية"
               className="w-full px-4 py-4 rounded-2xl border-2 text-center font-black text-xl tracking-widest mb-3 focus:outline-none"
-              style={{borderColor:idErr?"#ef4444":c.br}} />
-            {idErr && <div className="text-red-500 text-sm text-center font-bold mb-3">{idErr}</div>}
-            <button onClick={()=>responderId.trim()?setStep("form"):setIdErr("أدخل رقم الهوية")}
-              className="w-full py-4 rounded-2xl font-black text-white text-base" style={{background:bg1}}>
+              style={{borderColor:idError?"#ef4444":pal.border}} />
+            {idError && <div className="text-red-500 text-sm text-center font-bold mb-3">{idError}</div>}
+            <button onClick={handleLogin}
+              className="w-full py-4 rounded-2xl font-black text-white text-base"
+              style={{background:"linear-gradient(135deg,"+pal.h1+","+pal.h2+")"}}>
               متابعة ◄
             </button>
           </div>
         )}
 
-        {step==="form" && (
+        {/* نموذج الأسئلة */}
+        {step === "form" && (
           <div className="space-y-4">
-            {survey.questions.map((q,qi)=>{
-              const ans=answers[q.id];
+            {survey.questions.map((q, qi) => {
+              const ans = answers[q.id];
               return (
-                <div key={q.id} className="bg-white rounded-2xl shadow-md overflow-hidden" style={{border:"2px solid "+c.br}}>
-                  <div className="px-4 py-3" style={{background:c.lt}}>
+                <div key={q.id} className="bg-white rounded-2xl shadow-md overflow-hidden"
+                  style={{border:"2px solid "+pal.border}}>
+                  <div className="px-4 py-3" style={{background:pal.light}}>
                     <div className="font-black text-sm text-gray-800 flex items-center gap-2">
                       {q.emoji && <span className="text-xl">{q.emoji}</span>}
                       <span>{qi+1}. {q.text}</span>
@@ -9884,63 +9913,76 @@ function SurveyRespond({ survey, onClose }) {
                     </div>
                   </div>
                   <div className="p-4">
+
+                    {/* radio */}
                     {q.type==="radio" && (
                       <div className="space-y-2">
-                        {(q.options||[]).map(o=>(
-                          <label key={o} className="flex items-center gap-3 cursor-pointer p-3 rounded-xl border-2 transition-all"
-                            style={{borderColor:ans===o?c.h2:c.br, background:ans===o?c.lt:"#fff"}}>
-                            <div className="w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center"
-                              style={{borderColor:c.h2, background:ans===o?c.h2:"transparent"}}>
-                              {ans===o && <div className="w-2 h-2 rounded-full bg-white"/>}
+                        {(q.options||[]).map(opt=>(
+                          <label key={opt}
+                            className="flex items-center gap-3 cursor-pointer p-3 rounded-xl border-2 transition-all"
+                            style={{borderColor:ans===opt?pal.h2:pal.border,background:ans===opt?pal.light:"#fff"}}>
+                            <div className="w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-all"
+                              style={{borderColor:pal.h2,background:ans===opt?pal.h2:"transparent"}}>
+                              {ans===opt && <div className="w-2 h-2 rounded-full bg-white"/>}
                             </div>
-                            <input type="radio" name={"q"+q.id} value={o} checked={ans===o} onChange={()=>setAns(q.id,o)} className="hidden"/>
-                            <span className="text-sm font-bold text-gray-700">{o}</span>
+                            <input type="radio" name={`q${q.id}`} value={opt}
+                              checked={ans===opt} onChange={()=>setAns(q.id,opt)} className="hidden" />
+                            <span className="text-sm font-bold text-gray-700">{opt}</span>
                           </label>
                         ))}
                       </div>
                     )}
+
+                    {/* checkbox */}
                     {q.type==="checkbox" && (
                       <div className="space-y-2">
-                        {(q.options||[]).map(o=>{
-                          const chk=(ans||[]).includes(o);
+                        {(q.options||[]).map(opt=>{
+                          const checked = (ans||[]).includes(opt);
                           return (
-                            <label key={o} className="flex items-center gap-3 cursor-pointer p-3 rounded-xl border-2 transition-all"
-                              style={{borderColor:chk?c.h2:c.br, background:chk?c.lt:"#fff"}}>
+                            <label key={opt}
+                              className="flex items-center gap-3 cursor-pointer p-3 rounded-xl border-2 transition-all"
+                              style={{borderColor:checked?pal.h2:pal.border,background:checked?pal.light:"#fff"}}>
                               <div className="w-5 h-5 rounded-lg border-2 flex-shrink-0 flex items-center justify-center"
-                                style={{borderColor:c.h2, background:chk?c.h2:"transparent"}}>
-                                {chk && <span className="text-white text-xs font-black">✓</span>}
+                                style={{borderColor:pal.h2,background:checked?pal.h2:"transparent"}}>
+                                {checked && <span className="text-white text-xs font-black">✓</span>}
                               </div>
-                              <input type="checkbox" checked={chk} onChange={()=>toggleChk(q.id,o)} className="hidden"/>
-                              <span className="text-sm font-bold text-gray-700">{o}</span>
+                              <input type="checkbox" checked={checked} onChange={()=>toggleCheck(q.id,opt)} className="hidden" />
+                              <span className="text-sm font-bold text-gray-700">{opt}</span>
                             </label>
                           );
                         })}
                       </div>
                     )}
+
+                    {/* text */}
                     {q.type==="text" && (
                       <textarea value={ans||""} onChange={e=>setAns(q.id,e.target.value)}
-                        placeholder="اكتب إجابتك..." rows={3}
+                        placeholder="اكتب إجابتك هنا..." rows={3}
                         className="w-full px-4 py-3 rounded-xl border-2 text-sm focus:outline-none resize-none"
-                        style={{borderColor:c.br}}/>
+                        style={{borderColor:ans?pal.h2:pal.border}} />
                     )}
+
+                    {/* scale5 */}
                     {q.type==="scale5" && (
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 flex-wrap">
                         {[1,2,3,4,5].map(n=>(
                           <button key={n} onClick={()=>setAns(q.id,n)}
-                            className="flex-1 py-3 rounded-xl border-2 font-black text-sm transition-all"
-                            style={{borderColor:ans>=n?c.h2:c.br, background:ans>=n?c.h2:"#fff", color:ans>=n?"#fff":c.h}}>
+                            className="flex-1 py-3 rounded-xl border-2 font-black text-base transition-all"
+                            style={{borderColor:ans>=n?pal.h2:pal.border,background:ans>=n?pal.h2:"#fff",color:ans>=n?"#fff":pal.h1,minWidth:48}}>
                             {"⭐".repeat(n)}
                           </button>
                         ))}
                       </div>
                     )}
+
+                    {/* yesno */}
                     {q.type==="yesno" && (
                       <div className="flex gap-3">
-                        {[{v:"نعم",i:"✅",bc:"#059669",bg:"#d1fae5"},{v:"لا",i:"❌",bc:"#dc2626",bg:"#fee2e2"}].map(o=>(
-                          <button key={o.v} onClick={()=>setAns(q.id,o.v)}
+                        {[{v:"نعم",i:"✅",c:"#059669",bg:"#d1fae5"},{v:"لا",i:"❌",c:"#dc2626",bg:"#fee2e2"}].map(opt=>(
+                          <button key={opt.v} onClick={()=>setAns(q.id,opt.v)}
                             className="flex-1 py-4 rounded-2xl font-black text-base border-2 transition-all"
-                            style={{background:ans===o.v?o.bg:"#fff", borderColor:ans===o.v?o.bc:"#e5e7eb", color:ans===o.v?o.bc:"#9ca3af"}}>
-                            {o.i} {o.v}
+                            style={{background:ans===opt.v?opt.bg:"#fff",borderColor:ans===opt.v?opt.c:"#e5e7eb",color:ans===opt.v?opt.c:"#9ca3af"}}>
+                            {opt.i} {opt.v}
                           </button>
                         ))}
                       </div>
@@ -9949,10 +9991,11 @@ function SurveyRespond({ survey, onClose }) {
                 </div>
               );
             })}
-            <button onClick={submit} disabled={busy}
+
+            <button onClick={submit} disabled={submitting}
               className="w-full py-4 rounded-2xl font-black text-white text-base shadow-xl"
-              style={{background:busy?"#9ca3af":bg1}}>
-              {busy?"⏳ جاري الإرسال...":"إرسال الإجابات 📤"}
+              style={{background:submitting?"#9ca3af":"linear-gradient(135deg,"+pal.h1+","+pal.h2+")"}}>
+              {submitting ? "⏳ جاري الإرسال..." : "إرسال الإجابات 📤"}
             </button>
           </div>
         )}
@@ -9961,47 +10004,57 @@ function SurveyRespond({ survey, onClose }) {
   );
 }
 
-// ─── صفحة الاستبيانات ───
+// ================================================================
+// ===== صفحة إدارة الاستبيانات =====
+// ================================================================
 function SurveysPage({ surveys, setSurveys, saveSurveys, isParent }) {
-  const [mode, setMode]           = useState("list");
+  const [mode, setMode]           = useState("list"); // list | build | respond
   const [editing, setEditing]     = useState(null);
   const [responding, setResponding] = useState(null);
-  const [copied, setCopied]       = useState(null);
+  const [copiedId, setCopiedId]   = useState(null);
+  const BASE_URL = window.location.origin + window.location.pathname;
 
-  const BASE = window.location.origin+window.location.pathname;
-  const getLink = (s) => BASE+"?survey="+s.id;
+  const getSurveyLink = (s) => `${BASE_URL}?survey=${s.id}`;
 
   const copyLink = (s) => {
-    navigator.clipboard.writeText(getLink(s)).then(()=>{setCopied(s.id);setTimeout(()=>setCopied(null),2000);});
+    const link = getSurveyLink(s);
+    navigator.clipboard.writeText(link).then(()=>{setCopiedId(s.id);setTimeout(()=>setCopiedId(null),2000);});
   };
   const shareWA = (s) => {
-    const msg=encodeURIComponent("🏫 *مدرسة عبيدة بن الحارث المتوسطة*\n\n📊 *"+s.title+"*\n👥 "+s.target+"\n\n📝 للمشاركة:\n"+getLink(s));
-    window.open("https://wa.me/?text="+msg,"_blank");
+    const link = getSurveyLink(s);
+    const msg = encodeURIComponent(`🏫 *مدرسة عبيدة بن الحارث المتوسطة*\n\n📊 *${s.title}*\n\n👥 موجّه إلى: ${s.target}\n\n📝 للمشاركة:\n${link}`);
+    window.open(`https://wa.me/?text=${msg}`,"_blank");
   };
 
-  const saveSv = (sv) => {
-    const ex=surveys.find(x=>x.id===sv.id);
-    const upd=ex?surveys.map(x=>x.id===sv.id?sv:x):[sv,...surveys];
-    setSurveys(upd); saveSurveys(upd); setMode("list"); setEditing(null);
+  const saveSurvey = (s) => {
+    const exists = surveys.find(x=>x.id===s.id);
+    const updated = exists ? surveys.map(x=>x.id===s.id?s:x) : [s,...surveys];
+    setSurveys(updated); saveSurveys(updated); setMode("list"); setEditing(null);
   };
-  const delSv = (id) => {
-    if(!confirm("حذف هذا الاستبيان؟")) return;
-    const upd=surveys.filter(s=>s.id!==id);
-    setSurveys(upd); saveSurveys(upd);
+  const deleteSurvey = (id) => {
+    if (!confirm("حذف هذا الاستبيان؟")) return;
+    const updated = surveys.filter(s=>s.id!==id);
+    setSurveys(updated); saveSurveys(updated);
   };
   const toggleActive = (id) => {
-    const upd=surveys.map(s=>s.id===id?{...s,active:!s.active}:s);
-    setSurveys(upd); saveSurveys(upd);
+    const updated = surveys.map(s=>s.id===id?{...s,active:!s.active}:s);
+    setSurveys(updated); saveSurveys(updated);
   };
 
-  if(mode==="build") return <SurveyBuilder survey={editing||svMkSurvey()} onSave={saveSv} onCancel={()=>{setMode("list");setEditing(null);}}/>;
-  if(mode==="respond"&&responding) return <SurveyRespond survey={responding} onClose={()=>{setMode("list");setResponding(null);}}/>;
+  if (mode==="build") return (
+    <SurveyBuilder survey={editing||mkSurvey()} onSave={saveSurvey} onCancel={()=>{setMode("list");setEditing(null);}} />
+  );
+  if (mode==="respond" && responding) return (
+    <SurveyRespond survey={responding} onClose={()=>{setMode("list");setResponding(null);}} />
+  );
 
-  const list = isParent ? surveys.filter(s=>s.active) : surveys;
+  const active = surveys.filter(s=>s.active);
+  const filtered = isParent ? active : surveys;
 
   return (
     <div dir="rtl" style={{fontFamily:"'Cairo',sans-serif"}}>
-      {/* رأس */}
+
+      {/* ── رأس الصفحة ── */}
       <div className="rounded-2xl overflow-hidden mb-6 shadow-xl text-white"
         style={{background:"linear-gradient(135deg,#4c1d95,#7c3aed,#ec4899)"}}>
         <div className="p-6">
@@ -10012,72 +10065,99 @@ function SurveysPage({ surveys, setSurveys, saveSurveys, isParent }) {
               <p className="opacity-80 text-sm">إنشاء استبيانات احترافية وجمع الآراء</p>
             </div>
           </div>
-          <div className="flex flex-wrap gap-4 items-center">
-            <div className="flex gap-4 text-sm opacity-90">
+          <div className="flex flex-wrap gap-3 items-center">
+            <div className="flex gap-4 text-sm opacity-90 flex-wrap">
               <span>📋 الإجمالي: <b>{surveys.length}</b></span>
-              <span>✅ نشط: <b>{surveys.filter(s=>s.active).length}</b></span>
-              <span>💬 إجابات: <b>{surveys.reduce((a,s)=>a+(s.responses?.length||0),0)}</b></span>
+              <span>✅ نشط: <b>{active.length}</b></span>
+              <span>💬 إجابات: <b>{surveys.reduce((acc,s)=>acc+(s.responses?.length||0),0)}</b></span>
             </div>
-            {!isParent && (
-              <button onClick={()=>{setEditing(null);setMode("build");}}
-                className="mr-auto bg-white text-purple-700 px-5 py-2.5 rounded-xl font-black text-sm hover:shadow-lg transition-all">
-                ➕ استبيان جديد
-              </button>
-            )}
+            <div className="mr-auto flex gap-2">
+              {!isParent && (
+                <button onClick={()=>{setEditing(null);setMode("build");}}
+                  className="bg-white text-purple-700 px-5 py-2.5 rounded-xl font-black text-sm hover:shadow-lg transition-all">
+                  ➕ استبيان جديد
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>
 
-      {/* القائمة */}
-      {list.length===0 ? (
+      {/* ── قائمة الاستبيانات ── */}
+      {filtered.length === 0 ? (
         <div className="bg-white rounded-2xl p-12 text-center border-2 border-dashed border-purple-100">
           <div className="text-5xl mb-3">📋</div>
           <div className="font-bold text-gray-400 mb-3">لا توجد استبيانات {isParent?"متاحة":"بعد"}</div>
-          {!isParent && <button onClick={()=>setMode("build")} className="bg-purple-600 text-white px-6 py-2.5 rounded-xl font-bold">➕ إنشاء أول استبيان</button>}
+          {!isParent && (
+            <button onClick={()=>setMode("build")}
+              className="bg-purple-600 text-white px-6 py-2.5 rounded-xl font-bold hover:bg-purple-700">
+              ➕ إنشاء أول استبيان
+            </button>
+          )}
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2">
-          {list.map(s=>{
-            const cl=SV_COLORS[s.color||0];
-            const bg1="linear-gradient(135deg,"+cl.h+","+cl.h2+")";
-            const survDate=(s.dayNum||"")+" "+(s.hijriMonth||"")+" "+(s.hijriYear||"");
+          {filtered.map(s => {
+            const pal = SURVEY_PALETTES[s.palette ?? 0];
+            const surveyDate = `${s.dayNum||""} ${s.hijriMonth||""} ${s.hijriYear||""}`;
             return (
-              <div key={s.id} className="bg-white rounded-2xl shadow-sm overflow-hidden hover:shadow-lg transition-all" style={{border:"2px solid "+cl.br}}>
-                <div className="px-5 py-4 text-white" style={{background:bg1}}>
+              <div key={s.id} className="bg-white rounded-2xl shadow-sm border overflow-hidden hover:shadow-lg transition-all"
+                style={{borderColor:pal.border}}>
+                {/* رأس البطاقة */}
+                <div className="px-5 py-4 text-white" style={{background:"linear-gradient(135deg,"+pal.h1+","+pal.h2+")"}}>
                   <div className="flex items-start justify-between gap-2 mb-2">
-                    <h3 className="font-black text-base flex-1">{s.title||"استبيان بدون عنوان"}</h3>
-                    {!s.active && <span className="text-xs px-2 py-0.5 rounded-full font-bold flex-shrink-0" style={{background:"rgba(255,255,255,.2)"}}>متوقف</span>}
+                    <h3 className="font-black text-base leading-tight flex-1">{s.title||"استبيان بدون عنوان"}</h3>
+                    {!s.active && <span className="bg-white/20 text-white text-xs px-2 py-0.5 rounded-full font-bold flex-shrink-0">متوقف</span>}
                   </div>
                   <div className="flex flex-wrap gap-3 text-xs opacity-80">
                     <span>👥 {s.target}</span>
                     <span>❓ {s.questions.length} سؤال</span>
-                    <span>📅 {survDate}</span>
+                    <span>📅 {surveyDate}</span>
                     <span>💬 {s.responses?.length||0} إجابة</span>
                     <span>{s.accessType==="free"?"🔓 مفتوح":"🪪 برقم الهوية"}</span>
                   </div>
                 </div>
+
+                {/* رابط */}
                 {!isParent && (
                   <div className="px-4 pt-3 pb-1">
-                    <div className="flex items-center gap-1.5 rounded-xl px-3 py-2 border" style={{background:cl.bg,borderColor:cl.br}}>
-                      <span className="text-xs text-gray-400 flex-1 truncate" dir="ltr">{getLink(s)}</span>
+                    <div className="flex items-center gap-1.5 rounded-xl px-3 py-2 border"
+                      style={{background:pal.bg,borderColor:pal.border}}>
+                      <span className="text-xs text-gray-400 flex-1 truncate" dir="ltr">{getSurveyLink(s)}</span>
                       <button onClick={()=>copyLink(s)}
                         className="flex-shrink-0 px-2.5 py-1 rounded-lg text-xs font-black transition-all"
-                        style={{background:copied===s.id?cl.h2:"#e5e7eb",color:copied===s.id?"#fff":"#374151"}}>
-                        {copied===s.id?"✓ تم":"📋 نسخ"}
+                        style={{background:copiedId===s.id?pal.h2:"#e5e7eb",color:copiedId===s.id?"#fff":"#374151"}}>
+                        {copiedId===s.id?"✓ تم":"📋 نسخ"}
                       </button>
                     </div>
                   </div>
                 )}
+
+                {/* أزرار */}
                 <div className="px-4 py-3 flex gap-2 flex-wrap">
                   <button onClick={()=>{setResponding(s);setMode("respond");}}
-                    className="flex-1 py-2 rounded-xl text-white text-xs font-black" style={{background:bg1}}>
+                    className="flex-1 py-2 rounded-xl text-white text-xs font-black"
+                    style={{background:"linear-gradient(135deg,"+pal.h1+","+pal.h2+")"}}>
                     📝 {isParent?"ملء الاستبيان":"معاينة"}
                   </button>
                   {!isParent && (<>
-                    <button onClick={()=>shareWA(s)} className="px-3 py-2 rounded-xl bg-green-50 text-green-700 text-xs font-black hover:bg-green-100">📲 واتساب</button>
-                    <button onClick={()=>{setEditing(s);setMode("build");}} className="px-3 py-2 rounded-xl bg-gray-100 text-gray-600 text-xs font-bold hover:bg-gray-200">✏️</button>
-                    <button onClick={()=>toggleActive(s.id)} className="px-3 py-2 rounded-xl text-xs font-bold" style={{background:s.active?cl.lt:cl.bg,color:cl.h}}>{s.active?"⏸":"▶"}</button>
-                    <button onClick={()=>delSv(s.id)} className="px-3 py-2 rounded-xl bg-red-50 text-red-500 text-xs font-bold hover:bg-red-100">🗑️</button>
+                    <button onClick={()=>shareWA(s)}
+                      className="px-3 py-2 rounded-xl bg-green-50 text-green-700 text-xs font-black hover:bg-green-100">
+                      📲 واتساب
+                    </button>
+                    <button onClick={()=>{setEditing(s);setMode("build");}}
+                      className="px-3 py-2 rounded-xl bg-gray-100 text-gray-600 text-xs font-bold hover:bg-gray-200">
+                      ✏️
+                    </button>
+                    <button onClick={()=>toggleActive(s.id)}
+                      className="px-3 py-2 rounded-xl text-xs font-bold"
+                      style={{background:s.active?pal.light:pal.bg,color:pal.h1}}>
+                      {s.active?"⏸":"▶"}
+                    </button>
+                    <button onClick={()=>deleteSurvey(s.id)}
+                      className="px-3 py-2 rounded-xl bg-red-50 text-red-500 text-xs font-bold hover:bg-red-100">
+                      🗑️
+                    </button>
                   </>)}
                 </div>
               </div>
@@ -10315,7 +10395,7 @@ function AnnouncementsPage({ announcements, setAnnouncements, saveAnnouncements,
                         <div style={{ flex:1, minWidth:0 }}>
                           <div style={{ display:"flex", alignItems:"center", gap:6, flexWrap:"wrap", marginBottom:4 }}>
                             {ann.pinned && <span style={{ fontSize:10, background:"#fef3c7", color:"#92400e", borderRadius:10, padding:"1px 7px", fontWeight:800 }}>📌 مثبّت</span>}
-                            <span style={{ fontSize:10, background: pBg[ann.priority]||"#f0fdfa", color:borderClr, borderRadius:10, padding:"1px 7px", fontWeight:800, border:"1px solid "+borderClr+"33" }}>{ann.priority}</span>
+                            <span style={{ fontSize:10, background: pBg[ann.priority]||"#f0fdfa", color:borderClr, borderRadius:10, padding:"1px 7px", fontWeight:800, border:`1px solid ${borderClr}33` }}>{ann.priority}</span>
                             <span style={{ fontSize:10, color:"#94a3b8", fontWeight:600 }}>{cIcons[ann.category]} {ann.category}</span>
                           </div>
                           <div style={{ fontSize:14, fontWeight:900, color:ann.titleColor||"#1f2937", lineHeight:1.3 }}>
@@ -13499,7 +13579,7 @@ function GradeAnalysisPage() {
                         <div className="text-xs font-bold text-gray-600 text-right flex-shrink-0" style={{width:130,fontSize:11}}>{sub.substring(0,14)}</div>
                         <div className="flex-1 h-6 rounded-lg overflow-hidden" style={{background:"#f3f4f6"}}>
                           <div className="h-full rounded-lg flex items-center justify-end pr-2 transition-all duration-700"
-                            style={{width:pct+"%", background:g.bg, border:"1px solid "+g.c+"44"}}>
+                            style={{width:pct+"%", background:g.bg, border:`1px solid ${g.c}44`}}>
                             <span className="text-xs font-black" style={{color:g.c}}>{avg}%</span>
                           </div>
                         </div>
@@ -14437,7 +14517,7 @@ function GradeAnalysisPage() {
             return (
               <>
                 {/* ملخص الفصلين */}
-                <div className="grid gap-4" style={{gridTemplateColumns:"repeat("+avSems.length+",1fr)"}}>
+                <div className="grid gap-4" style={{gridTemplateColumns:`repeat(${avSems.length},1fr)`}}>
                   {avSems.map((s,i)=>{
                     const d=semData[s]; const g=gaGradeLabel(d.overall);
                     return (
@@ -16173,7 +16253,7 @@ function AssessmentPage({ teachers: appTeachers = [] }) {
                                border:`1.5px solid ${checked?"#0e7c7b":"#d0dbe8"}`,
                                borderRadius:8, cursor:"pointer", background:checked?"#e8f8f8":"#fafcff",
                                transition:"all .15s" }}>
-                      <div style={{ width:20, height:20, border:"2px solid "+checked?"#0e7c7b":"#d0dbe8",
+                      <div style={{ width:20, height:20, border:`2px solid ${checked?"#0e7c7b":"#d0dbe8"}`,
                         borderRadius:5, display:"flex", alignItems:"center", justifyContent:"center",
                         background:checked?"#0e7c7b":"#fff", color:"#fff", fontSize:12, flexShrink:0, marginTop:1 }}>
                         {checked?"✓":""}
@@ -16646,7 +16726,7 @@ function TeacherEvalPage({ teachers = [] }) {
               onChange={e => { setLoginId(e.target.value); setLoginErr(""); }}
               onKeyDown={e => { if (e.key === "Enter") handleTeacherLogin(); }}
               placeholder="أدخل رقم هويتك"
-              style={{ width:"100%", padding:"12px 16px", borderRadius:12, border:"2px solid "+loginErr?"#ef4444":"#e2e8f0",
+              style={{ width:"100%", padding:"12px 16px", borderRadius:12, border:`2px solid ${loginErr?"#ef4444":"#e2e8f0"}`,
                        fontSize:15, textAlign:"center", fontFamily:"'Cairo',sans-serif", outline:"none", boxSizing:"border-box",
                        letterSpacing:2 }} />
             {loginErr && <div style={{ color:"#ef4444", fontSize:11, fontWeight:700, marginTop:6, textAlign:"center" }}>{loginErr}</div>}
@@ -16693,7 +16773,7 @@ function TeacherEvalPage({ teachers = [] }) {
       const c = clrs[opt] || "#7c3aed";
       return (
         <button onClick={() => setFormData(p=>({...p,[fId]:opt}))}
-          style={{ flex:1, padding:"10px 6px", borderRadius:12, border:"2px solid "+active?c:"#e2e8f0",
+          style={{ flex:1, padding:"10px 6px", borderRadius:12, border:`2px solid ${active?c:"#e2e8f0"}`,
                    background:active?c:"#f9fafb", color:active?"#fff":"#6b7280",
                    fontWeight:800, fontSize:12, cursor:"pointer", transition:"all .15s",
                    fontFamily:"'Cairo',sans-serif",
@@ -16707,7 +16787,7 @@ function TeacherEvalPage({ teachers = [] }) {
       <div dir="rtl" style={{ fontFamily:"'Cairo','Noto Naskh Arabic',sans-serif", minHeight:"100vh",
         background:"linear-gradient(180deg,#f8fafc,#f1f5f9)" }}>
         {/* رأس النموذج */}
-        <div style={{ background:"linear-gradient(135deg,"+sec.color+","+sec.color+"dd)", padding:"16px 18px 12px" }}>
+        <div style={{ background:`linear-gradient(135deg,${sec.color},${sec.color}dd)`, padding:"16px 18px 12px" }}>
           <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:12 }}>
             <div style={{ display:"flex", alignItems:"center", gap:10 }}>
               <div style={{ width:36, height:36, borderRadius:12, background:"rgba(255,255,255,0.2)",
@@ -16990,7 +17070,7 @@ function TeacherEvalPage({ teachers = [] }) {
         </div>
 
         {/* بطاقة النتيجة */}
-        <div style={{ background:"linear-gradient(135deg,"+lvl.color+","+lvl.color+"99)",
+        <div style={{ background:`linear-gradient(135deg,${lvl.color},${lvl.color}99)`,
           borderRadius:20, padding:24, marginBottom:16, color:"#fff" }}>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", flexWrap:"wrap", gap:12 }}>
             <div>
@@ -17269,7 +17349,7 @@ function TeacherEvalPage({ teachers = [] }) {
               return (
                 <div key={rec.id}
                   onClick={() => { setSelRec(rec); }}
-                  style={{ borderRadius:16, border:"1.5px solid "+lvl.brd,
+                  style={{ borderRadius:16, border:`1.5px solid ${lvl.brd}`,
                     background:lvl.bg, padding:"14px 16px", marginBottom:10,
                     cursor:"pointer", transition:"all .15s" }}
                   onMouseOver={e=>e.currentTarget.style.boxShadow="0 4px 16px rgba(0,0,0,0.1)"}
@@ -17606,7 +17686,7 @@ function LessonRecommendPage({ classList }) {
                           const fst=STATUS_OPTIONS.find(s=>s.val===f.status);
                           return fst ? (
                             <span key={i} className="text-xs px-2.5 py-1 rounded-xl font-bold"
-                              style={{background:fst.bg,color:fst.col,border:"1px solid "+fst.col+"33"}}>
+                              style={{background:fst.bg,color:fst.col,border:`1px solid ${fst.col}33`}}>
                               {fst.icon} {f.date}: {f.status}
                             </span>
                           ) : null;
@@ -17621,7 +17701,7 @@ function LessonRecommendPage({ classList }) {
                     {STATUS_OPTIONS.map(s=>(
                       <button key={s.val} onClick={()=>updateStatus(plan.id,s.val)}
                         className="text-xs px-3 py-1 rounded-xl font-bold transition-all hover:opacity-80"
-                        style={{background:plan.status===s.val?s.col:s.bg,color:plan.status===s.val?"#fff":s.col,border:"1.5px solid "+s.col+"40"}}>
+                        style={{background:plan.status===s.val?s.col:s.bg,color:plan.status===s.val?"#fff":s.col,border:`1.5px solid ${s.col}40`}}>
                         {s.icon} {s.val}
                       </button>
                     ))}
@@ -18136,7 +18216,7 @@ function OfficialFormsPage({ teachers, attendance, week }) {
   return (
     <div dir="rtl" className="space-y-4">
       {/* رأس الصفحة */}
-      <div className="rounded-b-2xl overflow-hidden shadow-xl" style={{background:"linear-gradient(135deg,"+FORM_GREEN+",#40916c)"}}>
+      <div className="rounded-b-2xl overflow-hidden shadow-xl" style={{background:`linear-gradient(135deg,${FORM_GREEN},#40916c)`}}>
         <div className="p-6 text-white">
           <h2 className="text-2xl font-black mb-1">📋 النماذج الرسمية</h2>
           <p className="opacity-80 text-sm">نماذج الدليل الإجرائي — وزارة التعليم السعودية</p>
@@ -18506,7 +18586,7 @@ function OfficialFormsPage({ teachers, attendance, week }) {
           )}
           <button onClick={printForm} disabled={!selectedTeacher}
             className="flex-1 py-4 rounded-2xl text-white font-black text-base disabled:opacity-40 transition-all hover:shadow-xl flex items-center justify-center gap-2"
-            style={{background:"linear-gradient(135deg,"+FORM_GREEN+",#40916c)"}}>
+            style={{background:`linear-gradient(135deg,${FORM_GREEN},#40916c)`}}>
             🖨️ طباعة النموذج
           </button>
         </div>
@@ -18517,7 +18597,7 @@ function OfficialFormsPage({ teachers, attendance, week }) {
         <div className="fixed inset-0 bg-black bg-opacity-55 flex items-center justify-center z-50 p-4"
           style={{ fontFamily:"'Cairo','Noto Naskh Arabic',sans-serif" }}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md" dir="rtl">
-            <div style={{ background:"linear-gradient(135deg,"+FORM_GREEN+",#40916c)", borderRadius:"16px 16px 0 0", padding:"16px 20px" }}>
+            <div style={{ background:`linear-gradient(135deg,${FORM_GREEN},#40916c)`, borderRadius:"16px 16px 0 0", padding:"16px 20px" }}>
               <div className="flex items-center justify-between">
                 <div className="text-white font-black text-base">📥 استيراد المعلمين من Excel</div>
                 <button onClick={() => setShowImportXlsx(false)}
@@ -19613,7 +19693,7 @@ function CommitteeMeetingPage({ teachers }) {
   return (
     <div dir="rtl" className="space-y-4">
       {/* رأس الصفحة */}
-      <div className="rounded-b-2xl overflow-hidden shadow-xl" style={{background:"linear-gradient(135deg,#1a3a2a,"+COM_GREEN+")"}}>
+      <div className="rounded-b-2xl overflow-hidden shadow-xl" style={{background:`linear-gradient(135deg,#1a3a2a,${COM_GREEN})`}}>
         <div className="p-6 text-white">
           <h2 className="text-2xl font-black mb-1">📋 اجتماعات اللجان والفرق</h2>
           <p className="opacity-80 text-sm">وفق الدليل التنظيمي والإجرائي — وزارة التعليم</p>
@@ -19798,7 +19878,7 @@ function CommitteeMeetingPage({ teachers }) {
           <div className="flex gap-3">
             <button onClick={saveMeeting}
               className="flex-1 py-4 rounded-2xl text-white font-black text-sm shadow-lg"
-              style={{background:"linear-gradient(135deg,"+COM_GREEN+",#2d6a4f)"}}>
+              style={{background:`linear-gradient(135deg,${COM_GREEN},#2d6a4f)`}}>
               💾 حفظ المحضر
             </button>
             <button onClick={printMeeting}
@@ -19925,7 +20005,7 @@ function CommitteeMeetingPage({ teachers }) {
           {/* زر الطباعة */}
           <div className="p-4">
             <button onClick={printMeeting} className="w-full py-3 rounded-2xl text-white font-black text-sm"
-              style={{background:"linear-gradient(135deg,"+COM_GREEN+",#2d6a4f)"}}>
+              style={{background:`linear-gradient(135deg,${COM_GREEN},#2d6a4f)`}}>
               🖨️ طباعة المحضر الرسمي بالألوان
             </button>
           </div>
@@ -24432,7 +24512,7 @@ function AbsenceStatsPage({ teachers, attendance, week, weekArchive }) {
                     </div>
                     <div className="h-3 rounded-full" style={{background:"#f3f4f6"}}>
                       <div className="h-full rounded-full transition-all duration-700"
-                        style={{width:t.rate+"%", background:"linear-gradient(to left, "+rateColor+", "+rateColor+"88)"}}/>
+                        style={{width:t.rate+"%", background:`linear-gradient(to left, ${rateColor}, ${rateColor}88)`}}/>
                     </div>
                   </div>
                 );
