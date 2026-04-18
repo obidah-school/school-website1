@@ -9492,508 +9492,605 @@ function MessagesPage({ messages, setMessages, saveMessages, isParent, parentNam
 }
 
 // ===== صفحة الاستبيانات =====
-const SURVEY_FIELD_TYPES = [
-  { value: "text",     label: "نص حر",       icon: "✍️" },
-  { value: "radio",    label: "اختيار واحد", icon: "🔘" },
-  { value: "checkbox", label: "اختيار متعدد",icon: "☑️" },
-  { value: "scale",    label: "تقييم 1-5",   icon: "⭐" },
-  { value: "yesno",    label: "نعم / لا",    icon: "✅" },
-];
-const SURVEY_THEMES = [
-  { name: "أزرق",     header: "#1e3a5f", accent: "#2563eb", bg: "#eff6ff" },
-  { name: "أخضر",    header: "#064e3b", accent: "#059669", bg: "#ecfdf5" },
-  { name: "بنفسجي",  header: "#4c1d95", accent: "#7c3aed", bg: "#f5f3ff" },
-  { name: "برتقالي", header: "#7c2d12", accent: "#ea580c", bg: "#fff7ed" },
-  { name: "وردي",    header: "#831843", accent: "#db2777", bg: "#fdf2f8" },
-  { name: "رمادي",   header: "#1f2937", accent: "#374151", bg: "#f9fafb" },
-];
-const SURVEY_FONTS = ["Tajawal","Cairo","Noto Naskh Arabic","Noto Kufi Arabic","Amiri","Reem Kufi"];
-const SURVEY_TARGETS = ["أولياء الأمور","المعلمون","الطلاب","الجميع"];
-const SURVEY_FACES = ["","😊","😁","🙂","😐","😕","😞","⭐","👍","👎","💪","🔥","💯","🌟"];
+// ================================================================
+// ===== نظام الاستبيانات — النسخة الجديدة الكاملة =====
+// ================================================================
 
-function newField() {
-  return { id: Date.now() + Math.random() * 1000 | 0, type: "radio", label: "", options: ["خيار 1","خيار 2"], required: true, emoji: "", fontSize: "text-sm" };
-}
-function newSurvey() {
-  return { id: Date.now(), title: "", description: "", target: "أولياء الأمور", theme: 0, font: "Tajawal", fields: [], active: true, responses: [], createdAt: new Date().toLocaleDateString("ar-SA") };
+// ── ثوابت الأيام والشهور ──
+const SURVEY_HIJRI_MONTHS = ["محرم","صفر","ربيع الأول","ربيع الآخر","جمادى الأولى","جمادى الآخرة","رجب","شعبان","رمضان","شوال","ذو القعدة","ذو الحجة"];
+const SURVEY_HIJRI_YEARS  = ["1446هـ","1447هـ","1448هـ","1449هـ"];
+const SURVEY_DAYS         = Array.from({length:31},(_,i)=>i+1);
+
+// ── أنواع الأسئلة ──
+const SURVEY_Q_TYPES = [
+  { val:"radio",    label:"اختيار واحد",    icon:"🔘" },
+  { val:"checkbox", label:"اختيار متعدد",   icon:"☑️"  },
+  { val:"text",     label:"نص حر",          icon:"✍️"  },
+  { val:"scale5",   label:"مقياس 1–5",      icon:"⭐"  },
+  { val:"yesno",    label:"نعم / لا",       icon:"✅"  },
+];
+
+// ── الألوان الزاهية ──
+const SURVEY_PALETTES = [
+  { name:"زهري",      h1:"#be185d", h2:"#ec4899", bg:"#fdf2f8", light:"#fce7f3", border:"#f9a8d4" },
+  { name:"بنفسجي",   h1:"#5b21b6", h2:"#8b5cf6", bg:"#f5f3ff", light:"#ede9fe", border:"#c4b5fd" },
+  { name:"أزرق",     h1:"#1e40af", h2:"#3b82f6", bg:"#eff6ff", light:"#dbeafe", border:"#93c5fd" },
+  { name:"أخضر",     h1:"#065f46", h2:"#10b981", bg:"#ecfdf5", light:"#d1fae5", border:"#6ee7b7" },
+  { name:"برتقالي",  h1:"#92400e", h2:"#f59e0b", bg:"#fffbeb", light:"#fef3c7", border:"#fcd34d" },
+  { name:"أحمر",     h1:"#991b1b", h2:"#ef4444", bg:"#fef2f2", light:"#fee2e2", border:"#fca5a5" },
+  { name:"تيل",      h1:"#134e4a", h2:"#14b8a6", bg:"#f0fdfa", light:"#ccfbf1", border:"#5eead4" },
+  { name:"توت",      h1:"#4c0519", h2:"#f43f5e", bg:"#fff1f2", light:"#ffe4e6", border:"#fda4af" },
+];
+
+const SURVEY_EMOJIS = ["😊","😁","🙂","😐","😕","😞","⭐","👍","👎","💪","🔥","💯","🌟","🎯","📚","🏫","🤝","💡","🎓","✅","❤️","🌈"];
+
+function mkSurvey() {
+  return {
+    id: Date.now(),
+    title: "",
+    dayNum: new Date().getDate(),
+    hijriMonth: SURVEY_HIJRI_MONTHS[new Date().getMonth()],
+    hijriYear: "1447هـ",
+    target: "الجميع",
+    palette: 0,
+    questions: [],
+    active: true,
+    responses: [],
+    createdAt: new Date().toLocaleDateString("ar-SA"),
+    accessType: "free", // free | id
+  };
 }
 
+function mkQuestion() {
+  return {
+    id: Date.now() + Math.random() * 1000 | 0,
+    type: "radio",
+    text: "",
+    emoji: "🔘",
+    options: ["خيار 1", "خيار 2", "خيار 3"],
+    required: true,
+  };
+}
+
+// ================================================================
+// ===== صانع الاستبيان =====
+// ================================================================
 function SurveyBuilder({ survey, onSave, onCancel }) {
   const [s, setS] = useState({ ...survey });
-  const [editingField, setEditingField] = useState(null);
+  const pal = SURVEY_PALETTES[s.palette ?? 0];
 
-  const theme = SURVEY_THEMES[s.theme];
-
-  const addField = () => {
-    const f = newField();
-    setS(p => ({ ...p, fields: [...p.fields, f] }));
-    setEditingField(f.id);
+  const addQ = () => {
+    const q = mkQuestion();
+    setS(p => ({ ...p, questions: [...p.questions, q] }));
   };
 
-  const updateField = (id, changes) => setS(p => ({ ...p, fields: p.fields.map(f => f.id === id ? { ...f, ...changes } : f) }));
-  const removeField = (id) => setS(p => ({ ...p, fields: p.fields.filter(f => f.id !== id) }));
-  const moveField = (id, dir) => {
-    const idx = s.fields.findIndex(f => f.id === id);
-    if (idx + dir < 0 || idx + dir >= s.fields.length) return;
-    const arr = [...s.fields];
-    [arr[idx], arr[idx + dir]] = [arr[idx + dir], arr[idx]];
-    setS(p => ({ ...p, fields: arr }));
+  const updQ = (id, changes) =>
+    setS(p => ({ ...p, questions: p.questions.map(q => q.id===id ? {...q,...changes} : q) }));
+
+  const delQ = (id) =>
+    setS(p => ({ ...p, questions: p.questions.filter(q => q.id !== id) }));
+
+  const moveQ = (id, dir) => {
+    const arr = [...s.questions];
+    const i = arr.findIndex(q => q.id===id);
+    if (i+dir < 0 || i+dir >= arr.length) return;
+    [arr[i], arr[i+dir]] = [arr[i+dir], arr[i]];
+    setS(p => ({ ...p, questions: arr }));
+  };
+
+  const addOpt = (qid) => updQ(qid, { options: [...s.questions.find(q=>q.id===qid).options, `خيار ${s.questions.find(q=>q.id===qid).options.length+1}`] });
+  const updOpt = (qid, oi, val) => {
+    const opts = [...s.questions.find(q=>q.id===qid).options];
+    opts[oi] = val;
+    updQ(qid, { options: opts });
+  };
+  const delOpt = (qid, oi) => {
+    const opts = s.questions.find(q=>q.id===qid).options.filter((_,i)=>i!==oi);
+    updQ(qid, { options: opts });
   };
 
   return (
-    <div className="bg-white rounded-b-2xl shadow-xl border border-gray-100 overflow-hidden">
-      {/* رأس البناء */}
-      <div className="px-6 py-4 flex items-center justify-between" style={{ background: theme.header }}>
-        <span className="font-black text-white text-lg">🛠️ {survey.id ? "تعديل الاستبيان" : "استبيان جديد"}</span>
-        <div className="flex gap-2">
-          <button onClick={() => onSave(s)} className="bg-green-400 text-white px-4 py-2 rounded-xl text-sm font-black hover:bg-green-500">💾 حفظ</button>
-          <button onClick={onCancel} className="bg-white bg-opacity-20 text-white px-3 py-2 rounded-xl text-sm font-bold hover:bg-opacity-30">✕ إلغاء</button>
-        </div>
-      </div>
+    <div dir="rtl" style={{fontFamily:"'Cairo',sans-serif"}}>
+      <style>{`
+        .sq-card{background:#fff;border-radius:16px;border:2px solid ${pal.border};margin-bottom:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.07);}
+        .sq-hdr{padding:10px 14px;font-weight:900;font-size:13px;color:#fff;display:flex;align-items:center;justify-content:space-between;background:linear-gradient(135deg,${pal.h1},${pal.h2});}
+        input.sq-in,textarea.sq-ta{border:2px solid ${pal.border};border-radius:10px;padding:8px 12px;font-size:13px;font-family:'Cairo',sans-serif;width:100%;outline:none;}
+        input.sq-in:focus,textarea.sq-ta:focus{border-color:${pal.h2};}
+        .sq-btn{border:none;border-radius:10px;padding:7px 16px;font-weight:900;font-size:12px;cursor:pointer;font-family:'Cairo',sans-serif;transition:all .15s;}
+      `}</style>
 
-      <div className="p-5 space-y-5" style={{ background: theme.bg, fontFamily: s.font }}>
-        {/* معلومات الاستبيان */}
-        <div className="bg-white rounded-2xl p-4 space-y-3 shadow-sm">
-          <h4 className="font-black text-gray-700 text-sm mb-3">📋 معلومات الاستبيان</h4>
-          <input value={s.title} onChange={e => setS(p => ({ ...p, title: e.target.value }))}
-            placeholder="عنوان الاستبيان *" style={{ fontFamily: s.font }}
-            className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 text-base font-black focus:outline-none focus:border-blue-400" />
-          <textarea value={s.description} onChange={e => setS(p => ({ ...p, description: e.target.value }))}
-            rows={2} placeholder="وصف أو مقدمة الاستبيان (اختياري)" style={{ fontFamily: s.font }}
-            className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 text-sm focus:outline-none focus:border-blue-400 resize-none" />
+      {/* رأس البناء */}
+      <div className="rounded-2xl overflow-hidden shadow-xl mb-4" style={{background:`linear-gradient(135deg,${pal.h1},${pal.h2})`}}>
+        <div className="flex items-center justify-between px-5 py-4">
+          <span className="font-black text-white text-lg">🛠️ {s.id===survey.id && s.title ? "تعديل الاستبيان" : "استبيان جديد"}</span>
+          <div className="flex gap-2">
+            <button onClick={addQ}
+              className="sq-btn text-white flex items-center gap-1.5"
+              style={{background:"rgba(255,255,255,.2)",border:"1.5px solid rgba(255,255,255,.4)"}}>
+              ➕ إضافة سؤال
+            </button>
+            <button onClick={()=>onSave(s)}
+              className="sq-btn" style={{background:"#22c55e",color:"#fff"}}>💾 حفظ</button>
+            <button onClick={onCancel}
+              className="sq-btn" style={{background:"rgba(255,255,255,.2)",color:"#fff",border:"1.5px solid rgba(255,255,255,.3)"}}>✕</button>
+          </div>
+        </div>
+
+        {/* إعدادات عامة */}
+        <div className="px-5 pb-5 space-y-3" style={{background:"rgba(0,0,0,.2)"}}>
+          <input value={s.title} onChange={e=>setS(p=>({...p,title:e.target.value}))}
+            placeholder="✏️ عنوان الاستبيان *"
+            className="sq-in text-white font-black text-base placeholder-white/50"
+            style={{background:"rgba(255,255,255,.12)",borderColor:"rgba(255,255,255,.3)",color:"#fff"}} />
+
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {/* اليوم */}
             <div>
-              <label className={cx.label}>الفئة المستهدفة</label>
-              <select value={s.target} onChange={e => setS(p => ({ ...p, target: e.target.value }))} style={{ fontFamily: s.font }}
-                className={cx.input}>
-                {SURVEY_TARGETS.map(t => <option key={t} value={t}>{t}</option>)}
+              <label className="text-xs font-bold text-white/70 mb-1 block">اليوم</label>
+              <select value={s.dayNum||1} onChange={e=>setS(p=>({...p,dayNum:Number(e.target.value)}))}
+                className="w-full px-3 py-2 rounded-xl border border-white/30 bg-white/15 text-white text-xs font-bold focus:outline-none">
+                {SURVEY_DAYS.map(d=><option key={d} value={d} style={{color:"#000"}}>{d}</option>)}
               </select>
             </div>
+            {/* الشهر الهجري */}
             <div>
-              <label className={cx.label}>الخط</label>
-              <select value={s.font} onChange={e => setS(p => ({ ...p, font: e.target.value }))}
-                className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 text-sm focus:outline-none">
-                {SURVEY_FONTS.map(f => <option key={f} value={f} style={{ fontFamily: f }}>{f}</option>)}
+              <label className="text-xs font-bold text-white/70 mb-1 block">الشهر الهجري</label>
+              <select value={s.hijriMonth||"شوال"} onChange={e=>setS(p=>({...p,hijriMonth:e.target.value}))}
+                className="w-full px-3 py-2 rounded-xl border border-white/30 bg-white/15 text-white text-xs font-bold focus:outline-none">
+                {SURVEY_HIJRI_MONTHS.map(m=><option key={m} value={m} style={{color:"#000"}}>{m}</option>)}
               </select>
             </div>
-            <div className="col-span-2">
-              <label className={cx.label}>لون الاستبيان</label>
-              <div className="flex gap-1.5">
-                {SURVEY_THEMES.map((t, i) => (
-                  <button key={i} onClick={() => setS(p => ({ ...p, theme: i }))}
-                    className="w-8 h-8 rounded-full border-4 transition-all"
-                    title={t.name}
-                    style={{ background: t.accent, borderColor: s.theme === i ? "#fff" : "transparent", outline: s.theme === i ? `2px solid ${t.accent}` : "none" }} />
+            {/* السنة */}
+            <div>
+              <label className="text-xs font-bold text-white/70 mb-1 block">السنة الهجرية</label>
+              <select value={s.hijriYear||"1447هـ"} onChange={e=>setS(p=>({...p,hijriYear:e.target.value}))}
+                className="w-full px-3 py-2 rounded-xl border border-white/30 bg-white/15 text-white text-xs font-bold focus:outline-none">
+                {SURVEY_HIJRI_YEARS.map(y=><option key={y} value={y} style={{color:"#000"}}>{y}</option>)}
+              </select>
+            </div>
+            {/* الفئة المستهدفة */}
+            <div>
+              <label className="text-xs font-bold text-white/70 mb-1 block">الفئة المستهدفة</label>
+              <select value={s.target||"الجميع"} onChange={e=>setS(p=>({...p,target:e.target.value}))}
+                className="w-full px-3 py-2 rounded-xl border border-white/30 bg-white/15 text-white text-xs font-bold focus:outline-none">
+                {["الطلاب","أولياء الأمور","المعلمون","الإداريون","الجميع"].map(t=><option key={t} value={t} style={{color:"#000"}}>{t}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            {/* نوع الوصول */}
+            <div>
+              <label className="text-xs font-bold text-white/70 mb-1 block">🔐 نوع الوصول</label>
+              <div className="flex gap-2">
+                {[{val:"free",l:"🔓 مفتوح (بدون هوية)"},{val:"id",l:"🪪 برقم الهوية"}].map(opt=>(
+                  <button key={opt.val} onClick={()=>setS(p=>({...p,accessType:opt.val}))}
+                    className="flex-1 py-2 rounded-xl text-xs font-black border-2 transition-all"
+                    style={{background:s.accessType===opt.val?"rgba(255,255,255,.25)":"transparent",color:"#fff",borderColor:s.accessType===opt.val?"rgba(255,255,255,.6)":"rgba(255,255,255,.2)"}}>
+                    {opt.l}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {/* اللون */}
+            <div>
+              <label className="text-xs font-bold text-white/70 mb-1 block">🎨 لون الاستبيان</label>
+              <div className="flex gap-1.5 flex-wrap">
+                {SURVEY_PALETTES.map((p,i)=>(
+                  <button key={i} onClick={()=>setS(prev=>({...prev,palette:i}))}
+                    className="w-7 h-7 rounded-full border-4 transition-transform hover:scale-110"
+                    style={{background:`linear-gradient(135deg,${p.h1},${p.h2})`,borderColor:s.palette===i?"#fff":"transparent"}} />
                 ))}
               </div>
             </div>
           </div>
         </div>
+      </div>
 
-        {/* الحقول */}
-        <div className="space-y-3">
-          {s.fields.map((field, fi) => (
-            <div key={field.id} className="bg-white rounded-2xl border-2 shadow-sm overflow-hidden"
-              style={{ borderColor: editingField === field.id ? theme.accent : "#e5e7eb" }}>
-              {/* رأس الحقل */}
-              <div className="flex items-center justify-between px-4 py-2.5" style={{ background: editingField === field.id ? theme.accent : "#f9fafb" }}>
-                <div className="flex items-center gap-2">
-                  <span className="text-base">{SURVEY_FIELD_TYPES.find(t => t.value === field.type)?.icon}</span>
-                  <span className={`font-bold text-sm ${editingField === field.id ? "text-white" : "text-gray-700"}`}>
-                    {field.label || `سؤال ${fi + 1}`}
-                  </span>
-                  {field.emoji && <span className="text-base">{field.emoji}</span>}
+      {/* الأسئلة */}
+      <div className="space-y-3">
+        {s.questions.length === 0 && (
+          <div className="text-center py-10 rounded-2xl border-2 border-dashed" style={{borderColor:pal.border,background:pal.light}}>
+            <div className="text-4xl mb-2">❓</div>
+            <div className="font-black text-sm" style={{color:pal.h1}}>لا توجد أسئلة بعد</div>
+            <div className="text-xs opacity-60 mt-1">اضغط "➕ إضافة سؤال" في الأعلى</div>
+          </div>
+        )}
+
+        {s.questions.map((q, qi) => (
+          <div key={q.id} className="sq-card">
+            <div className="sq-hdr">
+              <div className="flex items-center gap-2">
+                <span className="text-lg">{SURVEY_Q_TYPES.find(t=>t.val===q.type)?.icon}</span>
+                <span>س{qi+1}: {q.text || "سؤال جديد"}</span>
+                {q.required && <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full">إجباري</span>}
+              </div>
+              <div className="flex gap-1">
+                <button onClick={()=>moveQ(q.id,-1)} className="text-white/70 hover:text-white px-1.5 text-sm">↑</button>
+                <button onClick={()=>moveQ(q.id, 1)} className="text-white/70 hover:text-white px-1.5 text-sm">↓</button>
+                <button onClick={()=>delQ(q.id)} className="text-white/70 hover:text-red-300 px-1.5 text-sm">🗑️</button>
+              </div>
+            </div>
+
+            <div className="p-4 space-y-3" style={{background:pal.bg}}>
+              {/* نص السؤال */}
+              <input value={q.text} onChange={e=>updQ(q.id,{text:e.target.value})}
+                placeholder="اكتب نص السؤال هنا..."
+                className="sq-in font-bold" />
+
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {/* نوع الإجابة */}
+                <div>
+                  <label className="text-xs font-black text-gray-500 mb-1 block">نوع الإجابة</label>
+                  <select value={q.type} onChange={e=>updQ(q.id,{type:e.target.value})}
+                    className="w-full px-3 py-2 rounded-xl border-2 text-xs font-bold focus:outline-none bg-white"
+                    style={{borderColor:pal.border}}>
+                    {SURVEY_Q_TYPES.map(t=><option key={t.val} value={t.val}>{t.icon} {t.label}</option>)}
+                  </select>
                 </div>
-                <div className="flex gap-1">
-                  <button onClick={() => moveField(field.id, -1)} className="text-gray-400 hover:text-gray-600 px-1 text-sm">↑</button>
-                  <button onClick={() => moveField(field.id,  1)} className="text-gray-400 hover:text-gray-600 px-1 text-sm">↓</button>
-                  <button onClick={() => setEditingField(editingField === field.id ? null : field.id)}
-                    className={`px-2 py-0.5 rounded-lg text-xs font-bold transition-all ${editingField === field.id ? "bg-white text-gray-700" : "bg-gray-200 text-gray-600 hover:bg-gray-300"}`}>
-                    {editingField === field.id ? "✕ إغلاق" : "✏️ تعديل"}
-                  </button>
-                  <button onClick={() => removeField(field.id)} className="text-red-400 hover:text-red-600 px-1 text-sm">🗑️</button>
+                {/* إيموجي */}
+                <div>
+                  <label className="text-xs font-black text-gray-500 mb-1 block">رمز تعبيري</label>
+                  <select value={q.emoji||""} onChange={e=>updQ(q.id,{emoji:e.target.value})}
+                    className="w-full px-3 py-2 rounded-xl border-2 text-sm font-bold focus:outline-none bg-white"
+                    style={{borderColor:pal.border}}>
+                    <option value="">بدون</option>
+                    {SURVEY_EMOJIS.map(e=><option key={e} value={e}>{e}</option>)}
+                  </select>
+                </div>
+                {/* إجباري */}
+                <div className="flex items-end pb-1">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={q.required} onChange={e=>updQ(q.id,{required:e.target.checked})} className="w-4 h-4" />
+                    <span className="text-xs font-black text-gray-600">إجباري</span>
+                  </label>
                 </div>
               </div>
 
-              {/* تعديل الحقل */}
-              {editingField === field.id && (
-                <div className="p-4 space-y-3 border-t border-gray-100">
-                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                    <div>
-                      <label className={cx.label}>نص السؤال</label>
-                      <input value={field.label} onChange={e => updateField(field.id, { label: e.target.value })}
-                        placeholder="اكتب السؤال..." style={{ fontFamily: s.font }}
-                        className={cx.input} />
-                    </div>
-                    <div>
-                      <label className={cx.label}>نوع الإجابة</label>
-                      <select value={field.type} onChange={e => updateField(field.id, { type: e.target.value })}
-                        className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 text-sm focus:outline-none">
-                        {SURVEY_FIELD_TYPES.map(t => <option key={t.value} value={t.value}>{t.icon} {t.label}</option>)}
-                      </select>
-                    </div>
-                    <div>
-                      <label className={cx.label}>حجم الخط</label>
-                      <select value={field.fontSize || "text-sm"} onChange={e => updateField(field.id, { fontSize: e.target.value })}
-                        className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 text-sm focus:outline-none">
-                        <option value="text-xs">صغير</option>
-                        <option value="text-sm">متوسط</option>
-                        <option value="text-base">كبير</option>
-                        <option value="text-lg">كبير جداً</option>
-                      </select>
-                    </div>
-                  </div>
-                  {/* إيموجي */}
-                  <div>
-                    <label className="text-xs font-bold text-gray-500 mb-1.5 block">رمز تعبيري</label>
-                    <div className="flex gap-1.5 flex-wrap">
-                      {SURVEY_FACES.map(f => (
-                        <button key={f} onClick={() => updateField(field.id, { emoji: f === field.emoji ? "" : f })}
-                          className="w-8 h-8 rounded-lg text-base flex items-center justify-center border-2 transition-all"
-                          style={{ background: field.emoji === f ? "#dbeafe" : "#f3f4f6", borderColor: field.emoji === f ? "#3b82f6" : "transparent" }}>
-                          {f || "✕"}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  {/* خيارات radio/checkbox */}
-                  {(field.type === "radio" || field.type === "checkbox") && (
-                    <div>
-                      <label className="text-xs font-bold text-gray-500 mb-2 block">الخيارات</label>
-                      <div className="space-y-2">
-                        {(field.options || []).map((opt, oi) => (
-                          <div key={oi} className="flex gap-2 items-center">
-                            <span className="text-gray-400 text-xs w-4">{oi + 1}</span>
-                            <input value={opt} onChange={e => { const opts = [...field.options]; opts[oi] = e.target.value; updateField(field.id, { options: opts }); }}
-                              style={{ fontFamily: s.font }}
-                              className="flex-1 px-3 py-1.5 rounded-lg border-2 border-gray-200 text-sm focus:outline-none focus:border-blue-400" />
-                            <button onClick={() => updateField(field.id, { options: field.options.filter((_, i) => i !== oi) })}
-                              className="text-red-400 hover:text-red-600 text-sm px-1">✕</button>
-                          </div>
-                        ))}
-                        <button onClick={() => updateField(field.id, { options: [...(field.options || []), `خيار ${(field.options?.length || 0) + 1}`] })}
-                          className="text-blue-600 text-xs font-bold hover:underline">+ إضافة خيار</button>
+              {/* خيارات radio/checkbox */}
+              {(q.type==="radio" || q.type==="checkbox") && (
+                <div>
+                  <label className="text-xs font-black text-gray-500 mb-2 block">الخيارات</label>
+                  <div className="space-y-2">
+                    {(q.options||[]).map((opt,oi)=>(
+                      <div key={oi} className="flex gap-2 items-center">
+                        <span className="text-xs font-black w-5 text-center" style={{color:pal.h2}}>{oi+1}</span>
+                        <input value={opt} onChange={e=>updOpt(q.id,oi,e.target.value)}
+                          className="flex-1 px-3 py-1.5 rounded-lg border-2 text-sm focus:outline-none bg-white"
+                          style={{borderColor:pal.border}} />
+                        <button onClick={()=>delOpt(q.id,oi)} className="text-red-400 hover:text-red-600 text-sm px-1">✕</button>
                       </div>
-                    </div>
-                  )}
-                  <label className="flex items-center gap-2 text-sm cursor-pointer">
-                    <input type="checkbox" checked={field.required} onChange={e => updateField(field.id, { required: e.target.checked })} />
-                    <span className="font-bold text-gray-600">إجباري</span>
-                  </label>
-                </div>
-              )}
-
-              {/* معاينة الحقل */}
-              {editingField !== field.id && field.label && (
-                <div className="px-4 py-3">
-                  <div className={`font-bold text-gray-700 mb-2 flex items-center gap-2 ${field.fontSize || "text-sm"}`} style={{ fontFamily: s.font }}>
-                    {field.emoji && <span>{field.emoji}</span>}
-                    {field.label}
-                    {field.required && <span className="text-red-500 text-xs">*</span>}
+                    ))}
+                    <button onClick={()=>addOpt(q.id)}
+                      className="text-xs font-black hover:underline mt-1" style={{color:pal.h2}}>
+                      ➕ إضافة خيار
+                    </button>
                   </div>
-                  {field.type === "text" && <div className="h-9 rounded-xl border-2 border-dashed border-gray-200 bg-gray-50" />}
-                  {(field.type === "radio" || field.type === "checkbox") && (
-                    <div className="flex flex-wrap gap-2">
-                      {(field.options || []).map((o, i) => (
-                        <span key={i} className="px-3 py-1.5 rounded-full text-xs border-2 border-gray-200 text-gray-500" style={{ fontFamily: s.font }}>{o}</span>
-                      ))}
-                    </div>
-                  )}
-                  {field.type === "scale" && (
-                    <div className="flex gap-1">
-                      {[1,2,3,4,5].map(n => <span key={n} className="w-9 h-9 rounded-xl border-2 border-gray-200 text-gray-400 text-sm flex items-center justify-center font-bold">{"⭐".repeat(n).slice(-1)}{n}</span>)}
-                    </div>
-                  )}
-                  {field.type === "yesno" && (
-                    <div className="flex gap-2">
-                      <span className="px-5 py-2 rounded-xl border-2 border-green-200 text-green-600 text-sm font-bold">✅ نعم</span>
-                      <span className="px-5 py-2 rounded-xl border-2 border-red-200 text-red-500 text-sm font-bold">❌ لا</span>
-                    </div>
-                  )}
                 </div>
               )}
             </div>
-          ))}
-        </div>
+          </div>
+        ))}
+      </div>
 
-        {/* زر إضافة سؤال */}
-        <button onClick={addField}
-          className="w-full py-3 rounded-2xl border-2 border-dashed font-black text-sm hover:opacity-90 transition-all"
-          style={{ borderColor: theme.accent, color: theme.accent, background: theme.bg }}>
+      {/* زر إضافة سؤال في الأسفل */}
+      {s.questions.length > 0 && (
+        <button onClick={addQ}
+          className="w-full py-3 rounded-2xl border-2 border-dashed font-black text-sm mt-2 hover:opacity-80 transition-all"
+          style={{borderColor:pal.h2,color:pal.h2,background:pal.light}}>
           ➕ إضافة سؤال جديد
         </button>
-      </div>
+      )}
     </div>
   );
 }
 
-function SurveyRespond({ survey, onClose }) {
+// ================================================================
+// ===== ملء الاستبيان (للطلاب / أولياء الأمور / المعلمين) =====
+// ================================================================
+function SurveyRespond({ survey, onClose, prefillId }) {
+  const pal = SURVEY_PALETTES[survey.palette ?? 0];
+  const [responderId, setResponderId] = useState(prefillId || "");
+  const [step, setStep] = useState(survey.accessType === "free" ? "form" : "login");
+  const [idError, setIdError] = useState("");
   const [answers, setAnswers] = useState({});
+  const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
-  const theme = SURVEY_THEMES[survey.theme ?? 0];
 
-  const setAns = (fid, val) => setAnswers(p => ({ ...p, [fid]: val }));
-  const toggleCheck = (fid, opt) => {
-    const cur = answers[fid] || [];
-    setAns(fid, cur.includes(opt) ? cur.filter(x => x !== opt) : [...cur, opt]);
+  const surveyDate = `${survey.dayNum||""} ${survey.hijriMonth||""} ${survey.hijriYear||""}`;
+
+  const setAns = (qid, val) => setAnswers(p=>({...p,[qid]:val}));
+  const toggleCheck = (qid, opt) => {
+    const cur = answers[qid] || [];
+    setAns(qid, cur.includes(opt) ? cur.filter(x=>x!==opt) : [...cur, opt]);
   };
 
-  const submit = () => {
-    const missing = survey.fields.filter(f => f.required && !answers[f.id]);
-    if (missing.length > 0) { alert(`يرجى الإجابة على: ${missing.map(f => f.label).join("، ")}`); return; }
-    setSubmitted(true);
+  const handleLogin = () => {
+    if (!responderId.trim()) { setIdError("أدخل رقم هويتك"); return; }
+    setIdError("");
+    setStep("form");
+  };
+
+  const submit = async () => {
+    const missing = survey.questions.filter(q => q.required && (
+      answers[q.id] === undefined || answers[q.id] === "" ||
+      (Array.isArray(answers[q.id]) && answers[q.id].length === 0)
+    ));
+    if (missing.length > 0) {
+      alert(`يرجى الإجابة على: ${missing.map((q,i)=>`س${survey.questions.indexOf(q)+1}`).join("، ")}`);
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const existing = await DB.get("school-surveys", []);
+      const arr = Array.isArray(existing) ? existing : [];
+      const updated = arr.map(s => {
+        if (s.id !== survey.id) return s;
+        const resp = {
+          id: Date.now(),
+          responderId: responderId || "مجهول",
+          answers,
+          submittedAt: new Date().toISOString(),
+        };
+        return { ...s, responses: [...(s.responses||[]), resp] };
+      });
+      await DB.set("school-surveys", updated);
+      setSubmitted(true);
+    } catch { alert("حدث خطأ، حاول مجدداً"); }
+    setSubmitting(false);
   };
 
   if (submitted) return (
-    <div className="bg-white rounded-3xl p-10 text-center shadow-xl border border-gray-100">
-      <div className="text-6xl mb-4">🎉</div>
-      <h3 className="font-black text-gray-800 text-xl mb-2">شكراً لمشاركتك!</h3>
-      <p className="text-gray-500 text-sm mb-5">تم استلام إجابتك بنجاح وسيتم مراجعتها من قِبل الإدارة</p>
-      <button onClick={onClose} className="px-6 py-2.5 rounded-xl text-white font-bold" style={{ background: theme.accent }}>العودة</button>
+    <div className="min-h-screen flex items-center justify-center p-4"
+      style={{background:`linear-gradient(135deg,${pal.h1},${pal.h2})`}}>
+      <div className="bg-white rounded-3xl p-10 shadow-2xl text-center max-w-sm w-full">
+        <div className="text-7xl mb-4">🎉</div>
+        <h3 className="font-black text-2xl text-gray-800 mb-2">شكراً لمشاركتك!</h3>
+        <p className="text-gray-500 text-sm mb-6">تم استلام إجابتك بنجاح</p>
+        <button onClick={onClose}
+          className="w-full py-3 rounded-2xl font-black text-white"
+          style={{background:`linear-gradient(135deg,${pal.h1},${pal.h2})`}}>
+          العودة
+        </button>
+      </div>
     </div>
   );
 
   return (
-    <div className="rounded-b-2xl overflow-hidden shadow-xl border border-gray-100" style={{ background: theme.bg, fontFamily: survey.font || "Tajawal" }}>
-      <div className="px-6 py-5 text-white" style={{ background: `linear-gradient(135deg, ${theme.header}, ${theme.accent})` }}>
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h3 className="font-black text-xl mb-1">{survey.title}</h3>
-            {survey.description && <p className="opacity-80 text-sm">{survey.description}</p>}
-          </div>
-          <button onClick={onClose} className="text-white opacity-60 hover:opacity-100 text-xl font-bold flex-shrink-0">✕</button>
+    <div className="min-h-screen" dir="rtl"
+      style={{background:`linear-gradient(160deg,${pal.h1} 0%,${pal.h2} 60%,${pal.bg} 100%)`,fontFamily:"'Cairo',sans-serif"}}>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;800;900&display=swap');`}</style>
+
+      {/* رأس الصفحة */}
+      <div className="text-center text-white pt-10 pb-6 px-4 relative">
+        <button onClick={onClose} className="absolute right-4 top-4 bg-white/20 text-white px-3 py-1.5 rounded-xl text-xs font-bold">← رجوع</button>
+        <div className="w-20 h-20 rounded-3xl mx-auto mb-3 flex items-center justify-center text-4xl shadow-xl"
+          style={{background:"rgba(255,255,255,.18)",backdropFilter:"blur(10px)"}}>
+          📊
         </div>
-        <div className="mt-3 flex gap-3 text-xs opacity-80">
+        <h1 className="text-2xl font-black mb-1">{survey.title}</h1>
+        <div className="flex justify-center gap-3 text-xs opacity-75 mt-2 flex-wrap">
           <span>👥 {survey.target}</span>
-          <span>📅 {survey.createdAt}</span>
-          <span>❓ {survey.fields.length} سؤال</span>
+          <span>📅 {surveyDate}</span>
+          <span>❓ {survey.questions.length} سؤال</span>
         </div>
       </div>
-      <div className="p-5 space-y-4">
-        {survey.fields.map((field, fi) => (
-          <div key={field.id} className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
-            <div className={`font-bold text-gray-800 mb-3 flex items-center gap-2 ${field.fontSize || "text-sm"}`}>
-              {field.emoji && <span className="text-lg">{field.emoji}</span>}
-              <span>{fi + 1}. {field.label}</span>
-              {field.required && <span className="text-red-500 text-xs mr-1">*</span>}
-            </div>
-            {field.type === "text" && (
-              <textarea rows={3} value={answers[field.id] || ""} onChange={e => setAns(field.id, e.target.value)}
-                placeholder="اكتب إجابتك هنا..."
-                className="w-full px-3 py-2.5 rounded-xl border-2 border-gray-200 text-sm focus:outline-none resize-none"
-                style={{ borderColor: answers[field.id] ? theme.accent : undefined, fontFamily: survey.font }} />
-            )}
-            {(field.type === "radio") && (
-              <div className="space-y-2">
-                {(field.options || []).map(opt => (
-                  <label key={opt} className="flex items-center gap-3 cursor-pointer p-2.5 rounded-xl border-2 transition-all hover:border-blue-200"
-                    style={{ borderColor: answers[field.id] === opt ? theme.accent : "#e5e7eb", background: answers[field.id] === opt ? theme.bg : "white" }}>
-                    <input type="radio" name={`f${field.id}`} value={opt} checked={answers[field.id] === opt} onChange={() => setAns(field.id, opt)} className="sr-only" />
-                    <div className="w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0"
-                      style={{ borderColor: answers[field.id] === opt ? theme.accent : "#d1d5db", background: answers[field.id] === opt ? theme.accent : "white" }}>
-                      {answers[field.id] === opt && <div className="w-2 h-2 rounded-full bg-white" />}
-                    </div>
-                    <span className="text-sm font-medium text-gray-700" style={{ fontFamily: survey.font }}>{opt}</span>
-                  </label>
-                ))}
-              </div>
-            )}
-            {(field.type === "checkbox") && (
-              <div className="space-y-2">
-                {(field.options || []).map(opt => {
-                  const checked = (answers[field.id] || []).includes(opt);
-                  return (
-                    <label key={opt} className="flex items-center gap-3 cursor-pointer p-2.5 rounded-xl border-2 transition-all hover:border-blue-200"
-                      style={{ borderColor: checked ? theme.accent : "#e5e7eb", background: checked ? theme.bg : "white" }}>
-                      <input type="checkbox" checked={checked} onChange={() => toggleCheck(field.id, opt)} className="sr-only" />
-                      <div className="w-5 h-5 rounded-lg border-2 flex items-center justify-center flex-shrink-0"
-                        style={{ borderColor: checked ? theme.accent : "#d1d5db", background: checked ? theme.accent : "white" }}>
-                        {checked && <span className="text-white text-xs font-black">✓</span>}
-                      </div>
-                      <span className="text-sm font-medium text-gray-700" style={{ fontFamily: survey.font }}>{opt}</span>
-                    </label>
-                  );
-                })}
-              </div>
-            )}
-            {field.type === "scale" && (
-              <div className="flex gap-2">
-                {[1,2,3,4,5].map(n => (
-                  <button key={n} onClick={() => setAns(field.id, n)}
-                    className="flex-1 py-3 rounded-xl border-2 font-black text-sm transition-all"
-                    style={{ borderColor: answers[field.id] === n ? theme.accent : "#e5e7eb", background: answers[field.id] === n ? theme.accent : "white", color: answers[field.id] === n ? "white" : "#374151" }}>
-                    {"⭐".repeat(n)}
-                  </button>
-                ))}
-              </div>
-            )}
-            {field.type === "yesno" && (
-              <div className="flex gap-3">
-                {[["نعم","✅","#dcfce7","#16a34a"], ["لا","❌","#fee2e2","#dc2626"]].map(([opt, icon, bg, col]) => (
-                  <button key={opt} onClick={() => setAns(field.id, opt)}
-                    className="flex-1 py-3 rounded-xl border-2 font-black text-sm transition-all"
-                    style={{ borderColor: answers[field.id] === opt ? col : "#e5e7eb", background: answers[field.id] === opt ? bg : "white", color: answers[field.id] === opt ? col : "#9ca3af" }}>
-                    {icon} {opt}
-                  </button>
-                ))}
-              </div>
-            )}
+
+      <div className="px-4 pb-10 max-w-lg mx-auto">
+
+        {/* شاشة تسجيل الدخول برقم الهوية */}
+        {step === "login" && (
+          <div className="bg-white rounded-3xl p-7 shadow-2xl">
+            <h2 className="font-black text-center text-gray-800 text-lg mb-5">🪪 أدخل رقم هويتك للمشاركة</h2>
+            <input type="text" inputMode="numeric" value={responderId}
+              onChange={e=>{setResponderId(e.target.value);setIdError("");}}
+              onKeyDown={e=>e.key==="Enter"&&handleLogin()}
+              placeholder="رقم الهوية الوطنية"
+              className="w-full px-4 py-4 rounded-2xl border-2 text-center font-black text-xl tracking-widest mb-3 focus:outline-none"
+              style={{borderColor:idError?"#ef4444":pal.border}} />
+            {idError && <div className="text-red-500 text-sm text-center font-bold mb-3">{idError}</div>}
+            <button onClick={handleLogin}
+              className="w-full py-4 rounded-2xl font-black text-white text-base"
+              style={{background:`linear-gradient(135deg,${pal.h1},${pal.h2})`}}>
+              متابعة ◄
+            </button>
           </div>
-        ))}
-        <button onClick={submit}
-          className="w-full py-4 rounded-2xl text-white font-black text-base shadow-lg hover:shadow-xl transition-all"
-          style={{ background: `linear-gradient(135deg, ${theme.header}, ${theme.accent})` }}>
-          📤 إرسال الإجابات
-        </button>
+        )}
+
+        {/* نموذج الأسئلة */}
+        {step === "form" && (
+          <div className="space-y-4">
+            {survey.questions.map((q, qi) => {
+              const ans = answers[q.id];
+              return (
+                <div key={q.id} className="bg-white rounded-2xl shadow-md overflow-hidden"
+                  style={{border:`2px solid ${pal.border}`}}>
+                  <div className="px-4 py-3" style={{background:pal.light}}>
+                    <div className="font-black text-sm text-gray-800 flex items-center gap-2">
+                      {q.emoji && <span className="text-xl">{q.emoji}</span>}
+                      <span>{qi+1}. {q.text}</span>
+                      {q.required && <span className="text-red-500 text-xs">*</span>}
+                    </div>
+                  </div>
+                  <div className="p-4">
+
+                    {/* radio */}
+                    {q.type==="radio" && (
+                      <div className="space-y-2">
+                        {(q.options||[]).map(opt=>(
+                          <label key={opt}
+                            className="flex items-center gap-3 cursor-pointer p-3 rounded-xl border-2 transition-all"
+                            style={{borderColor:ans===opt?pal.h2:pal.border,background:ans===opt?pal.light:"#fff"}}>
+                            <div className="w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-all"
+                              style={{borderColor:pal.h2,background:ans===opt?pal.h2:"transparent"}}>
+                              {ans===opt && <div className="w-2 h-2 rounded-full bg-white"/>}
+                            </div>
+                            <input type="radio" name={`q${q.id}`} value={opt}
+                              checked={ans===opt} onChange={()=>setAns(q.id,opt)} className="hidden" />
+                            <span className="text-sm font-bold text-gray-700">{opt}</span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* checkbox */}
+                    {q.type==="checkbox" && (
+                      <div className="space-y-2">
+                        {(q.options||[]).map(opt=>{
+                          const checked = (ans||[]).includes(opt);
+                          return (
+                            <label key={opt}
+                              className="flex items-center gap-3 cursor-pointer p-3 rounded-xl border-2 transition-all"
+                              style={{borderColor:checked?pal.h2:pal.border,background:checked?pal.light:"#fff"}}>
+                              <div className="w-5 h-5 rounded-lg border-2 flex-shrink-0 flex items-center justify-center"
+                                style={{borderColor:pal.h2,background:checked?pal.h2:"transparent"}}>
+                                {checked && <span className="text-white text-xs font-black">✓</span>}
+                              </div>
+                              <input type="checkbox" checked={checked} onChange={()=>toggleCheck(q.id,opt)} className="hidden" />
+                              <span className="text-sm font-bold text-gray-700">{opt}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {/* text */}
+                    {q.type==="text" && (
+                      <textarea value={ans||""} onChange={e=>setAns(q.id,e.target.value)}
+                        placeholder="اكتب إجابتك هنا..." rows={3}
+                        className="w-full px-4 py-3 rounded-xl border-2 text-sm focus:outline-none resize-none"
+                        style={{borderColor:ans?pal.h2:pal.border}} />
+                    )}
+
+                    {/* scale5 */}
+                    {q.type==="scale5" && (
+                      <div className="flex gap-2 flex-wrap">
+                        {[1,2,3,4,5].map(n=>(
+                          <button key={n} onClick={()=>setAns(q.id,n)}
+                            className="flex-1 py-3 rounded-xl border-2 font-black text-base transition-all"
+                            style={{borderColor:ans>=n?pal.h2:pal.border,background:ans>=n?pal.h2:"#fff",color:ans>=n?"#fff":pal.h1,minWidth:48}}>
+                            {"⭐".repeat(n)}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* yesno */}
+                    {q.type==="yesno" && (
+                      <div className="flex gap-3">
+                        {[{v:"نعم",i:"✅",c:"#059669",bg:"#d1fae5"},{v:"لا",i:"❌",c:"#dc2626",bg:"#fee2e2"}].map(opt=>(
+                          <button key={opt.v} onClick={()=>setAns(q.id,opt.v)}
+                            className="flex-1 py-4 rounded-2xl font-black text-base border-2 transition-all"
+                            style={{background:ans===opt.v?opt.bg:"#fff",borderColor:ans===opt.v?opt.c:"#e5e7eb",color:ans===opt.v?opt.c:"#9ca3af"}}>
+                            {opt.i} {opt.v}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+
+            <button onClick={submit} disabled={submitting}
+              className="w-full py-4 rounded-2xl font-black text-white text-base shadow-xl"
+              style={{background:submitting?"#9ca3af":`linear-gradient(135deg,${pal.h1},${pal.h2})`}}>
+              {submitting ? "⏳ جاري الإرسال..." : "إرسال الإجابات 📤"}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
+// ================================================================
+// ===== صفحة إدارة الاستبيانات =====
+// ================================================================
 function SurveysPage({ surveys, setSurveys, saveSurveys, isParent }) {
-  const [mode, setMode] = useState("list");
-  const [editing, setEditing] = useState(null);
+  const [mode, setMode]           = useState("list"); // list | build | respond
+  const [editing, setEditing]     = useState(null);
   const [responding, setResponding] = useState(null);
-  const [filterTarget, setFilterTarget] = useState("all");
-  const [copiedId, setCopiedId] = useState(null);
-  const [shareMsg, setShareMsg] = useState("");
+  const [copiedId, setCopiedId]   = useState(null);
+  const BASE_URL = window.location.origin + window.location.pathname;
 
-  const BASE_URL = "https://school-website1.vercel.app";
-
-  const getSurveyLink = (s) => `${BASE_URL}/?survey=${s.id}`;
+  const getSurveyLink = (s) => `${BASE_URL}?survey=${s.id}`;
 
   const copyLink = (s) => {
     const link = getSurveyLink(s);
-    navigator.clipboard.writeText(link).then(() => {
-      setCopiedId(s.id);
-      setTimeout(() => setCopiedId(null), 2000);
-    });
+    navigator.clipboard.writeText(link).then(()=>{setCopiedId(s.id);setTimeout(()=>setCopiedId(null),2000);});
   };
-
-  const shareWhatsApp = (s) => {
+  const shareWA = (s) => {
     const link = getSurveyLink(s);
-    const msg = encodeURIComponent(
-      `🏫 *مدرسة عبيدة بن الحارث المتوسطة*\n\n` +
-      `📊 *${s.title}*\n` +
-      (s.description ? `${s.description}\n\n` : `\n`) +
-      `👥 موجّه إلى: ${s.target}\n\n` +
-      `📝 للمشاركة في الاستبيان اضغط الرابط:\n${link}\n\n` +
-      `_أدخل رقم هوية الطالب للوصول_`
-    );
-    window.open(`https://wa.me/?text=${msg}`, "_blank");
-  };
-
-  const shareMsgPage = () => {
-    const link = BASE_URL;
-    const msg = encodeURIComponent(
-      `🏫 *مدرسة عبيدة بن الحارث المتوسطة*\n\n` +
-      `✉️ *بوابة التواصل مع المدرسة*\n\n` +
-      `يمكنكم الآن إرسال آرائكم ومقترحاتكم واستفساراتكم مباشرةً إلى إدارة المدرسة\n\n` +
-      `👈 اضغط الرابط وأدخل رقم هوية الطالب:\n${link}\n\n` +
-      `_ثم اختر تبويب "رسالة" 📩_`
-    );
-    window.open(`https://wa.me/?text=${msg}`, "_blank");
+    const msg = encodeURIComponent(`🏫 *مدرسة عبيدة بن الحارث المتوسطة*\n\n📊 *${s.title}*\n\n👥 موجّه إلى: ${s.target}\n\n📝 للمشاركة:\n${link}`);
+    window.open(`https://wa.me/?text=${msg}`,"_blank");
   };
 
   const saveSurvey = (s) => {
-    const exists = surveys.find(x => x.id === s.id);
-    const updated = exists ? surveys.map(x => x.id === s.id ? s : x) : [s, ...surveys];
+    const exists = surveys.find(x=>x.id===s.id);
+    const updated = exists ? surveys.map(x=>x.id===s.id?s:x) : [s,...surveys];
     setSurveys(updated); saveSurveys(updated); setMode("list"); setEditing(null);
   };
   const deleteSurvey = (id) => {
-    if (!confirm("حذف هذا الاستبيان نهائياً؟")) return;
-    const updated = surveys.filter(s => s.id !== id);
+    if (!confirm("حذف هذا الاستبيان؟")) return;
+    const updated = surveys.filter(s=>s.id!==id);
     setSurveys(updated); saveSurveys(updated);
   };
   const toggleActive = (id) => {
-    const updated = surveys.map(s => s.id === id ? { ...s, active: !s.active } : s);
+    const updated = surveys.map(s=>s.id===id?{...s,active:!s.active}:s);
     setSurveys(updated); saveSurveys(updated);
   };
 
-  const filtered = surveys.filter(s => {
-    if (isParent && !s.active) return false;
-    if (filterTarget !== "all" && s.target !== filterTarget && s.target !== "الجميع") return false;
-    return true;
-  });
-
-  const newSurveyCount = surveys.filter(s => s.active).length;
-
-  if (mode === "build") return (
-    <SurveyBuilder survey={editing || newSurvey()} onSave={saveSurvey} onCancel={() => { setMode("list"); setEditing(null); }} />
+  if (mode==="build") return (
+    <SurveyBuilder survey={editing||mkSurvey()} onSave={saveSurvey} onCancel={()=>{setMode("list");setEditing(null);}} />
   );
-  if (mode === "respond" && responding) return (
-    <SurveyRespond survey={responding} onClose={() => { setMode("list"); setResponding(null); }} />
+  if (mode==="respond" && responding) return (
+    <SurveyRespond survey={responding} onClose={()=>{setMode("list");setResponding(null);}} />
   );
+
+  const active = surveys.filter(s=>s.active);
+  const filtered = isParent ? active : surveys;
 
   return (
-    <div dir="rtl">
-      {/* رأس الصفحة */}
-      <div className="rounded-b-2xl overflow-hidden mb-6 shadow-xl" style={{ background: "linear-gradient(135deg, #4c1d95 0%, #7c3aed 60%, #a78bfa 100%)" }}>
-        <div className="p-8 text-white">
-          <div className="flex flex-col md:flex-row items-center gap-6">
-            <div className="text-7xl flex-shrink-0">📊</div>
-            <div className="text-center md:text-right flex-1">
-              <h2 className="text-2xl font-black mb-2">الاستبيانات والاستطلاعات</h2>
-              <p className="text-purple-100 text-sm leading-relaxed">
-                منصة متكاملة لإنشاء استبيانات احترافية وجمع آراء أولياء الأمور والمعلمين والطلاب
-                — شاركونا في تطوير بيئتنا التعليمية
-              </p>
+    <div dir="rtl" style={{fontFamily:"'Cairo',sans-serif"}}>
+
+      {/* ── رأس الصفحة ── */}
+      <div className="rounded-2xl overflow-hidden mb-6 shadow-xl text-white"
+        style={{background:"linear-gradient(135deg,#4c1d95,#7c3aed,#ec4899)"}}>
+        <div className="p-6">
+          <div className="flex items-center gap-4 mb-4">
+            <div className="text-5xl">📊</div>
+            <div>
+              <h2 className="text-2xl font-black mb-1">الاستبيانات</h2>
+              <p className="opacity-80 text-sm">إنشاء استبيانات احترافية وجمع الآراء</p>
             </div>
           </div>
-        </div>
-        <div className="bg-white bg-opacity-10 px-6 py-3 flex flex-wrap gap-3 justify-between items-center">
-          <div className="flex gap-4 text-white text-sm">
-            <span>📋 إجمالي الاستبيانات: <b>{surveys.length}</b></span>
-            <span>✅ نشط: <b>{surveys.filter(s => s.active).length}</b></span>
-          </div>
-          <div className="flex gap-2 flex-wrap">
-            {/* زر مشاركة بوابة الرسائل عبر واتساب */}
-            {!isParent && (
-              <button onClick={shareMsgPage}
-                className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-xl font-black text-xs flex items-center gap-1.5 shadow">
-                <span className="text-base">📲</span> دعوة أولياء الأمور للتواصل
-              </button>
-            )}
-            {!isParent && (
-              <button onClick={() => { setEditing(null); setMode("build"); }}
-                className="bg-white text-purple-700 px-5 py-2 rounded-xl font-black text-sm hover:bg-purple-50 shadow">
-                ➕ استبيان جديد
-              </button>
-            )}
+          <div className="flex flex-wrap gap-3 items-center">
+            <div className="flex gap-4 text-sm opacity-90 flex-wrap">
+              <span>📋 الإجمالي: <b>{surveys.length}</b></span>
+              <span>✅ نشط: <b>{active.length}</b></span>
+              <span>💬 إجابات: <b>{surveys.reduce((acc,s)=>acc+(s.responses?.length||0),0)}</b></span>
+            </div>
+            <div className="mr-auto flex gap-2">
+              {!isParent && (
+                <button onClick={()=>{setEditing(null);setMode("build");}}
+                  className="bg-white text-purple-700 px-5 py-2.5 rounded-xl font-black text-sm hover:shadow-lg transition-all">
+                  ➕ استبيان جديد
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>
 
-      {/* إشعار لولي الأمر عند وجود استبيانات نشطة */}
-      {isParent && newSurveyCount > 0 && (
-        <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-4 mb-4 flex items-start gap-3 shadow-sm">
-          <span className="text-2xl flex-shrink-0">🔔</span>
-          <div>
-            <div className="font-black text-amber-800 text-sm">يوجد {newSurveyCount} استبيان بانتظار مشاركتك!</div>
-            <div className="text-amber-600 text-xs mt-0.5">رأيك يهمنا — شاركنا في تطوير بيئة أبنائنا التعليمية</div>
-          </div>
-        </div>
-      )}
-
-      {/* فلتر */}
-      {!isParent && (
-        <div className="flex gap-2 mb-4 flex-wrap">
-          {["all", ...SURVEY_TARGETS].map(t => (
-            <button key={t} onClick={() => setFilterTarget(t)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold border-2 transition-all ${filterTarget === t ? "bg-purple-600 text-white border-purple-600" : "bg-white text-gray-500 border-gray-200"}`}>
-              {t === "all" ? "الكل" : t}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* قائمة الاستبيانات */}
+      {/* ── قائمة الاستبيانات ── */}
       {filtered.length === 0 ? (
         <div className="bg-white rounded-2xl p-12 text-center border-2 border-dashed border-purple-100">
           <div className="text-5xl mb-3">📋</div>
-          <div className="font-bold text-gray-400 mb-3">لا توجد استبيانات {isParent ? "متاحة" : "بعد"}</div>
+          <div className="font-bold text-gray-400 mb-3">لا توجد استبيانات {isParent?"متاحة":"بعد"}</div>
           {!isParent && (
-            <button onClick={() => setMode("build")} className="bg-purple-600 text-white px-6 py-2.5 rounded-xl font-bold hover:bg-purple-700">
+            <button onClick={()=>setMode("build")}
+              className="bg-purple-600 text-white px-6 py-2.5 rounded-xl font-bold hover:bg-purple-700">
               ➕ إنشاء أول استبيان
             </button>
           )}
@@ -10001,60 +10098,67 @@ function SurveysPage({ surveys, setSurveys, saveSurveys, isParent }) {
       ) : (
         <div className="grid gap-4 sm:grid-cols-2">
           {filtered.map(s => {
-            const theme = SURVEY_THEMES[s.theme ?? 0];
-            const link = getSurveyLink(s);
+            const pal = SURVEY_PALETTES[s.palette ?? 0];
+            const surveyDate = `${s.dayNum||""} ${s.hijriMonth||""} ${s.hijriYear||""}`;
             return (
-              <div key={s.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-all">
-                <div className="px-5 py-4 text-white" style={{ background: `linear-gradient(135deg, ${theme.header}, ${theme.accent})` }}>
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1">
-                      <h3 className="font-black text-base leading-tight">{s.title || "استبيان بدون عنوان"}</h3>
-                      {s.description && <p className="opacity-80 text-xs mt-1 line-clamp-2">{s.description}</p>}
-                    </div>
-                    {!s.active && <span className="bg-white bg-opacity-20 text-white text-xs px-2 py-0.5 rounded-full font-bold flex-shrink-0">متوقف</span>}
+              <div key={s.id} className="bg-white rounded-2xl shadow-sm border overflow-hidden hover:shadow-lg transition-all"
+                style={{borderColor:pal.border}}>
+                {/* رأس البطاقة */}
+                <div className="px-5 py-4 text-white" style={{background:`linear-gradient(135deg,${pal.h1},${pal.h2})`}}>
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <h3 className="font-black text-base leading-tight flex-1">{s.title||"استبيان بدون عنوان"}</h3>
+                    {!s.active && <span className="bg-white/20 text-white text-xs px-2 py-0.5 rounded-full font-bold flex-shrink-0">متوقف</span>}
                   </div>
-                  <div className="flex gap-3 mt-3 text-xs opacity-80">
+                  <div className="flex flex-wrap gap-3 text-xs opacity-80">
                     <span>👥 {s.target}</span>
-                    <span>❓ {s.fields.length} سؤال</span>
-                    <span>📅 {s.createdAt}</span>
+                    <span>❓ {s.questions.length} سؤال</span>
+                    <span>📅 {surveyDate}</span>
+                    <span>💬 {s.responses?.length||0} إجابة</span>
+                    <span>{s.accessType==="free"?"🔓 مفتوح":"🪪 برقم الهوية"}</span>
                   </div>
                 </div>
 
-                {/* رابط الاستبيان — للإدارة فقط */}
+                {/* رابط */}
                 {!isParent && (
                   <div className="px-4 pt-3 pb-1">
-                    <div className="flex items-center gap-1.5 bg-gray-50 rounded-xl px-3 py-2 border border-gray-200">
-                      <span className="text-xs text-gray-400 flex-1 truncate" dir="ltr">{link}</span>
-                      <button onClick={() => copyLink(s)}
-                        className={`flex-shrink-0 px-2.5 py-1 rounded-lg text-xs font-black transition-all ${copiedId === s.id ? "bg-green-500 text-white" : "bg-gray-200 text-gray-600 hover:bg-gray-300"}`}>
-                        {copiedId === s.id ? "✓ تم" : "📋 نسخ"}
+                    <div className="flex items-center gap-1.5 rounded-xl px-3 py-2 border"
+                      style={{background:pal.bg,borderColor:pal.border}}>
+                      <span className="text-xs text-gray-400 flex-1 truncate" dir="ltr">{getSurveyLink(s)}</span>
+                      <button onClick={()=>copyLink(s)}
+                        className="flex-shrink-0 px-2.5 py-1 rounded-lg text-xs font-black transition-all"
+                        style={{background:copiedId===s.id?pal.h2:"#e5e7eb",color:copiedId===s.id?"#fff":"#374151"}}>
+                        {copiedId===s.id?"✓ تم":"📋 نسخ"}
                       </button>
                     </div>
                   </div>
                 )}
 
+                {/* أزرار */}
                 <div className="px-4 py-3 flex gap-2 flex-wrap">
-                  <button onClick={() => { setResponding(s); setMode("respond"); }}
-                    className="flex-1 py-2 rounded-xl text-white text-xs font-black hover:opacity-90 transition-all"
-                    style={{ background: theme.accent }}>
-                    📝 {isParent ? "ملء الاستبيان" : "معاينة"}
+                  <button onClick={()=>{setResponding(s);setMode("respond");}}
+                    className="flex-1 py-2 rounded-xl text-white text-xs font-black"
+                    style={{background:`linear-gradient(135deg,${pal.h1},${pal.h2})`}}>
+                    📝 {isParent?"ملء الاستبيان":"معاينة"}
                   </button>
-                  {!isParent && (
-                    <>
-                      {/* زر مشاركة واتساب */}
-                      <button onClick={() => shareWhatsApp(s)}
-                        className="px-3 py-2 rounded-xl bg-green-50 text-green-700 text-xs font-black hover:bg-green-100 flex items-center gap-1">
-                        <span>📲</span> واتساب
-                      </button>
-                      <button onClick={() => { setEditing(s); setMode("build"); }}
-                        className="px-3 py-2 rounded-xl bg-gray-100 text-gray-600 text-xs font-bold hover:bg-gray-200">✏️ تعديل</button>
-                      <button onClick={() => toggleActive(s.id)}
-                        className={`px-3 py-2 rounded-xl text-xs font-bold ${s.active ? "bg-amber-50 text-amber-700 hover:bg-amber-100" : "bg-green-50 text-green-700 hover:bg-green-100"}`}>
-                        {s.active ? "⏸ إيقاف" : "▶ تفعيل"}
-                      </button>
-                      <button onClick={() => deleteSurvey(s.id)} className="px-3 py-2 rounded-xl bg-red-50 text-red-500 text-xs font-bold hover:bg-red-100">🗑️</button>
-                    </>
-                  )}
+                  {!isParent && (<>
+                    <button onClick={()=>shareWA(s)}
+                      className="px-3 py-2 rounded-xl bg-green-50 text-green-700 text-xs font-black hover:bg-green-100">
+                      📲 واتساب
+                    </button>
+                    <button onClick={()=>{setEditing(s);setMode("build");}}
+                      className="px-3 py-2 rounded-xl bg-gray-100 text-gray-600 text-xs font-bold hover:bg-gray-200">
+                      ✏️
+                    </button>
+                    <button onClick={()=>toggleActive(s.id)}
+                      className="px-3 py-2 rounded-xl text-xs font-bold"
+                      style={{background:s.active?pal.light:pal.bg,color:pal.h1}}>
+                      {s.active?"⏸":"▶"}
+                    </button>
+                    <button onClick={()=>deleteSurvey(s.id)}
+                      className="px-3 py-2 rounded-xl bg-red-50 text-red-500 text-xs font-bold hover:bg-red-100">
+                      🗑️
+                    </button>
+                  </>)}
                 </div>
               </div>
             );
@@ -11869,52 +11973,62 @@ const RichField = ({ label, value, onChange, placeholder, rows }) => {
 };
 
 function ProgramReportPage() {
+
+  // ── قوائم منسدلة ──
+  const HIJRI_MONTHS = ["محرم","صفر","ربيع الأول","ربيع الآخر","جمادى الأولى","جمادى الآخرة","رجب","شعبان","رمضان","شوال","ذو القعدة","ذو الحجة"];
+  const HIJRI_YEARS  = ["1446هـ","1447هـ","1448هـ","1449هـ"];
+  const SEMESTERS    = ["الأول","الثاني","الثالث"];
+  const PERIODS      = ["الأولى","الثانية","الثالثة"];
+  const DAYS_LIST    = Array.from({length:31},(_,i)=>i+1);
+  const FIELDS_LIST  = ["النشاط الطلابيّ","التوجيه والإرشاد","الرياضة المدرسية","الأمن والسلامة","التربية الإسلامية","المناهج الدراسية","التقنية والحاسب","البيئة والصحة","الفنون والثقافة","الخدمة المجتمعية","أخرى"];
+  const TARGETS_LIST = ["الطلاب","الطلاب وأولياء الأمور","المعلمون","الهيئة التعليمية","الجميع","أخرى"];
+
   const EMPTY = {
-    acadYear:   "1447هـ",
-    semester:   "الأول",
-    period:     "الأولى",
+    acadYear:"1447هـ", semester:"الأول", period:"الأولى",
     reportTitle:"تقرير تكريم الطلاب المتفوقين في الفترة الأولى للفصل الدراسي الأول لعام 1447هـ",
-    field:      "النشاط الطلابيّ",
-    executor:   "طلال القرني _معيض القرني",
+    field:"النشاط الطلابيّ",
+    executor:"طلال القرني _معيض القرني",
     targetGroup:"الطلاب",
-    execDate:   "1447/10/24 هـ",
-    intro:      "يُعدّ تكريم الطلاب المتفوقين من أهم الوسائل التي تعزز روح المنافسة والاجتهاد بين الطلبة، حيث يعكس تقدير المجتمع التربوي للجهود المبذولة والإنجازات المحققة.",
-    objectives: "• تحفيز الطلاب على الاجتهاد والسعي نحو التفوق.\n• تقدير جهود الطلاب المتفوقين وتعزيز ثقتهم بأنفسهم.\n• نشر ثقافة التميز والنجاح بين جميع الطلاب.\n• تشجيع المنافسة الإيجابية بين الطلبة.\n• إبراز النماذج المتميزة ليكونوا قدوة لغيرهم.",
-    activities: "تم تنفيذ مجموعة من الأنشطة التي تهدف إلى إبراز جهود الطلاب المتفوقين والاحتفاء بإنجازاتهم، حيث شمل البرنامج حفل تكريم رسمي بحضور الهيئة التعليمية.",
-    results:    "من المتوقع أن يسهم هذا البرنامج في رفع مستوى الدافعية لدى الطلاب وتحفيزهم على تحقيق المزيد من النجاحات. كما يساعد في تعزيز الثقة بالنفس لدى الطلاب المتفوقين.",
-    recommendations: "يوصى بالاستمرار في تنفيذ برامج تكريم الطلاب المتفوقين بشكل دوري لما لها من أثر إيجابي كبير. كما يُفضل تنويع أساليب التكريم لتشمل الجوانب الأكاديمية والسلوكية.",
-    activityLeader: "طلال القرني",
-    activityLeaderTitle: "رائد النشاط",
-    coordinator: "معيض القرني",
-    coordinatorTitle: "منسق الرياضي",
-    principal:  "فارع القرني",
-    witnesses:  [null,null,null,null,null,null],
+    execDayNum:"24", execHijriMonth:"شوال", execHijriYear:"1447هـ",
+    intro:"يُعدّ تكريم الطلاب المتفوقين من أهم الوسائل التي تعزز روح المنافسة والاجتهاد بين الطلبة، حيث يعكس تقدير المجتمع التربوي للجهود المبذولة والإنجازات المحققة.",
+    objectives:"• تحفيز الطلاب على الاجتهاد والسعي نحو التفوق.\n• تقدير جهود الطلاب المتفوقين وتعزيز ثقتهم بأنفسهم.\n• نشر ثقافة التميز والنجاح بين جميع الطلاب.\n• تشجيع المنافسة الإيجابية بين الطلبة.\n• إبراز النماذج المتميزة ليكونوا قدوة لغيرهم.",
+    activities:"تم تنفيذ مجموعة من الأنشطة التي تهدف إلى إبراز جهود الطلاب المتفوقين والاحتفاء بإنجازاتهم، حيث شمل البرنامج حفل تكريم رسمي بحضور الهيئة التعليمية.",
+    results:"من المتوقع أن يسهم هذا البرنامج في رفع مستوى الدافعية لدى الطلاب وتحفيزهم على تحقيق المزيد من النجاحات.",
+    recommendations:"يوصى بالاستمرار في تنفيذ برامج تكريم الطلاب المتفوقين بشكل دوري لما لها من أثر إيجابي كبير.",
+    activityLeader:"طلال القرني", activityLeaderTitle:"رائد النشاط",
+    coordinator:"معيض القرني",   coordinatorTitle:"منسق الرياضي",
+    principal:"فازع القرني",
+    witnesses:[null,null,null,null,null,null],
   };
 
   const [report, setReport] = useState(() => {
     try {
-      const s = localStorage.getItem("prog_report_v2");
+      const s = localStorage.getItem("prog_report_v3");
       if (!s) return EMPTY;
-      const parsed = JSON.parse(s);
-      // تأكد من وجود 6 شواهد
-      if (!parsed.witnesses || parsed.witnesses.length < 6)
-        parsed.witnesses = [...(parsed.witnesses||[]), null,null,null,null,null,null].slice(0,6);
-      return parsed;
+      const p = JSON.parse(s);
+      if (!p.witnesses || p.witnesses.length < 6)
+        p.witnesses = [...(p.witnesses||[]), null,null,null,null,null,null].slice(0,6);
+      return p;
     } catch { return EMPTY; }
   });
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
   const witnessRefs = [useRef(),useRef(),useRef(),useRef(),useRef(),useRef()];
 
   const upd = (k, v) => setReport(p => ({ ...p, [k]: v }));
 
   useEffect(() => {
-    try {
-      const toSave = { ...report, witnesses: report.witnesses.map(w => w ? { dataUrl: w.dataUrl||null, name: w.name||"" } : null) };
-      localStorage.setItem("prog_report_v2", JSON.stringify(toSave));
-      DB.set("school-prog-report", toSave);
-    } catch {}
-    setSaved(true);
-    const t = setTimeout(() => setSaved(false), 1500);
+    setSaving(true);
+    const t = setTimeout(() => {
+      try {
+        const toSave = { ...report, witnesses: report.witnesses.map(w => w ? {dataUrl:w.dataUrl||null,name:w.name||""} : null) };
+        localStorage.setItem("prog_report_v3", JSON.stringify(toSave));
+        DB.set("school-prog-report", toSave);
+      } catch {}
+      setSaving(false);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 1500);
+    }, 600);
     return () => clearTimeout(t);
   }, [report]);
 
@@ -11931,199 +12045,107 @@ function ProgramReportPage() {
     setReport(p => ({ ...p, witnesses: w }));
   };
 
-  /* ─── طباعة / تصدير ─── */
+  const execDate = `${report.execDayNum} ${report.execHijriMonth} ${report.execHijriYear}`;
+
+  /* ── طباعة ── */
   const printReport = () => {
     const wHtml = report.witnesses.map((w,i) =>
-      w ? `<div class="sh-item"><img src="${w.dataUrl}" /><div class="sh-lbl">الشاهد رقم ${i+1}</div></div>`
-        : `<div class="sh-item empty"><div class="sh-empty">الشاهد رقم ${i+1}</div></div>`
+      w ? `<div class="sh"><img src="${w.dataUrl}"/><div class="sh-l">الشاهد رقم ${i+1}</div></div>`
+        : `<div class="sh empty"><div class="sh-e">الشاهد رقم ${i+1}</div></div>`
     ).join("");
-
-    const formatText = (t) => (t||"").replace(/\n/g,"<br/>");
+    const ft = (t) => (t||"").replace(/\n/g,"<br/>");
 
     printWindow(`<!DOCTYPE html>
-<html dir="rtl" lang="ar">
-<head>
-<meta charset="UTF-8">
+<html dir="rtl" lang="ar"><head><meta charset="UTF-8">
 <title>${report.reportTitle||"تقرير برنامج"}</title>
-<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:'Cairo',sans-serif;background:#fff;color:#1a2035;direction:rtl;font-size:13px}
-.page{max-width:800px;margin:0 auto;border:3px solid #0d3b6e;border-radius:0}
-
-/* ── الترويسة ── */
-.header{background:linear-gradient(135deg,#0d3b6e 0%,#1a5276 50%,#0d9488 100%);color:#fff;padding:0;display:flex;align-items:stretch;min-height:90px}
-.hcol{flex:1;display:flex;flex-direction:column;justify-content:center;padding:12px 18px}
-.hcol.right{text-align:right;border-left:1px solid rgba(255,255,255,.25)}
-.hcol.center{flex:0 0 120px;align-items:center;border-left:1px solid rgba(255,255,255,.25)}
-.hcol.left{text-align:left}
-.kingdom{font-size:12px;opacity:.8;margin-bottom:2px}
-.ministry{font-size:14px;font-weight:900}
-.dept{font-size:11px;opacity:.8;margin-top:2px}
-.school-name{font-size:13px;font-weight:900}
-.logo-img{height:65px;width:auto;filter:brightness(0) invert(1)}
-.year-row{display:grid;grid-template-columns:1fr 1fr;gap:0;background:rgba(255,255,255,.08);border-top:1px solid rgba(255,255,255,.2)}
-.year-cell{padding:5px 14px;font-size:11px;font-weight:700}
-.year-cell:first-child{border-left:1px solid rgba(255,255,255,.2);text-align:left}
-
-/* ── شريط العنوان ── */
-.title-bar{background:#1a2f5e;color:#fff;text-align:center;padding:12px 16px;font-size:16px;font-weight:900;border-top:4px solid #f59e0b;letter-spacing:.3px}
-
-/* ── بيانات التنفيذ ── */
-.meta-row{display:grid;grid-template-columns:repeat(4,1fr);border-bottom:2px solid #0d9488}
-.meta-cell{padding:7px 10px;border-left:1px solid #c7d2e8;background:#f8fafd}
-.meta-cell:last-child{border-left:none}
-.meta-lbl{font-size:9px;color:#64748b;font-weight:700;margin-bottom:3px;border-bottom:1px solid #e2e8f0;padding-bottom:2px}
-.meta-val{font-size:12px;font-weight:700;color:#1a2035}
-
-/* ── الأقسام النصية ── */
-.sections{padding:12px 14px;display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.section-full{grid-column:1/-1}
-.section{border:1.5px solid #c7d2e8;border-radius:8px;overflow:hidden}
-.sec-hdr{background:linear-gradient(135deg,#1a2f5e,#1d4ed8);color:#fff;padding:6px 12px;font-size:12px;font-weight:900;display:flex;align-items:center;gap:6px}
-.sec-hdr .icon{font-size:15px}
-.sec-body{padding:10px 12px;font-size:12.5px;line-height:1.8;min-height:70px;color:#1e293b;white-space:pre-wrap}
-
-/* ── التوقيعات ── */
+.page{max-width:800px;margin:0 auto;border:3px solid #0d3b6e}
+.hdr{background:linear-gradient(135deg,#0d3b6e,#1a5276,#0d9488);color:#fff;display:flex;align-items:stretch;min-height:88px}
+.hc{flex:1;padding:12px 18px;display:flex;flex-direction:column;justify-content:center}
+.hc.c{flex:0 0 115px;align-items:center;border-right:1px solid rgba(255,255,255,.25);border-left:1px solid rgba(255,255,255,.25)}
+.hc.r{text-align:right}.hc.l{text-align:left}
+.logo{height:65px;filter:brightness(0) invert(1)}
+.yr{display:grid;grid-template-columns:1fr 1fr;background:rgba(0,0,0,.2);border-top:1px solid rgba(255,255,255,.15)}
+.yc{padding:5px 16px;font-size:11px;color:rgba(255,255,255,.85);font-weight:700}
+.yc:first-child{border-left:1px solid rgba(255,255,255,.2)}
+.tb{background:#1a2f5e;color:#fff;text-align:center;padding:12px 16px;font-size:16px;font-weight:900;border-top:4px solid #f59e0b}
+.meta{display:grid;grid-template-columns:repeat(4,1fr);border-bottom:2px solid #0d9488}
+.mc{padding:7px 10px;border-left:1px solid #c7d2e8;background:#f8fafd}.mc:last-child{border-left:none}
+.ml{font-size:9px;color:#0d9488;font-weight:700;margin-bottom:3px}.mv{font-size:12px;font-weight:700;color:#1a2035}
+.secs{padding:12px 14px;display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.full{grid-column:1/-1}
+.sec{border:1.5px solid #c7d2e8;border-radius:8px;overflow:hidden}
+.sh2{background:linear-gradient(135deg,#1a2f5e,#1d4ed8);color:#fff;padding:6px 12px;font-size:12px;font-weight:900;display:flex;align-items:center;gap:5px}
+.sb{padding:10px 12px;font-size:12.5px;line-height:1.8;min-height:70px;color:#1e293b;white-space:pre-wrap}
 .sigs{display:grid;grid-template-columns:repeat(3,1fr);gap:0;border-top:2px solid #0d3b6e;margin:0 14px 14px}
-.sig{text-align:center;padding:14px 10px 6px;border-left:1px solid #c7d2e8}
-.sig:first-child{border-left:none}
-.sig-role{font-size:10px;color:#64748b;margin-bottom:6px}
-.sig-name{font-size:12px;font-weight:900;color:#1a2035;border-top:1.5px dashed #0d9488;padding-top:8px;margin-top:14px}
-
-/* ── الشواهد ── */
-.witnesses-page{page-break-before:always;padding:0}
-.wit-title-bar{background:linear-gradient(135deg,#1a2f5e,#0d9488);color:#fff;text-align:center;padding:11px;font-size:15px;font-weight:900}
-.wit-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:14px}
-.sh-item{border:2px solid #0d3b6e;border-radius:10px;overflow:hidden;text-align:center}
-.sh-item img{width:100%;height:200px;object-fit:cover;display:block}
-.sh-lbl{background:#0d3b6e;color:#fff;font-size:11px;font-weight:700;padding:5px;text-align:center}
-.sh-item.empty{min-height:220px;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#f8fafd}
-.sh-empty{color:#94a3b8;font-size:12px}
-
-/* ── الفوتر ── */
-.footer{background:#0d1b2e;color:rgba(255,255,255,.55);text-align:center;padding:7px;font-size:10px;margin-top:6px}
-
-@media print{
-  @page{size:A4;margin:10mm}
-  body{-webkit-print-color-adjust:exact;print-color-adjust:exact}
-  .witnesses-page{page-break-before:always}
-}
-</style>
-</head>
-<body>
+.sg{text-align:center;padding:14px 8px 6px;border-left:1px solid #c7d2e8}
+.sg:first-child{border-left:none}
+.sg-r{font-size:10px;color:#64748b;margin-bottom:6px}.sg-n{font-size:12px;font-weight:900;color:#1a2035;border-top:1.5px dashed #0d9488;padding-top:8px;margin-top:14px}
+.wp{page-break-before:always;padding:0}
+.wt{background:linear-gradient(135deg,#1a2f5e,#0d9488);color:#fff;text-align:center;padding:11px;font-size:15px;font-weight:900}
+.wg{display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:14px}
+.sh{border:2px solid #0d3b6e;border-radius:10px;overflow:hidden;text-align:center}
+.sh img{width:100%;height:200px;object-fit:cover;display:block}
+.sh-l{background:#0d3b6e;color:#fff;font-size:11px;font-weight:700;padding:5px}
+.sh.empty{min-height:220px;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#f8fafd}
+.sh-e{color:#94a3b8;font-size:12px}
+.ft{background:#0d1b2e;color:rgba(255,255,255,.5);text-align:center;padding:7px;font-size:10px}
+@media print{@page{size:A4;margin:10mm}body{-webkit-print-color-adjust:exact;print-color-adjust:exact}.wp{page-break-before:always}}
+</style></head><body>
 <div class="page">
-  <!-- الترويسة -->
-  <div class="header">
-    <div class="hcol right">
-      <div class="kingdom">المملكة العربية السعودية</div>
-      <div class="ministry">وزارة التعليم</div>
-      <div class="dept">إدارة تعليم جدة</div>
-    </div>
-    <div class="hcol center">
-      <img src="${LOGO_URL}" class="logo-img" alt="شعار" />
-    </div>
-    <div class="hcol left">
-      <div class="kingdom">مدرسة عبيدة بن الحارث المتوسطة</div>
-      <div class="ministry">العام الدراسي ${report.acadYear}</div>
-      <div class="dept">الفصل الدراسي ${report.semester}</div>
-    </div>
+  <div class="hdr">
+    <div class="hc r"><div style="font-size:11px;opacity:.8">المملكة العربية السعودية</div><div style="font-size:14px;font-weight:900">وزارة التعليم</div><div style="font-size:11px;opacity:.8">إدارة تعليم جدة</div></div>
+    <div class="hc c"><img src="${LOGO_URL}" class="logo"/></div>
+    <div class="hc l"><div style="font-size:11px;opacity:.8">مدرسة عبيدة بن الحارث المتوسطة</div><div style="font-size:13px;font-weight:900">العام الدراسي ${report.acadYear}</div><div style="font-size:11px;opacity:.8">الفصل الدراسي ${report.semester}</div></div>
   </div>
-  <div class="year-row">
-    <div class="year-cell">العام الدراسي ${report.acadYear}</div>
-    <div class="year-cell">الفصل الدراسي ${report.semester}</div>
+  <div class="yr"><div class="yc">العام الدراسي ${report.acadYear}</div><div class="yc">الفصل الدراسي ${report.semester}</div></div>
+  <div class="tb">${report.reportTitle}</div>
+  <div class="meta">
+    <div class="mc"><div class="ml">المجال</div><div class="mv">${report.field}</div></div>
+    <div class="mc"><div class="ml">المنفذ</div><div class="mv">${report.executor}</div></div>
+    <div class="mc"><div class="ml">الفئة المستهدفة</div><div class="mv">${report.targetGroup}</div></div>
+    <div class="mc"><div class="ml">تاريخ التنفيذ</div><div class="mv">${execDate}</div></div>
   </div>
-
-  <!-- عنوان التقرير -->
-  <div class="title-bar">${report.reportTitle}</div>
-
-  <!-- بيانات التنفيذ -->
-  <div class="meta-row">
-    <div class="meta-cell"><div class="meta-lbl">المجال</div><div class="meta-val">${report.field}</div></div>
-    <div class="meta-cell"><div class="meta-lbl">المنفذ</div><div class="meta-val">${report.executor}</div></div>
-    <div class="meta-cell"><div class="meta-lbl">الفئة المستهدفة</div><div class="meta-val">${report.targetGroup}</div></div>
-    <div class="meta-cell"><div class="meta-lbl">تاريخ التنفيذ</div><div class="meta-val">${report.execDate}</div></div>
+  <div class="secs">
+    <div class="sec full"><div class="sh2">📝 المقدمة</div><div class="sb">${ft(report.intro)}</div></div>
+    <div class="sec"><div class="sh2">🎯 الأهداف</div><div class="sb">${ft(report.objectives)}</div></div>
+    <div class="sec"><div class="sh2">⚡ الأنشطة المنفذة</div><div class="sb">${ft(report.activities)}</div></div>
+    <div class="sec"><div class="sh2">✅ النتائج المتوقعة</div><div class="sb">${ft(report.results)}</div></div>
+    <div class="sec"><div class="sh2">💡 التوصيات</div><div class="sb">${ft(report.recommendations)}</div></div>
   </div>
-
-  <!-- الأقسام -->
-  <div class="sections">
-    <div class="section section-full">
-      <div class="sec-hdr"><span class="icon">📝</span>المقدمة</div>
-      <div class="sec-body">${formatText(report.intro)}</div>
-    </div>
-    <div class="section">
-      <div class="sec-hdr"><span class="icon">🎯</span>الأهداف</div>
-      <div class="sec-body">${formatText(report.objectives)}</div>
-    </div>
-    <div class="section">
-      <div class="sec-hdr"><span class="icon">⚡</span>الأنشطة المنفذة</div>
-      <div class="sec-body">${formatText(report.activities)}</div>
-    </div>
-    <div class="section">
-      <div class="sec-hdr"><span class="icon">✅</span>النتائج المتوقعة</div>
-      <div class="sec-body">${formatText(report.results)}</div>
-    </div>
-    <div class="section">
-      <div class="sec-hdr"><span class="icon">💡</span>التوصيات</div>
-      <div class="sec-body">${formatText(report.recommendations)}</div>
-    </div>
-  </div>
-
-  <!-- التوقيعات -->
   <div class="sigs">
-    <div class="sig">
-      <div class="sig-role">${report.activityLeaderTitle} / إسم المعلم</div>
-      <div class="sig-name">${report.activityLeader}</div>
-    </div>
-    <div class="sig">
-      <div class="sig-role">${report.coordinatorTitle} / إسم المعلم</div>
-      <div class="sig-name">${report.coordinator}</div>
-    </div>
-    <div class="sig">
-      <div class="sig-role">مدير المدرسة / اسم المدير</div>
-      <div class="sig-name">${report.principal}</div>
-    </div>
+    <div class="sg"><div class="sg-r">${report.activityLeaderTitle} / إسم المعلم</div><div class="sg-n">${report.activityLeader}</div></div>
+    <div class="sg"><div class="sg-r">${report.coordinatorTitle} / إسم المعلم</div><div class="sg-n">${report.coordinator}</div></div>
+    <div class="sg"><div class="sg-r">مدير المدرسة / اسم المدير</div><div class="sg-n">${report.principal}</div></div>
   </div>
-
-  <div class="footer">www.edu-forms.com — موقع نماذج تعليمية • صفحة 1 من 2</div>
+  <div class="ft">www.edu-forms.com — موقع نماذج تعليمية • صفحة 1 من 2</div>
 </div>
-
-<!-- ── صفحة الشواهد ── -->
-<div class="page witnesses-page">
-  <!-- ترويسة مكررة -->
-  <div class="header">
-    <div class="hcol right">
-      <div class="kingdom">المملكة العربية السعودية</div>
-      <div class="ministry">وزارة التعليم</div>
-      <div class="dept">إدارة تعليم جدة</div>
-    </div>
-    <div class="hcol center">
-      <img src="${LOGO_URL}" class="logo-img" alt="شعار" />
-    </div>
-    <div class="hcol left">
-      <div class="school-name">مدرسة عبيدة بن الحارث المتوسطة</div>
-      <div class="ministry">العام الدراسي ${report.acadYear}</div>
-      <div class="dept">الفصل الدراسي ${report.semester}</div>
-    </div>
+<div class="page wp">
+  <div class="hdr">
+    <div class="hc r"><div style="font-size:11px;opacity:.8">المملكة العربية السعودية</div><div style="font-size:14px;font-weight:900">وزارة التعليم</div><div style="font-size:11px;opacity:.8">إدارة تعليم جدة</div></div>
+    <div class="hc c"><img src="${LOGO_URL}" class="logo"/></div>
+    <div class="hc l"><div style="font-size:11px;opacity:.8">مدرسة عبيدة بن الحارث المتوسطة</div><div style="font-size:13px;font-weight:900">العام الدراسي ${report.acadYear}</div></div>
   </div>
-  <div class="wit-title-bar">شواهد ${report.reportTitle}</div>
-  <div class="wit-grid">${wHtml}</div>
-  <div class="footer">www.edu-forms.com — موقع نماذج تعليمية • صفحة 2 من 2</div>
+  <div class="wt">شواهد ${report.reportTitle}</div>
+  <div class="wg">${wHtml}</div>
+  <div class="ft">www.edu-forms.com — موقع نماذج تعليمية • صفحة 2 من 2</div>
 </div>
-
 <script>window.onload=()=>window.print();</script>
 </body></html>`);
   };
 
-  /* ─── حقل نصي قابل للتحرير ─── */
+  /* ── مكوّن حقل نصي ── */
   const TF = ({ label, field, ph, rows, icon }) => (
     <div className="space-y-1">
       <label className="text-xs font-black flex items-center gap-1" style={{color:"#1d4ed8"}}>
         {icon && <span>{icon}</span>}{label}
       </label>
       {rows ? (
-        <textarea value={report[field]||""} onChange={e=>upd(field,e.target.value)} rows={rows}
-          placeholder={ph}
+        <textarea value={report[field]||""} onChange={e=>upd(field,e.target.value)}
+          rows={rows} placeholder={ph}
           className="w-full border-2 rounded-xl px-3 py-2 text-sm focus:outline-none resize-none leading-relaxed"
           style={{borderColor:"#c7d2e8",fontFamily:"Cairo,sans-serif"}} />
       ) : (
@@ -12135,37 +12157,34 @@ body{font-family:'Cairo',sans-serif;background:#fff;color:#1a2035;direction:rtl;
     </div>
   );
 
-  /* ─── بطاقة شاهد ─── */
+  /* ── بطاقة شاهد ── */
   const WitnessCard = ({ idx }) => {
     const w = report.witnesses[idx];
     return (
-      <div className="relative rounded-2xl overflow-hidden border-2" style={{borderColor:"#0d3b6e",minHeight:170}}>
+      <div className="rounded-2xl overflow-hidden border-2"
+        style={{borderColor:w?"#0d3b6e":"#d1d5db",minHeight:165}}>
         {w ? (
           <>
             <img src={w.dataUrl} alt={`شاهد ${idx+1}`}
-              className="w-full object-cover" style={{height:150}} />
-            <div className="flex items-center justify-between px-3 py-2"
+              className="w-full object-cover" style={{height:140}} />
+            <div className="flex items-center justify-between px-3 py-1.5"
               style={{background:"linear-gradient(135deg,#0d3b6e,#0d9488)"}}>
               <span className="text-white text-xs font-black">الشاهد رقم {idx+1}</span>
               <button onClick={()=>removeWitness(idx)}
                 className="text-white/70 hover:text-red-300 text-xs font-bold px-2 py-0.5 rounded-lg bg-white/10">
-                🗑️ حذف
+                🗑️
               </button>
             </div>
           </>
         ) : (
           <label className="flex flex-col items-center justify-center h-full cursor-pointer hover:bg-blue-50 transition-all"
-            style={{minHeight:170}}>
-            <div className="text-3xl mb-2">📷</div>
+            style={{minHeight:165}}>
+            <div className="text-3xl mb-1.5">📷</div>
             <div className="text-xs font-black" style={{color:"#1d4ed8"}}>الشاهد رقم {idx+1}</div>
-            <div className="text-xs text-gray-400 mt-1">اضغط لإضافة صورة</div>
+            <div className="text-xs text-gray-400 mt-0.5">اضغط لإضافة صورة</div>
             <input type="file" accept="image/*" className="hidden" ref={witnessRefs[idx]}
               onChange={e=>{const f=e.target.files?.[0];if(f)handleWitness(idx,f);e.target.value="";}} />
           </label>
-        )}
-        {!w && (
-          <input type="file" accept="image/*" className="hidden" ref={witnessRefs[idx]}
-            onChange={e=>{const f=e.target.files?.[0];if(f)handleWitness(idx,f);e.target.value="";}} />
         )}
       </div>
     );
@@ -12174,114 +12193,140 @@ body{font-family:'Cairo',sans-serif;background:#fff;color:#1a2035;direction:rtl;
   return (
     <div dir="rtl" className="max-w-4xl mx-auto space-y-5 pb-10" style={{fontFamily:"'Cairo',sans-serif"}}>
       <style>{`
-        .report-section-hdr { background: linear-gradient(135deg,#0d3b6e,#1d4ed8); color:#fff; padding:10px 16px; border-radius:12px 12px 0 0; font-weight:900; font-size:14px; display:flex; align-items:center; gap:8px; }
-        .report-card { border:2px solid #c7d2e8; border-radius:14px; overflow:hidden; background:#fff; box-shadow:0 2px 12px rgba(13,59,110,.07); }
-        textarea:focus, input[type=text]:focus { border-color:#1d4ed8 !important; box-shadow:0 0 0 3px rgba(29,78,216,.12); }
+        .rpt-hdr{background:linear-gradient(135deg,#0d3b6e,#1d4ed8);color:#fff;padding:10px 16px;border-radius:12px 12px 0 0;font-weight:900;font-size:14px;display:flex;align-items:center;gap:8px;}
+        .rpt-card{border:2px solid #c7d2e8;border-radius:14px;overflow:hidden;background:#fff;box-shadow:0 2px 12px rgba(13,59,110,.07);}
+        select.rpt-sel{border:2px solid #c7d2e8;border-radius:10px;padding:7px 10px;font-size:12px;font-weight:700;font-family:'Cairo',sans-serif;outline:none;background:#fff;color:#1a2035;width:100%;}
+        select.rpt-sel:focus{border-color:#1d4ed8;}
+        textarea:focus,input[type=text]:focus{border-color:#1d4ed8!important;box-shadow:0 0 0 3px rgba(29,78,216,.1);}
       `}</style>
 
-      {/* ══ ترويسة الصفحة ══ */}
+      {/* ── ترويسة ── */}
       <div className="rounded-2xl overflow-hidden shadow-2xl text-white"
         style={{background:"linear-gradient(135deg,#0d3b6e 0%,#1a5276 50%,#0d9488 100%)"}}>
-        <div className="flex items-stretch" style={{minHeight:90}}>
+        <div className="flex items-stretch" style={{minHeight:88}}>
           <div className="flex-1 flex flex-col justify-center text-right px-5 py-3 border-l border-white/20">
-            <div className="text-xs opacity-75">المملكة العربية السعودية</div>
+            <div className="text-xs opacity-70">المملكة العربية السعودية</div>
             <div className="font-black text-base">وزارة التعليم</div>
-            <div className="text-xs opacity-75 mt-1">إدارة تعليم — جدة</div>
+            <div className="text-xs opacity-70 mt-1">إدارة تعليم — جدة</div>
           </div>
           <div className="flex items-center justify-center px-5 gap-3">
             <div style={{width:"1.5px",height:60,background:"rgba(255,255,255,.3)",borderRadius:2}}/>
-            <img src={LOGO_URL} alt="شعار" className="h-16 w-auto" style={{filter:"brightness(0) invert(1)"}} />
+            <img src={LOGO_URL} alt="" className="h-16 w-auto" style={{filter:"brightness(0) invert(1)"}} />
             <div style={{width:"1.5px",height:60,background:"rgba(255,255,255,.3)",borderRadius:2}}/>
           </div>
           <div className="flex-1 flex flex-col justify-center text-left px-5 py-3">
             <div className="font-black text-sm">مدرسة عبيدة بن الحارث المتوسطة</div>
-            <div className="flex gap-3 mt-2 text-xs opacity-80">
-              <input value={report.acadYear||""} onChange={e=>upd("acadYear",e.target.value)}
-                className="bg-white/15 rounded-lg px-2 py-0.5 text-white placeholder-white/50 text-xs font-bold w-20 focus:outline-none border border-white/30"
-                placeholder="1447هـ" />
-              <select value={report.semester||"الأول"} onChange={e=>upd("semester",e.target.value)}
+            <div className="flex gap-2 mt-2">
+              <select value={report.acadYear} onChange={e=>upd("acadYear",e.target.value)}
                 className="bg-white/15 rounded-lg px-2 py-0.5 text-white text-xs font-bold focus:outline-none border border-white/30">
-                <option value="الأول">الفصل الأول</option>
-                <option value="الثاني">الفصل الثاني</option>
-                <option value="الثالث">الفصل الثالث</option>
+                {HIJRI_YEARS.map(y=><option key={y} value={y}>{y}</option>)}
+              </select>
+              <select value={report.semester} onChange={e=>upd("semester",e.target.value)}
+                className="bg-white/15 rounded-lg px-2 py-0.5 text-white text-xs font-bold focus:outline-none border border-white/30">
+                {SEMESTERS.map(s=><option key={s} value={s}>الفصل {s}</option>)}
               </select>
             </div>
           </div>
         </div>
-        {/* شريط العنوان */}
-        <div className="px-5 py-3" style={{background:"rgba(0,0,0,.35)"}}>
+        <div className="px-5 py-3" style={{background:"rgba(0,0,0,.32)"}}>
           <input value={report.reportTitle||""} onChange={e=>upd("reportTitle",e.target.value)}
             className="w-full bg-transparent border-b-2 border-white/50 text-white placeholder-white/40 focus:outline-none focus:border-yellow-400 font-black text-base py-1 text-center"
             placeholder="اكتب عنوان التقرير هنا..." />
         </div>
       </div>
 
-      {/* ══ جدول بيانات التنفيذ ══ */}
-      <div className="report-card">
-        <div className="report-section-hdr">📋 بيانات التنفيذ</div>
-        <div className="grid grid-cols-2 gap-4 p-4 lg:grid-cols-4">
-          <TF label="المجال" field="field" ph="النشاط الطلابي..." />
-          <TF label="المنفذ" field="executor" ph="اسم المنفذ..." />
-          <TF label="الفئة المستهدفة" field="targetGroup" ph="الطلاب..." />
-          <TF label="تاريخ التنفيذ" field="execDate" ph="1447/10/24 هـ" />
+      {/* ── بيانات التنفيذ ── */}
+      <div className="rpt-card">
+        <div className="rpt-hdr">📋 بيانات التنفيذ</div>
+        <div className="p-4 grid grid-cols-2 gap-4 lg:grid-cols-4">
+          {/* المجال */}
+          <div>
+            <label className="text-xs font-black text-gray-600 mb-1.5 block">المجال</label>
+            <select value={report.field||""} onChange={e=>upd("field",e.target.value)} className="rpt-sel">
+              {FIELDS_LIST.map(f=><option key={f} value={f}>{f}</option>)}
+            </select>
+          </div>
+          {/* المنفذ */}
+          <div>
+            <label className="text-xs font-black text-gray-600 mb-1.5 block">المنفذ</label>
+            <input value={report.executor||""} onChange={e=>upd("executor",e.target.value)}
+              placeholder="اسم المنفذ..."
+              className="w-full border-2 rounded-xl px-3 py-2 text-sm focus:outline-none"
+              style={{borderColor:"#c7d2e8"}} />
+          </div>
+          {/* الفئة المستهدفة */}
+          <div>
+            <label className="text-xs font-black text-gray-600 mb-1.5 block">الفئة المستهدفة</label>
+            <select value={report.targetGroup||""} onChange={e=>upd("targetGroup",e.target.value)} className="rpt-sel">
+              {TARGETS_LIST.map(t=><option key={t} value={t}>{t}</option>)}
+            </select>
+          </div>
+          {/* تاريخ التنفيذ */}
+          <div>
+            <label className="text-xs font-black text-gray-600 mb-1.5 block">تاريخ التنفيذ</label>
+            <div className="flex gap-1">
+              <select value={report.execDayNum||"1"} onChange={e=>upd("execDayNum",e.target.value)}
+                className="rpt-sel" style={{flex:"0 0 52px"}}>
+                {DAYS_LIST.map(d=><option key={d} value={d}>{d}</option>)}
+              </select>
+              <select value={report.execHijriMonth||"محرم"} onChange={e=>upd("execHijriMonth",e.target.value)}
+                className="rpt-sel">
+                {HIJRI_MONTHS.map(m=><option key={m} value={m}>{m}</option>)}
+              </select>
+              <select value={report.execHijriYear||"1447هـ"} onChange={e=>upd("execHijriYear",e.target.value)}
+                className="rpt-sel" style={{flex:"0 0 68px"}}>
+                {HIJRI_YEARS.map(y=><option key={y} value={y}>{y}</option>)}
+              </select>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* ══ المقدمة ══ */}
-      <div className="report-card">
-        <div className="report-section-hdr">📝 المقدمة</div>
-        <div className="p-4">
-          <TF field="intro" ph="اكتب المقدمة هنا..." rows={4} />
-        </div>
+      {/* ── المقدمة ── */}
+      <div className="rpt-card">
+        <div className="rpt-hdr">📝 المقدمة</div>
+        <div className="p-4"><TF field="intro" ph="اكتب المقدمة هنا..." rows={4} /></div>
       </div>
 
-      {/* ══ الأهداف والأنشطة ══ */}
+      {/* ── الأهداف والأنشطة ── */}
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-        <div className="report-card">
-          <div className="report-section-hdr">🎯 الأهداف</div>
-          <div className="p-4">
-            <TF field="objectives" ph="اكتب الأهداف هنا..." rows={6} />
-          </div>
+        <div className="rpt-card">
+          <div className="rpt-hdr">🎯 الأهداف</div>
+          <div className="p-4"><TF field="objectives" ph="اكتب الأهداف..." rows={6} /></div>
         </div>
-        <div className="report-card">
-          <div className="report-section-hdr">⚡ الأنشطة المنفذة</div>
-          <div className="p-4">
-            <TF field="activities" ph="اكتب الأنشطة المنفذة هنا..." rows={6} />
-          </div>
+        <div className="rpt-card">
+          <div className="rpt-hdr">⚡ الأنشطة المنفذة</div>
+          <div className="p-4"><TF field="activities" ph="اكتب الأنشطة..." rows={6} /></div>
         </div>
-        <div className="report-card">
-          <div className="report-section-hdr">✅ النتائج المتوقعة</div>
-          <div className="p-4">
-            <TF field="results" ph="اكتب النتائج المتوقعة هنا..." rows={6} />
-          </div>
+        <div className="rpt-card">
+          <div className="rpt-hdr">✅ النتائج المتوقعة</div>
+          <div className="p-4"><TF field="results" ph="اكتب النتائج..." rows={6} /></div>
         </div>
-        <div className="report-card">
-          <div className="report-section-hdr">💡 التوصيات</div>
-          <div className="p-4">
-            <TF field="recommendations" ph="اكتب التوصيات هنا..." rows={6} />
-          </div>
+        <div className="rpt-card">
+          <div className="rpt-hdr">💡 التوصيات</div>
+          <div className="p-4"><TF field="recommendations" ph="اكتب التوصيات..." rows={6} /></div>
         </div>
       </div>
 
-      {/* ══ التوقيعات ══ */}
-      <div className="report-card">
-        <div className="report-section-hdr">✍️ التوقيعات</div>
+      {/* ── التوقيعات ── */}
+      <div className="rpt-card">
+        <div className="rpt-hdr">✍️ التوقيعات</div>
         <div className="grid grid-cols-3 gap-4 p-4">
           {[
-            {roleField:"activityLeaderTitle", nameField:"activityLeader", roleDefault:"رائد النشاط"},
-            {roleField:"coordinatorTitle",   nameField:"coordinator",    roleDefault:"منسق الرياضي"},
-            {roleField:null,                  nameField:"principal",       roleDefault:"مدير المدرسة"},
+            {roleF:"activityLeaderTitle",nameF:"activityLeader",  defRole:"رائد النشاط"},
+            {roleF:"coordinatorTitle",   nameF:"coordinator",     defRole:"منسق الرياضي"},
+            {roleF:null,                 nameF:"principal",        defRole:"مدير المدرسة"},
           ].map((sig,i)=>(
             <div key={i} className="text-center p-3 rounded-xl border-2 space-y-2" style={{borderColor:"#c7d2e8"}}>
-              {sig.roleField ? (
-                <input value={report[sig.roleField]||""} onChange={e=>upd(sig.roleField,e.target.value)}
+              {sig.roleF ? (
+                <input value={report[sig.roleF]||""} onChange={e=>upd(sig.roleF,e.target.value)}
                   className="w-full text-center text-xs font-black border rounded-lg px-2 py-1 focus:outline-none"
-                  style={{color:"#64748b",borderColor:"#e2e8f0"}} placeholder={sig.roleDefault} />
+                  style={{color:"#64748b",borderColor:"#e2e8f0"}} placeholder={sig.defRole} />
               ) : (
-                <div className="text-xs font-black text-gray-500">مدير المدرسة / اسم المدير</div>
+                <div className="text-xs font-black text-gray-500">مدير المدرسة</div>
               )}
               <div style={{height:1,background:"#e2e8f0",margin:"10px 0"}}/>
-              <input value={report[sig.nameField]||""} onChange={e=>upd(sig.nameField,e.target.value)}
+              <input value={report[sig.nameF]||""} onChange={e=>upd(sig.nameF,e.target.value)}
                 className="w-full text-center font-black text-sm border-b-2 focus:outline-none bg-transparent"
                 style={{borderColor:"#0d9488",color:"#0d3b6e"}} placeholder="الاسم" />
             </div>
@@ -12289,27 +12334,29 @@ body{font-family:'Cairo',sans-serif;background:#fff;color:#1a2035;direction:rtl;
         </div>
       </div>
 
-      {/* ══ الشواهد (6 صور) ══ */}
-      <div className="report-card">
-        <div className="report-section-hdr">📸 شواهد التقرير</div>
+      {/* ── الشواهد 6 صور ── */}
+      <div className="rpt-card">
+        <div className="rpt-hdr">📸 شواهد التقرير (6 صور)</div>
         <div className="p-4 grid grid-cols-2 gap-4 lg:grid-cols-3">
-          {[0,1,2,3,4,5].map(i => <WitnessCard key={i} idx={i} />)}
+          {[0,1,2,3,4,5].map(i=><WitnessCard key={i} idx={i} />)}
         </div>
       </div>
 
-      {/* ══ أزرار التحكم ══ */}
-      <div className="flex gap-3 flex-wrap justify-between items-center rounded-2xl p-4 shadow-lg"
+      {/* ── شريط التحكم ── */}
+      <div className="flex gap-3 flex-wrap justify-between items-center rounded-2xl p-4 shadow-lg text-white"
         style={{background:"linear-gradient(135deg,#0d3b6e,#0d9488)"}}>
-        <div className="flex items-center gap-2 text-white text-sm font-black">
-          {saved ? <><span className="text-green-300">✅</span><span>تم الحفظ</span></> : <><span className="animate-pulse">💾</span><span>يحفظ تلقائياً</span></>}
+        <div className="flex items-center gap-2 text-sm font-black">
+          {saving ? <><span className="animate-pulse">💾</span><span>يحفظ…</span></>
+                  : saved  ? <><span className="text-green-300">✅</span><span>تم الحفظ</span></>
+                           : <><span>☁️</span><span className="opacity-60">يحفظ تلقائياً</span></>}
         </div>
         <div className="flex gap-3">
-          <button onClick={()=>setReport(EMPTY)}
+          <button onClick={()=>{ if(confirm("إعادة تعيين جميع البيانات؟")) setReport(EMPTY); }}
             className="px-5 py-2.5 rounded-xl font-black text-sm text-white/80 border border-white/30 hover:bg-white/10">
             🔄 إعادة تعيين
           </button>
           <button onClick={printReport}
-            className="px-6 py-2.5 rounded-xl font-black text-sm shadow-lg hover:shadow-xl transition-all"
+            className="px-6 py-2.5 rounded-xl font-black text-sm shadow-lg"
             style={{background:"linear-gradient(135deg,#f59e0b,#d97706)",color:"#fff"}}>
             🖨️ طباعة / PDF
           </button>
@@ -25328,13 +25375,27 @@ export default function SchoolWebsite() {
   const [user, setUser] = useState(null);
   const [parentPortal,        setParentPortal]        = useState(false);
   const [perfStandardsPortal,  setPerfStandardsPortal]  = useState(false);
+  const [urlSurvey, setUrlSurvey] = useState(null); // for ?survey=ID direct access
   const [suggestionsPortal,    setSuggestionsPortal]    = useState(false);
 
-  // استمع لطلب فتح بوابة التقويم الذاتي من داخل بوابة المعلم
+  // استمع لطلب فتح بوابة التقويم الذاتي
   useEffect(() => {
     const handler = () => { setTeacherProfilePortal(false); setPerfStandardsPortal(true); };
     window.addEventListener("open-perf-portal", handler);
     return () => window.removeEventListener("open-perf-portal", handler);
+  }, []);
+
+  // استمع لفتح استبيان عبر URL
+  useEffect(() => {
+    const handler = (e) => {
+      const sid = e.detail;
+      DB.get("school-surveys", []).then(arr => {
+        const found = Array.isArray(arr) ? arr.find(s => s.id === sid) : null;
+        if (found) setUrlSurvey(found);
+      });
+    };
+    window.addEventListener("open-survey-url", handler);
+    return () => window.removeEventListener("open-survey-url", handler);
   }, []);
   const [teacherProfilePortal, setTeacherProfilePortal] = useState(false);
   const [studentRaffle,       setStudentRaffle]       = useState(false);
@@ -25365,6 +25426,15 @@ export default function SchoolWebsite() {
   const [excuseFromHash, setExcuseFromHash] = useState(() =>
     window.location.hash.replace("#","") === "excuses"
   );
+
+  // Handle ?survey=ID URL param
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const surveyId = params.get("survey");
+    if (surveyId) {
+      window.dispatchEvent(new CustomEvent("open-survey-url", { detail: Number(surveyId) }));
+    }
+  }, []);
 
   useEffect(() => {
     const h = () => {
@@ -25404,7 +25474,7 @@ export default function SchoolWebsite() {
           DB.get("school-font", "'Noto Naskh Arabic', serif"),
           DB.get("school-class-list", []),
           DB.get("school-messages", []),
-          DB.get("school-surveys", []),
+          DB.get("school-surveys", (() => { try { const c=localStorage.getItem('school_surveys_cache'); return c?JSON.parse(c):[]; } catch{return [];} })()),
           DB.get("school-week-archive", []),
         ]);
 
@@ -25597,7 +25667,10 @@ export default function SchoolWebsite() {
     setMessages(updated);
     await saveMessages(updated);
   };
-  const saveSurveys = (v) => DB.set("school-surveys", v);
+  const saveSurveys = (v) => {
+    try { localStorage.setItem("school_surveys_cache", JSON.stringify(v)); } catch {}
+    DB.set("school-surveys", v);
+  };
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center" style={{ background: "linear-gradient(135deg, #f0fdfa 0%, #ecfdf5 50%, #f5f5f4 100%)" }}>
@@ -25615,6 +25688,9 @@ export default function SchoolWebsite() {
   if (!user && studentRaffle) return <StudentRafflePortal siteFont={siteFont} onBack={() => setStudentRaffle(false)} />;
   if (!user && perfStandardsPortal) return <PerformanceStandardsPortal siteFont={siteFont} onBack={() => setPerfStandardsPortal(false)} />;
   if (suggestionsPortal) return <SuggestionsPortal siteFont={siteFont} onBack={() => setSuggestionsPortal(false)} classList={classList} />;
+  if (urlSurvey) return (
+    <SurveyRespond survey={urlSurvey} onClose={()=>setUrlSurvey(null)} />
+  );
   if (teacherProfilePortal) return <TeacherProfilePortal siteFont={siteFont} onBack={() => { setTeacherProfilePortal(false); window.location.hash = user ? "home" : ""; }} attendance={attendance} teachers={teachers} week={week} />;
   if (!user && parentPortal) return <ParentPortal classList={classList} setClassList={setClassList} saveClass={saveClass} messages={messages} setMessages={setMessages} saveMessages={saveMessages} surveys={surveys} setSurveys={setSurveys} saveSurveys={saveSurveys} siteFont={siteFont} onBack={() => setParentPortal(false)} onSuggestions={() => { setParentPortal(false); setSuggestionsPortal(true); }} />;
   if (!user) return <LoginPage users={users} onLogin={setUser} siteFont={siteFont} onParentPortal={() => setParentPortal(true)} onTeacherPortal={() => setPerfStandardsPortal(true)} onTeacherProfile={() => setTeacherProfilePortal(true)} onStudentRaffle={() => setStudentRaffle(true)} onPublicAnnouncements={() => setPublicAnnouncements(true)} onExcusePortal={() => setExcusePortal(true)} onSuggestions={() => setSuggestionsPortal(true)} />;
