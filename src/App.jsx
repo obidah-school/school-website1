@@ -23323,6 +23323,17 @@ function DailyAttendanceTrackerPage({ teachers }) {
     return {...s, total:recs.length};
   };
 
+  // حذف جميع سجلات معلم
+  const deleteTeacherRecords = (name) => {
+    if (!window.confirm(`هل تريد حذف جميع سجلات "${name}"؟ لا يمكن التراجع.`)) return;
+    persist(records.filter(r=>r.teacherName!==name));
+  };
+
+  // تثبيت المدخلات
+  const [pinnedTeachers, setPinnedTeachers] = useState({});
+  const togglePin = (name) => setPinnedTeachers(p=>({...p,[name]:!p[name]}));
+  const isPinned = (name) => !!pinnedTeachers[name];
+
   const printReport = () => {
     const rows = filtered.map(t=>{
       const r=getRec(t), si=getStatusInfo(r.status||""), at=getAbsTypeInfo(r.absenceType||"");
@@ -23679,22 +23690,37 @@ function DailyAttendanceTrackerPage({ teachers }) {
             return (
               <div key={ti} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                 {/* رأس المعلم */}
-                <div className="px-5 py-3 font-black text-sm text-white flex items-center justify-between"
-                  style={{background:"linear-gradient(135deg,#065f46,#0d9488)"}}>
+                <div className="px-5 py-3 font-black text-sm text-white flex items-center justify-between flex-wrap gap-2"
+                  style={{background:isPinned(teacher)?"linear-gradient(135deg,#1e3a5f,#1d4ed8)":"linear-gradient(135deg,#065f46,#0d9488)"}}>
                   <div className="flex items-center gap-2">
                     <span>👨‍🏫</span>
                     <span>{teacher}</span>
+                    {isPinned(teacher) && <span className="text-xs px-2 py-0.5 rounded-full font-black" style={{background:"rgba(255,255,255,0.25)"}}>📌 مثبّت</span>}
                   </div>
-                  <div className="flex gap-3 text-xs">
+                  <div className="flex items-center gap-2 flex-wrap">
                     {STATUS_OPTIONS.map(s=>(
-                      <span key={s.val} className="px-2 py-0.5 rounded-full font-black"
+                      <span key={s.val} className="px-2 py-0.5 rounded-full font-black text-xs"
                         style={{background:"rgba(255,255,255,0.2)"}}>
                         {s.val}: {stats[s.val]}
                       </span>
                     ))}
-                    <span className="px-2 py-0.5 rounded-full font-black" style={{background:"rgba(255,255,255,0.3)"}}>
+                    <span className="px-2 py-0.5 rounded-full font-black text-xs" style={{background:"rgba(255,255,255,0.3)"}}>
                       المجموع: {stats.total}
                     </span>
+                    {/* زر تثبيت */}
+                    <button onClick={()=>togglePin(teacher)}
+                      className="px-3 py-1 rounded-xl text-xs font-black transition-all"
+                      style={{background:isPinned(teacher)?"#fbbf24":"rgba(255,255,255,0.2)",color:isPinned(teacher)?"#1e3a5f":"#fff",border:"1.5px solid rgba(255,255,255,0.4)"}}>
+                      {isPinned(teacher)?"📌 مثبّت — إلغاء":"📌 تثبيت"}
+                    </button>
+                    {/* زر حذف */}
+                    {!isPinned(teacher) && (
+                      <button onClick={()=>deleteTeacherRecords(teacher)}
+                        className="px-3 py-1 rounded-xl text-xs font-black transition-all"
+                        style={{background:"rgba(220,38,38,0.7)",color:"#fff",border:"1.5px solid rgba(255,255,255,0.3)"}}>
+                        🗑️ حذف السجلات
+                      </button>
+                    )}
                   </div>
                 </div>
 
