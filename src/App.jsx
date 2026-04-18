@@ -23242,6 +23242,28 @@ function DailyAttendanceTrackerPage({ teachers }) {
   const [selGregM,  setSelGregM]  = useState(GREG_MONTHS[new Date().getMonth()]);
   const [selGregY,  setSelGregY]  = useState(2026);
 
+  // ── تحويل هجري → ميلادي عند تغيير أي من حقول الهجري ──
+  const updateGregFromHijri = (dayNum, hijriM, hijriY) => {
+    try {
+      const hMonthIdx = HIJRI_MONTHS.indexOf(hijriM) + 1;
+      if (hMonthIdx < 1) return;
+      const d = hijriToGregorian(hijriY, hMonthIdx, dayNum);
+      setSelGregM(GREG_MONTHS[d.getMonth()]);
+      setSelGregY(d.getFullYear());
+    } catch(e) {}
+  };
+
+  // ── تحويل ميلادي → هجري عند تغيير أي من حقول الميلادي ──
+  const updateHijriFromGreg = (dayNum, gregM, gregY) => {
+    try {
+      const gMonthIdx = GREG_MONTHS.indexOf(gregM) + 1;
+      if (gMonthIdx < 1) return;
+      const h = gregorianToHijri(gregY, gMonthIdx, dayNum);
+      setSelHijriM(HIJRI_MONTHS[h.m - 1]);
+      setSelHijriY(h.y);
+    } catch(e) {}
+  };
+
   const dateKey = `${selDayNum}-${selHijriM}-${selHijriY}`;
 
   useEffect(() => {
@@ -23421,22 +23443,59 @@ function DailyAttendanceTrackerPage({ teachers }) {
             style={{background:"linear-gradient(135deg,#1e3a5f,#1d4ed8)"}}>
             <span>📅</span> اليوم والتاريخ
           </div>
-          <div className="p-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-            {[
-              {label:"اليوم",        val:selDay,    set:setSelDay,    opts:DAYS_AR.map(d=>({v:d,l:d}))},
-              {label:"رقم اليوم",    val:selDayNum, set:e=>setSelDayNum(Number(e)), opts:DAYS_LIST.map(d=>({v:d,l:d}))},
-              {label:"الشهر الهجري", val:selHijriM, set:setSelHijriM, opts:HIJRI_MONTHS.map(m=>({v:m,l:m}))},
-              {label:"السنة الهجرية",val:selHijriY, set:e=>setSelHijriY(Number(e)), opts:HIJRI_YEARS.map(y=>({v:y,l:y+"هـ"}))},
-              {label:"الشهر الميلادي",val:selGregM, set:setSelGregM, opts:GREG_MONTHS.map(m=>({v:m,l:m}))},
-            ].map(f=>(
-              <div key={f.label}>
-                <label className="text-xs font-black text-gray-500 mb-1.5 block">{f.label}</label>
-                <select value={f.val} onChange={e=>f.set(e.target.value)}
-                  className="w-full px-3 py-2.5 rounded-xl border-2 border-gray-200 focus:border-blue-400 focus:outline-none text-sm font-bold bg-white">
-                  {f.opts.map(o=><option key={o.v} value={o.v}>{o.l}</option>)}
-                </select>
-              </div>
-            ))}
+          <div className="p-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+            {/* اليوم */}
+            <div>
+              <label className="text-xs font-black text-gray-500 mb-1.5 block">اليوم</label>
+              <select value={selDay} onChange={e=>setSelDay(e.target.value)}
+                className="w-full px-3 py-2.5 rounded-xl border-2 border-gray-200 focus:border-blue-400 focus:outline-none text-sm font-bold bg-white">
+                {DAYS_AR.map(d=><option key={d} value={d}>{d}</option>)}
+              </select>
+            </div>
+            {/* رقم اليوم */}
+            <div>
+              <label className="text-xs font-black text-gray-500 mb-1.5 block">رقم اليوم</label>
+              <select value={selDayNum} onChange={e=>{const v=Number(e.target.value);setSelDayNum(v);updateGregFromHijri(v,selHijriM,selHijriY);}}
+                className="w-full px-3 py-2.5 rounded-xl border-2 border-gray-200 focus:border-blue-400 focus:outline-none text-sm font-bold bg-white">
+                {DAYS_LIST.map(d=><option key={d} value={d}>{d}</option>)}
+              </select>
+            </div>
+            {/* الشهر الهجري */}
+            <div>
+              <label className="text-xs font-black mb-1.5 block" style={{color:"#b45309"}}>{"🌙 الشهر الهجري"}</label>
+              <select value={selHijriM} onChange={e=>{setSelHijriM(e.target.value);updateGregFromHijri(selDayNum,e.target.value,selHijriY);}}
+                className="w-full px-3 py-2.5 rounded-xl border-2 focus:outline-none text-sm font-bold bg-white"
+                style={{borderColor:"#fde68a"}}>
+                {HIJRI_MONTHS.map(m=><option key={m} value={m}>{m}</option>)}
+              </select>
+            </div>
+            {/* السنة الهجرية */}
+            <div>
+              <label className="text-xs font-black mb-1.5 block" style={{color:"#b45309"}}>{"🌙 السنة الهجرية"}</label>
+              <select value={selHijriY} onChange={e=>{const v=Number(e.target.value);setSelHijriY(v);updateGregFromHijri(selDayNum,selHijriM,v);}}
+                className="w-full px-3 py-2.5 rounded-xl border-2 focus:outline-none text-sm font-bold bg-white"
+                style={{borderColor:"#fde68a"}}>
+                {HIJRI_YEARS.map(y=><option key={y} value={y}>{y+"هـ"}</option>)}
+              </select>
+            </div>
+            {/* الشهر الميلادي */}
+            <div>
+              <label className="text-xs font-black mb-1.5 block" style={{color:"#0369a1"}}>{"☀️ الشهر الميلادي"}</label>
+              <select value={selGregM} onChange={e=>{setSelGregM(e.target.value);updateHijriFromGreg(selDayNum,e.target.value,selGregY);}}
+                className="w-full px-3 py-2.5 rounded-xl border-2 focus:outline-none text-sm font-bold bg-white"
+                style={{borderColor:"#bae6fd"}}>
+                {GREG_MONTHS.map(m=><option key={m} value={m}>{m}</option>)}
+              </select>
+            </div>
+            {/* السنة الميلادية */}
+            <div>
+              <label className="text-xs font-black mb-1.5 block" style={{color:"#0369a1"}}>{"☀️ السنة الميلادية"}</label>
+              <select value={selGregY} onChange={e=>{const v=Number(e.target.value);setSelGregY(v);updateHijriFromGreg(selDayNum,selGregM,v);}}
+                className="w-full px-3 py-2.5 rounded-xl border-2 focus:outline-none text-sm font-bold bg-white"
+                style={{borderColor:"#bae6fd"}}>
+                {Array.from({length:10},(_,i)=>2023+i).map(y=><option key={y} value={y}>{y+"م"}</option>)}
+              </select>
+            </div>
           </div>
           <div className="mx-4 mb-4 rounded-xl px-4 py-2.5 flex items-center justify-between gap-3" style={{background:"#eff6ff"}}>
             <span className="font-black text-sm" style={{color:"#1d4ed8"}}>
