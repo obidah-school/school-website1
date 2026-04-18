@@ -8831,6 +8831,7 @@ ${link}
   };
 
   return (
+    <>
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden mb-3">
       {/* رأس الطالب */}
       <div className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-gray-50 transition-all"
@@ -9390,6 +9391,7 @@ ${link}
     </div>
     {/* Lightbox مكبّر الصور */}
     {lightbox && <ImageLightbox src={lightbox.src} name={lightbox.name} onClose={()=>setLightbox(null)} />}
+    </>
   );
 }
 
