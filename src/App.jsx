@@ -8510,16 +8510,16 @@ function StudentEvalCard({ student, onUpdate, onDelete, onSendNote, messages }) 
       const sid = student.nationalId || "";
       const noteLink = siteUrl + (sid ? "?studentnote=" + sid : "");
       const msg = encodeURIComponent(
-        "السلام عليكم ورحمة الله وبركاته
-ولي أمر الطالب / " + student.name + "
+        `السلام عليكم ورحمة الله وبركاته
+ولي أمر الطالب / ${student.name}
 
 لديكم ملاحظة جديدة من معلم ابنكم.
 يرجى الاطلاع عليها والرد:
-" + noteLink + "
+${noteLink}
 
-📌 رقم هوية الطالب: " + (sid||"—") + "
+📌 رقم هوية الطالب: ${sid||"—"}
 
-مع تحيات مدرسة عبيدة بن الحارث المتوسطة"
+مع تحيات مدرسة عبيدة بن الحارث المتوسطة`
       );
       window.open("https://wa.me/" + phone + "?text=" + msg, "_blank");
     }
