@@ -232,6 +232,72 @@ const DEFAULT_USERS = [
   { username: import.meta.env.VITE_WAKIL_USER || "wakil", password: import.meta.env.VITE_WAKIL_PASS || "wakil123", role: "وكيل", name: "وكيل شؤون المعلمين" },
 ];
 
+
+// ═══════════════════════════════════════════════════════════════
+// بوابة إداري الغياب — دخول برقم الهوية
+// ═══════════════════════════════════════════════════════════════
+function AbsenceAdminPortal({ onBack }) {
+  const [step, setStep] = React.useState("login"); // login | main
+  const [nationalId, setNationalId] = React.useState("");
+  const [adminInfo, setAdminInfo] = React.useState(null);
+  const [error, setError] = React.useState("");
+
+  const handleLogin = async () => {
+    const id = nationalId.trim();
+    if (!id) { setError("أدخل رقم الهوية الوطنية"); return; }
+    const admins = await DB.get("school-absence-admins", []);
+    const found = admins.find(a => a.nationalId === id);
+    if (!found) { setError("رقم الهوية غير مسجّل أو غير مخوّل"); return; }
+    setAdminInfo(found);
+    setStep("main");
+  };
+
+  if (step === "login") return (
+    <div dir="rtl" style={{minHeight:"100vh",background:"linear-gradient(135deg,#0d3b6e,#0d9488)",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Cairo',sans-serif",padding:16}}>
+      <div style={{background:"#fff",borderRadius:24,padding:32,width:"100%",maxWidth:400,boxShadow:"0 20px 60px rgba(0,0,0,.3)"}}>
+        <div style={{textAlign:"center",marginBottom:24}}>
+          <div style={{fontSize:48,marginBottom:8}}>🎒</div>
+          <h2 style={{fontWeight:900,fontSize:20,color:"#0d3b6e",margin:0}}>بوابة غياب الطلاب</h2>
+          <p style={{fontSize:12,color:"#64748b",marginTop:4}}>أدخل رقم هويتك الوطنية للدخول</p>
+        </div>
+        <input
+          value={nationalId} onChange={e=>{setNationalId(e.target.value);setError("");}}
+          onKeyDown={e=>e.key==="Enter"&&handleLogin()}
+          placeholder="رقم الهوية الوطنية"
+          style={{width:"100%",padding:"12px 16px",borderRadius:12,border:"2px solid #e2e8f0",fontSize:16,fontFamily:"'Cairo',sans-serif",marginBottom:12,boxSizing:"border-box",textAlign:"center",letterSpacing:2}}
+        />
+        {error && <p style={{color:"#dc2626",fontSize:13,textAlign:"center",marginBottom:8,fontWeight:700}}>{error}</p>}
+        <button onClick={handleLogin}
+          style={{width:"100%",padding:"13px",borderRadius:12,background:"linear-gradient(135deg,#0d3b6e,#0d9488)",color:"#fff",fontWeight:900,fontSize:15,border:"none",cursor:"pointer",fontFamily:"'Cairo',sans-serif"}}>
+          دخول
+        </button>
+        <button onClick={onBack}
+          style={{width:"100%",padding:"10px",borderRadius:12,background:"#f1f5f9",color:"#64748b",fontWeight:700,fontSize:13,border:"none",cursor:"pointer",fontFamily:"'Cairo',sans-serif",marginTop:8}}>
+          ← رجوع
+        </button>
+      </div>
+    </div>
+  );
+
+  return (
+    <div dir="rtl" style={{minHeight:"100vh",background:"#f8fafd",fontFamily:"'Cairo',sans-serif"}}>
+      {/* رأس الصفحة */}
+      <div style={{background:"linear-gradient(135deg,#0d3b6e,#0d9488)",color:"#fff",padding:"16px 20px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+        <div>
+          <div style={{fontWeight:900,fontSize:16}}>🎒 غياب الطلاب</div>
+          <div style={{fontSize:12,opacity:.8}}>مرحباً {adminInfo.name}</div>
+        </div>
+        <button onClick={()=>{setStep("login");setNationalId("");setAdminInfo(null);}}
+          style={{background:"rgba(255,255,255,.2)",border:"none",color:"#fff",borderRadius:10,padding:"6px 14px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"'Cairo',sans-serif"}}>
+          خروج
+        </button>
+      </div>
+      {/* صفحة الغياب */}
+      <StudentAbsencePage adminMode={true} />
+    </div>
+  );
+}
+
 const FONTS = [
   { label: "نوتو نسخ", value: "'Noto Naskh Arabic', serif" },
   { label: "نوتو كوفي", value: "'Noto Kufi Arabic', sans-serif" },
@@ -956,7 +1022,7 @@ function PublicAnnouncementsPage({ announcements, siteFont, onLogin, onTeacherPo
   );
 }
 
-function LoginPage({ users, onLogin, siteFont, onParentPortal, onTeacherPortal, onStudentRaffle, onPublicAnnouncements, onExcusePortal, onTeacherProfile, onSuggestions }) {
+function LoginPage({ users, onLogin, siteFont, onParentPortal, onTeacherPortal, onStudentRaffle, onPublicAnnouncements, onExcusePortal, onTeacherProfile, onSuggestions, onAbsenceAdmin }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -1021,6 +1087,11 @@ function LoginPage({ users, onLogin, siteFont, onParentPortal, onTeacherPortal, 
               className="w-full py-3 rounded-xl font-bold hover:shadow-lg transition-all text-sm text-white mt-2"
               style={{ background: "linear-gradient(135deg,#1e3a5f,#1d4ed8)" }}>
               📋 بوابة الأعذار — تقديم عذر غياب طالب
+            </button>
+            <button onClick={onAbsenceAdmin}
+              className="w-full py-3 rounded-xl font-bold hover:shadow-lg transition-all text-sm text-white mt-2"
+              style={{ background: "linear-gradient(135deg,#065f46,#047857)" }}>
+              🎒 بوابة إداري الغياب — تسجيل غياب الطلاب
             </button>
           </div>
 
@@ -1239,6 +1310,7 @@ function HomePage({ teachers, announcements, activities, navigate, attendance, w
           {id:"portfolio",     icon:"📁",  label:"ملف الطالب",     grad:"linear-gradient(135deg,#8b5cf6,#7c3aed)", glow:"rgba(139,92,246,.35)"},
           {id:"meetings",      icon:"📅",  label:"الاجتماعات",     grad:"linear-gradient(135deg,#0891b2,#0e7490)", glow:"rgba(8,145,178,.35)"},
           {id:"settings",      icon:"⚙️",  label:"الإعدادات",      grad:"linear-gradient(135deg,#64748b,#475569)", glow:"rgba(100,116,139,.35)"},
+          {id:"student-absence", icon:"🎒", label:"غياب الطلاب",    grad:"linear-gradient(135deg,#065f46,#047857)", glow:"rgba(6,95,70,.35)"},
         ].map(p=>(
           <button key={p.id} onClick={()=>navigate(p.id)}
             className="rounded-2xl flex flex-col items-center gap-2 transition-all relative overflow-hidden group"
@@ -20659,6 +20731,86 @@ function SettingsPage({ teachers, setTeachers, saveTeachers, week, setWeek, save
   return (
     <div>
       <h2 className="text-2xl font-black text-teal-900 mb-6">إعدادات النظام</h2>
+
+      {/* ===== إداريو الغياب ===== */}
+      {(()=>{
+        const [admins, setAdmins] = React.useState([]);
+        const [newName, setNewName] = React.useState("");
+        const [newId, setNewId] = React.useState("");
+        const [saving, setSaving] = React.useState(false);
+        const [saved, setSaved] = React.useState(false);
+
+        React.useEffect(()=>{ DB.get("school-absence-admins",[]).then(d=>setAdmins(Array.isArray(d)?d:[])); },[]);
+
+        const persist = async (list) => {
+          setSaving(true);
+          await DB.set("school-absence-admins", list);
+          setSaving(false); setSaved(true);
+          setTimeout(()=>setSaved(false),1800);
+        };
+
+        const addAdmin = () => {
+          if (!newName.trim() || !newId.trim()) return;
+          if (admins.find(a=>a.nationalId===newId.trim())) { alert("هذا الرقم مسجّل مسبقاً"); return; }
+          const list = [...admins, { name: newName.trim(), nationalId: newId.trim(), addedAt: new Date().toISOString() }];
+          setAdmins(list); persist(list); setNewName(""); setNewId("");
+        };
+
+        const removeAdmin = (id) => {
+          if (!window.confirm("هل تريد حذف هذا الإداري؟")) return;
+          const list = admins.filter(a=>a.nationalId!==id);
+          setAdmins(list); persist(list);
+        };
+
+        return (
+          <div className="bg-white rounded-2xl p-5 shadow-sm border border-emerald-100 mb-6">
+            <h3 className="font-bold text-gray-800 mb-1 flex items-center gap-2">
+              🎒 إداريو غياب الطلاب
+              {saving && <span className="text-xs text-amber-600 font-bold">💾 يحفظ…</span>}
+              {saved  && <span className="text-xs text-emerald-600 font-bold">✅ تم الحفظ</span>}
+            </h3>
+            <p className="text-xs text-gray-400 mb-4">أضف الإداريين المخوّلين بتسجيل غياب الطلاب. يدخلون عبر رقم هويتهم الوطنية فقط.</p>
+
+            {/* إضافة إداري */}
+            <div className="flex gap-2 mb-4 flex-wrap">
+              <input value={newName} onChange={e=>setNewName(e.target.value)} placeholder="اسم الإداري"
+                className="flex-1 min-w-32 px-3 py-2 rounded-xl border-2 border-gray-200 text-sm focus:border-emerald-400 focus:outline-none" />
+              <input value={newId} onChange={e=>setNewId(e.target.value)} placeholder="رقم الهوية الوطنية"
+                onKeyDown={e=>e.key==="Enter"&&addAdmin()}
+                className="flex-1 min-w-36 px-3 py-2 rounded-xl border-2 border-gray-200 text-sm focus:border-emerald-400 focus:outline-none" />
+              <button onClick={addAdmin}
+                className="px-4 py-2 rounded-xl text-white text-sm font-black"
+                style={{background:"linear-gradient(135deg,#065f46,#0d9488)"}}>
+                ➕ إضافة
+              </button>
+            </div>
+
+            {/* قائمة الإداريين */}
+            {admins.length === 0 ? (
+              <div className="text-center py-6 text-gray-400 text-sm border-2 border-dashed border-gray-200 rounded-xl">
+                لا يوجد إداريون مضافون بعد
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {admins.map((a,i)=>(
+                  <div key={i} className="flex items-center justify-between px-4 py-3 rounded-xl border border-emerald-100" style={{background:"#f0fdf4"}}>
+                    <div>
+                      <div className="font-black text-sm text-gray-800">{a.name}</div>
+                      <div className="text-xs text-gray-500 font-mono mt-0.5">🪪 {a.nationalId}</div>
+                    </div>
+                    <button onClick={()=>removeAdmin(a.nationalId)}
+                      className="text-xs px-3 py-1.5 rounded-xl font-black"
+                      style={{background:"#fee2e2",color:"#dc2626"}}>
+                      🗑️ حذف
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
       <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 mb-6">
         <h3 className="font-bold text-gray-800 mb-4">🔤 خط الموقع</h3>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
@@ -26666,6 +26818,7 @@ export default function SchoolWebsite() {
   const [studentRaffle,       setStudentRaffle]       = useState(false);
   const [publicAnnouncements, setPublicAnnouncements] = useState(false);
   const [excusePortal,        setExcusePortal]        = useState(false);
+  const [absenceAdminPortal,  setAbsenceAdminPortal]  = useState(false);
   const [page, setPage] = useState("home");
   const [menuOpen, setMenuOpen] = useState(false);
   const [showExtra, setShowExtra] = useState(false);
@@ -26971,7 +27124,8 @@ export default function SchoolWebsite() {
   );
   if (teacherProfilePortal) return <TeacherProfilePortal siteFont={siteFont} onBack={() => { setTeacherProfilePortal(false); window.location.hash = user ? "home" : ""; }} attendance={attendance} teachers={teachers} week={week} />;
   if (!user && parentPortal) return <ParentPortal classList={classList} setClassList={setClassList} saveClass={saveClass} messages={messages} setMessages={setMessages} saveMessages={saveMessages} surveys={surveys} setSurveys={setSurveys} saveSurveys={saveSurveys} siteFont={siteFont} initialStudentId={parentStudentId} onBack={() => { setParentPortal(false); setParentStudentId(null); window.location.hash = ""; }} onSuggestions={() => { setParentPortal(false); setSuggestionsPortal(true); }} />;
-  if (!user) return <LoginPage users={users} onLogin={setUser} siteFont={siteFont} onParentPortal={() => setParentPortal(true)} onTeacherPortal={() => setPerfStandardsPortal(true)} onTeacherProfile={() => setTeacherProfilePortal(true)} onStudentRaffle={() => setStudentRaffle(true)} onPublicAnnouncements={() => setPublicAnnouncements(true)} onExcusePortal={() => setExcusePortal(true)} onSuggestions={() => setSuggestionsPortal(true)} />;
+  if (!user && absenceAdminPortal) return <AbsenceAdminPortal onBack={() => setAbsenceAdminPortal(false)} />;
+  if (!user) return <LoginPage users={users} onLogin={setUser} siteFont={siteFont} onParentPortal={() => setParentPortal(true)} onTeacherPortal={() => setPerfStandardsPortal(true)} onTeacherProfile={() => setTeacherProfilePortal(true)} onStudentRaffle={() => setStudentRaffle(true)} onPublicAnnouncements={() => setPublicAnnouncements(true)} onExcusePortal={() => setExcusePortal(true)} onSuggestions={() => setSuggestionsPortal(true)} onAbsenceAdmin={() => setAbsenceAdminPortal(true)} />;
 
   const pages = [
     { id: "home",            label: "الرئيسية",        icon: "🏡" },
