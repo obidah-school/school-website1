@@ -9600,7 +9600,7 @@ function SurveyBuilder({ survey, onSave, onCancel }) {
       `}</style>
 
       {/* رأس البناء */}
-      <div className="rounded-2xl overflow-hidden shadow-xl mb-4" style={{background:`linear-gradient(135deg,${pal.h1},${pal.h2})`}}>
+      <div className="rounded-2xl overflow-hidden shadow-xl mb-4" style={{background:"linear-gradient(135deg,"+pal.h1+","+pal.h2+")"}}>
         <div className="flex items-center justify-between px-5 py-4">
           <span className="font-black text-white text-lg">🛠️ {s.id===survey.id && s.title ? "تعديل الاستبيان" : "استبيان جديد"}</span>
           <div className="flex gap-2">
@@ -9679,7 +9679,7 @@ function SurveyBuilder({ survey, onSave, onCancel }) {
                 {SURVEY_PALETTES.map((p,i)=>(
                   <button key={i} onClick={()=>setS(prev=>({...prev,palette:i}))}
                     className="w-7 h-7 rounded-full border-4 transition-transform hover:scale-110"
-                    style={{background:`linear-gradient(135deg,${p.h1},${p.h2})`,borderColor:s.palette===i?"#fff":"transparent"}} />
+                    style={{background:"linear-gradient(135deg,"+p.h1+","+p.h2+")",borderColor:s.palette===i?"#fff":"transparent"}} />
                 ))}
               </div>
             </div>
@@ -9842,14 +9842,14 @@ function SurveyRespond({ survey, onClose, prefillId }) {
 
   if (submitted) return (
     <div className="min-h-screen flex items-center justify-center p-4"
-      style={{background:`linear-gradient(135deg,${pal.h1},${pal.h2})`}}>
+      style={{background:"linear-gradient(135deg,"+pal.h1+","+pal.h2+")"}}>
       <div className="bg-white rounded-3xl p-10 shadow-2xl text-center max-w-sm w-full">
         <div className="text-7xl mb-4">🎉</div>
         <h3 className="font-black text-2xl text-gray-800 mb-2">شكراً لمشاركتك!</h3>
         <p className="text-gray-500 text-sm mb-6">تم استلام إجابتك بنجاح</p>
         <button onClick={onClose}
           className="w-full py-3 rounded-2xl font-black text-white"
-          style={{background:`linear-gradient(135deg,${pal.h1},${pal.h2})`}}>
+          style={{background:"linear-gradient(135deg,"+pal.h1+","+pal.h2+")"}}>
           العودة
         </button>
       </div>
@@ -9858,7 +9858,7 @@ function SurveyRespond({ survey, onClose, prefillId }) {
 
   return (
     <div className="min-h-screen" dir="rtl"
-      style={{background:`linear-gradient(160deg,${pal.h1} 0%,${pal.h2} 60%,${pal.bg} 100%)`,fontFamily:"'Cairo',sans-serif"}}>
+      style={{background:"linear-gradient(160deg,"+pal.h1+" 0%,"+pal.h2+" 60%,"+pal.bg+" 100%)",fontFamily:"'Cairo',sans-serif"}}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;800;900&display=swap');`}</style>
 
       {/* رأس الصفحة */}
@@ -9891,7 +9891,7 @@ function SurveyRespond({ survey, onClose, prefillId }) {
             {idError && <div className="text-red-500 text-sm text-center font-bold mb-3">{idError}</div>}
             <button onClick={handleLogin}
               className="w-full py-4 rounded-2xl font-black text-white text-base"
-              style={{background:`linear-gradient(135deg,${pal.h1},${pal.h2})`}}>
+              style={{background:"linear-gradient(135deg,"+pal.h1+","+pal.h2+")"}}>
               متابعة ◄
             </button>
           </div>
@@ -9904,7 +9904,7 @@ function SurveyRespond({ survey, onClose, prefillId }) {
               const ans = answers[q.id];
               return (
                 <div key={q.id} className="bg-white rounded-2xl shadow-md overflow-hidden"
-                  style={{border:`2px solid ${pal.border}`}}>
+                  style={{border:"2px solid "+pal.border}}>
                   <div className="px-4 py-3" style={{background:pal.light}}>
                     <div className="font-black text-sm text-gray-800 flex items-center gap-2">
                       {q.emoji && <span className="text-xl">{q.emoji}</span>}
@@ -9994,7 +9994,7 @@ function SurveyRespond({ survey, onClose, prefillId }) {
 
             <button onClick={submit} disabled={submitting}
               className="w-full py-4 rounded-2xl font-black text-white text-base shadow-xl"
-              style={{background:submitting?"#9ca3af":`linear-gradient(135deg,${pal.h1},${pal.h2})`}}>
+              style={{background:submitting?"#9ca3af":"linear-gradient(135deg,"+pal.h1+","+pal.h2+")"}}>
               {submitting ? "⏳ جاري الإرسال..." : "إرسال الإجابات 📤"}
             </button>
           </div>
@@ -10104,7 +10104,7 @@ function SurveysPage({ surveys, setSurveys, saveSurveys, isParent }) {
               <div key={s.id} className="bg-white rounded-2xl shadow-sm border overflow-hidden hover:shadow-lg transition-all"
                 style={{borderColor:pal.border}}>
                 {/* رأس البطاقة */}
-                <div className="px-5 py-4 text-white" style={{background:`linear-gradient(135deg,${pal.h1},${pal.h2})`}}>
+                <div className="px-5 py-4 text-white" style={{background:"linear-gradient(135deg,"+pal.h1+","+pal.h2+")"}}>
                   <div className="flex items-start justify-between gap-2 mb-2">
                     <h3 className="font-black text-base leading-tight flex-1">{s.title||"استبيان بدون عنوان"}</h3>
                     {!s.active && <span className="bg-white/20 text-white text-xs px-2 py-0.5 rounded-full font-bold flex-shrink-0">متوقف</span>}
@@ -10137,7 +10137,7 @@ function SurveysPage({ surveys, setSurveys, saveSurveys, isParent }) {
                 <div className="px-4 py-3 flex gap-2 flex-wrap">
                   <button onClick={()=>{setResponding(s);setMode("respond");}}
                     className="flex-1 py-2 rounded-xl text-white text-xs font-black"
-                    style={{background:`linear-gradient(135deg,${pal.h1},${pal.h2})`}}>
+                    style={{background:"linear-gradient(135deg,"+pal.h1+","+pal.h2+")"}}>
                     📝 {isParent?"ملء الاستبيان":"معاينة"}
                   </button>
                   {!isParent && (<>
