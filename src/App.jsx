@@ -1436,10 +1436,9 @@ function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, sa
   const [showSummary, setShowSummary] = useState(false);
   const [showExcelImport, setShowExcelImport] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [dpCalType, setDpCalType] = useState("hijri");
-  const [dpDay,   setDpDay]   = useState(10);
-  const [dpMonth, setDpMonth] = useState(10);
-  const [dpYear,  setDpYear]  = useState(1447);
+  const [dpDay,   setDpDay]   = useState(() => new Date().getDate());
+  const [dpMonth, setDpMonth] = useState(() => new Date().getMonth() + 1);
+  const [dpYear,  setDpYear]  = useState(() => new Date().getFullYear());
   const [dpPreview, setDpPreview] = useState(null);
   const GREG_M_ATT = ["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"];
   const [refreshing, setRefreshing] = useState(false);
@@ -1712,9 +1711,7 @@ function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, sa
 
   const handleDpGenerate = () => {
     try {
-      const gen = dpCalType === "hijri"
-        ? generateWeekDaysFromHijri(dpDay, dpMonth, dpYear)
-        : generateWeekDays(`${dpYear}-${String(dpMonth).padStart(2,"0")}-${String(dpDay).padStart(2,"0")}`);
+      const gen = generateWeekDays(`${dpYear}-${String(dpMonth).padStart(2,"0")}-${String(dpDay).padStart(2,"0")}`);
       setDpPreview(gen);
     } catch(e) { alert("تاريخ غير صحيح"); }
   };
@@ -2293,97 +2290,88 @@ function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, sa
 
       {/* لوحة تغيير التاريخ */}
       {showDatePicker && (
-        <div className="bg-gradient-to-l from-amber-50 to-teal-50 border-2 border-amber-300 rounded-2xl p-4 mb-4 shadow-lg">
-          <div className="font-black text-teal-800 text-sm mb-3 flex items-center justify-between">
-            <span>📅 تحديد أسبوع جديد <span className="text-xs text-gray-400 font-normal mr-1">(اختر أي يوم من الأسبوع المطلوب)</span></span>
+        <div className="bg-white border-2 border-teal-300 rounded-2xl p-4 mb-4 shadow-xl">
+          {/* رأس */}
+          <div className="flex items-center justify-between mb-4">
+            <span className="font-black text-teal-800 text-sm">📅 تحديد أسبوع جديد</span>
             <div className="flex items-center gap-2">
               <button onClick={() => {
-                // إعادة ضبط الأسبوع الحالي من اليوم الحالي فوراً
                 const today = new Date();
                 const dow = today.getDay();
-                const diffToSunday = dow === 0 ? 0 : dow >= 5 ? (7 - dow) : -dow;
-                const sunday = new Date(today);
-                sunday.setDate(today.getDate() + diffToSunday);
-                const isoSunday = `${sunday.getFullYear()}-${String(sunday.getMonth()+1).padStart(2,'0')}-${String(sunday.getDate()).padStart(2,'0')}`;
-                const newWeek = generateWeekDays(isoSunday);
-                if (setWeek) setWeek(newWeek);
-                if (saveWeek) saveWeek(newWeek);
+                const diff = dow === 0 ? 0 : dow >= 5 ? (7 - dow) : -dow;
+                const sun = new Date(today); sun.setDate(today.getDate() + diff);
+                const iso = `${sun.getFullYear()}-${String(sun.getMonth()+1).padStart(2,"0")}-${String(sun.getDate()).padStart(2,"0")}`;
+                const nw = generateWeekDays(iso);
+                if (setWeek) setWeek(nw);
+                if (saveWeek) saveWeek(nw);
                 setShowDatePicker(false);
                 setSelectedDay(today.getDay() < 5 ? today.getDay() : 0);
-              }} className="bg-teal-100 text-teal-700 hover:bg-teal-200 rounded-lg px-3 py-1 text-xs font-black transition-all">
+              }} style={{background:"#ccfbf1",color:"#0f766e",border:"none",borderRadius:10,padding:"6px 14px",fontSize:12,fontWeight:900,cursor:"pointer",fontFamily:"inherit"}}>
                 📍 الأسبوع الحالي
               </button>
-              <button onClick={() => { setShowDatePicker(false); setDpPreview(null); }} className="text-gray-400 hover:text-gray-600 text-lg font-bold">✕</button>
+              <button onClick={() => { setShowDatePicker(false); setDpPreview(null); }}
+                style={{background:"#f1f5f9",border:"none",borderRadius:10,padding:"6px 12px",fontSize:14,cursor:"pointer",color:"#64748b",fontWeight:900}}>✕</button>
             </div>
           </div>
 
-          {/* نوع التقويم */}
-          <div className="flex gap-2 mb-3">
-            {[{v:"hijri",l:"🌙 هجري"},{v:"gregorian",l:"☀️ ميلادي"}].map(t => (
-              <button key={t.v} onClick={() => { setDpCalType(t.v); setDpDay(1); setDpMonth(1); setDpYear(t.v==="hijri"?1447:2026); setDpPreview(null); }}
-                className={"flex-1 py-2 rounded-xl text-sm font-black transition-all border-2 " +
-                  (dpCalType===t.v ? "border-teal-500 bg-teal-600 text-white" : "border-gray-200 bg-white text-gray-600 hover:border-teal-300")}>
-                {t.l}
-              </button>
-            ))}
-          </div>
-
-          {/* القوائم المنسدلة */}
-          <div className="grid grid-cols-3 gap-2 mb-3">
-            <div>
-              <label className="text-xs font-bold text-gray-500 block mb-1">اليوم</label>
-              <select value={dpDay} onChange={e => { setDpDay(Number(e.target.value)); setDpPreview(null); }}
-                className="w-full px-2 py-2.5 rounded-xl border-2 border-gray-200 focus:border-teal-400 focus:outline-none text-sm font-bold bg-white text-center"
-                style={{fontFamily:"inherit"}}>
-                {Array.from({length: dpCalType==="hijri" ? 30 : 31}, (_,i) => i+1).map(d => (
-                  <option key={d} value={d}>{String(d).padStart(2,"0")}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="text-xs font-bold text-gray-500 block mb-1">الشهر</label>
-              <select value={dpMonth} onChange={e => { setDpMonth(Number(e.target.value)); setDpPreview(null); }}
-                className="w-full px-2 py-2.5 rounded-xl border-2 border-gray-200 focus:border-teal-400 focus:outline-none text-sm font-bold bg-white"
-                style={{fontFamily:"inherit"}}>
-                {(dpCalType==="hijri" ? HIJRI_MONTHS : GREG_M_ATT).map((m,i) => (
-                  <option key={i+1} value={i+1}>{m}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="text-xs font-bold text-gray-500 block mb-1">السنة</label>
-              <select value={dpYear} onChange={e => { setDpYear(Number(e.target.value)); setDpPreview(null); }}
-                className="w-full px-2 py-2.5 rounded-xl border-2 border-gray-200 focus:border-teal-400 focus:outline-none text-sm font-bold bg-white text-center"
-                style={{fontFamily:"inherit"}}>
-                {(dpCalType==="hijri" ? Array.from({length:20},(_,i)=>1440+i) : Array.from({length:10},(_,i)=>2023+i)).map(y => (
-                  <option key={y} value={y}>{y} {dpCalType==="hijri"?"هـ":"م"}</option>
-                ))}
-              </select>
+          {/* ── منتقي التاريخ الميلادي ── */}
+          <div style={{background:"#f0fdf4",borderRadius:14,padding:"14px 12px",marginBottom:12,border:"2px solid #bbf7d0"}}>
+            <div style={{fontSize:11,fontWeight:900,color:"#065f46",marginBottom:10,textAlign:"center"}}>☀️ التاريخ الميلادي — اختر أي يوم من الأسبوع المطلوب</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 2fr 1.5fr",gap:8}}>
+              {/* اليوم */}
+              <div>
+                <div style={{fontSize:10,fontWeight:700,color:"#6b7280",marginBottom:4}}>اليوم</div>
+                <select value={dpDay} onChange={e=>{setDpDay(Number(e.target.value));setDpPreview(null);}}
+                  style={{width:"100%",padding:"10px 6px",borderRadius:10,border:"2px solid #d1fae5",fontSize:15,fontWeight:900,fontFamily:"inherit",background:"#fff",textAlign:"center",WebkitAppearance:"none",appearance:"none",cursor:"pointer"}}>
+                  {Array.from({length:31},(_,i)=>i+1).map(d=>(
+                    <option key={d} value={d}>{String(d).padStart(2,"0")}</option>
+                  ))}
+                </select>
+              </div>
+              {/* الشهر */}
+              <div>
+                <div style={{fontSize:10,fontWeight:700,color:"#6b7280",marginBottom:4}}>الشهر</div>
+                <select value={dpMonth} onChange={e=>{setDpMonth(Number(e.target.value));setDpPreview(null);}}
+                  style={{width:"100%",padding:"10px 6px",borderRadius:10,border:"2px solid #d1fae5",fontSize:13,fontWeight:900,fontFamily:"inherit",background:"#fff",WebkitAppearance:"none",appearance:"none",cursor:"pointer"}}>
+                  {["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"].map((m,i)=>(
+                    <option key={i+1} value={i+1}>{m}</option>
+                  ))}
+                </select>
+              </div>
+              {/* السنة */}
+              <div>
+                <div style={{fontSize:10,fontWeight:700,color:"#6b7280",marginBottom:4}}>السنة</div>
+                <select value={dpYear} onChange={e=>{setDpYear(Number(e.target.value));setDpPreview(null);}}
+                  style={{width:"100%",padding:"10px 6px",borderRadius:10,border:"2px solid #d1fae5",fontSize:14,fontWeight:900,fontFamily:"inherit",background:"#fff",textAlign:"center",WebkitAppearance:"none",appearance:"none",cursor:"pointer"}}>
+                  {[2026,2027,2028,2029,2030].map(y=>(
+                    <option key={y} value={y}>{y} م</option>
+                  ))}
+                </select>
+              </div>
             </div>
           </div>
 
           {/* أزرار */}
-          <div className="flex gap-2">
+          <div style={{display:"flex",gap:8}}>
             <button onClick={handleDpGenerate}
-              className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-sm font-black transition-all">
+              style={{flex:1,padding:"12px",borderRadius:12,background:"linear-gradient(135deg,#f59e0b,#d97706)",color:"#fff",fontSize:14,fontWeight:900,border:"none",cursor:"pointer",fontFamily:"inherit"}}>
               👁️ معاينة الأسبوع
             </button>
             {dpPreview && (
               <button onClick={handleDpConfirm}
-                className="flex-1 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-sm font-black transition-all">
+                style={{flex:1,padding:"12px",borderRadius:12,background:"linear-gradient(135deg,#0d9488,#065f46)",color:"#fff",fontSize:14,fontWeight:900,border:"none",cursor:"pointer",fontFamily:"inherit"}}>
                 ✅ تطبيق وحفظ
               </button>
             )}
           </div>
 
-          {/* معاينة */}
+          {/* معاينة الأسبوع */}
           {dpPreview && (
-            <div className="mt-3 grid grid-cols-5 gap-1.5">
-              {dpPreview.days.map((d,i) => (
-                <div key={i} className="bg-white rounded-xl p-2 text-center border-2 border-teal-200 shadow-sm">
-                  <div className="text-xs font-black text-teal-800">{d.name}</div>
-                  <div className="text-xs text-amber-700 font-bold mt-1">🌙 {d.dateH}</div>
-                  <div className="text-xs text-gray-400 mt-0.5">☀️ {d.dateM}</div>
+            <div style={{marginTop:12,display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:6}}>
+              {dpPreview.days.map((d,i)=>(
+                <div key={i} style={{background:"#f0fdf4",borderRadius:12,padding:"8px 4px",textAlign:"center",border:"2px solid #bbf7d0"}}>
+                  <div style={{fontSize:11,fontWeight:900,color:"#0f766e"}}>{d.name}</div>
+                  <div style={{fontSize:10,color:"#6b7280",marginTop:4}}>☀️ {d.dateM}</div>
                 </div>
               ))}
             </div>
@@ -12081,6 +12069,13 @@ function StudentAbsencePage() {
   };
 
   /* - excel - */
+  // ── دالة مساعدة: تكشف ما إذا كان الصف يحتوي على بيانات طالب من تنسيق نور ──
+  const _isNoorStudentRow = (row) => {
+    const name = String(row[5] || "").trim();
+    const nid  = String(row[15] || "").trim();
+    return name.length > 3 && /\d{5,}/.test(nid) && name !== "الاسم";
+  };
+
   const handleExcel = e => {
     const file = e.target.files[0]; if (!file) return;
     file.arrayBuffer().then(async ev => {
@@ -12088,23 +12083,60 @@ function StudentAbsencePage() {
         await loadXLSX();
         const XLSX = window.XLSX;
         const wb   = XLSX.read(ev, { type:"array" });
-        const ws   = wb.Sheets[wb.SheetNames[0]];
-        const rows = XLSX.utils.sheet_to_json(ws, { header:1 });
         const incoming = [];
-        rows.forEach((row, i) => {
-          if (i === 0) return;
-          const name = String(row[0] || "").trim();
-          const phone = String(row[1] || "").trim();
-          const nationalId = String(row[2] || "").trim();
-          if (name) incoming.push({ id: Date.now().toString() + i, name, phone, nationalId });
-        });
+        let detectedClass = "";
+
+        // ── فحص هل هو تنسيق نور (متعدد الشيتات، بيانات وصفية) ──
+        const isNoor = wb.SheetNames.length >= 1 && (() => {
+          const ws0 = wb.Sheets[wb.SheetNames[0]];
+          const rows0 = XLSX.utils.sheet_to_json(ws0, { header:1 });
+          return rows0.some(r => _isNoorStudentRow(r));
+        })();
+
+        if (isNoor) {
+          // ── استيراد تنسيق نور: كل شيت فصل، البيانات في أعمدة 5 و 15 ──
+          wb.SheetNames.forEach(sheetName => {
+            const ws   = wb.Sheets[sheetName];
+            const rows = XLSX.utils.sheet_to_json(ws, { header:1 });
+            // استخرج اسم الصف والفصل من الميتاداتا
+            let grade = "", section = "";
+            rows.forEach((row, ri) => {
+              if (ri === 1 && row[1]) grade   = String(row[1]).trim();
+              if (ri === 7 && row[1]) section = String(row[1]).trim();
+            });
+            if (!detectedClass && grade) detectedClass = grade + (section ? " / فصل " + section : "");
+            rows.forEach((row, ri) => {
+              if (!_isNoorStudentRow(row)) return;
+              const name       = String(row[5]  || "").trim();
+              const nationalId = String(row[15] || "").trim().replace(/[^0-9]/g, "");
+              if (name && !incoming.find(s => s.name === name)) {
+                incoming.push({ id: Date.now().toString() + ri + Math.random(), name, nationalId, phone:"", grade, section });
+              }
+            });
+          });
+        } else {
+          // ── التنسيق البسيط القديم: عمود 0=الاسم، 1=هاتف، 2=هوية ──
+          const ws   = wb.Sheets[wb.SheetNames[0]];
+          const rows = XLSX.utils.sheet_to_json(ws, { header:1 });
+          rows.forEach((row, i) => {
+            if (i === 0) return;
+            const name = String(row[0] || "").trim();
+            const phone = String(row[1] || "").trim();
+            const nationalId = String(row[2] || "").trim();
+            if (name) incoming.push({ id: Date.now().toString() + i, name, phone, nationalId });
+          });
+        }
+
         if (incoming.length) {
           const merged = [...students];
           incoming.forEach(ns => { if (!merged.find(s => s.name === ns.name)) merged.push(ns); });
-          setStudents(merged); persist(merged, attendance);
-          window.alert("✅ تم استيراد " + incoming.length + " طالب");
+          if (detectedClass && !className) { setClassName(detectedClass); }
+          setStudents(merged); persist(merged, attendance, detectedClass || undefined);
+          window.alert("✅ تم استيراد " + incoming.length + " طالب" + (detectedClass ? "\nالفصل: " + detectedClass : ""));
+        } else {
+          window.alert("⚠️ لم يتم العثور على بيانات طلاب في الملف");
         }
-      } catch { window.alert("خطأ في قراءة الملف"); }
+      } catch(err) { window.alert("خطأ في قراءة الملف: " + err.message); }
     });
     e.target.value = "";
   };
@@ -12215,7 +12247,7 @@ function StudentAbsencePage() {
               className="bg-white bg-opacity-20 border border-white border-opacity-30 rounded-xl px-3 py-2 text-sm font-bold focus:outline-none text-white" />
             <button onClick={() => xlsRef.current?.click()}
               className="bg-white bg-opacity-20 hover:bg-opacity-30 border border-white border-opacity-30 rounded-xl px-3 py-2 text-sm font-bold flex items-center gap-1">
-              📥 Excel
+              📥 استيراد من نور
             </button>
             <input ref={xlsRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleExcel} />
             <button onClick={printReport}
