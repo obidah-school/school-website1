@@ -23393,11 +23393,14 @@ function TeacherLicenseTab({ teacherName, teacherId }) {
 // ================================================================
 function DailyAttendanceTrackerPage({ teachers }) {
 
-  const DAYS_AR      = ["الأحد","الاثنين","الثلاثاء","الأربعاء","الخميس"];
-  const HIJRI_MONTHS = ["محرم","صفر","ربيع الأول","ربيع الآخر","جمادى الأولى","جمادى الآخرة","رجب","شعبان","رمضان","شوال","ذو القعدة","ذو الحجة"];
-  const GREG_MONTHS  = ["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"];
-  const DAYS_LIST    = Array.from({length:31},(_,i)=>i+1);
-  const HIJRI_YEARS  = [1447,1448,1449];
+  const DAYS_AR     = ["الأحد","الاثنين","الثلاثاء","الأربعاء","الخميس"];
+  const HIJRI_MONTHS= ["محرم","صفر","ربيع الأول","ربيع الآخر","جمادى الأولى","جمادى الآخرة","رجب","شعبان","رمضان","شوال","ذو القعدة","ذو الحجة"];
+  const GREG_MONTHS = ["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"];
+  const DAYS_LIST   = Array.from({length:31},(_,i)=>i+1);
+  // السنوات الهجرية من 1446 إلى 1452
+  const HIJRI_YEARS = Array.from({length:7},(_,i)=>1446+i);
+  // السنوات الميلادية من 2024 إلى 2030
+  const GREG_YEARS  = Array.from({length:7},(_,i)=>2024+i);
 
   const STATUS_OPTIONS = [
     { val:"حاضر",   label:"✅ حاضر",   color:"#059669", bg:"#d1fae5" },
@@ -23407,10 +23410,30 @@ function DailyAttendanceTrackerPage({ teachers }) {
   ];
 
   const ABSENCE_TYPES = [
-    {val:"اضطراري",      icon:"🔴"}, {val:"مرضي",         icon:"🏥"},
-    {val:"اعتيادي",      icon:"📋"}, {val:"وفاة",          icon:"🖤"},
-    {val:"موعد مستشفى", icon:"🩺"}, {val:"أخرى",          icon:"📌"},
+    {val:"اضطراري",icon:"🔴"},{val:"مرضي",icon:"🏥"},
+    {val:"اعتيادي",icon:"📋"},{val:"وفاة",icon:"🖤"},
+    {val:"موعد مستشفى",icon:"🩺"},{val:"أخرى",icon:"📌"},
   ];
+
+  // ── حساب التاريخ الحالي الصحيح عند الفتح ──
+  const initDate = () => {
+    const today = new Date();
+    const dow   = today.getDay(); // 0=الأحد
+    const dayName = DAYS_AR[dow] || DAYS_AR[0];
+    const dayNum  = today.getDate();
+    const gregM   = GREG_MONTHS[today.getMonth()];
+    const gregY   = today.getFullYear();
+    // تحويل إلى هجري
+    let hijriM = HIJRI_MONTHS[9], hijriY = 1447; // افتراضي
+    try {
+      const h = gregorianToHijri(gregY, today.getMonth()+1, dayNum);
+      hijriM = HIJRI_MONTHS[h.m - 1];
+      hijriY = h.y;
+    } catch(e){}
+    return { dayName, dayNum, gregM, gregY, hijriM, hijriY };
+  };
+
+  const init = initDate();
 
   // ── state ──
   const [records,   setRecords]   = useState([]);
@@ -23419,36 +23442,49 @@ function DailyAttendanceTrackerPage({ teachers }) {
   const [lastSaved, setLastSaved] = useState(null);
   const [view,      setView]      = useState("entry");
   const [search,    setSearch]    = useState("");
-  const [selDay,    setSelDay]    = useState(DAYS_AR[0]);
-  const [selDayNum, setSelDayNum] = useState(new Date().getDate());
-  const [selHijriM, setSelHijriM] = useState(HIJRI_MONTHS[9]);
-  const [selHijriY, setSelHijriY] = useState(1447);
-  const [selGregM,  setSelGregM]  = useState(GREG_MONTHS[new Date().getMonth()]);
-  const [selGregY,  setSelGregY]  = useState(2026);
+  const [selDay,    setSelDay]    = useState(init.dayName);
+  const [selDayNum, setSelDayNum] = useState(init.dayNum);
+  const [selHijriM, setSelHijriM] = useState(init.hijriM);
+  const [selHijriY, setSelHijriY] = useState(init.hijriY);
+  const [selGregM,  setSelGregM]  = useState(init.gregM);
+  const [selGregY,  setSelGregY]  = useState(init.gregY);
 
-  // ── تحويل هجري → ميلادي عند تغيير أي من حقول الهجري ──
-  const updateGregFromHijri = (dayNum, hijriM, hijriY) => {
+  // ── عند تغيير يوم/شهر/سنة هجري → تحديث الميلادي ──
+  const onHijriChange = (dayNum, hijriM, hijriY) => {
+    setSelDayNum(dayNum);
+    setSelHijriM(hijriM);
+    setSelHijriY(hijriY);
     try {
-      const hMonthIdx = HIJRI_MONTHS.indexOf(hijriM) + 1;
-      if (hMonthIdx < 1) return;
-      const d = hijriToGregorian(hijriY, hMonthIdx, dayNum);
+      const hIdx = HIJRI_MONTHS.indexOf(hijriM) + 1;
+      if (hIdx < 1) return;
+      const d = hijriToGregorian(hijriY, hIdx, dayNum);
       setSelGregM(GREG_MONTHS[d.getMonth()]);
       setSelGregY(d.getFullYear());
-    } catch(e) {}
+      // تحديث اسم اليوم
+      const dow = d.getDay();
+      setSelDay(DAYS_AR[dow] !== undefined ? DAYS_AR[dow] : "—");
+    } catch(e){}
   };
 
-  // ── تحويل ميلادي → هجري عند تغيير أي من حقول الميلادي ──
-  const updateHijriFromGreg = (dayNum, gregM, gregY) => {
+  // ── عند تغيير يوم/شهر/سنة ميلادي → تحديث الهجري ──
+  const onGregChange = (dayNum, gregM, gregY) => {
+    setSelDayNum(dayNum);
+    setSelGregM(gregM);
+    setSelGregY(gregY);
     try {
-      const gMonthIdx = GREG_MONTHS.indexOf(gregM) + 1;
-      if (gMonthIdx < 1) return;
-      const h = gregorianToHijri(gregY, gMonthIdx, dayNum);
+      const gIdx = GREG_MONTHS.indexOf(gregM) + 1;
+      if (gIdx < 1) return;
+      const h = gregorianToHijri(gregY, gIdx, dayNum);
       setSelHijriM(HIJRI_MONTHS[h.m - 1]);
       setSelHijriY(h.y);
-    } catch(e) {}
+      // تحديث اسم اليوم
+      const d = new Date(gregY, gIdx-1, dayNum);
+      const dow = d.getDay();
+      setSelDay(DAYS_AR[dow] !== undefined ? DAYS_AR[dow] : "—");
+    } catch(e){}
   };
 
-  const dateKey = `${selDayNum}-${selHijriM}-${selHijriY}`;
+  const dateKey = selDayNum+"-"+selHijriM+"-"+selHijriY;
 
   useEffect(() => {
     DB.get("school-daily-attendance", []).then(d => {
@@ -23466,38 +23502,30 @@ function DailyAttendanceTrackerPage({ teachers }) {
     });
   };
 
-  const getRec  = (name) => records.find(r => r.teacherName===name && r.dateKey===dateKey) || {};
+  const getRec    = (name) => records.find(r=>r.teacherName===name && r.dateKey===dateKey) || {};
   const getStatus = (name) => getRec(name).status || "";
 
-  // تحديث أي حقل لسجل معلم في اليوم المحدد
   const patch = (name, fields) => {
-    const idx = records.findIndex(r => r.teacherName===name && r.dateKey===dateKey);
-    const base = {
-      teacherName:name, dateKey,
-      day:selDay, dayNum:selDayNum,
-      hijriMonth:selHijriM, hijriYear:selHijriY,
-      gregMonth:selGregM, gregYear:selGregY,
-    };
+    const idx  = records.findIndex(r=>r.teacherName===name && r.dateKey===dateKey);
+    const base = { teacherName:name, dateKey, day:selDay, dayNum:selDayNum, hijriMonth:selHijriM, hijriYear:selHijriY, gregMonth:selGregM, gregYear:selGregY };
     const prev = idx >= 0 ? records[idx] : base;
     const next = {...prev, ...fields, updatedAt:new Date().toISOString()};
     persist(idx>=0 ? records.map((r,i)=>i===idx?next:r) : [...records, next]);
   };
 
   const setStatus = (name, val) => {
-    // عند اختيار نفس الحالة → مسح
-    if (val === getStatus(name)) patch(name, {status:"", absenceType:"", farisEntered:null});
-    else if (val !== "غائب")     patch(name, {status:val, absenceType:"", farisEntered:null});
-    else                          patch(name, {status:"غائب"});
+    if (val === getStatus(name)) patch(name,{status:"",absenceType:"",farisEntered:null});
+    else if (val !== "غائب")     patch(name,{status:val,absenceType:"",farisEntered:null});
+    else                          patch(name,{status:"غائب"});
   };
 
-  const getStatusInfo   = (val) => STATUS_OPTIONS.find(s=>s.val===val);
-  const getAbsTypeInfo  = (val) => ABSENCE_TYPES.find(a=>a.val===val);
+  const getStatusInfo  = (val) => STATUS_OPTIONS.find(s=>s.val===val);
+  const getAbsTypeInfo = (val) => ABSENCE_TYPES.find(a=>a.val===val);
 
   const teacherList = Array.isArray(teachers)
     ? teachers.map(t=>typeof t==="string"?t:t.name).filter(Boolean) : [];
   const filtered = teacherList.filter(t=>!search||t.includes(search));
 
-  // إحصائيات اليوم
   const dayStat = (key) => teacherList.filter(t=>getStatus(t)===key).length;
 
   const getTeacherStats = (name) => {
@@ -23507,64 +23535,22 @@ function DailyAttendanceTrackerPage({ teachers }) {
     return {...s, total:recs.length};
   };
 
-  // حذف جميع سجلات معلم
   const deleteTeacherRecords = (name) => {
-    if (!window.confirm(`هل تريد حذف جميع سجلات "${name}"؟ لا يمكن التراجع.`)) return;
+    if (!window.confirm("هل تريد حذف جميع سجلات \""+name+"\"؟ لا يمكن التراجع.")) return;
     persist(records.filter(r=>r.teacherName!==name));
   };
 
-  // تثبيت المدخلات
   const [pinnedTeachers, setPinnedTeachers] = useState({});
   const togglePin = (name) => setPinnedTeachers(p=>({...p,[name]:!p[name]}));
-  const isPinned = (name) => !!pinnedTeachers[name];
+  const isPinned  = (name) => !!pinnedTeachers[name];
 
   const printReport = () => {
     const rows = filtered.map(t=>{
       const r=getRec(t), si=getStatusInfo(r.status||""), at=getAbsTypeInfo(r.absenceType||"");
-      return `<tr>
-        <td>${t}</td>
-        <td style="text-align:center;font-weight:900;color:${si?.color||"#94a3b8"}">${si?.label||"—"}</td>
-        <td style="text-align:center;color:#7c3aed">${at?at.icon+" "+at.val:"—"}</td>
-        <td style="text-align:center;font-weight:900;color:${r.farisEntered?"#059669":r.farisEntered===false?"#dc2626":"#94a3b8"}">${r.farisEntered===true?"✅ نعم":r.farisEntered===false?"❌ لا":"—"}</td>
-      </tr>`;
+      return "<tr><td>"+t+"</td><td style=\"text-align:center;font-weight:900;color:"+(si?.color||"#94a3b8")+"\">"+(si?.label||"—")+"</td><td style=\"text-align:center;color:#7c3aed\">"+(at?at.icon+" "+at.val:"—")+"</td><td style=\"text-align:center;font-weight:900;color:"+(r.farisEntered?"#059669":r.farisEntered===false?"#dc2626":"#94a3b8")+"\">"+(r.farisEntered===true?"✅ نعم":r.farisEntered===false?"❌ لا":"—")+"</td></tr>";
     }).join("");
-
     const st = {حاضر:dayStat("حاضر"),غائب:dayStat("غائب"),متأخر:dayStat("متأخر"),مستأذن:dayStat("مستأذن")};
-    printWindow(`<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="UTF-8">
-<title>كشف الحضور اليومي</title>
-<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap" rel="stylesheet">
-<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Cairo',sans-serif;direction:rtl;font-size:12px;color:#1a2035}.page{max-width:760px;margin:0 auto;border:3px solid #0d3b6e}.hdr{background:linear-gradient(135deg,#0d3b6e,#1a5276,#0d9488);color:#fff;display:flex;align-items:stretch;min-height:78px}.hc{flex:1;padding:10px 15px;display:flex;flex-direction:column;justify-content:center}.hc.c{flex:0 0 95px;align-items:center;border-right:1px solid rgba(255,255,255,.25);border-left:1px solid rgba(255,255,255,.25)}.hc.r{text-align:right}.hc.l{text-align:left}.logo{height:55px;filter:brightness(0) invert(1)}.tb{background:#1a2f5e;color:#fff;text-align:center;padding:9px;font-size:14px;font-weight:900;border-top:4px solid #f59e0b}.meta{display:grid;grid-template-columns:repeat(4,1fr);border-bottom:2px solid #0d9488}.mc{padding:6px 10px;border-left:1px solid #c7d2e8;background:#f8fafd}.mc:last-child{border-left:none}.ml{font-size:9px;color:#64748b;font-weight:700;margin-bottom:2px}.mv{font-size:11px;font-weight:700}.stats{display:grid;grid-template-columns:repeat(4,1fr);margin:8px 12px;border:2px solid #c7d2e8;border-radius:8px;overflow:hidden}.st{padding:7px;text-align:center;border-left:1px solid #c7d2e8}.st:first-child{border-left:none}.stn{font-size:17px;font-weight:900}.stl{font-size:9px;color:#64748b;font-weight:700}table{width:100%;border-collapse:collapse;margin:0 0 8px}thead tr{background:linear-gradient(135deg,#0d3b6e,#1d4ed8);color:#fff}th,td{padding:6px 10px;border:1px solid #c7d2e8;font-size:11px}th{font-weight:900;text-align:center}td:first-child{text-align:right}tbody tr:nth-child(even){background:#f8fafd}.sig{display:grid;grid-template-columns:1fr 1fr;margin:0 12px 8px;border:2px solid #c7d2e8;border-radius:8px;overflow:hidden}.sb{padding:10px;text-align:center;border-left:1px solid #c7d2e8}.sb:first-child{border-left:none}.sr{font-size:9px;color:#64748b;margin-bottom:6px}.sn{border-top:1.5px dashed #0d9488;padding-top:5px;font-size:11px;font-weight:900;color:#0d3b6e;margin-top:12px}.footer{background:#0d1b2e;color:rgba(255,255,255,.5);text-align:center;padding:5px;font-size:9px}
-@media print{@page{size:A4;margin:8mm}body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}</style></head><body>
-<div class="page">
-  <div class="hdr">
-    <div class="hc r"><div style="font-size:10px;opacity:.8">المملكة العربية السعودية</div><div style="font-size:13px;font-weight:900">وزارة التعليم</div><div style="font-size:10px;opacity:.8">إدارة تعليم جدة</div></div>
-    <div class="hc c"><img src="${LOGO_URL}" class="logo"/></div>
-    <div class="hc l"><div style="font-size:11px;opacity:.8">مدرسة عبيدة بن الحارث المتوسطة</div><div style="font-size:12px;font-weight:900">العام الدراسي 1447هـ</div></div>
-  </div>
-  <div class="tb">كشف متابعة الحضور اليومي للمعلمين</div>
-  <div class="meta">
-    <div class="mc"><div class="ml">اليوم</div><div class="mv">${selDay}</div></div>
-    <div class="mc"><div class="ml">التاريخ الميلادي</div><div class="mv">${selDayNum} ${selGregM} ${selGregY}م</div></div>
-    <div class="mc"><div class="ml">إجمالي المعلمين</div><div class="mv">${teacherList.length} معلم</div></div>
-  </div>
-  <div class="stats">
-    <div class="st"><div class="stn" style="color:#059669">${st.حاضر}</div><div class="stl">حاضر</div></div>
-    <div class="st"><div class="stn" style="color:#dc2626">${st.غائب}</div><div class="stl">غائب</div></div>
-    <div class="st"><div class="stn" style="color:#d97706">${st.متأخر}</div><div class="stl">متأخر</div></div>
-    <div class="st"><div class="stn" style="color:#2563eb">${st.مستأذن}</div><div class="stl">مستأذن</div></div>
-  </div>
-  <table>
-    <thead><tr><th>اسم المعلم</th><th>الحالة</th><th>نوع الغياب</th><th>إدخال فارس</th></tr></thead>
-    <tbody>${rows}</tbody>
-  </table>
-  <div class="sig">
-    <div class="sb"><div class="sr">مشرف الحضور / إسم المعلم</div><div class="sn">______________</div></div>
-    <div class="sb"><div class="sr">مدير المدرسة</div><div class="sn">فازع عبدالله القرني</div></div>
-  </div>
-  <div class="footer">مدرسة عبيدة بن الحارث المتوسطة — كشف الحضور اليومي</div>
-</div>
-<script>window.onload=()=>window.print();</script>
-</body></html>`);
+    printWindow(`<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="UTF-8"><title>كشف الحضور اليومي</title><link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap" rel="stylesheet"><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Cairo',sans-serif;direction:rtl;font-size:12px}.page{max-width:760px;margin:0 auto;border:3px solid #0d3b6e}.hdr{background:linear-gradient(135deg,#0d3b6e,#1a5276,#0d9488);color:#fff;display:flex;align-items:stretch;min-height:78px}.hc{flex:1;padding:10px 15px;display:flex;flex-direction:column;justify-content:center}.hc.c{flex:0 0 95px;align-items:center}.hc.r{text-align:right}.hc.l{text-align:left}.logo{height:55px;filter:brightness(0) invert(1)}.tb{background:#1a2f5e;color:#fff;text-align:center;padding:9px;font-size:14px;font-weight:900;border-top:4px solid #f59e0b}.meta{display:grid;grid-template-columns:repeat(4,1fr);border-bottom:2px solid #0d9488}.mc{padding:6px 10px;border-left:1px solid #c7d2e8;background:#f8fafd}.mc:last-child{border-left:none}.ml{font-size:9px;color:#64748b;font-weight:700}.mv{font-size:11px;font-weight:700}.stats{display:grid;grid-template-columns:repeat(4,1fr);margin:8px 12px;border:2px solid #c7d2e8;border-radius:8px;overflow:hidden}.st{padding:7px;text-align:center;border-left:1px solid #c7d2e8}.st:first-child{border-left:none}.stn{font-size:17px;font-weight:900}.stl{font-size:9px;color:#64748b}table{width:100%;border-collapse:collapse;margin:0 0 8px}thead tr{background:linear-gradient(135deg,#0d3b6e,#1d4ed8);color:#fff}th,td{padding:6px 10px;border:1px solid #c7d2e8;font-size:11px}th{font-weight:900;text-align:center}td:first-child{text-align:right}tbody tr:nth-child(even){background:#f8fafd}.sig{display:grid;grid-template-columns:1fr 1fr;margin:0 12px 8px;border:2px solid #c7d2e8;border-radius:8px;overflow:hidden}.sb{padding:10px;text-align:center;border-left:1px solid #c7d2e8}.sb:first-child{border-left:none}.sr{font-size:9px;color:#64748b}.sn{border-top:1.5px dashed #0d9488;padding-top:5px;font-size:11px;font-weight:900;color:#0d3b6e;margin-top:12px}.footer{background:#0d1b2e;color:rgba(255,255,255,.5);text-align:center;padding:5px;font-size:9px}@media print{@page{size:A4;margin:8mm}body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}</style></head><body><div class="page"><div class="hdr"><div class="hc r"><div style="font-size:10px;opacity:.8">المملكة العربية السعودية</div><div style="font-size:13px;font-weight:900">وزارة التعليم</div><div style="font-size:10px;opacity:.8">إدارة تعليم جدة</div></div><div class="hc c"><img src="${LOGO_URL}" class="logo"/></div><div class="hc l"><div style="font-size:11px;opacity:.8">مدرسة عبيدة بن الحارث المتوسطة</div></div></div><div class="tb">كشف متابعة الحضور اليومي للمعلمين</div><div class="meta"><div class="mc"><div class="ml">اليوم</div><div class="mv">${selDay}</div></div><div class="mc"><div class="ml">الهجري</div><div class="mv">${selDayNum} ${selHijriM} ${selHijriY}هـ</div></div><div class="mc"><div class="ml">الميلادي</div><div class="mv">${selDayNum} ${selGregM} ${selGregY}م</div></div><div class="mc"><div class="ml">الإجمالي</div><div class="mv">${teacherList.length} معلم</div></div></div><div class="stats"><div class="st"><div class="stn" style="color:#059669">${st.حاضر}</div><div class="stl">حاضر</div></div><div class="st"><div class="stn" style="color:#dc2626">${st.غائب}</div><div class="stl">غائب</div></div><div class="st"><div class="stn" style="color:#d97706">${st.متأخر}</div><div class="stl">متأخر</div></div><div class="st"><div class="stn" style="color:#2563eb">${st.مستأذن}</div><div class="stl">مستأذن</div></div></div><table><thead><tr><th>اسم المعلم</th><th>الحالة</th><th>نوع الغياب</th><th>فارس</th></tr></thead><tbody>${rows}</tbody></table><div class="sig"><div class="sb"><div class="sr">مشرف الحضور</div><div class="sn">______________</div></div><div class="sb"><div class="sr">مدير المدرسة</div><div class="sn">فازع عبدالله القرني</div></div></div><div class="footer">مدرسة عبيدة بن الحارث المتوسطة — كشف الحضور اليومي</div></div><script>window.onload=()=>window.print();</script></body></html>`);
   };
 
   if (loading) return (
@@ -23584,6 +23570,7 @@ function DailyAttendanceTrackerPage({ teachers }) {
         .tb2.on{background:linear-gradient(135deg,#7c3aed,#6d28d9);color:#fff;border-color:transparent;box-shadow:0 2px 8px rgba(124,58,237,.3);}
         .fb2{border-radius:999px;padding:4px 12px;font-size:11px;font-weight:900;cursor:pointer;font-family:'Cairo',sans-serif;transition:all .15s;border:2px solid;}
         .fb2:hover{transform:scale(1.04);}
+        .dat-sel{width:100%;padding:9px 10px;border-radius:12px;border:2px solid;font-size:13px;font-weight:900;font-family:'Cairo',sans-serif;background:#fff;focus:outline-none;cursor:pointer;}
       `}</style>
 
       {/* ── ترويسة ── */}
@@ -23597,7 +23584,7 @@ function DailyAttendanceTrackerPage({ teachers }) {
           </div>
           <div className="flex items-center justify-center px-4 gap-3">
             <div style={{width:"1.5px",height:52,background:"rgba(255,255,255,.3)",borderRadius:2}}/>
-            <img src={LOGO_URL} alt="" className="h-13 w-auto" style={{filter:"brightness(0) invert(1)",height:52}} />
+            <img src={LOGO_URL} alt="" style={{filter:"brightness(0) invert(1)",height:52}} />
             <div style={{width:"1.5px",height:52,background:"rgba(255,255,255,.3)",borderRadius:2}}/>
           </div>
           <div className="flex-1 flex flex-col justify-center text-left px-5 py-3">
@@ -23621,8 +23608,7 @@ function DailyAttendanceTrackerPage({ teachers }) {
         ))}
         <div className="flex-1"/>
         {view==="entry" && (
-          <button onClick={printReport}
-            className="px-5 py-2.5 rounded-xl font-black text-sm text-white"
+          <button onClick={printReport} className="px-5 py-2.5 rounded-xl font-black text-sm text-white"
             style={{background:"linear-gradient(135deg,#f59e0b,#d97706)"}}>
             🖨️ طباعة
           </button>
@@ -23631,55 +23617,102 @@ function DailyAttendanceTrackerPage({ teachers }) {
 
       {view==="entry" && (<>
 
-        {/* ── اليوم والتاريخ ── */}
+        {/* ── اختيار التاريخ ── */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="px-5 py-3 font-black text-sm text-white flex items-center gap-2"
             style={{background:"linear-gradient(135deg,#1e3a5f,#1d4ed8)"}}>
-            <span>📅</span> اليوم والتاريخ
+            <span>📅</span> اختيار التاريخ
           </div>
-          <div className="p-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {/* اليوم */}
+
+          <div className="p-4 space-y-4">
+            {/* ── صف التاريخ الهجري ── */}
             <div>
-              <label className="text-xs font-black text-gray-500 mb-1.5 block">اليوم</label>
-              <select value={selDay} onChange={e=>setSelDay(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-xl border-2 border-gray-200 focus:border-blue-400 focus:outline-none text-sm font-bold bg-white">
-                {DAYS_AR.map(d=><option key={d} value={d}>{d}</option>)}
-              </select>
+              <div className="text-xs font-black mb-2 flex items-center gap-1.5" style={{color:"#7c3aed"}}>
+                🌙 التاريخ الهجري
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <label className="text-xs font-black text-gray-500 mb-1 block">اليوم</label>
+                  <select value={selDayNum}
+                    onChange={e => onHijriChange(Number(e.target.value), selHijriM, selHijriY)}
+                    className="dat-sel" style={{borderColor:"#ddd6fe"}}>
+                    {DAYS_LIST.map(d=><option key={d} value={d}>{d}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-black text-gray-500 mb-1 block">الشهر الهجري</label>
+                  <select value={selHijriM}
+                    onChange={e => onHijriChange(selDayNum, e.target.value, selHijriY)}
+                    className="dat-sel" style={{borderColor:"#ddd6fe"}}>
+                    {HIJRI_MONTHS.map(m=><option key={m} value={m}>{m}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-black text-gray-500 mb-1 block">السنة الهجرية</label>
+                  <select value={selHijriY}
+                    onChange={e => onHijriChange(selDayNum, selHijriM, Number(e.target.value))}
+                    className="dat-sel" style={{borderColor:"#ddd6fe"}}>
+                    {HIJRI_YEARS.map(y=><option key={y} value={y}>{y}هـ</option>)}
+                  </select>
+                </div>
+              </div>
             </div>
-            {/* رقم اليوم */}
+
+            {/* ── صف التاريخ الميلادي ── */}
             <div>
-              <label className="text-xs font-black text-gray-500 mb-1.5 block">رقم اليوم</label>
-              <select value={selDayNum} onChange={e=>setSelDayNum(Number(e.target.value))}
-                className="w-full px-3 py-2.5 rounded-xl border-2 border-gray-200 focus:border-blue-400 focus:outline-none text-sm font-bold bg-white">
-                {DAYS_LIST.map(d=><option key={d} value={d}>{d}</option>)}
-              </select>
+              <div className="text-xs font-black mb-2 flex items-center gap-1.5" style={{color:"#0369a1"}}>
+                ☀️ التاريخ الميلادي
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <label className="text-xs font-black text-gray-500 mb-1 block">اليوم</label>
+                  <select value={selDayNum}
+                    onChange={e => onGregChange(Number(e.target.value), selGregM, selGregY)}
+                    className="dat-sel" style={{borderColor:"#bae6fd"}}>
+                    {DAYS_LIST.map(d=><option key={d} value={d}>{d}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-black text-gray-500 mb-1 block">الشهر الميلادي</label>
+                  <select value={selGregM}
+                    onChange={e => onGregChange(selDayNum, e.target.value, selGregY)}
+                    className="dat-sel" style={{borderColor:"#bae6fd"}}>
+                    {GREG_MONTHS.map(m=><option key={m} value={m}>{m}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-black text-gray-500 mb-1 block">السنة الميلادية</label>
+                  <select value={selGregY}
+                    onChange={e => onGregChange(selDayNum, selGregM, Number(e.target.value))}
+                    className="dat-sel" style={{borderColor:"#bae6fd"}}>
+                    {GREG_YEARS.map(y=><option key={y} value={y}>{y}م</option>)}
+                  </select>
+                </div>
+              </div>
             </div>
-            {/* الشهر الميلادي */}
-            <div>
-              <label className="text-xs font-black mb-1.5 block" style={{color:"#0369a1"}}>الشهر الميلادي</label>
-              <select value={selGregM} onChange={e=>setSelGregM(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-xl border-2 focus:outline-none text-sm font-bold bg-white"
-                style={{borderColor:"#bae6fd"}}>
-                {GREG_MONTHS.map(m=><option key={m} value={m}>{m}</option>)}
-              </select>
+
+            {/* ── شريط ملخص اليوم المختار ── */}
+            <div className="rounded-xl px-4 py-3 flex items-center justify-between gap-3 border-2"
+              style={{background:"linear-gradient(135deg,#eff6ff,#f5f3ff)",borderColor:"#c4b5fd"}}>
+              <div>
+                <div className="font-black text-sm" style={{color:"#1d4ed8"}}>
+                  📌 {selDay === "—" ? "يوم عطلة" : selDay} — {selDayNum} {selHijriM} {selHijriY}هـ
+                </div>
+                <div className="text-xs font-bold mt-0.5" style={{color:"#0369a1"}}>
+                  ☀️ {selDayNum} {selGregM} {selGregY}م
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                {selDay === "—" && (
+                  <span className="text-xs font-black px-2 py-1 rounded-lg" style={{background:"#fef3c7",color:"#d97706"}}>
+                    ⚠️ يوم عطلة
+                  </span>
+                )}
+                <span className="text-xs font-bold" style={{color:saving?"#d97706":"#059669"}}>
+                  {saving?"💾 يحفظ…":lastSaved?"✅ محفوظ "+lastSaved:""}
+                </span>
+              </div>
             </div>
-            {/* السنة الميلادية */}
-            <div>
-              <label className="text-xs font-black mb-1.5 block" style={{color:"#0369a1"}}>السنة الميلادية</label>
-              <select value={selGregY} onChange={e=>setSelGregY(Number(e.target.value))}
-                className="w-full px-3 py-2.5 rounded-xl border-2 focus:outline-none text-sm font-bold bg-white"
-                style={{borderColor:"#bae6fd"}}>
-                {Array.from({length:10},(_,i)=>2023+i).map(y=><option key={y} value={y}>{y+"م"}</option>)}
-              </select>
-            </div>
-          </div>
-          <div className="mx-4 mb-4 rounded-xl px-4 py-2.5 flex items-center justify-between gap-3" style={{background:"#eff6ff"}}>
-            <span className="font-black text-sm" style={{color:"#1d4ed8"}}>
-              {"📌 "}{selDay} — {selDayNum} {selGregM} {selGregY}م
-            </span>
-            <span className="text-xs font-bold" style={{color:saving?"#d97706":"#059669"}}>
-              {saving?"💾 يحفظ…":lastSaved?`✅ محفوظ ${lastSaved}`:""}
-            </span>
           </div>
         </div>
 
@@ -23712,12 +23745,10 @@ function DailyAttendanceTrackerPage({ teachers }) {
               const st  = rec.status || "";
               const si  = getStatusInfo(st);
               const at  = getAbsTypeInfo(rec.absenceType || "");
-              const fi  = rec.farisEntered; // true | false | null/undefined
+              const fi  = rec.farisEntered;
 
               return (
                 <div key={i} className="p-4 space-y-3">
-
-                  {/* ── صف الاسم + أزرار الحالة ── */}
                   <div className="flex items-start gap-3 flex-wrap sm:flex-nowrap">
                     <div className="w-7 h-7 rounded-xl flex items-center justify-center text-xs font-black flex-shrink-0 mt-1"
                       style={{background:"#f1f5f9",color:"#64748b"}}>{i+1}</div>
@@ -23727,7 +23758,7 @@ function DailyAttendanceTrackerPage({ teachers }) {
                     <div className="flex gap-1.5 flex-wrap items-center">
                       {STATUS_OPTIONS.map(s=>(
                         <button key={s.val} onClick={()=>setStatus(teacher, s.val)}
-                          className={`sb2${st===s.val?" on":""}`}
+                          className={"sb2"+(st===s.val?" on":"")}
                           style={st===s.val?{background:s.bg,color:s.color,borderColor:s.color}:{}}>
                           {s.label}
                         </button>
@@ -23735,261 +23766,92 @@ function DailyAttendanceTrackerPage({ teachers }) {
                     </div>
                   </div>
 
-                  {/* ── تفاصيل الغياب — تظهر فقط عند اختيار غائب ── */}
                   {st === "غائب" && (
-                    <div className="mr-10 rounded-2xl border-2 border-red-100 overflow-hidden"
-                      style={{background:"#fff8f8"}}>
-
-                      {/* نوع الغياب */}
+                    <div className="mr-10 rounded-2xl border-2 border-red-100 overflow-hidden" style={{background:"#fff8f8"}}>
                       <div className="px-4 pt-3 pb-2">
-                        <div className="text-xs font-black text-red-700 mb-2 flex items-center gap-1">
-                          <span>📋</span> نوع الغياب
-                        </div>
+                        <div className="text-xs font-black text-red-700 mb-2">📋 نوع الغياب</div>
                         <div className="flex flex-wrap gap-2">
                           {ABSENCE_TYPES.map(a=>(
                             <button key={a.val}
                               onClick={()=>patch(teacher,{absenceType: rec.absenceType===a.val?"":a.val})}
-                              className={`tb2${rec.absenceType===a.val?" on":""}`}>
+                              className={"tb2"+(rec.absenceType===a.val?" on":"")}>
                               {a.icon} {a.val}
                             </button>
                           ))}
                         </div>
                       </div>
-
-                      {/* إدخال في فارس */}
                       <div className="px-4 pb-3 border-t border-red-100 pt-2 mt-1">
-                        <div className="text-xs font-black text-red-700 mb-2 flex items-center gap-1">
-                          <span>💻</span> هل تم إدخال الغياب في فارس؟
-                        </div>
+                        <div className="text-xs font-black text-red-700 mb-2">💻 هل تم إدخال الغياب في فارس؟</div>
                         <div className="flex gap-2">
-                          <button onClick={()=>patch(teacher,{farisEntered: fi===true ? null : true})}
-                            className="fb2"
-                            style={{
-                              background: fi===true ? "#d1fae5" : "#f8fafd",
-                              color:      fi===true ? "#065f46" : "#6b7280",
-                              borderColor:fi===true ? "#6ee7b7" : "#e2e8f0",
-                              fontWeight:900, fontSize:12,
-                            }}>
+                          <button onClick={()=>patch(teacher,{farisEntered: fi===true ? null : true})} className="fb2"
+                            style={{background:fi===true?"#d1fae5":"#f8fafd",color:fi===true?"#065f46":"#6b7280",borderColor:fi===true?"#6ee7b7":"#e2e8f0",fontWeight:900,fontSize:12}}>
                             ✅ نعم، تم الإدخال
                           </button>
-                          <button onClick={()=>patch(teacher,{farisEntered: fi===false ? null : false})}
-                            className="fb2"
-                            style={{
-                              background: fi===false ? "#fee2e2" : "#f8fafd",
-                              color:      fi===false ? "#991b1b" : "#6b7280",
-                              borderColor:fi===false ? "#fca5a5" : "#e2e8f0",
-                              fontWeight:900, fontSize:12,
-                            }}>
+                          <button onClick={()=>patch(teacher,{farisEntered: fi===false ? null : false})} className="fb2"
+                            style={{background:fi===false?"#fee2e2":"#f8fafd",color:fi===false?"#991b1b":"#6b7280",borderColor:fi===false?"#fca5a5":"#e2e8f0",fontWeight:900,fontSize:12}}>
                             ❌ لا، لم يُدخَل بعد
                           </button>
                         </div>
-                        {fi === true && (
-                          <div className="mt-2 text-xs font-black text-green-700 flex items-center gap-1">
-                            <span>✅</span> تم تسجيل إدخال الغياب في فارس
-                          </div>
-                        )}
-                        {fi === false && (
-                          <div className="mt-2 text-xs font-black text-red-600 flex items-center gap-1 animate-pulse">
-                            <span>⚠️</span> الغياب لم يُدخَل في فارس بعد
-                          </div>
-                        )}
+                        {fi===true && <div className="mt-2 text-xs font-black text-green-700">✅ تم تسجيل إدخال الغياب في فارس</div>}
+                        {fi===false && <div className="mt-2 text-xs font-black text-red-600 animate-pulse">⚠️ الغياب لم يُدخَل في فارس بعد</div>}
                       </div>
                     </div>
                   )}
 
-                  {/* ملخص سريع إذا كانت هناك بيانات ولم يكن الصندوق مفتوحاً */}
-                  {st !== "غائب" && st && (
-                    <div className="mr-10 flex flex-wrap gap-2">
-                      <span className="text-xs font-black px-2.5 py-1 rounded-full"
-                        style={{background:si?.bg||"#f1f5f9",color:si?.color||"#475569"}}>
+                  {st && st !== "غائب" && (
+                    <div className="mr-10">
+                      <span className="text-xs font-black px-3 py-1 rounded-full" style={{background:si?.bg,color:si?.color}}>
                         {si?.label}
                       </span>
                     </div>
                   )}
+                </div>
+              );
+            })}
+            {filtered.length === 0 && (
+              <div className="py-12 text-center text-gray-400">
+                <div className="text-4xl mb-2">🔍</div>
+                <div className="font-bold">لا توجد نتائج</div>
+              </div>
+            )}
+          </div>
+        </div>
+      </>)}
 
+      {view==="weekly" && (()=>{
+        const uniqueDays = [...new Set(records.map(r=>r.dateKey))].sort();
+        if (uniqueDays.length === 0) return (
+          <div className="bg-white rounded-2xl p-10 text-center text-gray-400 shadow-sm border border-gray-100">
+            <div className="text-4xl mb-2">📊</div>
+            <div className="font-bold">لا توجد بيانات بعد</div>
+          </div>
+        );
+        return (
+          <div className="space-y-4">
+            {teacherList.map((t,i) => {
+              const stats = getTeacherStats(t);
+              if (stats.total === 0) return null;
+              return (
+                <div key={i} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                  <div className="px-4 py-3 flex items-center justify-between"
+                    style={{background:"linear-gradient(135deg,#f8fafd,#eff6ff)"}}>
+                    <div className="font-black text-sm text-gray-800">{t}</div>
+                    <div className="flex gap-2 text-xs font-black">
+                      <span style={{color:"#059669"}}>✅ {stats.حاضر}</span>
+                      <span style={{color:"#dc2626"}}>❌ {stats.غائب}</span>
+                      <span style={{color:"#d97706"}}>⏰ {stats.متأخر}</span>
+                      <span style={{color:"#2563eb"}}>📋 {stats.مستأذن}</span>
+                    </div>
+                    <button onClick={()=>deleteTeacherRecords(t)}
+                      className="text-xs font-black px-3 py-1 rounded-xl"
+                      style={{background:"#fee2e2",color:"#dc2626"}}>
+                      🗑️ حذف
+                    </button>
+                  </div>
                 </div>
               );
             })}
           </div>
-        </div>
-
-        {/* ── التوقيعات ── */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="grid grid-cols-2 divide-x divide-x-reverse divide-gray-100">
-            <div className="p-5 text-center">
-              <div className="text-xs text-gray-400 mb-2">مشرف الحضور / إسم المعلم</div>
-              <div className="border-t-2 border-dashed border-teal-400 pt-3 mt-8 font-black text-sm text-gray-600">__________________</div>
-            </div>
-            <div className="p-5 text-center">
-              <div className="text-xs text-gray-400 mb-2">مدير المدرسة</div>
-              <div className="border-t-2 border-dashed border-teal-400 pt-3 mt-8 font-black text-sm" style={{color:"#0d3b6e"}}>فازع عبدالله القرني</div>
-            </div>
-          </div>
-        </div>
-
-      </>)}
-
-      {/* ── الإحصائيات ── */}
-      {view==="weekly" && (()=>{
-        // جمع كل المفاتيح الزمنية المسجّلة ومعلوماتها
-        const allKeys = [...new Set(records.map(r=>r.dateKey))].sort((a,b)=>{
-          const ra=records.find(r=>r.dateKey===a), rb=records.find(r=>r.dateKey===b);
-          const da=`${ra?.gregYear||""}-${GREG_MONTHS.indexOf(ra?.gregMonth||"")+1}-${String(ra?.dayNum||"").padStart(2,"0")}`;
-          const db=`${rb?.gregYear||""}-${GREG_MONTHS.indexOf(rb?.gregMonth||"")+1}-${String(rb?.dayNum||"").padStart(2,"0")}`;
-          return da.localeCompare(db);
-        });
-
-        const keyInfo = (key) => {
-          const r = records.find(rr=>rr.dateKey===key);
-          return r ? `${r.day||""} ${r.dayNum||""} ${r.gregMonth||""} ${r.gregYear||""}م` : key;
-        };
-
-        return (
-        <div className="space-y-4">
-          {/* ملخص عام */}
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-            <div className="px-5 py-3 font-black text-sm text-white" style={{background:"linear-gradient(135deg,#4c1d95,#7c3aed)"}}>
-              📊 ملخص الحضور — جميع الأيام المسجّلة
-            </div>
-            <div className="p-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-              {STATUS_OPTIONS.map(s=>{
-                const cnt=records.filter(r=>r.status===s.val).length;
-                return (
-                  <div key={s.val} className="rounded-2xl p-3 text-center" style={{background:s.bg}}>
-                    <div className="text-2xl font-black" style={{color:s.color}}>{cnt}</div>
-                    <div className="text-xs font-bold mt-0.5" style={{color:s.color}}>{s.val}</div>
-                  </div>
-                );
-              })}
-            </div>
-            <div className="pb-3 text-xs text-gray-400 text-center font-bold">
-              إجمالي السجلات: {records.length} | الأيام: {allKeys.length}
-            </div>
-          </div>
-
-          {/* جدول تفصيلي لكل معلم */}
-          {teacherList.filter(t=>getTeacherStats(t).total>0).map((teacher,ti)=>{
-            const teacherRecs = records.filter(r=>r.teacherName===teacher);
-            const stats = getTeacherStats(teacher);
-            return (
-              <div key={ti} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                {/* رأس المعلم */}
-                <div className="px-5 py-3 font-black text-sm text-white flex items-center justify-between flex-wrap gap-2"
-                  style={{background:isPinned(teacher)?"linear-gradient(135deg,#1e3a5f,#1d4ed8)":"linear-gradient(135deg,#065f46,#0d9488)"}}>
-                  <div className="flex items-center gap-2">
-                    <span>👨‍🏫</span>
-                    <span>{teacher}</span>
-                    {isPinned(teacher) && <span className="text-xs px-2 py-0.5 rounded-full font-black" style={{background:"rgba(255,255,255,0.25)"}}>📌 مثبّت</span>}
-                  </div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {STATUS_OPTIONS.map(s=>(
-                      <span key={s.val} className="px-2 py-0.5 rounded-full font-black text-xs"
-                        style={{background:"rgba(255,255,255,0.2)"}}>
-                        {s.val}: {stats[s.val]}
-                      </span>
-                    ))}
-                    <span className="px-2 py-0.5 rounded-full font-black text-xs" style={{background:"rgba(255,255,255,0.3)"}}>
-                      المجموع: {stats.total}
-                    </span>
-                    {/* زر تثبيت */}
-                    <button onClick={()=>togglePin(teacher)}
-                      className="px-3 py-1 rounded-xl text-xs font-black transition-all"
-                      style={{background:isPinned(teacher)?"#fbbf24":"rgba(255,255,255,0.2)",color:isPinned(teacher)?"#1e3a5f":"#fff",border:"1.5px solid rgba(255,255,255,0.4)"}}>
-                      {isPinned(teacher)?"📌 مثبّت — إلغاء":"📌 تثبيت"}
-                    </button>
-                    {/* زر حذف */}
-                    {!isPinned(teacher) && (
-                      <button onClick={()=>deleteTeacherRecords(teacher)}
-                        className="px-3 py-1 rounded-xl text-xs font-black transition-all"
-                        style={{background:"rgba(220,38,38,0.7)",color:"#fff",border:"1.5px solid rgba(255,255,255,0.3)"}}>
-                        🗑️ حذف السجلات
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* جدول الأيام */}
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr style={{background:"#f8fafd"}}>
-                        <th className="px-3 py-2.5 text-right font-black text-gray-600 border-b">اليوم</th>
-                        <th className="px-3 py-2.5 text-center font-black text-gray-600 border-b">التاريخ</th>
-                        {STATUS_OPTIONS.map(s=>(
-                          <th key={s.val} className="px-3 py-2.5 text-center font-black border-b" style={{color:s.color}}>{s.label}</th>
-                        ))}
-                        <th className="px-3 py-2.5 text-center font-black border-b" style={{color:"#7c3aed"}}>إدخال فارس</th>
-                        <th className="px-3 py-2.5 text-center font-black text-blue-600 border-b">الإجمالي</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {allKeys.map((key,ki)=>{
-                        const rec = teacherRecs.find(r=>r.dateKey===key);
-                        const info = records.find(r=>r.dateKey===key);
-                        const dayLabel = info ? `${info.day||""}` : "—";
-                        const dateLabel = info ? `${info.dayNum||""} ${info.gregMonth||""} ${info.gregYear||""}م` : key;
-                        const faris = rec?.farisEntered;
-                        return (
-                          <tr key={ki} className={ki%2===0?"bg-white":"bg-gray-50/50"}>
-                            <td className="px-3 py-2 font-bold text-gray-700">{dayLabel}</td>
-                            <td className="px-3 py-2 text-center font-bold text-gray-600">{dateLabel}</td>
-                            {STATUS_OPTIONS.map(s=>(
-                              <td key={s.val} className="px-3 py-2 text-center font-black">
-                                {rec?.status===s.val
-                                  ? <span className="px-2 py-0.5 rounded-full text-xs font-black" style={{background:s.bg,color:s.color}}>1</span>
-                                  : <span className="text-gray-300">—</span>}
-                              </td>
-                            ))}
-                            <td className="px-3 py-2 text-center font-black">
-                              {faris===true
-                                ? <span className="px-2 py-0.5 rounded-full text-xs font-black" style={{background:"#d1fae5",color:"#059669"}}>✅ نعم</span>
-                                : faris===false
-                                  ? <span className="px-2 py-0.5 rounded-full text-xs font-black" style={{background:"#fee2e2",color:"#dc2626"}}>❌ لا</span>
-                                  : <span className="text-gray-300">—</span>}
-                            </td>
-                            <td className="px-3 py-2 text-center font-black text-blue-600">
-                              {rec?.status ? 1 : <span className="text-gray-300">—</span>}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                    {/* صف الإجماليات */}
-                    <tfoot>
-                      <tr style={{background:"#f0fdf4",borderTop:"2px solid #d1fae5"}}>
-                        <td className="px-3 py-2.5 font-black text-gray-700" colSpan={2}>الإجمالي</td>
-                        {STATUS_OPTIONS.map(s=>(
-                          <td key={s.val} className="px-3 py-2.5 text-center font-black"
-                            style={{color:stats[s.val]>0?s.color:"#d1d5db"}}>
-                            {stats[s.val]>0?stats[s.val]:"—"}
-                          </td>
-                        ))}
-                        <td className="px-3 py-2.5 text-center font-black" style={{color:"#7c3aed"}}>
-                          {(()=>{const fc=teacherRecs.filter(r=>r.farisEntered===true).length;return fc>0?fc:"—";})()}
-                        </td>
-                        <td className="px-3 py-2.5 text-center font-black text-blue-700">{stats.total}</td>
-                      </tr>
-                    </tfoot>
-                  </table>
-                </div>
-              </div>
-            );
-          })}
-
-          {teacherList.every(t=>getTeacherStats(t).total===0) && (
-            <div className="text-center py-16 text-gray-400 bg-white rounded-2xl border border-gray-100">
-              <div className="text-5xl mb-3">📊</div>
-              <p className="font-bold text-sm">لا توجد بيانات بعد — ابدأ بتسجيل الحضور</p>
-            </div>
-          )}
-
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-            <div className="grid grid-cols-2 divide-x divide-x-reverse divide-gray-100">
-              <div className="p-5 text-center"><div className="text-xs text-gray-400 mb-2">مشرف الحضور</div><div className="border-t-2 border-dashed border-teal-400 pt-3 mt-8 font-black text-sm text-gray-600">__________________</div></div>
-              <div className="p-5 text-center"><div className="text-xs text-gray-400 mb-2">مدير المدرسة</div><div className="border-t-2 border-dashed border-teal-400 pt-3 mt-8 font-black text-sm" style={{color:"#0d3b6e"}}>فازع عبدالله القرني</div></div>
-            </div>
-          </div>
-        </div>
         );
       })()}
     </div>
