@@ -5380,7 +5380,6 @@ function ParentPortal({ classList, setClassList, saveClass, messages, setMessage
                 { id: "notes",    label: "ملاحظات المعلم", icon: "🔔", badge: unreadNotes },
                 { id: "grades",   label: "التقييمات",       icon: "📊" },
                 { id: "messages", label: "رسالة",           icon: "✉️" },
-                { id: "surveys",  label: "استبيانات",       icon: "📋" },
               ];
               return (
                 <div className="flex gap-1 bg-white rounded-2xl p-1.5 shadow-sm">
@@ -5685,17 +5684,6 @@ function ParentPortal({ classList, setClassList, saveClass, messages, setMessage
               </div>
             )}
 
-            {/* تبويب الاستبيانات */}
-            {tab === "surveys" && (
-              <div className={cx.cardXl}>
-                <SurveysPage
-                  surveys={surveys}
-                  setSurveys={setSurveys}
-                  saveSurveys={saveSurveys}
-                  isParent={true}
-                />
-              </div>
-            )}
           </div>
         )}
 
@@ -10393,540 +10381,310 @@ function MessagesPage({ messages, setMessages, saveMessages, isParent, parentNam
   );
 }
 
-// ===== صفحة الاستبيانات =====
-// ================================================================
-// ===== نظام الاستبيانات — النسخة الجديدة الكاملة =====
+// ===== نظام الاستبيانات — مقياس ليكرت الخماسي =====
 // ================================================================
 
-// ── ثوابت الأيام والشهور ──
-const SURVEY_HIJRI_MONTHS = ["محرم","صفر","ربيع الأول","ربيع الآخر","جمادى الأولى","جمادى الآخرة","رجب","شعبان","رمضان","شوال","ذو القعدة","ذو الحجة"];
-const SURVEY_HIJRI_YEARS  = ["1446هـ","1447هـ","1448هـ","1449هـ"];
-const SURVEY_DAYS         = Array.from({length:31},(_,i)=>i+1);
-
-// ── أنواع الأسئلة ──
-const SURVEY_Q_TYPES = [
-  { val:"radio",    label:"اختيار واحد",    icon:"🔘" },
-  { val:"checkbox", label:"اختيار متعدد",   icon:"☑️"  },
-  { val:"text",     label:"نص حر",          icon:"✍️"  },
-  { val:"scale5",   label:"مقياس 1–5",      icon:"⭐"  },
-  { val:"yesno",    label:"نعم / لا",       icon:"✅"  },
-];
-
-// ── الألوان الزاهية ──
-const SURVEY_PALETTES = [
-  { name:"زهري",      h1:"#be185d", h2:"#ec4899", bg:"#fdf2f8", light:"#fce7f3", border:"#f9a8d4" },
-  { name:"بنفسجي",   h1:"#5b21b6", h2:"#8b5cf6", bg:"#f5f3ff", light:"#ede9fe", border:"#c4b5fd" },
-  { name:"أزرق",     h1:"#1e40af", h2:"#3b82f6", bg:"#eff6ff", light:"#dbeafe", border:"#93c5fd" },
-  { name:"أخضر",     h1:"#065f46", h2:"#10b981", bg:"#ecfdf5", light:"#d1fae5", border:"#6ee7b7" },
-  { name:"برتقالي",  h1:"#92400e", h2:"#f59e0b", bg:"#fffbeb", light:"#fef3c7", border:"#fcd34d" },
-  { name:"أحمر",     h1:"#991b1b", h2:"#ef4444", bg:"#fef2f2", light:"#fee2e2", border:"#fca5a5" },
-  { name:"تيل",      h1:"#134e4a", h2:"#14b8a6", bg:"#f0fdfa", light:"#ccfbf1", border:"#5eead4" },
-  { name:"توت",      h1:"#4c0519", h2:"#f43f5e", bg:"#fff1f2", light:"#ffe4e6", border:"#fda4af" },
-];
-
-const SURVEY_EMOJIS = ["😊","😁","🙂","😐","😕","😞","⭐","👍","👎","💪","🔥","💯","🌟","🎯","📚","🏫","🤝","💡","🎓","✅","❤️","🌈"];
+const LIKERT_OPTIONS = ["أوافق بشدة","أوافق","محايد","غير موافق","غير موافق بشدة"];
+const LIKERT_COLORS  = ["#16a34a","#4ade80","#f59e0b","#f97316","#dc2626"];
+const LIKERT_ICONS   = ["✅✅","✅","➖","❌","❌❌"];
+const SURVEY_TARGETS = ["معلمون","طلاب","أولياء أمور"];
 
 function mkSurvey() {
-  return {
-    id: Date.now(),
-    title: "",
-    dayNum: new Date().getDate(),
-    hijriMonth: SURVEY_HIJRI_MONTHS[new Date().getMonth()],
-    hijriYear: "1447هـ",
-    target: "الجميع",
-    palette: 0,
-    questions: [],
-    active: true,
-    responses: [],
-    createdAt: new Date().toLocaleDateString("ar-SA"),
-    accessType: "free", // free | id
-  };
+  const today = new Date();
+  try {
+    const h = gregorianToHijri(today.getFullYear(), today.getMonth()+1, today.getDate());
+    return {
+      id: Date.now(),
+      title: "",
+      dateH: `${String(h.d).padStart(2,"0")} / ${String(h.m).padStart(2,"0")} / ${h.y}`,
+      targets: [],
+      questions: [],
+      createdAt: today.toLocaleDateString("ar-SA"),
+      color: "#1e3a5f",
+    };
+  } catch {
+    return {
+      id: Date.now(), title: "", dateH: "____ / ____ / 1447",
+      targets: [], questions: [], createdAt: today.toLocaleDateString("ar-SA"), color: "#1e3a5f",
+    };
+  }
 }
 
 function mkQuestion() {
-  return {
-    id: Date.now() + Math.random() * 1000 | 0,
-    type: "radio",
-    text: "",
-    emoji: "🔘",
-    options: ["خيار 1", "خيار 2", "خيار 3"],
-    required: true,
-  };
+  return { id: Date.now() + Math.random() * 999 | 0, text: "" };
 }
 
 // ================================================================
-// ===== صانع الاستبيان =====
+// ===== صانع الاستبيان (نموذج الإنشاء/التعديل) =====
 // ================================================================
 function SurveyBuilder({ survey, onSave, onCancel }) {
-  const [s, setS] = useState({ ...survey });
-  const pal = SURVEY_PALETTES[s.palette ?? 0];
+  const [s, setS] = useState({ ...survey, questions: survey.questions.map(q=>({...q})) });
+  const colors = ["#1e3a5f","#065f46","#5b21b6","#991b1b","#92400e","#1d4ed8","#134e4a","#4c0519"];
 
-  const addQ = () => {
-    const q = mkQuestion();
-    setS(p => ({ ...p, questions: [...p.questions, q] }));
-  };
-
-  const updQ = (id, changes) =>
-    setS(p => ({ ...p, questions: p.questions.map(q => q.id===id ? {...q,...changes} : q) }));
-
-  const delQ = (id) =>
-    setS(p => ({ ...p, questions: p.questions.filter(q => q.id !== id) }));
-
-  const moveQ = (id, dir) => {
-    const arr = [...s.questions];
-    const i = arr.findIndex(q => q.id===id);
-    if (i+dir < 0 || i+dir >= arr.length) return;
-    [arr[i], arr[i+dir]] = [arr[i+dir], arr[i]];
-    setS(p => ({ ...p, questions: arr }));
-  };
-
-  const addOpt = (qid) => updQ(qid, { options: [...s.questions.find(q=>q.id===qid).options, `خيار ${s.questions.find(q=>q.id===qid).options.length+1}`] });
-  const updOpt = (qid, oi, val) => {
-    const opts = [...s.questions.find(q=>q.id===qid).options];
-    opts[oi] = val;
-    updQ(qid, { options: opts });
-  };
-  const delOpt = (qid, oi) => {
-    const opts = s.questions.find(q=>q.id===qid).options.filter((_,i)=>i!==oi);
-    updQ(qid, { options: opts });
+  const addQ = () => setS(p => ({ ...p, questions: [...p.questions, mkQuestion()] }));
+  const delQ = (id) => setS(p => ({ ...p, questions: p.questions.filter(q=>q.id!==id) }));
+  const updQ = (id, text) => setS(p => ({ ...p, questions: p.questions.map(q=>q.id===id?{...q,text}:q) }));
+  const moveQ = (idx, dir) => {
+    const qs = [...s.questions];
+    const to = idx + dir;
+    if (to < 0 || to >= qs.length) return;
+    [qs[idx], qs[to]] = [qs[to], qs[idx]];
+    setS(p => ({ ...p, questions: qs }));
   };
 
   return (
-    <div dir="rtl" style={{fontFamily:"'Cairo',sans-serif"}}>
-      <style>{`
-        .sq-card{background:#fff;border-radius:16px;border:2px solid ${pal.border};margin-bottom:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.07);}
-        .sq-hdr{padding:10px 14px;font-weight:900;font-size:13px;color:#fff;display:flex;align-items:center;justify-content:space-between;background:linear-gradient(135deg,${pal.h1},${pal.h2});}
-        input.sq-in,textarea.sq-ta{border:2px solid ${pal.border};border-radius:10px;padding:8px 12px;font-size:13px;font-family:'Cairo',sans-serif;width:100%;outline:none;}
-        input.sq-in:focus,textarea.sq-ta:focus{border-color:${pal.h2};}
-        .sq-btn{border:none;border-radius:10px;padding:7px 16px;font-weight:900;font-size:12px;cursor:pointer;font-family:'Cairo',sans-serif;transition:all .15s;}
-      `}</style>
+    <div dir="rtl" style={{ fontFamily:"'Cairo','Noto Naskh Arabic',sans-serif", background:"#f8fafc", minHeight:"100vh", padding:"16px" }}>
+      {/* رأس */}
+      <div style={{ background:`linear-gradient(135deg, ${s.color} 0%, ${s.color}cc 100%)`, borderRadius:16, padding:"16px 20px", marginBottom:16, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+        <div>
+          <div style={{ color:"#fff", fontWeight:900, fontSize:16 }}>📋 {s.id === survey.id && s.title ? "تعديل الاستبيان" : "استبيان جديد"}</div>
+          <div style={{ color:"rgba(255,255,255,.7)", fontSize:11, marginTop:2 }}>مدرسة عبيدة بن الحارث المتوسطة</div>
+        </div>
+        <button onClick={onCancel} style={{ background:"rgba(255,255,255,.15)", border:"none", borderRadius:8, color:"#fff", fontWeight:800, fontSize:12, padding:"6px 14px", cursor:"pointer", fontFamily:"'Cairo',sans-serif" }}>✕ إلغاء</button>
+      </div>
 
-      {/* رأس البناء */}
-      <div className="rounded-2xl overflow-hidden shadow-xl mb-4" style={{background:"linear-gradient(135deg,"+pal.h1+","+pal.h2+")"}}>
-        <div className="flex items-center justify-between px-5 py-4">
-          <span className="font-black text-white text-lg">🛠️ {s.id===survey.id && s.title ? "تعديل الاستبيان" : "استبيان جديد"}</span>
-          <div className="flex gap-2">
-            <button onClick={addQ}
-              className="sq-btn text-white flex items-center gap-1.5"
-              style={{background:"rgba(255,255,255,.2)",border:"1.5px solid rgba(255,255,255,.4)"}}>
-              ➕ إضافة سؤال
-            </button>
-            <button onClick={()=>onSave(s)}
-              className="sq-btn" style={{background:"#22c55e",color:"#fff"}}>💾 حفظ</button>
-            <button onClick={onCancel}
-              className="sq-btn" style={{background:"rgba(255,255,255,.2)",color:"#fff",border:"1.5px solid rgba(255,255,255,.3)"}}>✕</button>
-          </div>
+      <div style={{ background:"#fff", borderRadius:14, padding:16, marginBottom:12, boxShadow:"0 2px 8px rgba(0,0,0,.06)" }}>
+        {/* عنوان الاستبيان */}
+        <label style={{ fontSize:12, fontWeight:700, color:"#475569", display:"block", marginBottom:5 }}>📌 عنوان الاستبيان *</label>
+        <input value={s.title} onChange={e=>setS(p=>({...p,title:e.target.value}))}
+          placeholder="مثال: استبانة قياس رضا المعلمين"
+          style={{ width:"100%", padding:"10px 14px", borderRadius:10, border:"2px solid #e2e8f0", fontFamily:"'Cairo',sans-serif", fontSize:14, outline:"none", boxSizing:"border-box", marginBottom:12 }} />
+
+        {/* التاريخ */}
+        <label style={{ fontSize:12, fontWeight:700, color:"#475569", display:"block", marginBottom:5 }}>📅 التاريخ الهجري</label>
+        <input value={s.dateH} onChange={e=>setS(p=>({...p,dateH:e.target.value}))}
+          placeholder="مثال: 15 / 10 / 1447"
+          style={{ width:"100%", padding:"10px 14px", borderRadius:10, border:"2px solid #e2e8f0", fontFamily:"'Cairo',sans-serif", fontSize:14, outline:"none", boxSizing:"border-box", marginBottom:12 }} />
+
+        {/* الفئة المستهدفة */}
+        <label style={{ fontSize:12, fontWeight:700, color:"#475569", display:"block", marginBottom:8 }}>👥 الفئة المستهدفة</label>
+        <div style={{ display:"flex", gap:12, flexWrap:"wrap", marginBottom:12 }}>
+          {SURVEY_TARGETS.map(t => (
+            <label key={t} style={{ display:"flex", alignItems:"center", gap:6, cursor:"pointer", fontSize:13, fontWeight:700 }}>
+              <input type="checkbox" checked={s.targets.includes(t)}
+                onChange={e => setS(p => ({ ...p, targets: e.target.checked ? [...p.targets,t] : p.targets.filter(x=>x!==t) }))}
+                style={{ width:16, height:16, cursor:"pointer" }} />
+              {t}
+            </label>
+          ))}
         </div>
 
-        {/* إعدادات عامة */}
-        <div className="px-5 pb-5 space-y-3" style={{background:"rgba(0,0,0,.2)"}}>
-          <input value={s.title} onChange={e=>setS(p=>({...p,title:e.target.value}))}
-            placeholder="✏️ عنوان الاستبيان *"
-            className="sq-in text-white font-black text-base placeholder-white/50"
-            style={{background:"rgba(255,255,255,.12)",borderColor:"rgba(255,255,255,.3)",color:"#fff"}} />
-
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {/* اليوم */}
-            <div>
-              <label className="text-xs font-bold text-white/70 mb-1 block">اليوم</label>
-              <select value={s.dayNum||1} onChange={e=>setS(p=>({...p,dayNum:Number(e.target.value)}))}
-                className="w-full px-3 py-2 rounded-xl border border-white/30 bg-white/15 text-white text-xs font-bold focus:outline-none">
-                {SURVEY_DAYS.map(d=><option key={d} value={d} style={{color:"#000"}}>{d}</option>)}
-              </select>
-            </div>
-            {/* الشهر الهجري */}
-            <div>
-              <label className="text-xs font-bold text-white/70 mb-1 block">الشهر الهجري</label>
-              <select value={s.hijriMonth||"شوال"} onChange={e=>setS(p=>({...p,hijriMonth:e.target.value}))}
-                className="w-full px-3 py-2 rounded-xl border border-white/30 bg-white/15 text-white text-xs font-bold focus:outline-none">
-                {SURVEY_HIJRI_MONTHS.map(m=><option key={m} value={m} style={{color:"#000"}}>{m}</option>)}
-              </select>
-            </div>
-            {/* السنة */}
-            <div>
-              <label className="text-xs font-bold text-white/70 mb-1 block">السنة الهجرية</label>
-              <select value={s.hijriYear||"1447هـ"} onChange={e=>setS(p=>({...p,hijriYear:e.target.value}))}
-                className="w-full px-3 py-2 rounded-xl border border-white/30 bg-white/15 text-white text-xs font-bold focus:outline-none">
-                {SURVEY_HIJRI_YEARS.map(y=><option key={y} value={y} style={{color:"#000"}}>{y}</option>)}
-              </select>
-            </div>
-            {/* الفئة المستهدفة */}
-            <div>
-              <label className="text-xs font-bold text-white/70 mb-1 block">الفئة المستهدفة</label>
-              <select value={s.target||"الجميع"} onChange={e=>setS(p=>({...p,target:e.target.value}))}
-                className="w-full px-3 py-2 rounded-xl border border-white/30 bg-white/15 text-white text-xs font-bold focus:outline-none">
-                {["الطلاب","أولياء الأمور","المعلمون","الإداريون","الجميع"].map(t=><option key={t} value={t} style={{color:"#000"}}>{t}</option>)}
-              </select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            {/* نوع الوصول */}
-            <div>
-              <label className="text-xs font-bold text-white/70 mb-1 block">🔐 نوع الوصول</label>
-              <div className="flex gap-2">
-                {[{val:"free",l:"🔓 مفتوح (بدون هوية)"},{val:"id",l:"🪪 برقم الهوية"}].map(opt=>(
-                  <button key={opt.val} onClick={()=>setS(p=>({...p,accessType:opt.val}))}
-                    className="flex-1 py-2 rounded-xl text-xs font-black border-2 transition-all"
-                    style={{background:s.accessType===opt.val?"rgba(255,255,255,.25)":"transparent",color:"#fff",borderColor:s.accessType===opt.val?"rgba(255,255,255,.6)":"rgba(255,255,255,.2)"}}>
-                    {opt.l}
-                  </button>
-                ))}
-              </div>
-            </div>
-            {/* اللون */}
-            <div>
-              <label className="text-xs font-bold text-white/70 mb-1 block">🎨 لون الاستبيان</label>
-              <div className="flex gap-1.5 flex-wrap">
-                {SURVEY_PALETTES.map((p,i)=>(
-                  <button key={i} onClick={()=>setS(prev=>({...prev,palette:i}))}
-                    className="w-7 h-7 rounded-full border-4 transition-transform hover:scale-110"
-                    style={{background:"linear-gradient(135deg,"+p.h1+","+p.h2+")",borderColor:s.palette===i?"#fff":"transparent"}} />
-                ))}
-              </div>
-            </div>
-          </div>
+        {/* اللون */}
+        <label style={{ fontSize:12, fontWeight:700, color:"#475569", display:"block", marginBottom:6 }}>🎨 لون الاستبيان</label>
+        <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
+          {colors.map(c => (
+            <button key={c} onClick={()=>setS(p=>({...p,color:c}))}
+              style={{ width:30, height:30, borderRadius:"50%", background:c, border: s.color===c?"3px solid #1e293b":"2px solid #e2e8f0", cursor:"pointer" }} />
+          ))}
         </div>
       </div>
 
       {/* الأسئلة */}
-      <div className="space-y-3">
+      <div style={{ background:"#fff", borderRadius:14, padding:16, marginBottom:12, boxShadow:"0 2px 8px rgba(0,0,0,.06)" }}>
+        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:12 }}>
+          <span style={{ fontWeight:900, fontSize:14, color:"#1e293b" }}>❓ الأسئلة ({s.questions.length})</span>
+          <button onClick={addQ}
+            style={{ background:s.color, color:"#fff", border:"none", borderRadius:10, padding:"7px 14px", fontSize:12, fontWeight:800, cursor:"pointer", fontFamily:"'Cairo',sans-serif" }}>
+            ➕ إضافة سؤال
+          </button>
+        </div>
         {s.questions.length === 0 && (
-          <div className="text-center py-10 rounded-2xl border-2 border-dashed" style={{borderColor:pal.border,background:pal.light}}>
-            <div className="text-4xl mb-2">❓</div>
-            <div className="font-black text-sm" style={{color:pal.h1}}>لا توجد أسئلة بعد</div>
-            <div className="text-xs opacity-60 mt-1">اضغط "➕ إضافة سؤال" في الأعلى</div>
-          </div>
+          <div style={{ textAlign:"center", padding:"24px 0", color:"#94a3b8", fontSize:13 }}>لا توجد أسئلة بعد — اضغط «إضافة سؤال»</div>
         )}
-
-        {s.questions.map((q, qi) => (
-          <div key={q.id} className="sq-card">
-            <div className="sq-hdr">
-              <div className="flex items-center gap-2">
-                <span className="text-lg">{SURVEY_Q_TYPES.find(t=>t.val===q.type)?.icon}</span>
-                <span>س{qi+1}: {q.text || "سؤال جديد"}</span>
-                {q.required && <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full">إجباري</span>}
-              </div>
-              <div className="flex gap-1">
-                <button onClick={()=>moveQ(q.id,-1)} className="text-white/70 hover:text-white px-1.5 text-sm">↑</button>
-                <button onClick={()=>moveQ(q.id, 1)} className="text-white/70 hover:text-white px-1.5 text-sm">↓</button>
-                <button onClick={()=>delQ(q.id)} className="text-white/70 hover:text-red-300 px-1.5 text-sm">🗑️</button>
-              </div>
+        {s.questions.map((q, idx) => (
+          <div key={q.id} style={{ background:"#f8fafc", borderRadius:10, padding:"12px", marginBottom:8, border:"1.5px solid #e2e8f0" }}>
+            <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:6 }}>
+              <span style={{ background:s.color, color:"#fff", borderRadius:"50%", width:22, height:22, display:"flex", alignItems:"center", justifyContent:"center", fontSize:11, fontWeight:900, flexShrink:0 }}>{idx+1}</span>
+              <input value={q.text} onChange={e=>updQ(q.id, e.target.value)}
+                placeholder={`نص السؤال ${idx+1}...`}
+                style={{ flex:1, padding:"7px 10px", borderRadius:8, border:"1.5px solid #e2e8f0", fontFamily:"'Cairo',sans-serif", fontSize:13, outline:"none" }} />
+              <button onClick={()=>moveQ(idx,-1)} disabled={idx===0} style={{ background:"none", border:"none", fontSize:14, cursor:idx===0?"default":"pointer", opacity:idx===0?.3:1 }}>▲</button>
+              <button onClick={()=>moveQ(idx,1)} disabled={idx===s.questions.length-1} style={{ background:"none", border:"none", fontSize:14, cursor:idx===s.questions.length-1?"default":"pointer", opacity:idx===s.questions.length-1?.3:1 }}>▼</button>
+              <button onClick={()=>delQ(q.id)} style={{ background:"#fee2e2", border:"none", borderRadius:6, color:"#dc2626", fontSize:12, padding:"3px 8px", cursor:"pointer" }}>🗑️</button>
             </div>
-
-            <div className="p-4 space-y-3" style={{background:pal.bg}}>
-              {/* نص السؤال */}
-              <input value={q.text} onChange={e=>updQ(q.id,{text:e.target.value})}
-                placeholder="اكتب نص السؤال هنا..."
-                className="sq-in font-bold" />
-
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                {/* نوع الإجابة */}
-                <div>
-                  <label className="text-xs font-black text-gray-500 mb-1 block">نوع الإجابة</label>
-                  <select value={q.type} onChange={e=>updQ(q.id,{type:e.target.value})}
-                    className="w-full px-3 py-2 rounded-xl border-2 text-xs font-bold focus:outline-none bg-white"
-                    style={{borderColor:pal.border}}>
-                    {SURVEY_Q_TYPES.map(t=><option key={t.val} value={t.val}>{t.icon} {t.label}</option>)}
-                  </select>
-                </div>
-                {/* إيموجي */}
-                <div>
-                  <label className="text-xs font-black text-gray-500 mb-1 block">رمز تعبيري</label>
-                  <select value={q.emoji||""} onChange={e=>updQ(q.id,{emoji:e.target.value})}
-                    className="w-full px-3 py-2 rounded-xl border-2 text-sm font-bold focus:outline-none bg-white"
-                    style={{borderColor:pal.border}}>
-                    <option value="">بدون</option>
-                    {SURVEY_EMOJIS.map(e=><option key={e} value={e}>{e}</option>)}
-                  </select>
-                </div>
-                {/* إجباري */}
-                <div className="flex items-end pb-1">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" checked={q.required} onChange={e=>updQ(q.id,{required:e.target.checked})} className="w-4 h-4" />
-                    <span className="text-xs font-black text-gray-600">إجباري</span>
-                  </label>
-                </div>
-              </div>
-
-              {/* خيارات radio/checkbox */}
-              {(q.type==="radio" || q.type==="checkbox") && (
-                <div>
-                  <label className="text-xs font-black text-gray-500 mb-2 block">الخيارات</label>
-                  <div className="space-y-2">
-                    {(q.options||[]).map((opt,oi)=>(
-                      <div key={oi} className="flex gap-2 items-center">
-                        <span className="text-xs font-black w-5 text-center" style={{color:pal.h2}}>{oi+1}</span>
-                        <input value={opt} onChange={e=>updOpt(q.id,oi,e.target.value)}
-                          className="flex-1 px-3 py-1.5 rounded-lg border-2 text-sm focus:outline-none bg-white"
-                          style={{borderColor:pal.border}} />
-                        <button onClick={()=>delOpt(q.id,oi)} className="text-red-400 hover:text-red-600 text-sm px-1">✕</button>
-                      </div>
-                    ))}
-                    <button onClick={()=>addOpt(q.id)}
-                      className="text-xs font-black hover:underline mt-1" style={{color:pal.h2}}>
-                      ➕ إضافة خيار
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
+            <div style={{ fontSize:11, color:"#94a3b8", paddingRight:30 }}>مقياس: أوافق بشدة • أوافق • محايد • غير موافق • غير موافق بشدة</div>
           </div>
         ))}
       </div>
 
-      {/* زر إضافة سؤال في الأسفل */}
-      {s.questions.length > 0 && (
-        <button onClick={addQ}
-          className="w-full py-3 rounded-2xl border-2 border-dashed font-black text-sm mt-2 hover:opacity-80 transition-all"
-          style={{borderColor:pal.h2,color:pal.h2,background:pal.light}}>
-          ➕ إضافة سؤال جديد
-        </button>
-      )}
+      <button onClick={()=>{ if(!s.title.trim()){alert("أدخل عنوان الاستبيان أولاً");return;} if(s.questions.length===0){alert("أضف سؤالاً واحداً على الأقل");return;} onSave(s); }}
+        style={{ width:"100%", padding:"13px", borderRadius:12, border:"none", background:s.color, color:"#fff", fontWeight:900, fontSize:15, cursor:"pointer", fontFamily:"'Cairo',sans-serif" }}>
+        💾 حفظ الاستبيان
+      </button>
     </div>
   );
 }
 
 // ================================================================
-// ===== ملء الاستبيان (للطلاب / أولياء الأمور / المعلمين) =====
+// ===== صفحة ملء الاستبيان (طباعة + إجابة) =====
 // ================================================================
-function SurveyRespond({ survey, onClose, prefillId }) {
-  const pal = SURVEY_PALETTES[survey.palette ?? 0];
-  const [responderId, setResponderId] = useState(prefillId || "");
-  const [step, setStep] = useState(survey.accessType === "free" ? "form" : "login");
-  const [idError, setIdError] = useState("");
+function SurveyRespond({ survey, onClose }) {
   const [answers, setAnswers] = useState({});
-  const [submitting, setSubmitting] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
+  const [participantName, setParticipantName] = useState("");
+  const [participantPhone, setParticipantPhone] = useState("");
 
-  const surveyDate = `${survey.dayNum||""} ${survey.hijriMonth||""} ${survey.hijriYear||""}`;
-
-  const setAns = (qid, val) => setAnswers(p=>({...p,[qid]:val}));
-  const toggleCheck = (qid, opt) => {
-    const cur = answers[qid] || [];
-    setAns(qid, cur.includes(opt) ? cur.filter(x=>x!==opt) : [...cur, opt]);
-  };
-
-  const handleLogin = () => {
-    if (!responderId.trim()) { setIdError("أدخل رقم هويتك"); return; }
-    setIdError("");
-    setStep("form");
-  };
-
-  const submit = async () => {
-    const missing = survey.questions.filter(q => q.required && (
-      answers[q.id] === undefined || answers[q.id] === "" ||
-      (Array.isArray(answers[q.id]) && answers[q.id].length === 0)
-    ));
-    if (missing.length > 0) {
-      alert(`يرجى الإجابة على: ${missing.map((q,i)=>`س${survey.questions.indexOf(q)+1}`).join("، ")}`);
-      return;
-    }
-    setSubmitting(true);
-    try {
-      const existing = await DB.get("school-surveys", []);
-      const arr = Array.isArray(existing) ? existing : [];
-      const updated = arr.map(s => {
-        if (s.id !== survey.id) return s;
-        const resp = {
-          id: Date.now(),
-          responderId: responderId || "مجهول",
-          answers,
-          submittedAt: new Date().toISOString(),
-        };
-        return { ...s, responses: [...(s.responses||[]), resp] };
-      });
-      await DB.set("school-surveys", updated);
-      setSubmitted(true);
-    } catch { alert("حدث خطأ، حاول مجدداً"); }
-    setSubmitting(false);
-  };
-
-  if (submitted) return (
-    <div className="min-h-screen flex items-center justify-center p-4"
-      style={{background:"linear-gradient(135deg,"+pal.h1+","+pal.h2+")"}}>
-      <div className="bg-white rounded-3xl p-10 shadow-2xl text-center max-w-sm w-full">
-        <div className="text-7xl mb-4">🎉</div>
-        <h3 className="font-black text-2xl text-gray-800 mb-2">شكراً لمشاركتك!</h3>
-        <p className="text-gray-500 text-sm mb-6">تم استلام إجابتك بنجاح</p>
-        <button onClick={onClose}
-          className="w-full py-3 rounded-2xl font-black text-white"
-          style={{background:"linear-gradient(135deg,"+pal.h1+","+pal.h2+")"}}>
-          العودة
-        </button>
+  const handlePrint = () => {
+    const html = `<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8"><title>${survey.title}</title>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap');
+      *{margin:0;padding:0;box-sizing:border-box}
+      body{font-family:'Cairo',sans-serif;direction:rtl;background:#fff;color:#1e293b;padding:0}
+      .page{max-width:700px;margin:0 auto;padding:20px;border:3px solid ${survey.color};border-radius:12px;min-height:297mm}
+      .header{text-align:center;padding:20px 0 16px;border-bottom:3px solid ${survey.color};margin-bottom:20px}
+      .school-name{font-size:22px;font-weight:900;color:${survey.color};margin-bottom:4px}
+      .survey-title{font-size:18px;font-weight:900;color:#1e293b;margin:10px 0 4px}
+      .quote{font-size:12px;color:#64748b;font-style:italic;margin-bottom:12px;line-height:1.8}
+      .meta-row{display:flex;justify-content:center;gap:20px;flex-wrap:wrap;margin-bottom:8px}
+      .meta-item{font-size:12px;color:#475569}
+      .target-row{display:flex;justify-content:center;gap:20px;margin:10px 0}
+      .target-item{display:flex;align-items:center;gap:6px;font-size:12px}
+      .checkbox-sq{width:14px;height:14px;border:1.5px solid #475569;display:inline-block;border-radius:2px}
+      .checked-sq{background:${survey.color};border-color:${survey.color}}
+      .participant{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:12px}
+      .q-block{margin-bottom:18px;page-break-inside:avoid}
+      .q-num{display:inline-block;background:${survey.color};color:#fff;border-radius:50%;width:22px;height:22px;text-align:center;line-height:22px;font-size:11px;font-weight:900;margin-left:6px}
+      .q-text{font-size:13px;font-weight:700;margin-bottom:8px;display:flex;align-items:center}
+      .likert-table{width:100%;border-collapse:collapse;font-size:11.5px}
+      .likert-table th,.likert-table td{border:1px solid #e2e8f0;padding:6px 8px;text-align:center}
+      .likert-table th{background:#f0f4f8;font-weight:800;color:#1e293b}
+      .likert-table td:first-child{text-align:right;font-weight:700;color:#374151;padding-right:10px}
+      .circle{width:14px;height:14px;border:1.5px solid #94a3b8;border-radius:50%;display:inline-block}
+      .secret{text-align:center;font-size:11px;color:#94a3b8;margin-top:20px;padding-top:12px;border-top:1px dashed #e2e8f0}
+      .footer{text-align:center;font-size:10px;color:#94a3b8;margin-top:12px}
+      @media print{@page{size:A4;margin:1.5cm}body{padding:0}.page{border:2px solid ${survey.color};padding:16px}}
+    </style></head><body>
+    <div class="page">
+      <div class="header">
+        <div class="school-name">🏫 مدرسة عبيدة بن الحارث المتوسطة</div>
+        <div class="survey-title">📋 ${survey.title}</div>
+        <div class="quote">« رأيك يُسهم في تحسين بيئة التعلم وتجويد العمل المدرسي — شكراً لمشاركتك »</div>
+        <div class="meta-row">
+          <span class="meta-item">📅 التاريخ: ${survey.dateH} هـ</span>
+        </div>
+        <div class="target-row">
+          ${SURVEY_TARGETS.map(t=>`<div class="target-item"><div class="checkbox-sq ${survey.targets.includes(t)?"checked-sq":""}"></div><span>${t}</span></div>`).join("")}
+        </div>
       </div>
+      <div class="participant">
+        <div style="font-weight:700;margin-bottom:6px">معلومات المشارك <span style="font-weight:400;color:#94a3b8">(اختياري — سرية تامة)</span></div>
+        <div style="display:flex;gap:20px;flex-wrap:wrap">
+          <span>الاسم: _______________________</span>
+          <span>رقم الجوال: ___________________</span>
+        </div>
+      </div>
+      ${survey.questions.map((q,i)=>`
+        <div class="q-block">
+          <div class="q-text"><span class="q-num">${i+1}</span>${q.text}</div>
+          <table class="likert-table">
+            <tr>
+              <th>العبارة</th>
+              ${LIKERT_OPTIONS.map(o=>`<th>${o}</th>`).join("")}
+            </tr>
+            <tr>
+              <td>${q.text}</td>
+              ${LIKERT_OPTIONS.map(()=>`<td><div class="circle"></div></td>`).join("")}
+            </tr>
+          </table>
+        </div>`).join("")}
+      <div class="secret">🔒 هذه الاستبانة سرية ولا يطلع عليها إلا المعنيون في إدارة المدرسة</div>
+      <div class="footer">مدرسة عبيدة بن الحارث المتوسطة — إدارة تعليم جدة — ${new Date().getFullYear()} م</div>
     </div>
-  );
+    <script>window.onload=()=>window.print()</script>
+    </body></html>`;
+    printWindow(html);
+  };
 
   return (
-    <div className="min-h-screen" dir="rtl"
-      style={{background:"linear-gradient(160deg,"+pal.h1+" 0%,"+pal.h2+" 60%,"+pal.bg+" 100%)",fontFamily:"'Cairo',sans-serif"}}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;800;900&display=swap');`}</style>
-
-      {/* رأس الصفحة */}
-      <div className="text-center text-white pt-10 pb-6 px-4 relative">
-        <button onClick={onClose} className="absolute right-4 top-4 bg-white/20 text-white px-3 py-1.5 rounded-xl text-xs font-bold">← رجوع</button>
-        <div className="w-20 h-20 rounded-3xl mx-auto mb-3 flex items-center justify-center text-4xl shadow-xl"
-          style={{background:"rgba(255,255,255,.18)",backdropFilter:"blur(10px)"}}>
-          📊
+    <div dir="rtl" style={{ fontFamily:"'Cairo','Noto Naskh Arabic',sans-serif", background:"#f8fafc", minHeight:"100vh" }}>
+      {/* رأس الاستبيان */}
+      <div style={{ background:`linear-gradient(135deg,${survey.color},${survey.color}bb)`, padding:"20px 16px", textAlign:"center" }}>
+        <div style={{ fontSize:13, color:"rgba(255,255,255,.8)", marginBottom:4 }}>🏫 مدرسة عبيدة بن الحارث المتوسطة</div>
+        <div style={{ fontSize:20, fontWeight:900, color:"#fff", marginBottom:6 }}>{survey.title}</div>
+        <div style={{ fontSize:11.5, color:"rgba(255,255,255,.75)", lineHeight:1.7 }}>
+          « رأيك يُسهم في تحسين بيئة التعلم وتجويد العمل المدرسي »
         </div>
-        <h1 className="text-2xl font-black mb-1">{survey.title}</h1>
-        <div className="flex justify-center gap-3 text-xs opacity-75 mt-2 flex-wrap">
-          <span>👥 {survey.target}</span>
-          <span>📅 {surveyDate}</span>
-          <span>❓ {survey.questions.length} سؤال</span>
+        <div style={{ display:"flex", justifyContent:"center", gap:16, marginTop:10, flexWrap:"wrap" }}>
+          {SURVEY_TARGETS.map(t=>(
+            <label key={t} style={{ display:"flex", alignItems:"center", gap:5, color:"#fff", fontSize:12, cursor:"pointer" }}>
+              <div style={{ width:14, height:14, border:"2px solid rgba(255,255,255,.8)", borderRadius:3, background:survey.targets.includes(t)?"rgba(255,255,255,.9)":"transparent", flexShrink:0 }}></div>
+              {t}
+            </label>
+          ))}
         </div>
+        <div style={{ color:"rgba(255,255,255,.75)", fontSize:11.5, marginTop:8 }}>📅 {survey.dateH} هـ</div>
       </div>
 
-      <div className="px-4 pb-10 max-w-lg mx-auto">
+      <div style={{ maxWidth:640, margin:"0 auto", padding:"14px 12px 60px" }}>
 
-        {/* شاشة تسجيل الدخول برقم الهوية */}
-        {step === "login" && (
-          <div className="bg-white rounded-3xl p-7 shadow-2xl">
-            <h2 className="font-black text-center text-gray-800 text-lg mb-5">🪪 أدخل رقم هويتك للمشاركة</h2>
-            <input type="text" inputMode="numeric" value={responderId}
-              onChange={e=>{setResponderId(e.target.value);setIdError("");}}
-              onKeyDown={e=>e.key==="Enter"&&handleLogin()}
-              placeholder="رقم الهوية الوطنية"
-              className="w-full px-4 py-4 rounded-2xl border-2 text-center font-black text-xl tracking-widest mb-3 focus:outline-none"
-              style={{borderColor:idError?"#ef4444":pal.border}} />
-            {idError && <div className="text-red-500 text-sm text-center font-bold mb-3">{idError}</div>}
-            <button onClick={handleLogin}
-              className="w-full py-4 rounded-2xl font-black text-white text-base"
-              style={{background:"linear-gradient(135deg,"+pal.h1+","+pal.h2+")"}}>
-              متابعة ◄
-            </button>
+        {/* معلومات المشارك */}
+        <div style={{ background:"#fff", borderRadius:12, padding:14, marginBottom:14, boxShadow:"0 2px 8px rgba(0,0,0,.06)" }}>
+          <div style={{ fontWeight:800, fontSize:13, color:"#1e293b", marginBottom:10 }}>
+            👤 معلومات المشارك <span style={{ fontWeight:400, color:"#94a3b8", fontSize:11 }}>(اختياري)</span>
           </div>
-        )}
-
-        {/* نموذج الأسئلة */}
-        {step === "form" && (
-          <div className="space-y-4">
-            {survey.questions.map((q, qi) => {
-              const ans = answers[q.id];
-              return (
-                <div key={q.id} className="bg-white rounded-2xl shadow-md overflow-hidden"
-                  style={{border:"2px solid "+pal.border}}>
-                  <div className="px-4 py-3" style={{background:pal.light}}>
-                    <div className="font-black text-sm text-gray-800 flex items-center gap-2">
-                      {q.emoji && <span className="text-xl">{q.emoji}</span>}
-                      <span>{qi+1}. {q.text}</span>
-                      {q.required && <span className="text-red-500 text-xs">*</span>}
-                    </div>
-                  </div>
-                  <div className="p-4">
-
-                    {/* radio */}
-                    {q.type==="radio" && (
-                      <div className="space-y-2">
-                        {(q.options||[]).map(opt=>(
-                          <label key={opt}
-                            className="flex items-center gap-3 cursor-pointer p-3 rounded-xl border-2 transition-all"
-                            style={{borderColor:ans===opt?pal.h2:pal.border,background:ans===opt?pal.light:"#fff"}}>
-                            <div className="w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-all"
-                              style={{borderColor:pal.h2,background:ans===opt?pal.h2:"transparent"}}>
-                              {ans===opt && <div className="w-2 h-2 rounded-full bg-white"/>}
-                            </div>
-                            <input type="radio" name={`q${q.id}`} value={opt}
-                              checked={ans===opt} onChange={()=>setAns(q.id,opt)} className="hidden" />
-                            <span className="text-sm font-bold text-gray-700">{opt}</span>
-                          </label>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* checkbox */}
-                    {q.type==="checkbox" && (
-                      <div className="space-y-2">
-                        {(q.options||[]).map(opt=>{
-                          const checked = (ans||[]).includes(opt);
-                          return (
-                            <label key={opt}
-                              className="flex items-center gap-3 cursor-pointer p-3 rounded-xl border-2 transition-all"
-                              style={{borderColor:checked?pal.h2:pal.border,background:checked?pal.light:"#fff"}}>
-                              <div className="w-5 h-5 rounded-lg border-2 flex-shrink-0 flex items-center justify-center"
-                                style={{borderColor:pal.h2,background:checked?pal.h2:"transparent"}}>
-                                {checked && <span className="text-white text-xs font-black">✓</span>}
-                              </div>
-                              <input type="checkbox" checked={checked} onChange={()=>toggleCheck(q.id,opt)} className="hidden" />
-                              <span className="text-sm font-bold text-gray-700">{opt}</span>
-                            </label>
-                          );
-                        })}
-                      </div>
-                    )}
-
-                    {/* text */}
-                    {q.type==="text" && (
-                      <textarea value={ans||""} onChange={e=>setAns(q.id,e.target.value)}
-                        placeholder="اكتب إجابتك هنا..." rows={3}
-                        className="w-full px-4 py-3 rounded-xl border-2 text-sm focus:outline-none resize-none"
-                        style={{borderColor:ans?pal.h2:pal.border}} />
-                    )}
-
-                    {/* scale5 */}
-                    {q.type==="scale5" && (
-                      <div className="flex gap-2 flex-wrap">
-                        {[1,2,3,4,5].map(n=>(
-                          <button key={n} onClick={()=>setAns(q.id,n)}
-                            className="flex-1 py-3 rounded-xl border-2 font-black text-base transition-all"
-                            style={{borderColor:ans>=n?pal.h2:pal.border,background:ans>=n?pal.h2:"#fff",color:ans>=n?"#fff":pal.h1,minWidth:48}}>
-                            {"⭐".repeat(n)}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* yesno */}
-                    {q.type==="yesno" && (
-                      <div className="flex gap-3">
-                        {[{v:"نعم",i:"✅",c:"#059669",bg:"#d1fae5"},{v:"لا",i:"❌",c:"#dc2626",bg:"#fee2e2"}].map(opt=>(
-                          <button key={opt.v} onClick={()=>setAns(q.id,opt.v)}
-                            className="flex-1 py-4 rounded-2xl font-black text-base border-2 transition-all"
-                            style={{background:ans===opt.v?opt.bg:"#fff",borderColor:ans===opt.v?opt.c:"#e5e7eb",color:ans===opt.v?opt.c:"#9ca3af"}}>
-                            {opt.i} {opt.v}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-
-            <button onClick={submit} disabled={submitting}
-              className="w-full py-4 rounded-2xl font-black text-white text-base shadow-xl"
-              style={{background:submitting?"#9ca3af":"linear-gradient(135deg,"+pal.h1+","+pal.h2+")"}}>
-              {submitting ? "⏳ جاري الإرسال..." : "إرسال الإجابات 📤"}
-            </button>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+            <div>
+              <label style={{ fontSize:11, color:"#64748b", fontWeight:700, display:"block", marginBottom:4 }}>الاسم</label>
+              <input value={participantName} onChange={e=>setParticipantName(e.target.value)}
+                placeholder="اكتب اسمك..."
+                style={{ width:"100%", padding:"8px 10px", borderRadius:8, border:"1.5px solid #e2e8f0", fontFamily:"'Cairo',sans-serif", fontSize:13, outline:"none", boxSizing:"border-box" }} />
+            </div>
+            <div>
+              <label style={{ fontSize:11, color:"#64748b", fontWeight:700, display:"block", marginBottom:4 }}>رقم الجوال</label>
+              <input value={participantPhone} onChange={e=>setParticipantPhone(e.target.value)}
+                placeholder="05xxxxxxxx"
+                style={{ width:"100%", padding:"8px 10px", borderRadius:8, border:"1.5px solid #e2e8f0", fontFamily:"'Cairo',sans-serif", fontSize:13, outline:"none", boxSizing:"border-box", direction:"ltr", textAlign:"right" }} />
+            </div>
           </div>
-        )}
+          <div style={{ marginTop:10, background:"#f8fafc", borderRadius:8, padding:"7px 12px", fontSize:11, color:"#94a3b8", display:"flex", alignItems:"center", gap:6 }}>
+            🔒 هذه الاستبانة سرية ولا يطلع عليها إلا المعنيون في إدارة المدرسة
+          </div>
+        </div>
+
+        {/* الأسئلة */}
+        {survey.questions.map((q, idx) => (
+          <div key={q.id} style={{ background:"#fff", borderRadius:12, padding:14, marginBottom:12, boxShadow:"0 2px 8px rgba(0,0,0,.06)" }}>
+            <div style={{ display:"flex", alignItems:"flex-start", gap:8, marginBottom:12 }}>
+              <div style={{ background:survey.color, color:"#fff", borderRadius:"50%", width:24, height:24, display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, fontWeight:900, flexShrink:0 }}>{idx+1}</div>
+              <div style={{ fontSize:14, fontWeight:800, color:"#1e293b", lineHeight:1.6 }}>{q.text}</div>
+            </div>
+            <div style={{ display:"grid", gridTemplateColumns:"repeat(5,1fr)", gap:4 }}>
+              {LIKERT_OPTIONS.map((opt, oi) => {
+                const selected = answers[q.id] === opt;
+                return (
+                  <button key={opt} onClick={()=>setAnswers(p=>({...p,[q.id]:opt}))}
+                    style={{ padding:"8px 4px", borderRadius:8, border:`2px solid ${selected ? LIKERT_COLORS[oi] : "#e2e8f0"}`, background:selected ? LIKERT_COLORS[oi]+"22" : "#f8fafc", cursor:"pointer", fontFamily:"'Cairo',sans-serif", display:"flex", flexDirection:"column", alignItems:"center", gap:3, transition:"all .15s" }}>
+                    <div style={{ fontSize:14 }}>{LIKERT_ICONS[oi]}</div>
+                    <div style={{ fontSize:9.5, fontWeight:800, color:selected ? LIKERT_COLORS[oi] : "#64748b", textAlign:"center", lineHeight:1.3 }}>{opt}</div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+
+        {/* أزرار */}
+        <div style={{ display:"flex", gap:10, marginTop:4 }}>
+          <button onClick={handlePrint}
+            style={{ flex:1, padding:"12px", borderRadius:12, border:"none", background:"#7c3aed", color:"#fff", fontWeight:900, fontSize:14, cursor:"pointer", fontFamily:"'Cairo',sans-serif" }}>
+            🖨️ طباعة الاستبيان
+          </button>
+          <button onClick={onClose}
+            style={{ padding:"12px 20px", borderRadius:12, border:"1.5px solid #e2e8f0", background:"#fff", color:"#64748b", fontWeight:700, fontSize:13, cursor:"pointer", fontFamily:"'Cairo',sans-serif" }}>
+            ← رجوع
+          </button>
+        </div>
       </div>
     </div>
   );
 }
 
 // ================================================================
-// ===== صفحة إدارة الاستبيانات =====
+// ===== صفحة الاستبيانات الرئيسية =====
 // ================================================================
-function SurveysPage({ surveys, setSurveys, saveSurveys, isParent }) {
-  const [mode, setMode]           = useState("list"); // list | build | respond
-  const [editing, setEditing]     = useState(null);
-  const [responding, setResponding] = useState(null);
-  const [copiedId, setCopiedId]   = useState(null);
-  const BASE_URL = window.location.origin + window.location.pathname;
-
-  const getSurveyLink = (s) => `${BASE_URL}?survey=${s.id}`;
-
-  const copyLink = (s) => {
-    const link = getSurveyLink(s);
-    navigator.clipboard.writeText(link).then(()=>{setCopiedId(s.id);setTimeout(()=>setCopiedId(null),2000);});
-  };
-  const shareWA = (s) => {
-    const link = getSurveyLink(s);
-    const msg = encodeURIComponent(`🏫 *مدرسة عبيدة بن الحارث المتوسطة*\n\n📊 *${s.title}*\n\n👥 موجّه إلى: ${s.target}\n\n📝 للمشاركة:\n${link}`);
-    window.open(`https://wa.me/?text=${msg}`,"_blank");
-  };
+function SurveysPage({ surveys, setSurveys, saveSurveys }) {
+  const [mode, setMode]         = useState("list");
+  const [editing, setEditing]   = useState(null);
+  const [previewing, setPreviewing] = useState(null);
 
   const saveSurvey = (s) => {
     const exists = surveys.find(x=>x.id===s.id);
@@ -10934,142 +10692,86 @@ function SurveysPage({ surveys, setSurveys, saveSurveys, isParent }) {
     setSurveys(updated); saveSurveys(updated); setMode("list"); setEditing(null);
   };
   const deleteSurvey = (id) => {
-    if (!confirm("حذف هذا الاستبيان؟")) return;
+    if (!confirm("حذف هذا الاستبيان نهائياً؟")) return;
     const updated = surveys.filter(s=>s.id!==id);
     setSurveys(updated); saveSurveys(updated);
   };
-  const toggleActive = (id) => {
-    const updated = surveys.map(s=>s.id===id?{...s,active:!s.active}:s);
-    setSurveys(updated); saveSurveys(updated);
-  };
 
-  if (mode==="build") return (
-    <SurveyBuilder survey={editing||mkSurvey()} onSave={saveSurvey} onCancel={()=>{setMode("list");setEditing(null);}} />
-  );
-  if (mode==="respond" && responding) return (
-    <SurveyRespond survey={responding} onClose={()=>{setMode("list");setResponding(null);}} />
-  );
-
-  const active = surveys.filter(s=>s.active);
-  const filtered = isParent ? active : surveys;
+  if (mode === "build") return <SurveyBuilder survey={editing||mkSurvey()} onSave={saveSurvey} onCancel={()=>{setMode("list");setEditing(null);}} />;
+  if (mode === "preview" && previewing) return <SurveyRespond survey={previewing} onClose={()=>{setMode("list");setPreviewing(null);}} />;
 
   return (
-    <div dir="rtl" style={{fontFamily:"'Cairo',sans-serif"}}>
-
-      {/* ── رأس الصفحة ── */}
-      <div className="rounded-2xl overflow-hidden mb-6 shadow-xl text-white"
-        style={{background:"linear-gradient(135deg,#4c1d95,#7c3aed,#ec4899)"}}>
-        <div className="p-6">
-          <div className="flex items-center gap-4 mb-4">
-            <div className="text-5xl">📊</div>
-            <div>
-              <h2 className="text-2xl font-black mb-1">الاستبيانات</h2>
-              <p className="opacity-80 text-sm">إنشاء استبيانات احترافية وجمع الآراء</p>
-            </div>
+    <div dir="rtl">
+      {/* رأس الصفحة */}
+      <div className="rounded-b-2xl p-6 mb-5 text-white shadow-xl" style={{ background:"linear-gradient(135deg,#1e3a5f,#1d4ed8)" }}>
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="text-center sm:text-right">
+            <div className="text-4xl mb-1">📊</div>
+            <h2 className="text-2xl font-black">الاستبيانات</h2>
+            <p className="opacity-80 text-sm mt-1">إنشاء استبيانات مقياس ليكرت الخماسي وطباعتها</p>
           </div>
-          <div className="flex flex-wrap gap-3 items-center">
-            <div className="flex gap-4 text-sm opacity-90 flex-wrap">
-              <span>📋 الإجمالي: <b>{surveys.length}</b></span>
-              <span>✅ نشط: <b>{active.length}</b></span>
-              <span>💬 إجابات: <b>{surveys.reduce((acc,s)=>acc+(s.responses?.length||0),0)}</b></span>
-            </div>
-            <div className="mr-auto flex gap-2">
-              {!isParent && (
-                <button onClick={()=>{setEditing(null);setMode("build");}}
-                  className="bg-white text-purple-700 px-5 py-2.5 rounded-xl font-black text-sm hover:shadow-lg transition-all">
-                  ➕ استبيان جديد
-                </button>
-              )}
-            </div>
-          </div>
+          <button onClick={()=>{ setEditing(null); setMode("build"); }}
+            className="bg-white text-blue-800 px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-blue-50 shadow">
+            ➕ استبيان جديد
+          </button>
         </div>
       </div>
 
-      {/* ── قائمة الاستبيانات ── */}
-      {filtered.length === 0 ? (
-        <div className="bg-white rounded-2xl p-12 text-center border-2 border-dashed border-purple-100">
-          <div className="text-5xl mb-3">📋</div>
-          <div className="font-bold text-gray-400 mb-3">لا توجد استبيانات {isParent?"متاحة":"بعد"}</div>
-          {!isParent && (
-            <button onClick={()=>setMode("build")}
-              className="bg-purple-600 text-white px-6 py-2.5 rounded-xl font-bold hover:bg-purple-700">
-              ➕ إنشاء أول استبيان
-            </button>
-          )}
-        </div>
-      ) : (
-        <div className="grid gap-4 sm:grid-cols-2">
-          {filtered.map(s => {
-            const pal = SURVEY_PALETTES[s.palette ?? 0];
-            const surveyDate = `${s.dayNum||""} ${s.hijriMonth||""} ${s.hijriYear||""}`;
-            return (
-              <div key={s.id} className="bg-white rounded-2xl shadow-sm border overflow-hidden hover:shadow-lg transition-all"
-                style={{borderColor:pal.border}}>
-                {/* رأس البطاقة */}
-                <div className="px-5 py-4 text-white" style={{background:"linear-gradient(135deg,"+pal.h1+","+pal.h2+")"}}>
-                  <div className="flex items-start justify-between gap-2 mb-2">
-                    <h3 className="font-black text-base leading-tight flex-1">{s.title||"استبيان بدون عنوان"}</h3>
-                    {!s.active && <span className="bg-white/20 text-white text-xs px-2 py-0.5 rounded-full font-bold flex-shrink-0">متوقف</span>}
-                  </div>
-                  <div className="flex flex-wrap gap-3 text-xs opacity-80">
-                    <span>👥 {s.target}</span>
+      {/* القائمة */}
+      <div className="space-y-3">
+        {surveys.length === 0 && (
+          <div className="text-center py-16 text-gray-400">
+            <div className="text-5xl mb-3">📋</div>
+            <div className="font-bold text-sm">لا توجد استبيانات بعد</div>
+            <div className="text-xs mt-1">اضغط «استبيان جديد» للبدء</div>
+          </div>
+        )}
+        {surveys.map(s => (
+          <div key={s.id} className="bg-white rounded-2xl shadow-sm hover:shadow-md transition-all overflow-hidden" style={{ borderRight:`5px solid ${s.color}` }}>
+            <div className="p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex-1">
+                  <h3 className="font-black text-base text-gray-800">{s.title || "استبيان بدون عنوان"}</h3>
+                  <div className="flex gap-3 flex-wrap mt-1 text-xs text-gray-400">
+                    <span>📅 {s.dateH} هـ</span>
+                    {s.targets.length > 0 && <span>👥 {s.targets.join("، ")}</span>}
                     <span>❓ {s.questions.length} سؤال</span>
-                    <span>📅 {surveyDate}</span>
-                    <span>💬 {s.responses?.length||0} إجابة</span>
-                    <span>{s.accessType==="free"?"🔓 مفتوح":"🪪 برقم الهوية"}</span>
+                    <span>🗓️ {s.createdAt}</span>
                   </div>
                 </div>
-
-                {/* رابط */}
-                {!isParent && (
-                  <div className="px-4 pt-3 pb-1">
-                    <div className="flex items-center gap-1.5 rounded-xl px-3 py-2 border"
-                      style={{background:pal.bg,borderColor:pal.border}}>
-                      <span className="text-xs text-gray-400 flex-1 truncate" dir="ltr">{getSurveyLink(s)}</span>
-                      <button onClick={()=>copyLink(s)}
-                        className="flex-shrink-0 px-2.5 py-1 rounded-lg text-xs font-black transition-all"
-                        style={{background:copiedId===s.id?pal.h2:"#e5e7eb",color:copiedId===s.id?"#fff":"#374151"}}>
-                        {copiedId===s.id?"✓ تم":"📋 نسخ"}
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* أزرار */}
-                <div className="px-4 py-3 flex gap-2 flex-wrap">
-                  <button onClick={()=>{setResponding(s);setMode("respond");}}
-                    className="flex-1 py-2 rounded-xl text-white text-xs font-black"
-                    style={{background:"linear-gradient(135deg,"+pal.h1+","+pal.h2+")"}}>
-                    📝 {isParent?"ملء الاستبيان":"معاينة"}
+                <div className="flex gap-1 flex-wrap justify-end">
+                  <button onClick={()=>{ setPreviewing(s); setMode("preview"); }}
+                    className="text-xs px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 font-bold hover:bg-blue-100">
+                    👁️ معاينة
                   </button>
-                  {!isParent && (<>
-                    <button onClick={()=>shareWA(s)}
-                      className="px-3 py-2 rounded-xl bg-green-50 text-green-700 text-xs font-black hover:bg-green-100">
-                      📲 واتساب
-                    </button>
-                    <button onClick={()=>{setEditing(s);setMode("build");}}
-                      className="px-3 py-2 rounded-xl bg-gray-100 text-gray-600 text-xs font-bold hover:bg-gray-200">
-                      ✏️
-                    </button>
-                    <button onClick={()=>toggleActive(s.id)}
-                      className="px-3 py-2 rounded-xl text-xs font-bold"
-                      style={{background:s.active?pal.light:pal.bg,color:pal.h1}}>
-                      {s.active?"⏸":"▶"}
-                    </button>
-                    <button onClick={()=>deleteSurvey(s.id)}
-                      className="px-3 py-2 rounded-xl bg-red-50 text-red-500 text-xs font-bold hover:bg-red-100">
-                      🗑️
-                    </button>
-                  </>)}
+                  <button onClick={()=>{ setEditing(s); setMode("build"); }}
+                    className="text-xs px-3 py-1.5 rounded-lg bg-amber-50 text-amber-700 font-bold hover:bg-amber-100">
+                    ✏️ تعديل
+                  </button>
+                  <button onClick={()=>deleteSurvey(s.id)}
+                    className="text-xs px-3 py-1.5 rounded-lg bg-red-50 text-red-600 font-bold hover:bg-red-100">
+                    🗑️
+                  </button>
                 </div>
               </div>
-            );
-          })}
-        </div>
-      )}
+              {/* معاينة أسئلة */}
+              {s.questions.length > 0 && (
+                <div className="mt-3 space-y-1">
+                  {s.questions.slice(0,3).map((q,i)=>(
+                    <div key={q.id} className="text-xs text-gray-500 flex gap-2">
+                      <span className="font-bold" style={{color:s.color}}>{i+1}.</span>
+                      <span className="truncate">{q.text||"سؤال فارغ"}</span>
+                    </div>
+                  ))}
+                  {s.questions.length > 3 && <div className="text-xs text-gray-400">... و{s.questions.length-3} أسئلة أخرى</div>}
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
-}
 
 function AnnouncementsPage({ announcements, setAnnouncements, saveAnnouncements, viewMode = "desktop" }) {
   const [showForm, setShowForm] = useState(false);
@@ -27723,7 +27425,7 @@ export default function SchoolWebsite() {
                 {page === "announcements"  && <AnnouncementsPage announcements={announcements} setAnnouncements={setAnnouncements} saveAnnouncements={saveAnnouncements} viewMode="mobile" />}
                 {page === "activities"     && <ActivitiesPage activities={activities} setActivities={setActivities} saveActivities={saveActivities} />}
                 {page === "messages"       && <MessagesPage messages={messages} setMessages={setMessages} saveMessages={saveMessages} isParent={false} />}
-                {page === "surveys"        && <SurveysPage surveys={surveys} setSurveys={setSurveys} saveSurveys={saveSurveys} isParent={false} />}
+                {page === "surveys"        && <SurveysPage surveys={surveys} setSurveys={setSurveys} saveSurveys={saveSurveys} />}
                 {page === "sms"            && <SMSPage teachers={teachers} attendance={attendance} week={week} classList={classList} />}
                 {page === "report"         && <ProgramReportPage />}
                 {page === "strategies"     && <StrategiesPage />}
@@ -27965,7 +27667,7 @@ export default function SchoolWebsite() {
         {page === "announcements" && <AnnouncementsPage announcements={announcements} setAnnouncements={setAnnouncements} saveAnnouncements={saveAnnouncements} />}
         {page === "activities"    && <ActivitiesPage activities={activities} setActivities={setActivities} saveActivities={saveActivities} />}
         {page === "messages"      && <MessagesPage messages={messages} setMessages={setMessages} saveMessages={saveMessages} isParent={false} />}
-        {page === "surveys"       && <SurveysPage surveys={surveys} setSurveys={setSurveys} saveSurveys={saveSurveys} isParent={false} />}
+        {page === "surveys"       && <SurveysPage surveys={surveys} setSurveys={setSurveys} saveSurveys={saveSurveys} />}
         {page === "sms"           && <SMSPage teachers={teachers} attendance={attendance} week={week} classList={classList} />}
         {page === "report"        && <ProgramReportPage />}
         {page === "strategies"    && <StrategiesPage />}
