@@ -10772,6 +10772,7 @@ function SurveysPage({ surveys, setSurveys, saveSurveys }) {
       </div>
     </div>
   );
+}
 
 function AnnouncementsPage({ announcements, setAnnouncements, saveAnnouncements, viewMode = "desktop" }) {
   const [showForm, setShowForm] = useState(false);
