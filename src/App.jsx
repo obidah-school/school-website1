@@ -4278,6 +4278,8 @@ function StudentExcusePortal({ onBack, siteFont, isAdmin = false }) {
     alert("✅ تم حفظ رد الإدارة");
   };
 
+  // ── نسخ الرابط ──
+  const copyLink = () => {
     navigator.clipboard.writeText(EXCUSE_URL).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2500);
