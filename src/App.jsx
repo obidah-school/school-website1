@@ -4187,8 +4187,97 @@ function StudentExcusePortal({ onBack, siteFont, isAdmin = false }) {
     setView("success");
   };
 
-  // ── نسخ الرابط ──
-  const copyLink = () => {
+  const [adminReplyDraft, setAdminReplyDraft] = useState({}); // { [excuseId]: "نص الرد" }
+  const [replyOpen,       setReplyOpen]       = useState({}); // { [excuseId]: bool }
+
+  // ── طباعة عذر فردي ──
+  const printExcuse = (ex) => {
+    const sc = statusColor(ex.status);
+    printWindow(`<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8">
+    <title>عذر ${ex.studentName}</title>
+    <style>
+      *{margin:0;padding:0;box-sizing:border-box}
+      body{font-family:'Noto Sans Arabic',Arial,sans-serif;direction:rtl;background:#fff;color:#111;padding:32px}
+      .school{text-align:center;font-size:12px;color:#555;margin-bottom:4px}
+      h1{text-align:center;font-size:20px;font-weight:900;color:#1e3a5f;margin-bottom:18px;border-bottom:3px solid #1d4ed8;padding-bottom:10px}
+      .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
+      .field{background:#f8fafc;border-radius:8px;padding:10px 14px;border:1px solid #e2e8f0}
+      .label{font-size:10px;font-weight:700;color:#64748b;margin-bottom:4px}
+      .val{font-size:14px;font-weight:800;color:#1e293b}
+      .reason-box{background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:14px;margin-bottom:16px}
+      .status{display:inline-block;padding:4px 14px;border-radius:20px;font-size:13px;font-weight:800;
+              background:${sc.bg};color:${sc.color};border:1px solid ${sc.border}}
+      .admin-reply{background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:14px;margin-bottom:16px}
+      .sig{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:40px;text-align:center;font-size:12px;color:#374151}
+      .sig-line{border-top:1.5px solid #374151;padding-top:8px;margin-top:28px;font-weight:700}
+      @media print{@page{size:A4;margin:2cm}body{padding:0}}
+    </style></head><body>
+    <div class="school">إدارة تعليم جدة — مدرسة عبيدة بن الحارث المتوسطة</div>
+    <h1>📋 نموذج عذر طالب</h1>
+    <div class="grid">
+      <div class="field"><div class="label">👤 اسم الطالب</div><div class="val">${ex.studentName}</div></div>
+      <div class="field"><div class="label">🪪 رقم الهوية</div><div class="val" style="font-family:monospace">${ex.nationalId}</div></div>
+      <div class="field"><div class="label">🏫 الفصل</div><div class="val">${ex.className||"—"}</div></div>
+      <div class="field"><div class="label">📅 يوم الغياب</div><div class="val">${ex.absenceDay}</div></div>
+      <div class="field"><div class="label">🌙 التاريخ الهجري</div><div class="val">${ex.absenceDateH} هـ</div></div>
+      <div class="field"><div class="label">☀️ التاريخ الميلادي</div><div class="val">${ex.absenceDateM} م</div></div>
+      <div class="field"><div class="label">👤 مقدّم العذر</div><div class="val">${ex.parentRelation||"ولي الأمر"}: ${ex.parentName}</div></div>
+      <div class="field"><div class="label">📱 الجوال</div><div class="val">${ex.parentPhone||"—"}</div></div>
+    </div>
+    <div class="reason-box">
+      <div class="label" style="margin-bottom:8px">📝 سبب الغياب — ${ex.reasonCat}</div>
+      <div style="font-size:14px;line-height:1.9;color:#1e3a5f">${ex.reason || "(مرفق ملف)"}</div>
+    </div>
+    <div style="margin-bottom:16px">
+      <span class="label" style="margin-left:8px">الحالة:</span>
+      <span class="status">${ex.status}</span>
+      <span style="font-size:11px;color:#94a3b8;margin-right:12px">تقديم: ${ex.submittedAt}</span>
+    </div>
+    ${ex.adminReply ? `<div class="admin-reply">
+      <div class="label" style="margin-bottom:6px;color:#065f46">📌 رد الإدارة — ${ex.adminReplyAt||""}</div>
+      <div style="font-size:14px;line-height:1.9;color:#065f46;font-weight:700">${ex.adminReply}</div>
+    </div>` : ""}
+    <div class="sig">
+      <div><div class="sig-line">توقيع ولي الأمر</div></div>
+      <div><div class="sig-line">مدير المدرسة<br>فازع عبدالله حسن القرني</div></div>
+    </div>
+    <script>window.onload=()=>window.print()</script>
+    </body></html>`);
+  };
+
+  // ── أرشفة أعذار الأسبوع ──
+  const archiveWeekExcuses = async () => {
+    const list = archiveYear ? archiveData : excuses;
+    if (list.length === 0) { alert("لا توجد أعذار للأرشفة"); return; }
+    const weekNums = [...new Set(list.map(ex => {
+      const d = ex.absenceDateM?.split("/")||[];
+      return d.length===3 ? `${d[2]}-W${Math.ceil(parseInt(d[0])/7)}` : "غير محدد";
+    }))].join(", ");
+    if (!window.confirm(`أرشفة الأعذار الحالية (${list.length} عذر) كأسبوع مؤرشف؟\nنطاق التواريخ: ${weekNums}\n\n⚠️ الأعذار لن تُحذف — ستظل موجودة.`)) return;
+    const archKey = `school-excuses-archive-${Date.now()}`;
+    await DB.set(archKey, { archivedAt: new Date().toLocaleDateString("ar-SA"), excuses: list });
+    alert("✅ تمت أرشفة الأعذار بنجاح! يمكن استردادها من Firebase بالمفتاح:\n" + archKey);
+  };
+
+  // ── حفظ رد الإدارة ──
+  const saveAdminReply = async (excuseId) => {
+    const txt = (adminReplyDraft[excuseId]||"").trim();
+    if (!txt) { alert("أدخل نص الرد أولاً"); return; }
+    const key = `school-excuses-${archiveYear || YEAR_KEY}`;
+    const existing = await DB.get(key, {});
+    if (existing[excuseId]) {
+      existing[excuseId].adminReply   = txt;
+      existing[excuseId].adminReplyAt = new Date().toLocaleDateString("ar-SA");
+      await DB.set(key, existing);
+    }
+    const upd = ex => ex.id === excuseId ? { ...ex, adminReply: txt, adminReplyAt: new Date().toLocaleDateString("ar-SA") } : ex;
+    if (archiveYear) setArchiveData(prev => prev.map(upd));
+    else setExcuses(prev => prev.map(upd));
+    setReplyOpen(p => ({ ...p, [excuseId]: false }));
+    setAdminReplyDraft(p => ({ ...p, [excuseId]: "" }));
+    alert("✅ تم حفظ رد الإدارة");
+  };
+
     navigator.clipboard.writeText(EXCUSE_URL).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2500);
@@ -4414,6 +4503,11 @@ function StudentExcusePortal({ onBack, siteFont, isAdmin = false }) {
               {archiveYear ? `أرشيف ${archiveYear}` : `العام الحالي ${YEAR_KEY}`} · {totalSizeKB}KB
             </div>
           </div>
+          <button onClick={archiveWeekExcuses}
+            style={{ ...S.btn, background:"rgba(255,255,255,0.2)", color:"#fff", fontSize:11, padding:"7px 12px",
+                     border:"1px solid rgba(255,255,255,0.3)" }}>
+            🗂️ أرشفة الأسبوع
+          </button>
           {/* زر نسخ الرابط */}
           <button onClick={copyLink}
             style={{ ...S.btn, background: copied ? "rgba(110,231,183,0.3)" : "rgba(255,255,255,0.15)",
@@ -4687,6 +4781,16 @@ function StudentExcusePortal({ onBack, siteFont, isAdmin = false }) {
                                        background:"#fee2e2", color:"#991b1b", fontWeight:800,
                                        fontSize:11.5, cursor:"pointer", fontFamily:"'Cairo',sans-serif" }}>❌ رفض</button>
                           </>)}
+                          <button onClick={()=>printExcuse(ex)}
+                            style={{ padding:"4px 10px", borderRadius:8, border:"1px solid #e2e8f0",
+                                     background:"#f8fafc", color:"#7c3aed", fontWeight:800,
+                                     fontSize:11.5, cursor:"pointer", fontFamily:"'Cairo',sans-serif" }}>🖨️ طباعة</button>
+                          <button onClick={()=>setReplyOpen(p=>({...p,[ex.id]:!p[ex.id]}))}
+                            style={{ padding:"4px 10px", borderRadius:8, border:"1px solid #bfdbfe",
+                                     background: replyOpen[ex.id]?"#dbeafe":"#eff6ff", color:"#1d4ed8",
+                                     fontWeight:800, fontSize:11.5, cursor:"pointer", fontFamily:"'Cairo',sans-serif" }}>
+                            {ex.adminReply ? "✏️ تعديل الرد" : "💬 رد الإدارة"}
+                          </button>
                           <button onClick={()=>deleteExcuse(ex.id)}
                             style={{ padding:"4px 8px", borderRadius:8, border:"1px solid #e2e8f0",
                                      background:"#f8fafc", color:"#94a3b8", fontSize:11.5, cursor:"pointer" }}>🗑️</button>
@@ -4723,6 +4827,50 @@ function StudentExcusePortal({ onBack, siteFont, isAdmin = false }) {
                                      color:"#991b1b", fontWeight:700, fontSize:12, textDecoration:"none" }}>
                             📄 تنزيل {ex.fileName}
                           </a>
+                        )}
+                        {/* رد الإدارة الموجود */}
+                        {ex.adminReply && (
+                          <div style={{ marginTop:10, background:"#f0fdf4", border:"1px solid #86efac",
+                            borderRadius:8, padding:"10px 12px" }}>
+                            <div style={{ fontSize:11, fontWeight:800, color:"#065f46", marginBottom:4 }}>
+                              📌 رد الإدارة — {ex.adminReplyAt}
+                            </div>
+                            <div style={{ fontSize:13, color:"#065f46", lineHeight:1.8, fontWeight:700 }}>
+                              {ex.adminReply}
+                            </div>
+                          </div>
+                        )}
+                        {/* نموذج الرد */}
+                        {replyOpen[ex.id] && (
+                          <div style={{ marginTop:10, background:"#eff6ff", border:"1.5px solid #93c5fd",
+                            borderRadius:10, padding:"12px" }}>
+                            <div style={{ fontSize:11.5, fontWeight:800, color:"#1d4ed8", marginBottom:8 }}>
+                              💬 رد الإدارة على هذا العذر
+                            </div>
+                            <textarea
+                              value={adminReplyDraft[ex.id]||ex.adminReply||""}
+                              onChange={e=>setAdminReplyDraft(p=>({...p,[ex.id]:e.target.value}))}
+                              placeholder="اكتب رد الإدارة هنا (سيظهر للطالب عند الطباعة)..."
+                              rows={3}
+                              style={{ width:"100%", padding:"9px 12px", borderRadius:8, border:"1.5px solid #bfdbfe",
+                                fontFamily:"'Cairo',sans-serif", fontSize:13, resize:"vertical",
+                                outline:"none", boxSizing:"border-box", marginBottom:8 }}
+                            />
+                            <div style={{ display:"flex", gap:8 }}>
+                              <button onClick={()=>saveAdminReply(ex.id)}
+                                style={{ padding:"7px 18px", borderRadius:8, border:"none",
+                                  background:"#1d4ed8", color:"#fff", fontWeight:800,
+                                  fontSize:12, cursor:"pointer", fontFamily:"'Cairo',sans-serif" }}>
+                                💾 حفظ الرد
+                              </button>
+                              <button onClick={()=>setReplyOpen(p=>({...p,[ex.id]:false}))}
+                                style={{ padding:"7px 14px", borderRadius:8, border:"1px solid #e2e8f0",
+                                  background:"#fff", color:"#64748b", fontWeight:700,
+                                  fontSize:12, cursor:"pointer", fontFamily:"'Cairo',sans-serif" }}>
+                                إلغاء
+                              </button>
+                            </div>
+                          </div>
                         )}
                       </div>
                     </div>
@@ -10928,6 +11076,35 @@ function AnnouncementsPage({ announcements, setAnnouncements, saveAnnouncements,
   const [editId, setEditId] = useState(null);
   const [editAnn, setEditAnn] = useState(null);
   const [expandedId, setExpandedId] = useState(null); // for mobile card expand
+  const [annReplyName,  setAnnReplyName]  = useState({}); // { [annId]: "الاسم" }
+  const [annReplyText,  setAnnReplyText]  = useState({}); // { [annId]: "نص التعليق" }
+  const [replyFormOpen, setReplyFormOpen] = useState({}); // { [annId]: bool }
+
+  // ── إضافة رد/تعليق على إعلان ──
+  const addAnnReply = (annId) => {
+    const name = (annReplyName[annId]||"").trim();
+    const text = (annReplyText[annId]||"").trim();
+    if (!name) { alert("أدخل اسمك أولاً"); return; }
+    if (!text) { alert("أدخل نص تعليقك"); return; }
+    const newReply = { id: Date.now(), name, text, date: new Date().toLocaleDateString("ar-SA") };
+    const u = announcements.map(a => a.id === annId
+      ? { ...a, replies: [...(a.replies||[]), newReply] }
+      : a
+    );
+    setAnnouncements(u); saveAnnouncements(u);
+    setAnnReplyName(p=>({...p,[annId]:""}));
+    setAnnReplyText(p=>({...p,[annId]:""}));
+    setReplyFormOpen(p=>({...p,[annId]:false}));
+  };
+
+  // ── حذف رد ──
+  const delAnnReply = (annId, replyId) => {
+    const u = announcements.map(a => a.id === annId
+      ? { ...a, replies: (a.replies||[]).filter(r=>r.id!==replyId) }
+      : a
+    );
+    setAnnouncements(u); saveAnnouncements(u);
+  };
   const categories = ["الكل", "تعاميم", "إعلانات", "تدريب", "اجتماعات"];
   const pColors = { "عاجل": "red", "مهم": "amber", "عادي": "teal" };
   const pBg    = { "عاجل": "#fef2f2", "مهم": "#fffbeb", "عادي": "#f0fdfa" };
@@ -11169,11 +11346,58 @@ function AnnouncementsPage({ announcements, setAnnouncements, saveAnnouncements,
                           className="text-sm leading-loose text-gray-700"
                           dangerouslySetInnerHTML={{ __html: ann.content }} />
                         {/* أزرار الإجراءات */}
-                        <div style={{ display:"flex", gap:6, padding:"0 12px 12px", flexWrap:"wrap" }}>
+                        <div style={{ display:"flex", gap:6, padding:"0 12px 8px", flexWrap:"wrap" }}>
                           <button onClick={()=>startEdit(ann)} style={{ flex:"1 1 auto", padding:"8px 6px", borderRadius:10, border:"1.5px solid #dbeafe", background:"#eff6ff", color:"#2563eb", fontWeight:700, fontSize:12, cursor:"pointer", fontFamily:"'Cairo',sans-serif" }}>✏️ تعديل</button>
                           <button onClick={()=>pin(ann.id)} style={{ flex:"1 1 auto", padding:"8px 6px", borderRadius:10, border:"1.5px solid #fef3c7", background:"#fffbeb", color:"#92400e", fontWeight:700, fontSize:12, cursor:"pointer", fontFamily:"'Cairo',sans-serif" }}>{ann.pinned?"📌 إلغاء":"📌 تثبيت"}</button>
                           <button onClick={()=>printAnn(ann)} style={{ flex:"1 1 auto", padding:"8px 6px", borderRadius:10, border:"1.5px solid #f3e8ff", background:"#faf5ff", color:"#7c3aed", fontWeight:700, fontSize:12, cursor:"pointer", fontFamily:"'Cairo',sans-serif" }}>🖨️</button>
                           <button onClick={()=>{if(confirm("حذف هذا الإعلان؟"))del(ann.id);}} style={{ flex:"1 1 auto", padding:"8px 6px", borderRadius:10, border:"1.5px solid #fee2e2", background:"#fff5f5", color:"#dc2626", fontWeight:700, fontSize:12, cursor:"pointer", fontFamily:"'Cairo',sans-serif" }}>🗑️ حذف</button>
+                        </div>
+                        {/* قسم الردود والتعليقات */}
+                        <div style={{ borderTop:"1px solid rgba(0,0,0,0.05)", margin:"0 12px 12px", paddingTop:10 }}>
+                          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:6 }}>
+                            <span style={{ fontSize:11.5, fontWeight:800, color:"#1d4ed8" }}>
+                              💬 الردود والتعليقات {(ann.replies||[]).length > 0 && `(${ann.replies.length})`}
+                            </span>
+                            <button onClick={()=>setReplyFormOpen(p=>({...p,[ann.id]:!p[ann.id]}))}
+                              style={{ fontSize:11, padding:"4px 10px", borderRadius:8, border:"none",
+                                background: replyFormOpen[ann.id]?"#1d4ed8":"#dbeafe",
+                                color: replyFormOpen[ann.id]?"#fff":"#1d4ed8", fontWeight:700, cursor:"pointer", fontFamily:"'Cairo',sans-serif" }}>
+                              {replyFormOpen[ann.id]?"✕ إلغاء":"+ أضف رد"}
+                            </button>
+                          </div>
+                          {(ann.replies||[]).map(r=>(
+                            <div key={r.id} style={{ background:"#f0f9ff", border:"1px solid #bae6fd", borderRadius:8,
+                              padding:"8px 10px", marginBottom:6, fontSize:12 }}>
+                              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:3 }}>
+                                <span style={{ fontWeight:800, color:"#0369a1" }}>👤 {r.name}</span>
+                                <div style={{ display:"flex", gap:4, alignItems:"center" }}>
+                                  <span style={{ fontSize:10, color:"#94a3b8" }}>{r.date}</span>
+                                  <button onClick={()=>delAnnReply(ann.id,r.id)}
+                                    style={{ fontSize:10, background:"none", border:"none", color:"#fca5a5", cursor:"pointer" }}>✕</button>
+                                </div>
+                              </div>
+                              <div style={{ color:"#0c4a6e", lineHeight:1.7 }}>{r.text}</div>
+                            </div>
+                          ))}
+                          {replyFormOpen[ann.id] && (
+                            <div style={{ background:"#f0f9ff", borderRadius:10, padding:10, border:"1.5px solid #bae6fd" }}>
+                              <input value={annReplyName[ann.id]||""} onChange={e=>setAnnReplyName(p=>({...p,[ann.id]:e.target.value}))}
+                                placeholder="اسمك..."
+                                style={{ width:"100%", padding:"7px 10px", borderRadius:8, border:"1px solid #e2e8f0",
+                                  fontFamily:"'Cairo',sans-serif", fontSize:12, marginBottom:6, outline:"none", boxSizing:"border-box" }} />
+                              <textarea value={annReplyText[ann.id]||""} onChange={e=>setAnnReplyText(p=>({...p,[ann.id]:e.target.value}))}
+                                placeholder="تعليقك..."
+                                rows={2}
+                                style={{ width:"100%", padding:"7px 10px", borderRadius:8, border:"1px solid #e2e8f0",
+                                  fontFamily:"'Cairo',sans-serif", fontSize:12, resize:"none", marginBottom:6, outline:"none", boxSizing:"border-box" }} />
+                              <button onClick={()=>addAnnReply(ann.id)}
+                                style={{ width:"100%", padding:"8px", borderRadius:8, border:"none",
+                                  background:"#1d4ed8", color:"#fff", fontWeight:800, fontSize:12,
+                                  cursor:"pointer", fontFamily:"'Cairo',sans-serif" }}>
+                                💬 إرسال التعليق
+                              </button>
+                            </div>
+                          )}
                         </div>
                       </>
                     )}
@@ -11325,6 +11549,49 @@ function AnnouncementsPage({ announcements, setAnnouncements, saveAnnouncements,
                 <div className="flex items-center justify-between text-xs text-gray-400">
                   <span>{ann.date}</span>
                   <div className="flex gap-2"><Badge color="gray">{ann.category}</Badge><Badge color={pColors[ann.priority]}>{ann.priority}</Badge></div>
+                </div>
+                {/* ── قسم الردود والتعليقات (ديسكتوب) ── */}
+                <div className="mt-4 border-t border-gray-100 pt-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-xs font-black text-blue-700">
+                      💬 الردود والتعليقات {(ann.replies||[]).length > 0 && <span className="bg-blue-100 text-blue-700 rounded-full px-2 py-0.5 mr-1">{ann.replies.length}</span>}
+                    </span>
+                    <button onClick={()=>setReplyFormOpen(p=>({...p,[ann.id]:!p[ann.id]}))}
+                      className={`text-xs px-3 py-1.5 rounded-lg font-bold border transition-all ${replyFormOpen[ann.id]?"bg-blue-600 text-white border-blue-600":"bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"}`}>
+                      {replyFormOpen[ann.id]?"✕ إلغاء":"+ أضف رد / تعليق"}
+                    </button>
+                  </div>
+                  {(ann.replies||[]).map(r=>(
+                    <div key={r.id} className="flex items-start gap-2 mb-2 bg-sky-50 border border-sky-200 rounded-xl px-3 py-2">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-xs font-black text-sky-800">👤 {r.name}</span>
+                          <span className="text-xs text-gray-400">{r.date}</span>
+                        </div>
+                        <div className="text-sm text-sky-900 leading-relaxed">{r.text}</div>
+                      </div>
+                      <button onClick={()=>delAnnReply(ann.id,r.id)}
+                        className="text-xs text-red-300 hover:text-red-500 font-bold flex-shrink-0 mt-0.5">✕</button>
+                    </div>
+                  ))}
+                  {replyFormOpen[ann.id] && (
+                    <div className="bg-sky-50 border border-sky-200 rounded-xl p-3 mt-2">
+                      <div className="flex gap-2 mb-2">
+                        <input value={annReplyName[ann.id]||""} onChange={e=>setAnnReplyName(p=>({...p,[ann.id]:e.target.value}))}
+                          placeholder="اسمك..."
+                          className="flex-shrink-0 w-36 px-3 py-2 rounded-lg border border-gray-200 text-sm font-bold focus:outline-none focus:border-blue-400" />
+                        <input value={annReplyText[ann.id]||""} onChange={e=>setAnnReplyText(p=>({...p,[ann.id]:e.target.value}))}
+                          placeholder="اكتب تعليقك أو ردّك على هذا الإعلان..."
+                          className="flex-1 px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-blue-400"
+                          onKeyDown={e=>{ if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();addAnnReply(ann.id);} }} />
+                        <button onClick={()=>addAnnReply(ann.id)}
+                          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-bold flex-shrink-0">
+                          💬 إرسال
+                        </button>
+                      </div>
+                      <div className="text-xs text-gray-400">اضغط Enter للإرسال</div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
