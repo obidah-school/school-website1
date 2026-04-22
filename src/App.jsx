@@ -10389,301 +10389,227 @@ const LIKERT_COLORS  = ["#16a34a","#4ade80","#f59e0b","#f97316","#dc2626"];
 const LIKERT_ICONS   = ["✅✅","✅","➖","❌","❌❌"];
 const SURVEY_TARGETS = ["معلمون","طلاب","أولياء أمور"];
 
+// ================================================================
+// ===== الاستبيانات — دوال مساعدة =====
+// ================================================================
 function mkSurvey() {
   const today = new Date();
+  let dateH = "____ / ____ / 1447";
   try {
     const h = gregorianToHijri(today.getFullYear(), today.getMonth()+1, today.getDate());
-    return {
-      id: Date.now(),
-      title: "",
-      dateH: `${String(h.d).padStart(2,"0")} / ${String(h.m).padStart(2,"0")} / ${h.y}`,
-      targets: [],
-      questions: [],
-      createdAt: today.toLocaleDateString("ar-SA"),
-      color: "#1e3a5f",
-    };
-  } catch {
-    return {
-      id: Date.now(), title: "", dateH: "____ / ____ / 1447",
-      targets: [], questions: [], createdAt: today.toLocaleDateString("ar-SA"), color: "#1e3a5f",
-    };
-  }
+    dateH = String(h.d).padStart(2,"0") + " / " + String(h.m).padStart(2,"0") + " / " + h.y;
+  } catch(e) {}
+  return { id: Date.now(), title: "", dateH, targets: [], questions: [], createdAt: today.toLocaleDateString("ar-SA"), color: "#1e3a5f" };
 }
 
-function mkQuestion() {
-  return { id: Date.now() + Math.random() * 999 | 0, text: "" };
+function mkSurveyQ() {
+  return { id: Date.now() + (Math.random()*999|0), text: "" };
 }
 
-// ================================================================
-// ===== صانع الاستبيان (نموذج الإنشاء/التعديل) =====
-// ================================================================
+// ── بناء الاستبيان ──
 function SurveyBuilder({ survey, onSave, onCancel }) {
   const [s, setS] = useState({ ...survey, questions: survey.questions.map(q=>({...q})) });
-  const colors = ["#1e3a5f","#065f46","#5b21b6","#991b1b","#92400e","#1d4ed8","#134e4a","#4c0519"];
-
-  const addQ = () => setS(p => ({ ...p, questions: [...p.questions, mkQuestion()] }));
-  const delQ = (id) => setS(p => ({ ...p, questions: p.questions.filter(q=>q.id!==id) }));
-  const updQ = (id, text) => setS(p => ({ ...p, questions: p.questions.map(q=>q.id===id?{...q,text}:q) }));
+  const colors = ["#1e3a5f","#065f46","#5b21b6","#991b1b","#92400e","#0a5c6e","#1d4ed8","#7c3aed"];
+  const addQ = () => setS(p=>({ ...p, questions: [...p.questions, mkSurveyQ()] }));
+  const delQ = (id) => setS(p=>({ ...p, questions: p.questions.filter(q=>q.id!==id) }));
+  const updQ = (id, text) => setS(p=>({ ...p, questions: p.questions.map(q=>q.id===id?{...q,text}:q) }));
   const moveQ = (idx, dir) => {
-    const qs = [...s.questions];
-    const to = idx + dir;
-    if (to < 0 || to >= qs.length) return;
-    [qs[idx], qs[to]] = [qs[to], qs[idx]];
-    setS(p => ({ ...p, questions: qs }));
+    const qs = [...s.questions]; const to = idx+dir;
+    if (to<0 || to>=qs.length) return;
+    [qs[idx],qs[to]]=[qs[to],qs[idx]];
+    setS(p=>({...p,questions:qs}));
   };
-
+  const save = () => {
+    if (!s.title.trim()) { alert("أدخل عنوان الاستبيان"); return; }
+    if (s.questions.length===0) { alert("أضف عبارة واحدة على الأقل"); return; }
+    onSave(s);
+  };
   return (
-    <div dir="rtl" style={{ fontFamily:"'Cairo','Noto Naskh Arabic',sans-serif", background:"#f8fafc", minHeight:"100vh", padding:"16px" }}>
-      {/* رأس */}
-      <div style={{ background:`linear-gradient(135deg, ${s.color} 0%, ${s.color}cc 100%)`, borderRadius:16, padding:"16px 20px", marginBottom:16, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+    <div dir="rtl" style={{ fontFamily:"'Cairo','Noto Naskh Arabic',sans-serif", background:"#f8fafc", minHeight:"100vh", padding:14 }}>
+      <div style={{ background:"linear-gradient(135deg,"+s.color+","+s.color+"bb)", borderRadius:14, padding:"14px 18px", marginBottom:14, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
         <div>
-          <div style={{ color:"#fff", fontWeight:900, fontSize:16 }}>📋 {s.id === survey.id && s.title ? "تعديل الاستبيان" : "استبيان جديد"}</div>
-          <div style={{ color:"rgba(255,255,255,.7)", fontSize:11, marginTop:2 }}>مدرسة عبيدة بن الحارث المتوسطة</div>
+          <div style={{ color:"#fff", fontWeight:900, fontSize:15 }}>📋 {s.id===survey.id&&s.title?"تعديل":"استبيان جديد"}</div>
+          <div style={{ color:"rgba(255,255,255,.65)", fontSize:11 }}>مدرسة عبيدة بن الحارث المتوسطة</div>
         </div>
-        <button onClick={onCancel} style={{ background:"rgba(255,255,255,.15)", border:"none", borderRadius:8, color:"#fff", fontWeight:800, fontSize:12, padding:"6px 14px", cursor:"pointer", fontFamily:"'Cairo',sans-serif" }}>✕ إلغاء</button>
+        <button onClick={onCancel} style={{ background:"rgba(255,255,255,.18)", border:"none", borderRadius:8, color:"#fff", fontWeight:800, fontSize:12, padding:"6px 14px", cursor:"pointer", fontFamily:"'Cairo',sans-serif" }}>✕ إلغاء</button>
       </div>
-
-      <div style={{ background:"#fff", borderRadius:14, padding:16, marginBottom:12, boxShadow:"0 2px 8px rgba(0,0,0,.06)" }}>
-        {/* عنوان الاستبيان */}
-        <label style={{ fontSize:12, fontWeight:700, color:"#475569", display:"block", marginBottom:5 }}>📌 عنوان الاستبيان *</label>
-        <input value={s.title} onChange={e=>setS(p=>({...p,title:e.target.value}))}
-          placeholder="مثال: استبانة قياس رضا المعلمين"
-          style={{ width:"100%", padding:"10px 14px", borderRadius:10, border:"2px solid #e2e8f0", fontFamily:"'Cairo',sans-serif", fontSize:14, outline:"none", boxSizing:"border-box", marginBottom:12 }} />
-
-        {/* التاريخ */}
-        <label style={{ fontSize:12, fontWeight:700, color:"#475569", display:"block", marginBottom:5 }}>📅 التاريخ الهجري</label>
-        <input value={s.dateH} onChange={e=>setS(p=>({...p,dateH:e.target.value}))}
-          placeholder="مثال: 15 / 10 / 1447"
-          style={{ width:"100%", padding:"10px 14px", borderRadius:10, border:"2px solid #e2e8f0", fontFamily:"'Cairo',sans-serif", fontSize:14, outline:"none", boxSizing:"border-box", marginBottom:12 }} />
-
-        {/* الفئة المستهدفة */}
-        <label style={{ fontSize:12, fontWeight:700, color:"#475569", display:"block", marginBottom:8 }}>👥 الفئة المستهدفة</label>
-        <div style={{ display:"flex", gap:12, flexWrap:"wrap", marginBottom:12 }}>
-          {SURVEY_TARGETS.map(t => (
+      <div style={{ background:"#fff", borderRadius:12, padding:14, marginBottom:12, boxShadow:"0 2px 8px rgba(0,0,0,.06)" }}>
+        <label style={{ fontSize:11.5, fontWeight:700, color:"#475569", display:"block", marginBottom:5 }}>📌 عنوان الاستبيان *</label>
+        <input value={s.title} onChange={e=>setS(p=>({...p,title:e.target.value}))} placeholder="مثال: استبانة قياس الأثر — رضا المعلمين"
+          style={{ width:"100%", padding:"9px 12px", borderRadius:9, border:"2px solid #e2e8f0", fontFamily:"'Cairo',sans-serif", fontSize:13, outline:"none", boxSizing:"border-box", marginBottom:12 }} />
+        <label style={{ fontSize:11.5, fontWeight:700, color:"#475569", display:"block", marginBottom:5 }}>📅 التاريخ الهجري</label>
+        <input value={s.dateH} onChange={e=>setS(p=>({...p,dateH:e.target.value}))} placeholder="مثال: 15 / 08 / 1447"
+          style={{ width:"100%", padding:"9px 12px", borderRadius:9, border:"2px solid #e2e8f0", fontFamily:"'Cairo',sans-serif", fontSize:13, outline:"none", boxSizing:"border-box", marginBottom:12 }} />
+        <label style={{ fontSize:11.5, fontWeight:700, color:"#475569", display:"block", marginBottom:8 }}>👥 الفئة المستهدفة</label>
+        <div style={{ display:"flex", gap:16, flexWrap:"wrap", marginBottom:12 }}>
+          {SURVEY_TARGETS.map(t=>(
             <label key={t} style={{ display:"flex", alignItems:"center", gap:6, cursor:"pointer", fontSize:13, fontWeight:700 }}>
-              <input type="checkbox" checked={s.targets.includes(t)}
-                onChange={e => setS(p => ({ ...p, targets: e.target.checked ? [...p.targets,t] : p.targets.filter(x=>x!==t) }))}
-                style={{ width:16, height:16, cursor:"pointer" }} />
+              <input type="checkbox" checked={s.targets.includes(t)} onChange={e=>setS(p=>({...p,targets:e.target.checked?[...p.targets,t]:p.targets.filter(x=>x!==t)}))} style={{ width:15,height:15,cursor:"pointer" }} />
               {t}
             </label>
           ))}
         </div>
-
-        {/* اللون */}
-        <label style={{ fontSize:12, fontWeight:700, color:"#475569", display:"block", marginBottom:6 }}>🎨 لون الاستبيان</label>
+        <label style={{ fontSize:11.5, fontWeight:700, color:"#475569", display:"block", marginBottom:6 }}>🎨 لون الاستبيان</label>
         <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
-          {colors.map(c => (
-            <button key={c} onClick={()=>setS(p=>({...p,color:c}))}
-              style={{ width:30, height:30, borderRadius:"50%", background:c, border: s.color===c?"3px solid #1e293b":"2px solid #e2e8f0", cursor:"pointer" }} />
+          {colors.map(c=>(
+            <button key={c} onClick={()=>setS(p=>({...p,color:c}))} style={{ width:28,height:28,borderRadius:"50%",background:c,border:s.color===c?"3px solid #1e293b":"2px solid #e2e8f0",cursor:"pointer" }} />
           ))}
         </div>
       </div>
-
-      {/* الأسئلة */}
-      <div style={{ background:"#fff", borderRadius:14, padding:16, marginBottom:12, boxShadow:"0 2px 8px rgba(0,0,0,.06)" }}>
+      <div style={{ background:"#fff", borderRadius:12, padding:14, marginBottom:12, boxShadow:"0 2px 8px rgba(0,0,0,.06)" }}>
         <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:12 }}>
-          <span style={{ fontWeight:900, fontSize:14, color:"#1e293b" }}>❓ الأسئلة ({s.questions.length})</span>
-          <button onClick={addQ}
-            style={{ background:s.color, color:"#fff", border:"none", borderRadius:10, padding:"7px 14px", fontSize:12, fontWeight:800, cursor:"pointer", fontFamily:"'Cairo',sans-serif" }}>
-            ➕ إضافة سؤال
-          </button>
+          <span style={{ fontWeight:900, fontSize:13.5, color:"#1e293b" }}>❓ العبارات ({s.questions.length})</span>
+          <button onClick={addQ} style={{ background:s.color, color:"#fff", border:"none", borderRadius:9, padding:"7px 14px", fontSize:12, fontWeight:800, cursor:"pointer", fontFamily:"'Cairo',sans-serif" }}>➕ إضافة</button>
         </div>
-        {s.questions.length === 0 && (
-          <div style={{ textAlign:"center", padding:"24px 0", color:"#94a3b8", fontSize:13 }}>لا توجد أسئلة بعد — اضغط «إضافة سؤال»</div>
-        )}
-        {s.questions.map((q, idx) => (
-          <div key={q.id} style={{ background:"#f8fafc", borderRadius:10, padding:"12px", marginBottom:8, border:"1.5px solid #e2e8f0" }}>
-            <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:6 }}>
-              <span style={{ background:s.color, color:"#fff", borderRadius:"50%", width:22, height:22, display:"flex", alignItems:"center", justifyContent:"center", fontSize:11, fontWeight:900, flexShrink:0 }}>{idx+1}</span>
-              <input value={q.text} onChange={e=>updQ(q.id, e.target.value)}
-                placeholder={`نص السؤال ${idx+1}...`}
-                style={{ flex:1, padding:"7px 10px", borderRadius:8, border:"1.5px solid #e2e8f0", fontFamily:"'Cairo',sans-serif", fontSize:13, outline:"none" }} />
-              <button onClick={()=>moveQ(idx,-1)} disabled={idx===0} style={{ background:"none", border:"none", fontSize:14, cursor:idx===0?"default":"pointer", opacity:idx===0?.3:1 }}>▲</button>
-              <button onClick={()=>moveQ(idx,1)} disabled={idx===s.questions.length-1} style={{ background:"none", border:"none", fontSize:14, cursor:idx===s.questions.length-1?"default":"pointer", opacity:idx===s.questions.length-1?.3:1 }}>▼</button>
-              <button onClick={()=>delQ(q.id)} style={{ background:"#fee2e2", border:"none", borderRadius:6, color:"#dc2626", fontSize:12, padding:"3px 8px", cursor:"pointer" }}>🗑️</button>
+        {s.questions.length===0 && <div style={{ textAlign:"center", padding:"20px 0", color:"#94a3b8", fontSize:13 }}>لا توجد عبارات — اضغط إضافة</div>}
+        {s.questions.map((q,idx)=>(
+          <div key={q.id} style={{ background:"#f8fafc", borderRadius:9, padding:"10px 12px", marginBottom:8, border:"1.5px solid #e2e8f0" }}>
+            <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:5 }}>
+              <div style={{ background:s.color, color:"#fff", borderRadius:"50%", width:22, height:22, display:"flex", alignItems:"center", justifyContent:"center", fontSize:11, fontWeight:900, flexShrink:0 }}>{idx+1}</div>
+              <input value={q.text} onChange={e=>updQ(q.id,e.target.value)} placeholder={"نص العبارة "+(idx+1)+"..."} style={{ flex:1, padding:"6px 10px", borderRadius:7, border:"1.5px solid #e2e8f0", fontFamily:"'Cairo',sans-serif", fontSize:13, outline:"none" }} />
+              <button onClick={()=>moveQ(idx,-1)} disabled={idx===0} style={{ background:"none",border:"none",fontSize:13,cursor:idx===0?"default":"pointer",opacity:idx===0?.3:1 }}>▲</button>
+              <button onClick={()=>moveQ(idx,1)} disabled={idx===s.questions.length-1} style={{ background:"none",border:"none",fontSize:13,cursor:idx===s.questions.length-1?"default":"pointer",opacity:idx===s.questions.length-1?.3:1 }}>▼</button>
+              <button onClick={()=>delQ(q.id)} style={{ background:"#fee2e2",border:"none",borderRadius:6,color:"#dc2626",fontSize:11,padding:"3px 8px",cursor:"pointer" }}>🗑️</button>
             </div>
-            <div style={{ fontSize:11, color:"#94a3b8", paddingRight:30 }}>مقياس: أوافق بشدة • أوافق • محايد • غير موافق • غير موافق بشدة</div>
+            <div style={{ fontSize:10.5, color:"#94a3b8", paddingRight:30 }}>مقياس: أوافق بشدة • أوافق • محايد • غير موافق • غير موافق بشدة</div>
           </div>
         ))}
       </div>
-
-      <button onClick={()=>{ if(!s.title.trim()){alert("أدخل عنوان الاستبيان أولاً");return;} if(s.questions.length===0){alert("أضف سؤالاً واحداً على الأقل");return;} onSave(s); }}
-        style={{ width:"100%", padding:"13px", borderRadius:12, border:"none", background:s.color, color:"#fff", fontWeight:900, fontSize:15, cursor:"pointer", fontFamily:"'Cairo',sans-serif" }}>
-        💾 حفظ الاستبيان
-      </button>
+      <button onClick={save} style={{ width:"100%", padding:12, borderRadius:11, border:"none", background:s.color, color:"#fff", fontWeight:900, fontSize:14, cursor:"pointer", fontFamily:"'Cairo',sans-serif" }}>💾 حفظ الاستبيان</button>
     </div>
   );
 }
 
-// ================================================================
-// ===== صفحة ملء الاستبيان (طباعة + إجابة) =====
-// ================================================================
+// ── معاينة وطباعة الاستبيان ──
 function SurveyRespond({ survey, onClose }) {
   const [answers, setAnswers] = useState({});
-  const [participantName, setParticipantName] = useState("");
-  const [participantPhone, setParticipantPhone] = useState("");
+  const [pName, setPName] = useState("");
+  const [pPhone, setPPhone] = useState("");
 
   const handlePrint = () => {
-    const html = `<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8"><title>${survey.title}</title>
-    <style>
-      @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap');
-      *{margin:0;padding:0;box-sizing:border-box}
-      body{font-family:'Cairo',sans-serif;direction:rtl;background:#fff;color:#1e293b;padding:0}
-      .page{max-width:700px;margin:0 auto;padding:20px;border:3px solid ${survey.color};border-radius:12px;min-height:297mm}
-      .header{text-align:center;padding:20px 0 16px;border-bottom:3px solid ${survey.color};margin-bottom:20px}
-      .school-name{font-size:22px;font-weight:900;color:${survey.color};margin-bottom:4px}
-      .survey-title{font-size:18px;font-weight:900;color:#1e293b;margin:10px 0 4px}
-      .quote{font-size:12px;color:#64748b;font-style:italic;margin-bottom:12px;line-height:1.8}
-      .meta-row{display:flex;justify-content:center;gap:20px;flex-wrap:wrap;margin-bottom:8px}
-      .meta-item{font-size:12px;color:#475569}
-      .target-row{display:flex;justify-content:center;gap:20px;margin:10px 0}
-      .target-item{display:flex;align-items:center;gap:6px;font-size:12px}
-      .checkbox-sq{width:14px;height:14px;border:1.5px solid #475569;display:inline-block;border-radius:2px}
-      .checked-sq{background:${survey.color};border-color:${survey.color}}
-      .participant{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:12px}
-      .q-block{margin-bottom:18px;page-break-inside:avoid}
-      .q-num{display:inline-block;background:${survey.color};color:#fff;border-radius:50%;width:22px;height:22px;text-align:center;line-height:22px;font-size:11px;font-weight:900;margin-left:6px}
-      .q-text{font-size:13px;font-weight:700;margin-bottom:8px;display:flex;align-items:center}
-      .likert-table{width:100%;border-collapse:collapse;font-size:11.5px}
-      .likert-table th,.likert-table td{border:1px solid #e2e8f0;padding:6px 8px;text-align:center}
-      .likert-table th{background:#f0f4f8;font-weight:800;color:#1e293b}
-      .likert-table td:first-child{text-align:right;font-weight:700;color:#374151;padding-right:10px}
-      .circle{width:14px;height:14px;border:1.5px solid #94a3b8;border-radius:50%;display:inline-block}
-      .secret{text-align:center;font-size:11px;color:#94a3b8;margin-top:20px;padding-top:12px;border-top:1px dashed #e2e8f0}
-      .footer{text-align:center;font-size:10px;color:#94a3b8;margin-top:12px}
-      @media print{@page{size:A4;margin:1.5cm}body{padding:0}.page{border:2px solid ${survey.color};padding:16px}}
-    </style></head><body>
-    <div class="page">
-      <div class="header">
-        <div class="school-name">🏫 مدرسة عبيدة بن الحارث المتوسطة</div>
-        <div class="survey-title">📋 ${survey.title}</div>
-        <div class="quote">« رأيك يُسهم في تحسين بيئة التعلم وتجويد العمل المدرسي — شكراً لمشاركتك »</div>
-        <div class="meta-row">
-          <span class="meta-item">📅 التاريخ: ${survey.dateH} هـ</span>
-        </div>
-        <div class="target-row">
-          ${SURVEY_TARGETS.map(t=>`<div class="target-item"><div class="checkbox-sq ${survey.targets.includes(t)?"checked-sq":""}"></div><span>${t}</span></div>`).join("")}
-        </div>
-      </div>
-      <div class="participant">
-        <div style="font-weight:700;margin-bottom:6px">معلومات المشارك <span style="font-weight:400;color:#94a3b8">(اختياري — سرية تامة)</span></div>
-        <div style="display:flex;gap:20px;flex-wrap:wrap">
-          <span>الاسم: _______________________</span>
-          <span>رقم الجوال: ___________________</span>
-        </div>
-      </div>
-      ${survey.questions.map((q,i)=>`
-        <div class="q-block">
-          <div class="q-text"><span class="q-num">${i+1}</span>${q.text}</div>
-          <table class="likert-table">
-            <tr>
-              <th>العبارة</th>
-              ${LIKERT_OPTIONS.map(o=>`<th>${o}</th>`).join("")}
-            </tr>
-            <tr>
-              <td>${q.text}</td>
-              ${LIKERT_OPTIONS.map(()=>`<td><div class="circle"></div></td>`).join("")}
-            </tr>
-          </table>
-        </div>`).join("")}
-      <div class="secret">🔒 هذه الاستبانة سرية ولا يطلع عليها إلا المعنيون في إدارة المدرسة</div>
-      <div class="footer">مدرسة عبيدة بن الحارث المتوسطة — إدارة تعليم جدة — ${new Date().getFullYear()} م</div>
-    </div>
-    <script>window.onload=()=>window.print()</script>
-    </body></html>`;
+    // build HTML without nested template literals
+    const targetChecks = SURVEY_TARGETS.map(function(t) {
+      const sq = survey.targets.includes(t) ? "background:#0a5c6e;border-color:#0a5c6e;" : "";
+      return '<div style="display:flex;align-items:center;gap:6px;font-size:12px"><div style="width:14px;height:14px;border:1.5px solid #475569;border-radius:2px;'+sq+'display:inline-block"></div><span>'+t+'</span></div>';
+    }).join("");
+
+    const questionsHtml = survey.questions.map(function(q, i) {
+      const cols = LIKERT_OPTIONS.map(function() {
+        return '<td style="text-align:center"><div style="width:14px;height:14px;border:1.5px solid #94a3b8;border-radius:50%;display:inline-block"></div></td>';
+      }).join("");
+      const headers = LIKERT_OPTIONS.map(function(o) {
+        return '<th style="background:#f0f4f8;font-weight:800;color:#1e293b;border:1px solid #e2e8f0;padding:6px 8px">'+o+'</th>';
+      }).join("");
+      return '<div style="margin-bottom:18px;page-break-inside:avoid">'
+        +'<div style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;margin-bottom:8px">'
+        +'<div style="background:'+survey.color+';color:#fff;border-radius:50%;width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:900;flex-shrink:0">'+(i+1)+'</div>'
+        +q.text+'</div>'
+        +'<table style="width:100%;border-collapse:collapse;font-size:11.5px">'
+        +'<tr><th style="text-align:right;font-weight:700;background:#f0f4f8;border:1px solid #e2e8f0;padding:6px 10px">العبارة</th>'+headers+'</tr>'
+        +'<tr><td style="text-align:right;font-weight:600;border:1px solid #e2e8f0;padding:6px 10px">'+q.text+'</td>'+cols+'</tr>'
+        +'</table></div>';
+    }).join("");
+
+    const html = '<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8">'
+      +'<title>'+survey.title+'</title>'
+      +'<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap" rel="stylesheet">'
+      +'<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:\'Cairo\',sans-serif;direction:rtl;background:#fff;color:#1e293b;padding:0}'
+      +'.page{max-width:700px;margin:0 auto;padding:20px;border:3px double #c9a84c;border-radius:4px;min-height:297mm;position:relative}'
+      +'@media print{@page{size:A4;margin:1.5cm}body{padding:0}.page{max-width:100%;padding:16px}}'
+      +'</style></head><body><div class="page">'
+      +'<div style="text-align:center;padding:24px 0 20px;border-bottom:2px solid '+survey.color+';margin-bottom:20px">'
+      +'<div style="font-size:22px;font-weight:900;color:'+survey.color+';margin-bottom:4px">🏫 مدرسة عبيدة بن الحارث المتوسطة</div>'
+      +'<div style="font-size:11px;color:#64748b;margin-bottom:12px">إدارة تعليم جدة — وزارة التعليم</div>'
+      +'<div style="font-size:18px;font-weight:900;color:#1e293b;margin-bottom:6px">📋 '+survey.title+'</div>'
+      +'<div style="font-size:11.5px;color:#64748b;font-style:italic;line-height:1.8;margin-bottom:14px">« رأيك يُسهم في تحسين بيئة التعلم وتجويد العمل المدرسي »</div>'
+      +'<div style="display:flex;justify-content:center;gap:18px;flex-wrap:wrap;margin-bottom:8px">'+targetChecks+'</div>'
+      +'<div style="font-size:11.5px;color:#475569">📅 التاريخ: '+survey.dateH+' هـ</div>'
+      +'</div>'
+      +'<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px 16px;margin-bottom:20px;font-size:12px">'
+      +'<div style="font-weight:700;margin-bottom:8px">معلومات المشارك <span style="font-weight:400;color:#94a3b8">(اختياري — سرية تامة)</span></div>'
+      +'<div style="display:flex;gap:24px;flex-wrap:wrap">'
+      +'<span>الاسم: _______________________</span>'
+      +'<span>رقم الجوال: ___________________</span>'
+      +'</div></div>'
+      +questionsHtml
+      +'<div style="text-align:center;font-size:11px;color:#94a3b8;margin-top:24px;padding-top:14px;border-top:1px dashed #e2e8f0">'
+      +'🔒 هذه الاستبانة سرية ولا يطلع عليها إلا المعنيون في إدارة المدرسة</div>'
+      +'<div style="text-align:center;font-size:10px;color:#94a3b8;margin-top:10px">'
+      +'مدرسة عبيدة بن الحارث المتوسطة — إدارة تعليم جدة — وزارة التعليم</div>'
+      +'</div><script>window.onload=function(){window.print()}<\/script></body></html>';
+
     printWindow(html);
   };
 
   return (
     <div dir="rtl" style={{ fontFamily:"'Cairo','Noto Naskh Arabic',sans-serif", background:"#f8fafc", minHeight:"100vh" }}>
-      {/* رأس الاستبيان */}
-      <div style={{ background:`linear-gradient(135deg,${survey.color},${survey.color}bb)`, padding:"20px 16px", textAlign:"center" }}>
-        <div style={{ fontSize:13, color:"rgba(255,255,255,.8)", marginBottom:4 }}>🏫 مدرسة عبيدة بن الحارث المتوسطة</div>
+      <div style={{ background:"linear-gradient(135deg,"+survey.color+","+survey.color+"bb)", padding:"20px 16px", textAlign:"center" }}>
+        <div style={{ fontSize:12, color:"rgba(255,255,255,.75)", marginBottom:4 }}>🏫 مدرسة عبيدة بن الحارث المتوسطة</div>
         <div style={{ fontSize:20, fontWeight:900, color:"#fff", marginBottom:6 }}>{survey.title}</div>
-        <div style={{ fontSize:11.5, color:"rgba(255,255,255,.75)", lineHeight:1.7 }}>
-          « رأيك يُسهم في تحسين بيئة التعلم وتجويد العمل المدرسي »
-        </div>
+        <div style={{ fontSize:11.5, color:"rgba(255,255,255,.75)", lineHeight:1.7, fontStyle:"italic" }}>« رأيك يُسهم في تحسين بيئة التعلم وتجويد العمل المدرسي »</div>
         <div style={{ display:"flex", justifyContent:"center", gap:16, marginTop:10, flexWrap:"wrap" }}>
           {SURVEY_TARGETS.map(t=>(
-            <label key={t} style={{ display:"flex", alignItems:"center", gap:5, color:"#fff", fontSize:12, cursor:"pointer" }}>
-              <div style={{ width:14, height:14, border:"2px solid rgba(255,255,255,.8)", borderRadius:3, background:survey.targets.includes(t)?"rgba(255,255,255,.9)":"transparent", flexShrink:0 }}></div>
+            <div key={t} style={{ display:"flex", alignItems:"center", gap:5, color:"#fff", fontSize:12 }}>
+              <div style={{ width:14,height:14,border:"2px solid rgba(255,255,255,.8)",borderRadius:3,background:survey.targets.includes(t)?"rgba(255,255,255,.9)":"transparent",flexShrink:0 }}></div>
               {t}
-            </label>
+            </div>
           ))}
         </div>
-        <div style={{ color:"rgba(255,255,255,.75)", fontSize:11.5, marginTop:8 }}>📅 {survey.dateH} هـ</div>
+        <div style={{ color:"rgba(255,255,255,.7)", fontSize:11.5, marginTop:8 }}>📅 {survey.dateH} هـ</div>
       </div>
-
       <div style={{ maxWidth:640, margin:"0 auto", padding:"14px 12px 60px" }}>
-
-        {/* معلومات المشارك */}
         <div style={{ background:"#fff", borderRadius:12, padding:14, marginBottom:14, boxShadow:"0 2px 8px rgba(0,0,0,.06)" }}>
-          <div style={{ fontWeight:800, fontSize:13, color:"#1e293b", marginBottom:10 }}>
-            👤 معلومات المشارك <span style={{ fontWeight:400, color:"#94a3b8", fontSize:11 }}>(اختياري)</span>
-          </div>
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+          <div style={{ fontWeight:800, fontSize:13, color:"#1e293b", marginBottom:10 }}>👤 معلومات المشارك <span style={{ fontWeight:400, color:"#94a3b8", fontSize:11 }}>(اختياري)</span></div>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:10 }}>
             <div>
-              <label style={{ fontSize:11, color:"#64748b", fontWeight:700, display:"block", marginBottom:4 }}>الاسم</label>
-              <input value={participantName} onChange={e=>setParticipantName(e.target.value)}
-                placeholder="اكتب اسمك..."
-                style={{ width:"100%", padding:"8px 10px", borderRadius:8, border:"1.5px solid #e2e8f0", fontFamily:"'Cairo',sans-serif", fontSize:13, outline:"none", boxSizing:"border-box" }} />
+              <div style={{ fontSize:11,color:"#64748b",fontWeight:700,marginBottom:4 }}>الاسم</div>
+              <input value={pName} onChange={e=>setPName(e.target.value)} placeholder="اكتب اسمك..."
+                style={{ width:"100%",padding:"7px 10px",borderRadius:8,border:"1.5px solid #e2e8f0",fontFamily:"'Cairo',sans-serif",fontSize:13,outline:"none",boxSizing:"border-box" }} />
             </div>
             <div>
-              <label style={{ fontSize:11, color:"#64748b", fontWeight:700, display:"block", marginBottom:4 }}>رقم الجوال</label>
-              <input value={participantPhone} onChange={e=>setParticipantPhone(e.target.value)}
-                placeholder="05xxxxxxxx"
-                style={{ width:"100%", padding:"8px 10px", borderRadius:8, border:"1.5px solid #e2e8f0", fontFamily:"'Cairo',sans-serif", fontSize:13, outline:"none", boxSizing:"border-box", direction:"ltr", textAlign:"right" }} />
+              <div style={{ fontSize:11,color:"#64748b",fontWeight:700,marginBottom:4 }}>رقم الجوال</div>
+              <input value={pPhone} onChange={e=>setPPhone(e.target.value)} placeholder="05xxxxxxxx"
+                style={{ width:"100%",padding:"7px 10px",borderRadius:8,border:"1.5px solid #e2e8f0",fontFamily:"'Cairo',sans-serif",fontSize:13,outline:"none",boxSizing:"border-box",direction:"ltr",textAlign:"right" }} />
             </div>
           </div>
-          <div style={{ marginTop:10, background:"#f8fafc", borderRadius:8, padding:"7px 12px", fontSize:11, color:"#94a3b8", display:"flex", alignItems:"center", gap:6 }}>
+          <div style={{ background:"rgba(10,92,110,.07)",border:"1px solid rgba(10,92,110,.2)",borderRadius:8,padding:"7px 12px",fontSize:11.5,color:"#0a5c6e",fontWeight:700,display:"flex",alignItems:"center",gap:6 }}>
             🔒 هذه الاستبانة سرية ولا يطلع عليها إلا المعنيون في إدارة المدرسة
           </div>
         </div>
-
-        {/* الأسئلة */}
-        {survey.questions.map((q, idx) => (
+        {survey.questions.map((q,idx)=>(
           <div key={q.id} style={{ background:"#fff", borderRadius:12, padding:14, marginBottom:12, boxShadow:"0 2px 8px rgba(0,0,0,.06)" }}>
             <div style={{ display:"flex", alignItems:"flex-start", gap:8, marginBottom:12 }}>
-              <div style={{ background:survey.color, color:"#fff", borderRadius:"50%", width:24, height:24, display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, fontWeight:900, flexShrink:0 }}>{idx+1}</div>
-              <div style={{ fontSize:14, fontWeight:800, color:"#1e293b", lineHeight:1.6 }}>{q.text}</div>
+              <div style={{ background:survey.color,color:"#fff",borderRadius:"50%",width:24,height:24,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:900,flexShrink:0 }}>{idx+1}</div>
+              <div style={{ fontSize:14,fontWeight:800,color:"#1e293b",lineHeight:1.6 }}>{q.text}</div>
             </div>
             <div style={{ display:"grid", gridTemplateColumns:"repeat(5,1fr)", gap:4 }}>
-              {LIKERT_OPTIONS.map((opt, oi) => {
-                const selected = answers[q.id] === opt;
+              {LIKERT_OPTIONS.map((opt,oi)=>{
+                const sel=answers[q.id]===opt;
+                const cols=["#16a34a","#4ade80","#f59e0b","#f97316","#dc2626"];
                 return (
                   <button key={opt} onClick={()=>setAnswers(p=>({...p,[q.id]:opt}))}
-                    style={{ padding:"8px 4px", borderRadius:8, border:`2px solid ${selected ? LIKERT_COLORS[oi] : "#e2e8f0"}`, background:selected ? LIKERT_COLORS[oi]+"22" : "#f8fafc", cursor:"pointer", fontFamily:"'Cairo',sans-serif", display:"flex", flexDirection:"column", alignItems:"center", gap:3, transition:"all .15s" }}>
+                    style={{ padding:"8px 4px",borderRadius:8,border:"2px solid "+(sel?cols[oi]:"#e2e8f0"),background:sel?cols[oi]+"22":"#f8fafc",cursor:"pointer",fontFamily:"'Cairo',sans-serif",display:"flex",flexDirection:"column",alignItems:"center",gap:3 }}>
                     <div style={{ fontSize:14 }}>{LIKERT_ICONS[oi]}</div>
-                    <div style={{ fontSize:9.5, fontWeight:800, color:selected ? LIKERT_COLORS[oi] : "#64748b", textAlign:"center", lineHeight:1.3 }}>{opt}</div>
+                    <div style={{ fontSize:9.5,fontWeight:800,color:sel?cols[oi]:"#64748b",textAlign:"center",lineHeight:1.3 }}>{opt}</div>
                   </button>
                 );
               })}
             </div>
           </div>
         ))}
-
-        {/* أزرار */}
         <div style={{ display:"flex", gap:10, marginTop:4 }}>
-          <button onClick={handlePrint}
-            style={{ flex:1, padding:"12px", borderRadius:12, border:"none", background:"#7c3aed", color:"#fff", fontWeight:900, fontSize:14, cursor:"pointer", fontFamily:"'Cairo',sans-serif" }}>
-            🖨️ طباعة الاستبيان
-          </button>
-          <button onClick={onClose}
-            style={{ padding:"12px 20px", borderRadius:12, border:"1.5px solid #e2e8f0", background:"#fff", color:"#64748b", fontWeight:700, fontSize:13, cursor:"pointer", fontFamily:"'Cairo',sans-serif" }}>
-            ← رجوع
-          </button>
+          <button onClick={handlePrint} style={{ flex:1,padding:"12px",borderRadius:12,border:"none",background:"#7c3aed",color:"#fff",fontWeight:900,fontSize:14,cursor:"pointer",fontFamily:"'Cairo',sans-serif" }}>🖨️ طباعة الاستبيان</button>
+          <button onClick={onClose} style={{ padding:"12px 20px",borderRadius:12,border:"1.5px solid #e2e8f0",background:"#fff",color:"#64748b",fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:"'Cairo',sans-serif" }}>← رجوع</button>
         </div>
       </div>
     </div>
   );
 }
 
-// ================================================================
-// ===== صفحة الاستبيانات الرئيسية =====
-// ================================================================
+// ── صفحة الاستبيانات ──
 function SurveysPage({ surveys, setSurveys, saveSurveys }) {
-  const [mode, setMode]         = useState("list");
-  const [editing, setEditing]   = useState(null);
+  const [mode, setMode]       = useState("list");
+  const [editing, setEditing] = useState(null);
   const [previewing, setPreviewing] = useState(null);
 
   const saveSurvey = (s) => {
@@ -10697,75 +10623,60 @@ function SurveysPage({ surveys, setSurveys, saveSurveys }) {
     setSurveys(updated); saveSurveys(updated);
   };
 
-  if (mode === "build") return <SurveyBuilder survey={editing||mkSurvey()} onSave={saveSurvey} onCancel={()=>{setMode("list");setEditing(null);}} />;
-  if (mode === "preview" && previewing) return <SurveyRespond survey={previewing} onClose={()=>{setMode("list");setPreviewing(null);}} />;
+  if (mode==="build") return <SurveyBuilder survey={editing||mkSurvey()} onSave={saveSurvey} onCancel={()=>{setMode("list");setEditing(null);}} />;
+  if (mode==="preview"&&previewing) return <SurveyRespond survey={previewing} onClose={()=>{setMode("list");setPreviewing(null);}} />;
 
   return (
     <div dir="rtl">
-      {/* رأس الصفحة */}
-      <div className="rounded-b-2xl p-6 mb-5 text-white shadow-xl" style={{ background:"linear-gradient(135deg,#1e3a5f,#1d4ed8)" }}>
+      <div className="rounded-b-2xl p-6 mb-5 text-white shadow-xl" style={{ background:"linear-gradient(135deg,#0d2137,#0a5c6e)" }}>
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="text-center sm:text-right">
             <div className="text-4xl mb-1">📊</div>
             <h2 className="text-2xl font-black">الاستبيانات</h2>
-            <p className="opacity-80 text-sm mt-1">إنشاء استبيانات مقياس ليكرت الخماسي وطباعتها</p>
+            <p className="opacity-80 text-sm mt-1">استبيانات مقياس ليكرت الخماسي • قياس الأثر</p>
           </div>
-          <button onClick={()=>{ setEditing(null); setMode("build"); }}
-            className="bg-white text-blue-800 px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-blue-50 shadow">
+          <button onClick={()=>{setEditing(null);setMode("build");}} className="bg-white text-blue-900 px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-blue-50 shadow">
             ➕ استبيان جديد
           </button>
         </div>
       </div>
-
-      {/* القائمة */}
       <div className="space-y-3">
-        {surveys.length === 0 && (
+        {surveys.length===0 && (
           <div className="text-center py-16 text-gray-400">
             <div className="text-5xl mb-3">📋</div>
             <div className="font-bold text-sm">لا توجد استبيانات بعد</div>
-            <div className="text-xs mt-1">اضغط «استبيان جديد» للبدء</div>
+            <button onClick={()=>{setEditing(null);setMode("build");}} className="mt-3 text-blue-600 text-xs font-bold underline">➕ إنشاء أول استبيان</button>
           </div>
         )}
-        {surveys.map(s => (
-          <div key={s.id} className="bg-white rounded-2xl shadow-sm hover:shadow-md transition-all overflow-hidden" style={{ borderRight:`5px solid ${s.color}` }}>
+        {surveys.map(s=>(
+          <div key={s.id} className="bg-white rounded-2xl shadow-sm hover:shadow-md transition-all overflow-hidden" style={{ borderRight:"5px solid "+s.color }}>
             <div className="p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1">
-                  <h3 className="font-black text-base text-gray-800">{s.title || "استبيان بدون عنوان"}</h3>
+                  <h3 className="font-black text-base text-gray-800">{s.title||"استبيان بدون عنوان"}</h3>
                   <div className="flex gap-3 flex-wrap mt-1 text-xs text-gray-400">
                     <span>📅 {s.dateH} هـ</span>
-                    {s.targets.length > 0 && <span>👥 {s.targets.join("، ")}</span>}
-                    <span>❓ {s.questions.length} سؤال</span>
+                    {s.targets.length>0&&<span>👥 {s.targets.join("، ")}</span>}
+                    <span>❓ {s.questions.length} عبارة</span>
                     <span>🗓️ {s.createdAt}</span>
                   </div>
+                  {s.questions.length>0&&(
+                    <div className="mt-2 space-y-0.5">
+                      {s.questions.slice(0,2).map((q,i)=>(
+                        <div key={q.id} className="text-xs text-gray-500 truncate">
+                          <span className="font-bold ml-1" style={{color:s.color}}>{i+1}.</span>{q.text||"عبارة فارغة"}
+                        </div>
+                      ))}
+                      {s.questions.length>2&&<div className="text-xs text-gray-400">...و{s.questions.length-2} عبارات أخرى</div>}
+                    </div>
+                  )}
                 </div>
-                <div className="flex gap-1 flex-wrap justify-end">
-                  <button onClick={()=>{ setPreviewing(s); setMode("preview"); }}
-                    className="text-xs px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 font-bold hover:bg-blue-100">
-                    👁️ معاينة
-                  </button>
-                  <button onClick={()=>{ setEditing(s); setMode("build"); }}
-                    className="text-xs px-3 py-1.5 rounded-lg bg-amber-50 text-amber-700 font-bold hover:bg-amber-100">
-                    ✏️ تعديل
-                  </button>
-                  <button onClick={()=>deleteSurvey(s.id)}
-                    className="text-xs px-3 py-1.5 rounded-lg bg-red-50 text-red-600 font-bold hover:bg-red-100">
-                    🗑️
-                  </button>
+                <div className="flex gap-1.5 flex-wrap justify-end flex-shrink-0">
+                  <button onClick={()=>{setPreviewing(s);setMode("preview");}} className="text-xs px-3 py-1.5 rounded-lg bg-indigo-50 text-indigo-700 font-bold hover:bg-indigo-100">👁️ معاينة</button>
+                  <button onClick={()=>{setEditing(s);setMode("build");}} className="text-xs px-3 py-1.5 rounded-lg bg-amber-50 text-amber-700 font-bold hover:bg-amber-100">✏️ تعديل</button>
+                  <button onClick={()=>deleteSurvey(s.id)} className="text-xs px-3 py-1.5 rounded-lg bg-red-50 text-red-600 font-bold hover:bg-red-100">🗑️</button>
                 </div>
               </div>
-              {/* معاينة أسئلة */}
-              {s.questions.length > 0 && (
-                <div className="mt-3 space-y-1">
-                  {s.questions.slice(0,3).map((q,i)=>(
-                    <div key={q.id} className="text-xs text-gray-500 flex gap-2">
-                      <span className="font-bold" style={{color:s.color}}>{i+1}.</span>
-                      <span className="truncate">{q.text||"سؤال فارغ"}</span>
-                    </div>
-                  ))}
-                  {s.questions.length > 3 && <div className="text-xs text-gray-400">... و{s.questions.length-3} أسئلة أخرى</div>}
-                </div>
-              )}
             </div>
           </div>
         ))}
@@ -18156,6 +18067,481 @@ function TeacherEvalPage({ teachers = [] }) {
   );
 }
 
+
+// ================================================================
+// ===== المراجعة النصف سنوية — دورة الأداء الوظيفي 1447هـ =====
+// ================================================================
+const MIDYEAR_SECTIONS = [
+  {
+    id: "s1", title: "أولاً: التخطيط والتحضير", color: "#1e3a5f", icon: "📋",
+    items: [
+      { id: "1.1", text: "يُعدّ خطة الدرس اليومية وفق النموذج المعتمد" },
+      { id: "1.2", text: "يُحدد الأهداف السلوكية القابلة للقياس" },
+      { id: "1.3", text: "يختار طرائق التدريس الملائمة لطبيعة الدرس" },
+      { id: "1.4", text: "يُعدّ الوسائل التعليمية المناسبة" },
+      { id: "1.5", text: "يراعي الفروق الفردية بين الطلاب في تخطيطه" },
+      { id: "1.6", text: "يُخطط لأساليب التقويم المتنوعة" },
+    ],
+  },
+  {
+    id: "s2", title: "ثانياً: التنفيذ والتدريس", color: "#065f46", icon: "🎯",
+    items: [
+      { id: "2.1", text: "يبدأ الدرس في الوقت المحدد ويُدير وقت الحصة بكفاءة" },
+      { id: "2.2", text: "يربط الدرس الجديد بالمعرفة السابقة للطلاب" },
+      { id: "2.3", text: "يُوظّف استراتيجيات التعلم النشط والتفاعلي" },
+      { id: "2.4", text: "يستخدم التقنية والوسائل التعليمية بفاعلية" },
+      { id: "2.5", text: "يُشرك جميع الطلاب في الأنشطة الصفية" },
+      { id: "2.6", text: "يُراعي مستويات التفكير العليا (تحليل، تقييم، إبداع)" },
+      { id: "2.7", text: "يُدير الصف بأسلوب هادئ ومنظّم" },
+      { id: "2.8", text: "يلتزم بالمحتوى المقرر وخطة الفصل الدراسي" },
+    ],
+  },
+  {
+    id: "s3", title: "ثالثاً: التقويم ومتابعة الطلاب", color: "#7c2d12", icon: "📊",
+    items: [
+      { id: "3.1", text: "يُطبّق أساليب التقويم التكويني أثناء الدرس" },
+      { id: "3.2", text: "يُصحّح أعمال الطلاب ويُقدّم التغذية الراجعة في الوقت المناسب" },
+      { id: "3.3", text: "يرصد الدرجات ويُدخلها في نظام نور بانتظام" },
+      { id: "3.4", text: "يتابع الطلاب المتأخرين دراسياً ويُقدم الدعم اللازم" },
+      { id: "3.5", text: "يُنفّذ خطط علاجية للطلاب ذوي الصعوبات" },
+      { id: "3.6", text: "يتواصل مع أولياء الأمور بشأن مستوى أبنائهم" },
+    ],
+  },
+  {
+    id: "s4", title: "رابعاً: البيئة التعليمية والعلاقات", color: "#4c1d95", icon: "🏫",
+    items: [
+      { id: "4.1", text: "يُهيئ بيئة صفية آمنة ومحفّزة للتعلم" },
+      { id: "4.2", text: "يُعامل الطلاب باحترام ويُحفّزهم على التعلم" },
+      { id: "4.3", text: "يتعاون مع زملائه المعلمين في الفريق المادي" },
+      { id: "4.4", text: "يتواصل بإيجابية مع قيادة المدرسة" },
+      { id: "4.5", text: "يُشارك في الأنشطة والفعاليات المدرسية" },
+    ],
+  },
+  {
+    id: "s5", title: "خامساً: التطوير المهني", color: "#0f4c75", icon: "📚",
+    items: [
+      { id: "5.1", text: "يُشارك في برامج التطوير المهني والتدريب" },
+      { id: "5.2", text: "يُطبّق ما اكتسبه من التدريب في الفصل الدراسي" },
+      { id: "5.3", text: "يُمارس التأمل الذاتي في أدائه التدريسي" },
+      { id: "5.4", text: "يُطّلع على المستجدات التربوية والتعليمية" },
+      { id: "5.5", text: "يُشارك في مجتمعات التعلم المهنية" },
+    ],
+  },
+  {
+    id: "s6", title: "سادساً: الالتزام والمسؤولية", color: "#14532d", icon: "✅",
+    items: [
+      { id: "6.1", text: "يلتزم بمواعيد الحضور والانصراف" },
+      { id: "6.2", text: "يُنجز المهام الإدارية والوثائق في الوقت المحدد" },
+      { id: "6.3", text: "يحافظ على سجلات الطلاب وملفاتهم" },
+      { id: "6.4", text: "يلتزم بلوائح المدرسة وتعليمات الإدارة" },
+      { id: "6.5", text: "يُسهم في تحقيق أهداف خطة تطوير المدرسة" },
+    ],
+  },
+];
+
+const RATING_OPTS = [
+  { val: 4, label: "ممتاز",    color: "#15803d", bg: "#dcfce7" },
+  { val: 3, label: "جيد جداً", color: "#1d4ed8", bg: "#dbeafe" },
+  { val: 2, label: "جيد",      color: "#b45309", bg: "#fef3c7" },
+  { val: 1, label: "مقبول",   color: "#dc2626", bg: "#fee2e2" },
+];
+
+function MidYearReviewPage({ teachers = [] }) {
+  // ── State
+  const [viewMode, setViewMode] = useState("admin"); // admin | teacher
+  const [loginId,  setLoginId]  = useState("");
+  const [loginErr, setLoginErr] = useState("");
+  const [loggedTeacher, setLoggedTeacher] = useState(null);
+
+  // Admin state
+  const [selTeacherId, setSelTeacherId] = useState("");
+  const [ratings,     setRatings]     = useState({}); // { itemId: val }
+  const [adminNotes,  setAdminNotes]   = useState("");
+  const [strengths,   setStrengths]   = useState("");
+  const [improvements,setImprovements] = useState("");
+  const [reviewDate,  setReviewDate]  = useState("");
+  const [saving,     setSaving]      = useState(false);
+  const [saved,      setSaved]       = useState(false);
+
+  // Teacher feedback state
+  const [teacherOpinion, setTeacherOpinion] = useState("");
+  const [teacherData,    setTeacherData]    = useState(null);
+  const [loading,        setLoading]        = useState(false);
+
+  // Get teacher list from DEFAULT_TEACHERS_WITH_IDS or teachers prop
+  const teacherList = DEFAULT_TEACHERS_WITH_IDS.length > 0 ? DEFAULT_TEACHERS_WITH_IDS : teachers.map(t => ({ name: t, id: "" }));
+
+  const selTeacher = teacherList.find(t => t.id === selTeacherId);
+
+  // ── Load saved review for selected teacher (admin)
+  useEffect(() => {
+    if (!selTeacherId) { setRatings({}); setAdminNotes(""); setStrengths(""); setImprovements(""); setReviewDate(""); return; }
+    DB.get("school-midyear-" + selTeacherId, null).then(data => {
+      if (data) {
+        setRatings(data.ratings || {});
+        setAdminNotes(data.adminNotes || "");
+        setStrengths(data.strengths || "");
+        setImprovements(data.improvements || "");
+        setReviewDate(data.reviewDate || "");
+      } else {
+        setRatings({}); setAdminNotes(""); setStrengths(""); setImprovements(""); setReviewDate("");
+      }
+    });
+  }, [selTeacherId]);
+
+  // ── Save review (admin)
+  const saveReview = async () => {
+    if (!selTeacherId) { alert("اختر معلماً أولاً"); return; }
+    setSaving(true);
+    const data = { ratings, adminNotes, strengths, improvements, reviewDate, teacherName: selTeacher?.name || "", savedAt: new Date().toLocaleDateString("ar-SA") };
+    await DB.set("school-midyear-" + selTeacherId, data);
+    setSaving(false); setSaved(true);
+    setTimeout(() => setSaved(false), 2500);
+  };
+
+  // ── Teacher login
+  const handleTeacherLogin = async () => {
+    setLoginErr(""); setLoading(true);
+    const t = teacherList.find(x => x.id === loginId.trim());
+    if (!t) { setLoginErr("رقم الهوية غير موجود في قائمة المعلمين"); setLoading(false); return; }
+    const data = await DB.get("school-midyear-" + t.id, null);
+    setLoggedTeacher(t);
+    setTeacherData(data);
+    // load teacher opinion
+    const opin = await DB.get("school-midyear-opinion-" + t.id, "");
+    setTeacherOpinion(opin || "");
+    setLoading(false);
+  };
+
+  // ── Save teacher opinion
+  const saveTeacherOpinion = async () => {
+    if (!loggedTeacher) return;
+    setSaving(true);
+    await DB.set("school-midyear-opinion-" + loggedTeacher.id, teacherOpinion);
+    setSaving(false); setSaved(true);
+    setTimeout(() => setSaved(false), 2500);
+  };
+
+  // ── Calculate score
+  const calcScore = (rts) => {
+    const vals = Object.values(rts).filter(v => v > 0);
+    if (!vals.length) return 0;
+    return Math.round((vals.reduce((a,b)=>a+b,0)/vals.length) * 25);
+  };
+
+  // ── Print
+  const handlePrint = (data, teacher) => {
+    const scoreVal = calcScore(data.ratings || {});
+    const scoreLabel = scoreVal >= 90 ? "ممتاز" : scoreVal >= 75 ? "جيد جداً" : scoreVal >= 60 ? "جيد" : "مقبول";
+    const scoreColor = scoreVal >= 90 ? "#15803d" : scoreVal >= 75 ? "#1d4ed8" : scoreVal >= 60 ? "#b45309" : "#dc2626";
+
+    let sectionsHtml = "";
+    MIDYEAR_SECTIONS.forEach(sec => {
+      let rowsHtml = "";
+      sec.items.forEach((item, idx) => {
+        const rv = (data.ratings || {})[item.id] || 0;
+        const rl = RATING_OPTS.find(r => r.val === rv);
+        const bg = idx % 2 === 0 ? "#f8fafc" : "#fff";
+        const cells = RATING_OPTS.map(r => {
+          const checked = rv === r.val ? "background:" + r.color + ";border-color:" + r.color + ";" : "";
+          return '<td style="text-align:center;border:1px solid #e2e8f0;padding:6px"><div style="width:14px;height:14px;border-radius:50%;border:2px solid ' + (rv === r.val ? r.color : "#ccc") + ";" + checked + 'margin:0 auto"></div></td>';
+        }).join("");
+        rowsHtml += '<tr style="background:' + bg + '"><td style="border:1px solid #e2e8f0;padding:6px 10px;font-size:11px;font-weight:700;color:#374151">' + (idx+1) + '. ' + item.text + '</td>' + cells + '</tr>';
+      });
+      sectionsHtml += '<div style="margin-bottom:20px;page-break-inside:avoid"><div style="background:' + sec.color + ';color:#fff;font-size:13px;font-weight:900;padding:8px 14px;border-radius:4px 4px 0 0">' + sec.icon + ' ' + sec.title + '</div><table style="width:100%;border-collapse:collapse"><thead><tr><th style="text-align:right;background:#f0f4f8;border:1px solid #e2e8f0;padding:7px 10px;font-size:11px">العبارة</th>' + RATING_OPTS.map(r => '<th style="background:' + r.bg + ';color:' + r.color + ';border:1px solid #e2e8f0;padding:7px 6px;font-size:10px;font-weight:900;width:62px">' + r.label + '</th>').join("") + '</tr></thead><tbody>' + rowsHtml + '</tbody></table></div>';
+    });
+
+    const html = '<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8"><title>المراجعة النصف سنوية</title>'
+      + '<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap" rel="stylesheet">'
+      + '<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:\'Cairo\',sans-serif;direction:rtl;color:#1e293b;padding:20px;font-size:12px}'
+      + '.hdr{text-align:center;border-bottom:3px solid #1e3a5f;padding-bottom:16px;margin-bottom:18px}'
+      + '.school{font-size:20px;font-weight:900;color:#1e3a5f}.sub{font-size:11px;color:#64748b;margin:3px 0}'
+      + '.form-title{font-size:16px;font-weight:900;color:#0f766e;margin:10px 0 4px}'
+      + '.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px;background:#f8fafc;padding:12px;border-radius:6px;border:1px solid #e2e8f0}'
+      + '.info-item{font-size:11.5px}.info-label{font-weight:700;color:#475569}.info-val{color:#1e293b;font-weight:600}'
+      + '.score-box{text-align:center;margin:16px 0;padding:12px;border-radius:8px;background:#f0fdf4;border:2px solid ' + scoreColor + '}'
+      + '.score-num{font-size:32px;font-weight:900;color:' + scoreColor + '}.score-lbl{font-size:14px;font-weight:700;color:' + scoreColor + '}'
+      + '.notes-box{background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:12px;margin-bottom:12px}'
+      + '.notes-title{font-weight:900;font-size:12px;color:#1e293b;margin-bottom:6px}'
+      + '.sig-row{display:flex;justify-content:space-around;margin-top:30px}'
+      + '.sig-item{text-align:center;font-size:11px;color:#475569}.sig-line{border-top:1.5px solid #374151;width:160px;padding-top:6px;margin-top:28px}'
+      + '@media print{@page{size:A4;margin:1.5cm}body{padding:0}}</style></head><body>'
+      + '<div class="hdr"><div class="school">مدرسة عبيدة بن الحارث المتوسطة</div>'
+      + '<div class="sub">إدارة تعليم جدة — وزارة التعليم</div>'
+      + '<div class="form-title">📋 نموذج المراجعة النصف سنوية — دورة الأداء الوظيفي 1447هـ</div></div>'
+      + '<div class="info-grid"><div class="info-item"><span class="info-label">اسم المعلم: </span><span class="info-val">' + (teacher?.name || "") + '</span></div>'
+      + '<div class="info-item"><span class="info-label">رقم الهوية: </span><span class="info-val">' + (teacher?.id || "") + '</span></div>'
+      + '<div class="info-item"><span class="info-label">تاريخ المراجعة: </span><span class="info-val">' + (data.reviewDate || "__________") + ' هـ</span></div>'
+      + '<div class="info-item"><span class="info-label">الفصل الدراسي: </span><span class="info-val">الثاني — 1446/1447هـ</span></div></div>'
+      + '<div class="score-box"><div class="score-num">' + scoreVal + '%</div><div class="score-lbl">' + scoreLabel + '</div></div>'
+      + sectionsHtml
+      + (data.strengths ? '<div class="notes-box"><div class="notes-title">✅ نقاط القوة</div><div>' + data.strengths + '</div></div>' : '')
+      + (data.improvements ? '<div class="notes-box"><div class="notes-title">🔧 جوانب التطوير المقترحة</div><div>' + data.improvements + '</div></div>' : '')
+      + (data.adminNotes ? '<div class="notes-box"><div class="notes-title">📝 ملاحظات القائد المدرسي</div><div>' + data.adminNotes + '</div></div>' : '')
+      + '<div class="sig-row">'
+      + '<div class="sig-item"><div class="sig-line">القائد المدرسي<br>فازع عبدالله حسن القرني</div></div>'
+      + '<div class="sig-item"><div class="sig-line">المعلم / ' + (teacher?.name || "") + '</div></div>'
+      + '</div>'
+      + '<script>window.onload=function(){window.print()}<\/script></body></html>';
+    printWindow(html);
+  };
+
+  // ────────────────────────────────────────────────────────
+  // ── TEACHER VIEW
+  if (viewMode === "teacher" && !loggedTeacher) {
+    return (
+      <div dir="rtl" className="min-h-screen flex items-center justify-center p-4" style={{ background: "linear-gradient(135deg,#0c1e35,#1e3a5f)" }}>
+        <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-sm">
+          <div className="text-center mb-6">
+            <div className="text-5xl mb-3">🔐</div>
+            <div className="font-black text-xl text-gray-800">بوابة المعلم</div>
+            <div className="text-sm text-gray-500 mt-1">المراجعة النصف سنوية 1447هـ</div>
+            <div className="text-xs text-gray-400 mt-0.5">مدرسة عبيدة بن الحارث المتوسطة</div>
+          </div>
+          <label className="text-sm font-bold text-gray-600 block mb-2">رقم الهوية الوطنية</label>
+          <input value={loginId} onChange={e=>setLoginId(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleTeacherLogin()}
+            placeholder="أدخل رقم هويتك"
+            className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-center font-bold text-lg outline-none focus:border-blue-500 mb-3"
+            dir="ltr" inputMode="numeric" />
+          {loginErr && <div className="text-red-500 text-xs font-bold mb-3 text-center bg-red-50 rounded-lg px-3 py-2">{loginErr}</div>}
+          <button onClick={handleTeacherLogin} disabled={loading}
+            className="w-full py-3 rounded-xl font-black text-white text-base"
+            style={{ background: "linear-gradient(135deg,#1e3a5f,#1d4ed8)" }}>
+            {loading ? "جاري التحقق..." : "دخول →"}
+          </button>
+          <button onClick={()=>setViewMode("admin")} className="w-full mt-2 py-2 text-sm text-gray-400 hover:text-gray-600">← دخول المسؤول</button>
+        </div>
+      </div>
+    );
+  }
+
+  if (viewMode === "teacher" && loggedTeacher) {
+    const score = calcScore(teacherData?.ratings || {});
+    const scoreLabel = score >= 90 ? "ممتاز" : score >= 75 ? "جيد جداً" : score >= 60 ? "جيد" : "مقبول";
+    const scoreColor = score >= 90 ? "#15803d" : score >= 75 ? "#1d4ed8" : score >= 60 ? "#b45309" : "#dc2626";
+    return (
+      <div dir="rtl">
+        <div className="rounded-b-2xl p-5 mb-5 text-white shadow-xl" style={{ background: "linear-gradient(135deg,#1e3a5f,#1d4ed8)" }}>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="text-xs opacity-70 mb-1">🏫 مدرسة عبيدة بن الحارث المتوسطة</div>
+              <div className="font-black text-xl">📋 نتيجة مراجعتك النصف سنوية</div>
+              <div className="text-sm opacity-80 mt-1">{loggedTeacher.name}</div>
+            </div>
+            <button onClick={()=>{setLoggedTeacher(null);setLoginId("");setTeacherData(null);}} className="bg-white/20 text-white text-xs font-bold px-3 py-1.5 rounded-lg">تسجيل خروج</button>
+          </div>
+        </div>
+
+        {!teacherData ? (
+          <div className="text-center py-20 text-gray-400">
+            <div className="text-5xl mb-3">⏳</div>
+            <div className="font-bold">لم يتم إدخال نتيجة مراجعتك بعد</div>
+            <div className="text-sm mt-1">تواصل مع القائد المدرسي للمزيد</div>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {/* بطاقة الدرجة */}
+            <div className="bg-white rounded-2xl shadow-sm p-5">
+              <div className="text-center mb-4">
+                <div className="text-6xl font-black mb-1" style={{ color: scoreColor }}>{score}%</div>
+                <div className="text-xl font-black" style={{ color: scoreColor }}>{scoreLabel}</div>
+                <div className="text-xs text-gray-400 mt-1">الفصل الثاني — 1446/1447هـ • {teacherData.reviewDate} هـ</div>
+              </div>
+              {/* شريط التقدم */}
+              <div className="h-3 rounded-full bg-gray-100 overflow-hidden">
+                <div className="h-full rounded-full transition-all" style={{ width: score+"%", background: "linear-gradient(90deg,"+scoreColor+"88,"+scoreColor+")" }}></div>
+              </div>
+            </div>
+
+            {/* التفاصيل */}
+            {MIDYEAR_SECTIONS.map(sec => {
+              const secRatings = sec.items.map(item => teacherData.ratings?.[item.id] || 0).filter(v=>v>0);
+              const secAvg = secRatings.length ? Math.round(secRatings.reduce((a,b)=>a+b,0)/secRatings.length*25) : 0;
+              return (
+                <div key={sec.id} className="bg-white rounded-2xl shadow-sm overflow-hidden">
+                  <div className="flex items-center justify-between px-4 py-3" style={{ background: sec.color }}>
+                    <span className="text-white font-black text-sm">{sec.icon} {sec.title}</span>
+                    <span className="text-white font-black text-sm">{secAvg}%</span>
+                  </div>
+                  <div className="divide-y divide-gray-50">
+                    {sec.items.map((item, idx) => {
+                      const rv = teacherData.ratings?.[item.id] || 0;
+                      const rl = RATING_OPTS.find(r=>r.val===rv);
+                      return (
+                        <div key={item.id} className="flex items-center justify-between px-4 py-2.5">
+                          <span className="text-xs font-semibold text-gray-700 flex-1 ml-3">{idx+1}. {item.text}</span>
+                          {rl ? (
+                            <span className="text-xs font-black px-2.5 py-1 rounded-full flex-shrink-0" style={{ background: rl.bg, color: rl.color }}>{rl.label}</span>
+                          ) : (
+                            <span className="text-xs text-gray-300">—</span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* نقاط القوة والتطوير */}
+            {(teacherData.strengths || teacherData.improvements || teacherData.adminNotes) && (
+              <div className="bg-white rounded-2xl shadow-sm p-4 space-y-3">
+                {teacherData.strengths && <div><div className="font-black text-sm text-green-700 mb-1">✅ نقاط القوة</div><p className="text-sm text-gray-600">{teacherData.strengths}</p></div>}
+                {teacherData.improvements && <div><div className="font-black text-sm text-orange-700 mb-1">🔧 جوانب التطوير</div><p className="text-sm text-gray-600">{teacherData.improvements}</p></div>}
+                {teacherData.adminNotes && <div><div className="font-black text-sm text-blue-700 mb-1">📝 ملاحظات القائد</div><p className="text-sm text-gray-600">{teacherData.adminNotes}</p></div>}
+              </div>
+            )}
+
+            {/* رأي المعلم */}
+            <div className="bg-white rounded-2xl shadow-sm p-4">
+              <div className="font-black text-sm text-gray-800 mb-2">💬 رأيك وملاحظاتك على نتيجة المراجعة</div>
+              <textarea value={teacherOpinion} onChange={e=>setTeacherOpinion(e.target.value)} rows={4}
+                placeholder="اكتب ملاحظاتك أو تعليقك على نتيجة المراجعة..."
+                className="w-full border-2 border-gray-200 rounded-xl p-3 text-sm outline-none focus:border-blue-400 resize-none" />
+              <button onClick={saveTeacherOpinion} disabled={saving}
+                className="mt-2 w-full py-2.5 rounded-xl font-bold text-sm text-white"
+                style={{ background: saving ? "#94a3b8" : "#1d4ed8" }}>
+                {saving ? "جاري الحفظ..." : saved ? "✅ تم الحفظ" : "💾 حفظ رأيي"}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ────────────────────────────────────────────────────────
+  // ── ADMIN VIEW
+  const totalItems = MIDYEAR_SECTIONS.reduce((a,s)=>a+s.items.length, 0);
+  const ratedCount = Object.values(ratings).filter(v=>v>0).length;
+  const score = calcScore(ratings);
+  const scoreLabel = score >= 90 ? "ممتاز" : score >= 75 ? "جيد جداً" : score >= 60 ? "جيد" : "مقبول";
+  const scoreColor = score >= 90 ? "#15803d" : score >= 75 ? "#1d4ed8" : score >= 60 ? "#b45309" : "#dc2626";
+
+  return (
+    <div dir="rtl">
+      {/* رأس الصفحة */}
+      <div className="rounded-b-2xl p-5 mb-5 text-white shadow-xl" style={{ background: "linear-gradient(135deg,#1e3a5f,#0a5c6e)" }}>
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div>
+            <div className="text-xs opacity-70 mb-1">🏫 مدرسة عبيدة بن الحارث المتوسطة</div>
+            <div className="font-black text-xl">📋 المراجعة النصف سنوية</div>
+            <div className="text-sm opacity-80 mt-0.5">دورة الأداء الوظيفي — الفصل الثاني 1447هـ</div>
+          </div>
+          <button onClick={()=>setViewMode("teacher")} className="bg-white/20 text-white text-xs font-bold px-3 py-2 rounded-xl border border-white/30">
+            🔐 بوابة المعلم
+          </button>
+        </div>
+      </div>
+
+      {/* اختيار المعلم */}
+      <div className="bg-white rounded-2xl shadow-sm p-4 mb-4">
+        <label className="text-xs font-black text-gray-600 block mb-2">👤 اختر المعلم</label>
+        <select value={selTeacherId} onChange={e=>setSelTeacherId(e.target.value)}
+          className="w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-blue-500 mb-3">
+          <option value="">— اختر معلماً —</option>
+          {teacherList.map(t => (
+            <option key={t.id} value={t.id}>{t.name} — {t.id}</option>
+          ))}
+        </select>
+        {selTeacherId && (
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-bold text-gray-500 block mb-1">📅 تاريخ المراجعة (هجري)</label>
+              <input value={reviewDate} onChange={e=>setReviewDate(e.target.value)} placeholder="مثال: 15/08/1447"
+                className="w-full border-2 border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-blue-500" />
+            </div>
+            <div className="flex items-end">
+              {ratedCount > 0 && (
+                <div className="rounded-xl px-3 py-2 text-center w-full" style={{ background: scoreColor+"18" }}>
+                  <div className="font-black text-xl" style={{ color: scoreColor }}>{score}%</div>
+                  <div className="text-xs font-bold" style={{ color: scoreColor }}>{scoreLabel}</div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+        {selTeacherId && (
+          <div className="mt-3 h-1.5 rounded-full bg-gray-100 overflow-hidden">
+            <div className="h-full rounded-full bg-blue-500 transition-all" style={{ width: Math.round(ratedCount/totalItems*100)+"%" }}></div>
+          </div>
+        )}
+        {selTeacherId && <div className="text-xs text-gray-400 mt-1">{ratedCount} / {totalItems} عبارة تم تقييمها</div>}
+      </div>
+
+      {/* المحاور */}
+      {selTeacherId && MIDYEAR_SECTIONS.map(sec => (
+        <div key={sec.id} className="bg-white rounded-2xl shadow-sm mb-4 overflow-hidden">
+          <div className="flex items-center gap-2 px-4 py-3" style={{ background: sec.color }}>
+            <span className="text-white font-black text-sm">{sec.icon} {sec.title}</span>
+            <span className="mr-auto text-white/70 text-xs">
+              {sec.items.filter(item=>ratings[item.id]>0).length}/{sec.items.length}
+            </span>
+          </div>
+          <div className="divide-y divide-gray-50">
+            {sec.items.map((item, idx) => {
+              const rv = ratings[item.id] || 0;
+              return (
+                <div key={item.id} className="p-3">
+                  <div className="flex items-start gap-2 mb-2">
+                    <div className="w-5 h-5 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-black text-white mt-0.5" style={{ background: sec.color }}>{idx+1}</div>
+                    <p className="text-sm font-semibold text-gray-700 leading-relaxed">{item.text}</p>
+                  </div>
+                  <div className="grid grid-cols-4 gap-1.5 mr-7">
+                    {RATING_OPTS.map(opt => (
+                      <button key={opt.val} onClick={()=>setRatings(p=>({...p,[item.id]:opt.val}))}
+                        className="py-1.5 rounded-lg text-xs font-black border-2 transition-all"
+                        style={{ background: rv===opt.val ? opt.color : opt.bg, color: rv===opt.val ? "#fff" : opt.color, borderColor: rv===opt.val ? opt.color : "transparent" }}>
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+
+      {/* ملاحظات */}
+      {selTeacherId && (
+        <div className="bg-white rounded-2xl shadow-sm p-4 mb-4 space-y-3">
+          <div>
+            <label className="text-xs font-black text-green-700 block mb-1">✅ نقاط القوة</label>
+            <textarea value={strengths} onChange={e=>setStrengths(e.target.value)} rows={2} placeholder="اذكر نقاط القوة البارزة..."
+              className="w-full border-2 border-gray-200 rounded-xl p-3 text-sm outline-none focus:border-green-400 resize-none" />
+          </div>
+          <div>
+            <label className="text-xs font-black text-orange-700 block mb-1">🔧 جوانب التطوير المقترحة</label>
+            <textarea value={improvements} onChange={e=>setImprovements(e.target.value)} rows={2} placeholder="اذكر الجوانب التي تحتاج إلى تحسين..."
+              className="w-full border-2 border-gray-200 rounded-xl p-3 text-sm outline-none focus:border-orange-400 resize-none" />
+          </div>
+          <div>
+            <label className="text-xs font-black text-blue-700 block mb-1">📝 ملاحظات القائد المدرسي</label>
+            <textarea value={adminNotes} onChange={e=>setAdminNotes(e.target.value)} rows={2} placeholder="ملاحظات إضافية..."
+              className="w-full border-2 border-gray-200 rounded-xl p-3 text-sm outline-none focus:border-blue-400 resize-none" />
+          </div>
+        </div>
+      )}
+
+      {/* أزرار الحفظ والطباعة */}
+      {selTeacherId && (
+        <div className="flex gap-3 pb-8">
+          <button onClick={saveReview} disabled={saving}
+            className="flex-1 py-3 rounded-xl font-black text-white text-sm"
+            style={{ background: saving?"#94a3b8":saved?"#15803d":"#1e3a5f" }}>
+            {saving?"جاري الحفظ...":saved?"✅ تم الحفظ":"💾 حفظ المراجعة"}
+          </button>
+          <button onClick={()=>handlePrint({ratings,adminNotes,strengths,improvements,reviewDate}, selTeacher)}
+            className="flex-1 py-3 rounded-xl font-black text-white text-sm"
+            style={{ background: "#7c3aed" }}>
+            🖨️ طباعة النموذج
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function LessonRecommendPage({ classList }) {
   const [selClass,   setSelClass]   = useState("");
@@ -26753,558 +27139,6 @@ ${r.stat}${r.lateM>0?" — تأخر "+r.lateM+"د":""}`}
 
 
 
-
-// ===== صفحة قياس الأثر =====
-function QiyasAlatharPage() {
-  const htmlContent = `<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>استبانة قياس الأثر — مدرسة عبيدة بن الحارث المتوسطة</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&family=Amiri:wght@400;700&display=swap" rel="stylesheet">
-<style>
-/* ───────────────── متغيرات ───────────────── */
-:root {
-  --navy:   #0c1e35;
-  --teal:   #0e6b7a;
-  --gold:   #b8860b;
-  --gold2:  #d4a520;
-  --cream:  #fdf8ef;
-  --border: #c9a84c;
-  --ink:    #1a1a2e;
-  --muted:  #64748b;
-  --green:  #15803d;
-  --lime:   #4ade80;
-  --amber:  #b45309;
-  --orange: #ea580c;
-  --red:    #dc2626;
-}
-
-* { margin: 0; padding: 0; box-sizing: border-box; }
-
-body {
-  font-family: 'Cairo', sans-serif;
-  background: #ddd8c8;
-  background-image:
-    radial-gradient(ellipse 80% 50% at 20% 0%, rgba(14,107,122,.12) 0%, transparent 60%),
-    radial-gradient(ellipse 60% 80% at 80% 100%, rgba(184,134,11,.10) 0%, transparent 60%);
-  min-height: 100vh;
-  padding: 28px 12px 48px;
-}
-
-/* ── الغلاف ── */
-.card {
-  max-width: 800px;
-  margin: 0 auto;
-  background: var(--cream);
-  position: relative;
-  box-shadow:
-    0 0 0 1px var(--gold),
-    0 0 0 4px var(--cream),
-    0 0 0 5px var(--gold),
-    10px 10px 0 0 var(--navy),
-    0 30px 80px rgba(0,0,0,.25);
-}
-
-/* زخارف أركان */
-.card::before { content:''; position:absolute; top:10px; right:10px; width:55px; height:55px; border-top:2px solid var(--gold); border-right:2px solid var(--gold); pointer-events:none; z-index:2; }
-.card::after  { content:''; position:absolute; bottom:10px; left:10px; width:55px; height:55px; border-bottom:2px solid var(--gold); border-left:2px solid var(--gold); pointer-events:none; z-index:2; }
-.corner-bl { position:absolute; bottom:10px; right:10px; width:55px; height:55px; border-bottom:2px solid var(--gold); border-right:2px solid var(--gold); pointer-events:none; z-index:2; }
-.corner-tl { position:absolute; top:10px; left:10px; width:55px; height:55px; border-top:2px solid var(--gold); border-left:2px solid var(--gold); pointer-events:none; z-index:2; }
-
-/* ── رأس الاستبانة ── */
-.hdr {
-  background: linear-gradient(150deg, var(--navy) 0%, #143250 55%, var(--teal) 100%);
-  padding: 34px 44px 28px;
-  text-align: center;
-  position: relative;
-  overflow: hidden;
-}
-.hdr::before {
-  content: '';
-  position: absolute; inset: 0;
-  background: repeating-linear-gradient(
-    -45deg, transparent, transparent 18px,
-    rgba(184,134,11,.04) 18px, rgba(184,134,11,.04) 36px
-  );
-  pointer-events: none;
-}
-.hdr-ornament { color: var(--gold2); font-size: 11px; letter-spacing: 6px; margin-bottom: 12px; opacity: .8; }
-.school-name  { font-family: 'Amiri', serif; font-size: 26px; font-weight: 700; color: #fff; margin-bottom: 4px; text-shadow: 0 2px 10px rgba(0,0,0,.3); }
-.school-sub   { font-size: 11px; color: rgba(255,255,255,.55); margin-bottom: 16px; }
-
-.sep { display: flex; align-items: center; gap: 10px; margin: 14px 0; }
-.sep span { flex: 1; height: 1px; background: linear-gradient(to var(--end, left), transparent, var(--gold2)); }
-.sep span:last-child { --end: right; }
-.sep i { color: var(--gold2); font-size: 14px; font-style: normal; }
-
-.survey-title {
-  font-size: 19px; font-weight: 900; color: var(--gold2);
-  margin-bottom: 10px; line-height: 1.5;
-}
-.title-blank {
-  display: inline-block;
-  background: transparent;
-  border: none;
-  border-bottom: 1.5px dashed rgba(212,165,32,.65);
-  color: var(--gold2);
-  font-family: 'Cairo', sans-serif;
-  font-size: 17px; font-weight: 900;
-  width: 220px; text-align: center;
-  outline: none;
-}
-.title-blank::placeholder { color: rgba(212,165,32,.45); font-weight: 400; }
-
-.quote {
-  font-family: 'Amiri', serif;
-  font-size: 13.5px; color: rgba(255,255,255,.72);
-  line-height: 2.1; font-style: italic;
-  max-width: 520px; margin: 0 auto;
-}
-
-/* ── شريط الفئة والتاريخ ── */
-.meta-bar {
-  background: linear-gradient(135deg, #fdf3d8, #fff9ee);
-  border-top: 2px solid var(--border);
-  border-bottom: 2px solid var(--border);
-  padding: 18px 44px;
-  display: flex; flex-direction: column; gap: 14px;
-}
-.meta-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.meta-lbl { font-size: 12.5px; font-weight: 700; color: var(--navy); min-width: 130px; flex-shrink: 0; }
-
-/* checkboxes */
-.checks { display: flex; gap: 22px; flex-wrap: wrap; }
-.chk-item { display: flex; align-items: center; gap: 7px; cursor: pointer; user-select: none; font-size: 13px; font-weight: 700; color: var(--ink); }
-.chk-box {
-  width: 18px; height: 18px;
-  border: 2px solid var(--border); border-radius: 3px;
-  background: #fff; display: flex; align-items: center; justify-content: center;
-  transition: all .18s; flex-shrink: 0;
-}
-.chk-item input { display: none; }
-.chk-item input:checked ~ .chk-box { background: var(--teal); border-color: var(--teal); }
-.chk-item input:checked ~ .chk-box::after { content: '✓'; color: #fff; font-size: 11px; font-weight: 900; }
-
-/* date */
-.date-group { display: flex; align-items: center; gap: 6px; }
-.date-input {
-  width: 42px; height: 32px; border: 1.5px solid var(--border);
-  border-radius: 4px; background: #fff;
-  font-family: 'Cairo', sans-serif; font-size: 13px; font-weight: 700;
-  text-align: center; color: var(--ink); outline: none;
-  transition: border-color .15s;
-}
-.date-input:focus { border-color: var(--teal); }
-.date-slash { color: var(--gold); font-weight: 700; font-size: 14px; }
-.hijri-lbl  { font-size: 12px; font-weight: 700; color: var(--muted); margin-right: 3px; }
-
-/* ── المشارك ── */
-.participant {
-  padding: 16px 44px 14px;
-  display: grid; grid-template-columns: 1fr 1fr; gap: 14px;
-  border-bottom: 1px solid rgba(201,168,76,.22);
-}
-.pfield label { display: block; font-size: 11px; font-weight: 700; color: var(--muted); margin-bottom: 5px; }
-.pfield input {
-  width: 100%; border: none;
-  border-bottom: 1.5px solid var(--border);
-  background: transparent; font-family: 'Cairo', sans-serif;
-  font-size: 13px; color: var(--ink); padding: 4px 2px; outline: none;
-  transition: border-color .15s;
-}
-.pfield input:focus { border-color: var(--teal); }
-.secret-badge {
-  grid-column: 1 / -1;
-  display: flex; align-items: center; gap: 8px;
-  background: rgba(14,107,122,.07);
-  border: 1px solid rgba(14,107,122,.2);
-  border-radius: 7px; padding: 8px 13px;
-  font-size: 11.5px; color: var(--teal); font-weight: 700;
-}
-
-/* ── منطقة الأسئلة ── */
-.q-area { padding: 22px 44px 10px; }
-
-.sec-title {
-  font-size: 12.5px; font-weight: 900; color: var(--navy);
-  margin-bottom: 16px;
-  display: flex; align-items: center; gap: 8px;
-}
-.sec-title::before, .sec-title::after {
-  content: ''; flex: 1; height: 1px;
-  background: linear-gradient(to left, var(--border), transparent);
-}
-.sec-title::after { background: linear-gradient(to right, var(--border), transparent); }
-
-/* رأس مقياس ليكرت */
-.likert-hdr {
-  display: grid;
-  grid-template-columns: 1fr 78px 78px 78px 78px 78px;
-  gap: 3px; margin-bottom: 6px;
-}
-.lhdr-cell {
-  text-align: center; font-size: 10.5px; font-weight: 900;
-  color: #fff; border-radius: 7px; padding: 7px 3px; line-height: 1.35;
-}
-
-/* سطر السؤال */
-.q-row {
-  display: grid;
-  grid-template-columns: 1fr 78px 78px 78px 78px 78px;
-  gap: 3px; align-items: center;
-  border-radius: 9px; padding: 10px 5px; margin-bottom: 5px;
-  transition: background .15s;
-}
-.q-row:nth-child(odd) { background: rgba(12,30,53,.03); }
-.q-row:hover         { background: rgba(14,107,122,.06); }
-
-.q-label { display: flex; align-items: flex-start; gap: 8px; }
-.q-num {
-  background: var(--navy); color: #fff;
-  border-radius: 50%; width: 22px; height: 22px;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 11px; font-weight: 900; flex-shrink: 0; margin-top: 2px;
-}
-.q-text {
-  font-size: 13px; font-weight: 600; color: var(--ink);
-  line-height: 1.65; cursor: text; min-width: 0;
-  outline: none;
-}
-.q-text:empty::before { content: attr(data-ph); color: #bbb; }
-
-.l-cell { display: flex; align-items: center; justify-content: center; }
-.l-radio {
-  width: 20px; height: 20px; border-radius: 50%;
-  border: 2px solid #c0c0c0;
-  background: #fff; cursor: pointer;
-  appearance: none; -webkit-appearance: none;
-  transition: all .15s; flex-shrink: 0;
-}
-.l-radio:hover { transform: scale(1.15); }
-.l-radio:checked { border-width: 6px; }
-
-/* ── أزرار ── */
-.controls {
-  padding: 14px 44px 26px;
-  display: flex; gap: 10px; flex-wrap: wrap;
-}
-.btn {
-  font-family: 'Cairo', sans-serif; font-weight: 700;
-  font-size: 13px; border: none; border-radius: 9px;
-  padding: 10px 22px; cursor: pointer;
-  display: flex; align-items: center; gap: 7px;
-  transition: all .15s;
-}
-.btn-add   { background: var(--navy); color: #fff; }
-.btn-add:hover  { background: #1a3555; transform: translateY(-1px); }
-.btn-print { background: linear-gradient(135deg, var(--gold), var(--gold2)); color: var(--navy); font-weight: 900; }
-.btn-print:hover { box-shadow: 0 5px 14px rgba(184,134,11,.4); transform: translateY(-1px); }
-.btn-del   { background: #fee2e2; color: #dc2626; font-size: 12px; padding: 8px 14px; }
-.btn-del:hover { background: #fca5a5; }
-
-/* ── ذيل الصفحة ── */
-.footer {
-  border-top: 2px solid var(--border);
-  background: linear-gradient(135deg, #fdf3d8, #fff9ee);
-  padding: 13px 44px;
-  text-align: center; font-size: 10.5px; color: var(--muted);
-}
-
-/* ── نافذة الإضافة ── */
-.modal-bg {
-  display: none; position: fixed; inset: 0;
-  background: rgba(0,0,0,.55); z-index: 200;
-  align-items: center; justify-content: center; padding: 16px;
-}
-.modal-bg.open { display: flex; }
-.modal-box {
-  background: #fff; border-radius: 16px; padding: 28px;
-  width: 100%; max-width: 500px;
-  box-shadow: 0 28px 70px rgba(0,0,0,.28);
-  direction: rtl;
-}
-.modal-title { font-size: 16px; font-weight: 900; color: var(--navy); margin-bottom: 14px; }
-.modal-ta {
-  width: 100%; border: 2px solid #e2e8f0; border-radius: 10px;
-  padding: 10px 14px; font-family: 'Cairo', sans-serif;
-  font-size: 14px; outline: none; resize: vertical;
-  min-height: 72px; color: var(--ink);
-  transition: border-color .15s;
-}
-.modal-ta:focus { border-color: var(--teal); }
-.modal-btns { display: flex; gap: 10px; margin-top: 14px; }
-.mbtn-ok  { flex: 1; background: var(--teal); color: #fff; font-family: 'Cairo', sans-serif; font-size: 13px; font-weight: 700; border: none; border-radius: 8px; padding: 11px; cursor: pointer; transition: background .15s; }
-.mbtn-ok:hover { background: #0c5d6a; }
-.mbtn-cancel { padding: 11px 18px; border: 1.5px solid #e2e8f0; border-radius: 8px; background: #fff; color: var(--muted); font-family: 'Cairo', sans-serif; font-size: 13px; font-weight: 700; cursor: pointer; }
-
-/* ── طباعة ── */
-@media print {
-  body { background: #fff; padding: 0; }
-  .card {
-    box-shadow: none;
-    outline: 3px double var(--gold);
-    max-width: 100%; margin: 0;
-  }
-  .controls, .modal-bg, .btn-del { display: none !important; }
-  .q-row { break-inside: avoid; }
-  .hdr, .meta-bar, .likert-hdr, .lhdr-cell {
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-  .l-radio { border: 1.5px solid #888; background: #fff !important; }
-}
-
-/* ── جوال ── */
-@media (max-width: 620px) {
-  .hdr, .meta-bar, .q-area, .controls, .participant, .footer { padding-right: 18px; padding-left: 18px; }
-  .hdr { padding-top: 24px; }
-  .likert-hdr, .q-row { grid-template-columns: 1fr 52px 52px 52px 52px 52px; gap: 2px; }
-  .lhdr-cell { font-size: 8.5px; padding: 5px 1px; }
-  .l-radio { width: 17px; height: 17px; }
-  .participant { grid-template-columns: 1fr; }
-  .card::before, .card::after, .corner-bl, .corner-tl { width: 35px; height: 35px; }
-  .school-name { font-size: 20px; }
-}
-</style>
-</head>
-<body>
-
-<div class="card">
-  <!-- زخارف أركان إضافية -->
-  <div class="corner-bl"></div>
-  <div class="corner-tl"></div>
-
-  <!-- ── رأس ── -->
-  <div class="hdr">
-    <div class="hdr-ornament">❖ &nbsp; ❖ &nbsp; ❖</div>
-    <div class="school-name">مدرسة عبيدة بن الحارث المتوسطة</div>
-    <div class="school-sub">إدارة تعليم جدة &nbsp;—&nbsp; وزارة التعليم</div>
-
-    <div class="sep">
-      <span></span><i>✦</i><span></span>
-    </div>
-
-    <div class="survey-title">
-      استبانة قياس الأثر:&nbsp;
-      <input class="title-blank" id="survTitle" type="text" placeholder="أضف العنوان هنا..." />
-    </div>
-
-    <div class="quote">
-      « آراؤكم الصادقة تُشكّل ركيزةً حقيقية لتجويد بيئة التعلم ورفع مستوى الأداء المدرسي —<br>
-      فإن أثركم في تحسين التعليم يبدأ بكلمةٍ صادقة وموقفٍ مسؤول »
-    </div>
-  </div>
-
-  <!-- ── الفئة والتاريخ ── -->
-  <div class="meta-bar">
-    <!-- الفئة المستهدفة -->
-    <div class="meta-row">
-      <span class="meta-lbl">الفئة المستهدفة:</span>
-      <div class="checks">
-        <label class="chk-item">
-          <input type="checkbox" id="tMu"><div class="chk-box"></div>معلمون
-        </label>
-        <label class="chk-item">
-          <input type="checkbox" id="tSt"><div class="chk-box"></div>طلاب
-        </label>
-        <label class="chk-item">
-          <input type="checkbox" id="tPa"><div class="chk-box"></div>أولياء أمور
-        </label>
-      </div>
-    </div>
-    <!-- التاريخ الهجري -->
-    <div class="meta-row">
-      <span class="meta-lbl">التاريخ الهجري:</span>
-      <div class="date-group">
-        <input class="date-input" id="dd" type="text" inputmode="numeric" maxlength="2" placeholder="__">
-        <span class="date-slash">/</span>
-        <input class="date-input" id="dm" type="text" inputmode="numeric" maxlength="2" placeholder="__">
-        <span class="date-slash">/</span>
-        <input class="date-input" id="dy" type="text" inputmode="numeric" maxlength="4" placeholder="1447" style="width:56px">
-        <span class="hijri-lbl">هـ</span>
-      </div>
-    </div>
-  </div>
-
-  <!-- ── المشارك ── -->
-  <div class="participant">
-    <div class="pfield">
-      <label>الاسم &nbsp;<span style="font-weight:400;color:#bbb">(اختياري)</span></label>
-      <input type="text" placeholder="اكتب اسمك...">
-    </div>
-    <div class="pfield">
-      <label>رقم الجوال &nbsp;<span style="font-weight:400;color:#bbb">(اختياري)</span></label>
-      <input type="text" placeholder="05xxxxxxxx" dir="ltr" style="text-align:right">
-    </div>
-    <div class="secret-badge">
-      🔒 &nbsp; هذه الاستبانة سرية تامة ولا يطلع على بياناتها إلا المعنيون في إدارة المدرسة
-    </div>
-  </div>
-
-  <!-- ── الأسئلة ── -->
-  <div class="q-area">
-    <div class="sec-title">العبارات والأسئلة</div>
-
-    <!-- رأس ليكرت -->
-    <div class="likert-hdr">
-      <div></div>
-      <div class="lhdr-cell" style="background:#15803d">أوافق<br>بشدة</div>
-      <div class="lhdr-cell" style="background:#22c55e;color:#14532d">أوافق</div>
-      <div class="lhdr-cell" style="background:#b45309">محايد</div>
-      <div class="lhdr-cell" style="background:#ea580c">غير<br>موافق</div>
-      <div class="lhdr-cell" style="background:#dc2626">غير موافق<br>بشدة</div>
-    </div>
-
-    <!-- الأسئلة -->
-    <div id="qContainer">
-      <!-- سؤال 1 -->
-      <div class="q-row" data-q="1">
-        <div class="q-label">
-          <div class="q-num">1</div>
-          <div class="q-text" contenteditable="true" data-ph="اكتب نص العبارة هنا..." spellcheck="false">اكتب نص العبارة هنا...</div>
-        </div>
-        <div class="l-cell"><input type="radio" name="q1" class="l-radio" style="--c:#15803d" data-c="0"></div>
-        <div class="l-cell"><input type="radio" name="q1" class="l-radio" data-c="1"></div>
-        <div class="l-cell"><input type="radio" name="q1" class="l-radio" data-c="2"></div>
-        <div class="l-cell"><input type="radio" name="q1" class="l-radio" data-c="3"></div>
-        <div class="l-cell"><input type="radio" name="q1" class="l-radio" data-c="4"></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ── أزرار ── -->
-  <div class="controls">
-    <button class="btn btn-add" onclick="openModal()">➕ إضافة عبارة</button>
-    <button class="btn btn-print" onclick="window.print()">🖨️ طباعة الاستبانة</button>
-    <button class="btn btn-del" onclick="deleteLast()">🗑️ حذف آخر عبارة</button>
-  </div>
-
-  <!-- ذيل -->
-  <div class="footer">
-    مدرسة عبيدة بن الحارث المتوسطة &nbsp;|&nbsp; إدارة تعليم جدة &nbsp;|&nbsp; وزارة التعليم
-    &nbsp;|&nbsp; 🔒 جميع البيانات سرية ومحمية
-  </div>
-</div>
-
-<!-- ── نافذة الإضافة ── -->
-<div class="modal-bg" id="modal">
-  <div class="modal-box">
-    <div class="modal-title">📝 إضافة عبارة جديدة</div>
-    <textarea class="modal-ta" id="newQTxt" placeholder="اكتب نص العبارة أو السؤال هنا..." rows="3"></textarea>
-    <div class="modal-btns">
-      <button class="mbtn-ok" onclick="addQ()">✅ إضافة</button>
-      <button class="mbtn-cancel" onclick="closeModal()">إلغاء</button>
-    </div>
-  </div>
-</div>
-
-<script>
-  const COLORS = ["#15803d","#22c55e","#b45309","#ea580c","#dc2626"];
-  let qCount = 1;
-
-  /* ── ألوان الراديو عند التحديد ── */
-  document.addEventListener('change', function(e) {
-    if (!e.target.classList.contains('l-radio')) return;
-    const c = COLORS[+e.target.dataset.c] || '#888';
-    e.target.style.borderColor = c;
-    // reset siblings
-    const name = e.target.name;
-    document.querySelectorAll('input[name="'+name+'"]').forEach(function(r) {
-      if (r !== e.target) r.style.borderColor = '';
-    });
-  });
-
-  /* ── فتح / إغلاق النافذة ── */
-  function openModal() {
-    document.getElementById('modal').classList.add('open');
-    setTimeout(function(){ document.getElementById('newQTxt').focus(); }, 50);
-  }
-  function closeModal() {
-    document.getElementById('modal').classList.remove('open');
-    document.getElementById('newQTxt').value = '';
-  }
-  document.getElementById('modal').addEventListener('click', function(e) {
-    if (e.target === this) closeModal();
-  });
-  document.getElementById('newQTxt').addEventListener('keydown', function(e) {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); addQ(); }
-  });
-
-  /* ── إضافة سؤال ── */
-  function addQ() {
-    const txt = document.getElementById('newQTxt').value.trim();
-    if (!txt) { alert('أدخل نص العبارة أولاً'); return; }
-    qCount++;
-    const n = qCount;
-    const container = document.getElementById('qContainer');
-    const row = document.createElement('div');
-    row.className = 'q-row';
-    row.dataset.q = n;
-
-    var cells = '';
-    for (var i = 0; i < 5; i++) {
-      cells += '<div class="l-cell"><input type="radio" name="q' + n + '" class="l-radio" data-c="' + i + '"></div>';
-    }
-
-    row.innerHTML =
-      '<div class="q-label">' +
-        '<div class="q-num">' + n + '</div>' +
-        '<div class="q-text" contenteditable="true" spellcheck="false">' + txt.replace(/</g,'&lt;') + '</div>' +
-      '</div>' + cells;
-
-    container.appendChild(row);
-    closeModal();
-    row.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  }
-
-  /* ── حذف آخر سؤال ── */
-  function deleteLast() {
-    const c = document.getElementById('qContainer');
-    if (c.children.length <= 1) { alert('يجب الإبقاء على عبارة واحدة على الأقل'); return; }
-    c.removeChild(c.lastElementChild);
-    qCount--;
-  }
-
-  /* ── auto-tab للتاريخ ── */
-  document.getElementById('dd').addEventListener('input', function() {
-    if (this.value.length === 2) document.getElementById('dm').focus();
-  });
-  document.getElementById('dm').addEventListener('input', function() {
-    if (this.value.length === 2) document.getElementById('dy').focus();
-  });
-
-  /* ── تلميح للنص القابل للتعديل ── */
-  document.querySelectorAll('.q-text').forEach(function(el) {
-    el.addEventListener('focus', function() {
-      if (this.textContent.trim() === 'اكتب نص العبارة هنا...') {
-        document.execCommand('selectAll');
-      }
-    });
-  });
-</script>
-</body>
-</html>
-`;
-  return (
-    <div style={{ padding: "16px" }}>
-      <iframe
-        srcDoc={htmlContent}
-        style={{
-          width: "100%",
-          height: "calc(100vh - 120px)",
-          border: "none",
-          borderRadius: "12px",
-          boxShadow: "0 4px 24px rgba(0,0,0,0.1)"
-        }}
-        title="قياس الأثر"
-      />
-    </div>
-  );
-}
-
 export default function SchoolWebsite() {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
@@ -27392,7 +27226,7 @@ export default function SchoolWebsite() {
       if (hash.startsWith("ann-")) { setDirectAnnId(hash.replace("ann-","")); return; }
       setDirectAnnId(null);
       if (hash === "teacherportal") { setTeacherProfilePortal(true); return; }
-      if (["home","attendance","announcements","activities","settings","students","messages","surveys","qiyas","sms","report","gradeanalysis","monthlyreport","teacherprofile","absencestats","attendancereport","student-absence","strategies","calendar","gallery","certificates","poll","raffle","broadcast","groupdivider","quiz","classtimer","luckywheel","exitticket","timetable","honorboard","tasks","dailyquiz","aiteacher","lessonprep","lessonrecommend","officialforms","portfolio","earlywarning","meetings","heatmap","committeemeeting","teachereval","assessment","studentexcuses","perfresults","teacherreports","suggestions","dailyattend"].includes(hash)) { setTeacherProfilePortal(false); setPage(hash); }
+      if (["home","attendance","announcements","activities","settings","students","messages","surveys","sms","report","gradeanalysis","monthlyreport","teacherprofile","absencestats","attendancereport","student-absence","strategies","calendar","gallery","certificates","poll","raffle","broadcast","groupdivider","quiz","classtimer","luckywheel","exitticket","timetable","honorboard","tasks","dailyquiz","aiteacher","lessonprep","lessonrecommend","officialforms","portfolio","earlywarning","meetings","heatmap","committeemeeting","teachereval","assessment","studentexcuses","perfresults","teacherreports","suggestions","dailyattend"].includes(hash)) { setTeacherProfilePortal(false); setPage(hash); }
     };
     window.addEventListener("hashchange", h); h();
     return () => window.removeEventListener("hashchange", h);
@@ -27683,7 +27517,6 @@ export default function SchoolWebsite() {
     { id: "dailyattend",   label: "كشف الحضور اليومي",   icon: "📅" },
     { id: "poll",           label: "تميّز المعلم",         icon: "🏆" },
     { id: "surveys",        label: "الاستبيانات",          icon: "📊" },
-    { id: "qiyas",          label: "قياس الأثر",           icon: "📏" },
     { id: "report",         label: "تقرير برنامج",         icon: "📋" },
     { id: "assessment",     label: "بطاقة التشخيص",        icon: "🔍" },
     { id: "studentexcuses", label: "أعذار الطلاب",         icon: "📄" },
@@ -27701,6 +27534,7 @@ export default function SchoolWebsite() {
     { id: "heatmap",        label: "خريطة النشاط",         icon: "🗺️" },
     { id: "committeemeeting",label: "اجتماعات اللجان",     icon: "👔" },
     { id: "teachereval",    label: "قياس أداء المعلم",     icon: "🎖️" },
+    { id: "midyearreview", label: "المراجعة النصف سنوية", icon: "📋" },
     { id: "suggestions",    label: "آراء ومقترحات",        icon: "💬" },
     { id: "prolicense",     label: "الرخصة المهنية",         icon: "🏅" },
     { id: "teacherreports", label: "ملفات المعلمين",       icon: "🗄️" },
@@ -27980,7 +27814,6 @@ export default function SchoolWebsite() {
                 {page === "activities"     && <ActivitiesPage activities={activities} setActivities={setActivities} saveActivities={saveActivities} />}
                 {page === "messages"       && <MessagesPage messages={messages} setMessages={setMessages} saveMessages={saveMessages} isParent={false} />}
                 {page === "surveys"        && <SurveysPage surveys={surveys} setSurveys={setSurveys} saveSurveys={saveSurveys} />}
-                {page === "qiyas"          && <QiyasAlatharPage />}
                 {page === "sms"            && <SMSPage teachers={teachers} attendance={attendance} week={week} classList={classList} />}
                 {page === "report"         && <ProgramReportPage />}
                 {page === "strategies"     && <StrategiesPage />}
@@ -28014,6 +27847,7 @@ export default function SchoolWebsite() {
                 {page === "lessonprep"     && <LessonPrepPage />}
                 {page === "lessonrecommend"&& <LessonRecommendPage classList={classList} />}
                 {page === "teachereval"    && <TeacherEvalPage teachers={teachers} />}
+                {page === "midyearreview"  && <MidYearReviewPage teachers={teachers} />}
         {page === "perfresults"    && <PerfResultsAdminPage />}
         {page === "suggestions"    && <SuggestionsAdminPage />}
         {page === "prolicense"     && <ProfessionalLicensePage />}
@@ -28223,7 +28057,6 @@ export default function SchoolWebsite() {
         {page === "activities"    && <ActivitiesPage activities={activities} setActivities={setActivities} saveActivities={saveActivities} />}
         {page === "messages"      && <MessagesPage messages={messages} setMessages={setMessages} saveMessages={saveMessages} isParent={false} />}
         {page === "surveys"       && <SurveysPage surveys={surveys} setSurveys={setSurveys} saveSurveys={saveSurveys} />}
-        {page === "qiyas"         && <QiyasAlatharPage />}
         {page === "sms"           && <SMSPage teachers={teachers} attendance={attendance} week={week} classList={classList} />}
         {page === "report"        && <ProgramReportPage />}
         {page === "strategies"    && <StrategiesPage />}
@@ -28257,6 +28090,7 @@ export default function SchoolWebsite() {
         {page === "lessonprep"     && <LessonPrepPage />}
         {page === "lessonrecommend"&& <LessonRecommendPage classList={classList} />}
         {page === "teachereval"    && <TeacherEvalPage teachers={teachers} />}
+        {page === "midyearreview"  && <MidYearReviewPage teachers={teachers} />}
         {page === "perfresults"    && <PerfResultsAdminPage />}
         {page === "suggestions"    && <SuggestionsAdminPage />}
         {page === "prolicense"     && <ProfessionalLicensePage />}
