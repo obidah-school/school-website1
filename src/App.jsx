@@ -1305,9 +1305,9 @@ function HomePage({ teachers, announcements, activities, navigate, attendance, w
           {id:"attendance",    icon:"📋", label:"الحضور",         grad:"linear-gradient(135deg,#0d9488,#059669)", glow:"rgba(13,148,136,.35)"},
           {id:"students",      icon:"👨‍🎓", label:"التقييمات",      grad:"linear-gradient(135deg,#7c3aed,#6d28d9)", glow:"rgba(124,58,237,.35)"},
           {id:"messages",      icon:"✉️",  label:"الرسائل",        grad:"linear-gradient(135deg,#2563eb,#1d4ed8)", glow:"rgba(37,99,235,.35)"},
-          {id:  icon:"🚨",  label:"الإنذار المبكر", grad:"linear-gradient(135deg,#ef4444,#dc2626)", glow:"rgba(239,68,68,.35)"},
+          {id:"earlywarning",  icon:"🚨",  label:"الإنذار المبكر", grad:"linear-gradient(135deg,#ef4444,#dc2626)", glow:"rgba(239,68,68,.35)"},
           {id:"gradeanalysis", icon:"📊",  label:"تحليل الدرجات",  grad:"linear-gradient(135deg,#6366f1,#4f46e5)", glow:"rgba(99,102,241,.35)"},
-          {id:     icon:"📁",  label:"ملف الطالب",     grad:"linear-gradient(135deg,#8b5cf6,#7c3aed)", glow:"rgba(139,92,246,.35)"},
+          {id:"portfolio",     icon:"📁",  label:"ملف الطالب",     grad:"linear-gradient(135deg,#8b5cf6,#7c3aed)", glow:"rgba(139,92,246,.35)"},
           {id:"meetings",      icon:"📅",  label:"الاجتماعات",     grad:"linear-gradient(135deg,#0891b2,#0e7490)", glow:"rgba(8,145,178,.35)"},
           {id:"settings",      icon:"⚙️",  label:"الإعدادات",      grad:"linear-gradient(135deg,#64748b,#475569)", glow:"rgba(100,116,139,.35)"},
           {id:"student-absence", icon:"🎒", label:"غياب الطلاب",    grad:"linear-gradient(135deg,#065f46,#047857)", glow:"rgba(6,95,70,.35)"},
@@ -1387,9 +1387,9 @@ function HomePage({ teachers, announcements, activities, navigate, attendance, w
           {id:"attendance",    icon:"📋", label:"الحضور",         grad:"linear-gradient(135deg,#0d9488,#059669)", glow:"rgba(13,148,136,.35)"},
           {id:"students",      icon:"👨‍🎓", label:"التقييمات",      grad:"linear-gradient(135deg,#7c3aed,#6d28d9)", glow:"rgba(124,58,237,.35)"},
           {id:"messages",      icon:"✉️",  label:"الرسائل",        grad:"linear-gradient(135deg,#2563eb,#1d4ed8)", glow:"rgba(37,99,235,.35)"},
-          {id:  icon:"🚨",  label:"الإنذار المبكر", grad:"linear-gradient(135deg,#ef4444,#dc2626)", glow:"rgba(239,68,68,.35)"},
+          {id:"earlywarning",  icon:"🚨",  label:"الإنذار المبكر", grad:"linear-gradient(135deg,#ef4444,#dc2626)", glow:"rgba(239,68,68,.35)"},
           {id:"gradeanalysis", icon:"📊",  label:"تحليل الدرجات",  grad:"linear-gradient(135deg,#6366f1,#4f46e5)", glow:"rgba(99,102,241,.35)"},
-          {id:     icon:"📁",  label:"ملف الطالب",     grad:"linear-gradient(135deg,#8b5cf6,#7c3aed)", glow:"rgba(139,92,246,.35)"},
+          {id:"portfolio",     icon:"📁",  label:"ملف الطالب",     grad:"linear-gradient(135deg,#8b5cf6,#7c3aed)", glow:"rgba(139,92,246,.35)"},
           {id:"meetings",      icon:"📅",  label:"الاجتماعات",     grad:"linear-gradient(135deg,#0891b2,#0e7490)", glow:"rgba(8,145,178,.35)"},
           {id:"settings",      icon:"⚙️",  label:"الإعدادات",      grad:"linear-gradient(135deg,#64748b,#475569)", glow:"rgba(100,116,139,.35)"},
         ].map(p=>(
@@ -3056,7 +3056,670 @@ function AttendancePage({ teachers, setTeachers, saveTeachers, week, setWeek, sa
   );
 }
 
+// ===== صفحة دوام الإداريين =====
+function AdminAttendancePage() {
+  /* ─── بيانات دائمة ─── */
+  const LS_ADMINS   = "admin_att_staff_v1";
+  const LS_ATT      = "admin_att_records_v1";
+  const LS_WEEK     = "admin_att_week_v1";
+  const LS_ARCHIVE  = "admin_att_archive_v1";
 
+  const loadLS = (k, def) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : def; } catch { return def; } };
+  const saveLS = (k, v)   => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
+
+  const defaultWeek = () => {
+    const today = new Date();
+    const day = today.getDay(); // 0=sun
+    const diff = -day; // الجمعة/السبت → يعودان لأحد الأسبوع المنتهي
+    const sun = new Date(today); sun.setDate(today.getDate() + diff);
+    const DAYS = ["الأحد","الاثنين","الثلاثاء","الأربعاء","الخميس"];
+    return {
+      days: DAYS.map((name, i) => {
+        const d = new Date(sun); d.setDate(sun.getDate() + i);
+        return { name, dateM: d.toLocaleDateString("ar-SA-u-nu-latn", { year:"numeric", month:"2-digit", day:"2-digit" }) };
+      })
+    };
+  };
+
+  const [admins,   setAdmins]   = useState(() => loadLS(LS_ADMINS,  []));
+  const [att,      setAtt]      = useState(() => loadLS(LS_ATT,     {}));
+  const [week,     setWeek]     = useState(() => loadLS(LS_WEEK,    defaultWeek()));
+  const [archive,  setArchive]  = useState(() => loadLS(LS_ARCHIVE, []));
+  const [loaded,   setLoaded]   = useState(false);
+
+  // تحميل من Firebase عند الفتح ودمج مع localStorage
+  useEffect(() => {
+    Promise.all([
+      DB.get("school-admin-staff",   null),
+      DB.get("school-admin-att",     null),
+      DB.get("school-admin-week",    null),
+      DB.get("school-admin-archive", null),
+    ]).then(([fbStaff, fbAtt, fbWeek, fbArchive]) => {
+      if (Array.isArray(fbStaff) && fbStaff.length > 0)        { setAdmins(fbStaff);    saveLS(LS_ADMINS,  fbStaff);    }
+      else if (loadLS(LS_ADMINS,[]).length > 0)                 { DB.set("school-admin-staff",   loadLS(LS_ADMINS,[]));    }
+      if (fbAtt && typeof fbAtt==="object" && Object.keys(fbAtt).length) { setAtt(fbAtt); saveLS(LS_ATT, fbAtt); }
+      else if (Object.keys(loadLS(LS_ATT,{})).length)           { DB.set("school-admin-att",     loadLS(LS_ATT,{}));       }
+      if (fbWeek && fbWeek.days)                                { setWeek(fbWeek);        saveLS(LS_WEEK,    fbWeek);      }
+      if (Array.isArray(fbArchive))                             { setArchive(fbArchive);  saveLS(LS_ARCHIVE, fbArchive);   }
+      setLoaded(true);
+    });
+  }, []);
+
+  // حفظ في Firebase + localStorage عند كل تغيير
+  useEffect(() => { if (!loaded) return; DB.set("school-admin-staff",   admins);  saveLS(LS_ADMINS,  admins);  }, [admins,  loaded]);
+  useEffect(() => { if (!loaded) return; DB.set("school-admin-att",     att);     saveLS(LS_ATT,     att);     }, [att,     loaded]);
+  useEffect(() => { if (!loaded) return; DB.set("school-admin-week",    week);    saveLS(LS_WEEK,    week);    }, [week,    loaded]);
+  useEffect(() => { if (!loaded) return; DB.set("school-admin-archive", archive); saveLS(LS_ARCHIVE, archive); }, [archive, loaded]);
+
+  /* ─── UI state ─── */
+  const [selDay,       setSelDay]       = useState(0);
+  const [searchQ,      setSearchQ]      = useState("");
+  const [showAddAdmin, setShowAddAdmin] = useState(false);
+  const [newName,      setNewName]      = useState("");
+  const [newId,        setNewId]        = useState("");
+  const [showImport,   setShowImport]   = useState(false);
+  const [showSummary,  setShowSummary]  = useState(false);
+  const [showDatePick, setShowDatePick] = useState(false);
+  const [showArchive,  setShowArchive]  = useState(false);
+  const [archYear,     setArchYear]     = useState(new Date().getFullYear());
+  const [archMonth,    setArchMonth]    = useState(new Date().getMonth()+1);
+  const [printYear,    setPrintYear]    = useState(new Date().getFullYear());
+
+  /* ─── ثوابت ─── */
+  const STATUS_OPTS = [
+    { val:"حاضر",    label:"حاضر",            icon:"✅", bg:"#dcfce7", brd:"#16a34a", clr:"#15803d" },
+    { val:"متأخر",   label:"متأخر صباحاً",    icon:"🌅", bg:"#fef3c7", brd:"#d97706", clr:"#92400e" },
+    { val:"مستأذن",  label:"مستأذن",          icon:"📋", bg:"#dbeafe", brd:"#2563eb", clr:"#1d4ed8" },
+    { val:"غائب",    label:"غائب",            icon:"❌", bg:"#fee2e2", brd:"#dc2626", clr:"#991b1b" },
+    { val:"انسحاب",  label:"انسحاب (بدون إذن)",icon:"🚶", bg:"#fdf4ff", brd:"#9333ea", clr:"#6b21a8" },
+  ];
+  const EXCUSE_REASONS = ["موعد مستشفى","مرض","مولود","وفاة","حالة طارئة","إجراءات رسمية","أخرى"];
+
+  /* ─── مساعد تحديث ─── */
+  const upd = (ai, di, field, val) => {
+    setAtt(prev => ({
+      ...prev,
+      [ai]: {
+        ...prev[ai],
+        [di]: {
+          ...(prev[ai]?.[di] || {}),
+          [field]: val,
+          ...(field === "status" && val === "حاضر"   ? { lateMin:"", excuseReason:"", excuseOther:"", excuseFrom:"", excuseTo:"", exitTime:"", notes:"" } : {}),
+          ...(field === "status" && val === "غائب"   ? { lateMin:"", excuseFrom:"", excuseTo:"", exitTime:"" } : {}),
+          ...(field === "status" && val === "انسحاب" ? { lateMin:"", excuseReason:"", excuseFrom:"", excuseTo:"" } : {}),
+          ...(field === "status" && val === "مستأذن" ? { lateMin:"", exitTime:"" } : {}),
+        }
+      }
+    }));
+  };
+  const getR = (ai, di) => att[ai]?.[di] || {};
+  const getStatus = (ai, di) => getR(ai, di).status || "حاضر";
+
+  /* ─── إحصائيات ─── */
+  const cnt = (di, st) => admins.filter((_,ai) => getStatus(ai,di) === st).length;
+  const totalPresent = (di) => admins.length - cnt(di,"غائب") - cnt(di,"انسحاب");
+  const weekStats = (ai) => {
+    const abs  = week.days.filter((_,di) => getStatus(ai,di) === "غائب").length;
+    const late = week.days.filter((_,di) => getStatus(ai,di) === "متأخر").length;
+    const exc  = week.days.filter((_,di) => getStatus(ai,di) === "مستأذن").length;
+    const wlk  = week.days.filter((_,di) => getStatus(ai,di) === "انسحاب").length;
+    const lateMins = week.days.reduce((s,_,di) => {
+      const r = getR(ai,di); return r.status === "متأخر" ? s + (parseInt(r.lateMin)||0) : s;
+    }, 0);
+    return { abs, late, exc, wlk, lateMins };
+  };
+
+  /* ─── إضافة إداري ─── */
+  const addAdmin = () => {
+    const n = newName.trim(); if (!n) return;
+    setAdmins(prev => [...prev, { name: n, id: newId.trim() }]);
+    setNewName(""); setNewId(""); setShowAddAdmin(false);
+  };
+  const delAdmin = (ai) => {
+    if (!confirm("حذف هذا الإداري؟")) return;
+    setAdmins(prev => prev.filter((_,i) => i !== ai));
+    setAtt(prev => {
+      const nxt = {...prev}; delete nxt[ai];
+      const reindexed = {};
+      Object.keys(nxt).forEach(k => { const ki = parseInt(k); reindexed[ki > ai ? ki-1 : ki] = nxt[k]; });
+      return reindexed;
+    });
+  };
+
+  /* ─── استيراد إكسل ─── */
+  const handleImportXLSX = async (file) => {
+    await loadXLSX();
+    const buf = await file.arrayBuffer();
+    const wb = window.XLSX.read(buf);
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const data = window.XLSX.utils.sheet_to_json(ws, { header:1 });
+    const rows = data.flat().filter(c => String(c||"").trim().length > 2 && isNaN(String(c||"").trim()));
+    if (rows.length > 0) {
+      const names = rows.map(r => String(r).trim()).filter(Boolean);
+      const toAdd = names.filter(n => !admins.find(a => a.name === n));
+      setAdmins(prev => [...prev, ...toAdd.map(n => ({ name:n, id:"" }))]);
+      alert(`✅ تم إضافة ${toAdd.length} إداري جديد`);
+    }
+    setShowImport(false);
+  };
+
+  /* ─── أرشفة الأسبوع ─── */
+  const archiveWeek = () => {
+    if (!confirm("هل تريد أرشفة هذا الأسبوع وبدء أسبوع جديد؟")) return;
+    const entry = { week: JSON.parse(JSON.stringify(week)), att: JSON.parse(JSON.stringify(att)), archivedAt: new Date().toISOString() };
+    setArchive(prev => [entry, ...prev]);
+    setAtt({});
+    const nw = defaultWeek(); setWeek(nw);
+    setShowSummary(false); setSelDay(0);
+    alert("✅ تمت الأرشفة وبدأ أسبوع جديد");
+  };
+
+  /* ─── طباعة اليوم ─── */
+  const printDay = () => {
+    const day = week.days[selDay];
+    const rows = admins.map((a, ai) => {
+      const r = getR(ai, selDay); const st = r.status || "حاضر";
+      const stOpt = STATUS_OPTS.find(o => o.val === st) || STATUS_OPTS[0];
+      let detail = "—";
+      if (st === "متأخر")   detail = `تأخر صباحي — ${r.lateMin||"—"} دقيقة`;
+      if (st === "مستأذن")  detail = `من ${r.excuseFrom||"—"} إلى ${r.excuseTo||"—"}${r.excuseReason?" | "+r.excuseReason:""}${r.excuseReason==="أخرى"&&r.excuseOther?" ("+r.excuseOther+")":""}`;
+      if (st === "غائب")    detail = r.notes || "—";
+      if (st === "انسحاب")  detail = `انسحاب الساعة ${r.exitTime||"—"}`;
+      return `<tr style="background:${stOpt.bg}"><td>${ai+1}</td><td style="text-align:right;padding:6px 10px">${a.name}${a.id?` <small style="color:#888">(${a.id})</small>`:""}</td><td>${stOpt.icon} ${stOpt.label}</td><td>${detail}</td><td>${r.notes||"—"}</td></tr>`;
+    }).join("");
+    printWindow(`<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8"><title>دوام الإداريين</title>
+    <style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Noto Sans Arabic',Arial,sans-serif;padding:24px;direction:rtl}
+    .hdr{text-align:center;margin-bottom:16px;padding-bottom:10px;border-bottom:3px solid #7c3aed}
+    .hdr h1{font-size:18px;color:#7c3aed;font-weight:900}.hdr p{font-size:12px;color:#555;margin-top:3px}
+    .stats{display:flex;gap:10px;justify-content:center;margin-bottom:14px;flex-wrap:wrap}
+    .st{background:#f5f3ff;border:1px solid #ddd8fe;border-radius:8px;padding:7px 16px;text-align:center}
+    .st span{display:block;font-size:20px;font-weight:900}.st small{font-size:10px;color:#555}
+    table{width:100%;border-collapse:collapse;font-size:12px}
+    th{background:#7c3aed;color:#fff;padding:7px;text-align:center}
+    td{border:1px solid #e5e7eb;padding:5px;text-align:center}
+    .footer{text-align:center;margin-top:16px;font-size:10px;color:#999}
+    @media print{@page{size:A4;margin:1.5cm}}</style></head><body>
+    <div class="hdr"><h1>مدرسة عبيدة بن الحارث المتوسطة</h1>
+    <p>سجل دوام الإداريين — ${day.name} | ${day.dateM} م</p></div>
+    <div class="stats">
+      <div class="st"><span>${totalPresent(selDay)}</span><small>✅ حاضر</small></div>
+      <div class="st"><span>${cnt(selDay,"متأخر")}</span><small>🌅 متأخر</small></div>
+      <div class="st"><span>${cnt(selDay,"مستأذن")}</span><small>📋 مستأذن</small></div>
+      <div class="st"><span>${cnt(selDay,"غائب")}</span><small>❌ غائب</small></div>
+      <div class="st"><span>${cnt(selDay,"انسحاب")}</span><small>🚶 انسحاب</small></div>
+    </div>
+    <table><thead><tr><th>م</th><th>اسم الإداري</th><th>الحالة</th><th>التفاصيل</th><th>ملاحظات</th></tr></thead>
+    <tbody>${rows}</tbody></table>
+    <div class="footer">تم الإصدار ${new Date().toLocaleDateString("ar-SA")} — بوابة مدرسة عبيدة بن الحارث الإلكترونية</div>
+    <script>window.onload=()=>window.print()</script></body></html>`);
+  };
+
+  /* ─── طباعة ملخص الأسبوع ─── */
+  const printWeekSummary = (wk, wkAtt, title="ملخص الأسبوع") => {
+    const getWSt = (ai,di) => (wkAtt[ai]?.[di]?.status) || "حاضر";
+    const getWR  = (ai,di) => wkAtt[ai]?.[di] || {};
+    const rows = admins.map((a,ai) => {
+      const abs  = wk.days.filter((_,di) => getWSt(ai,di)==="غائب").length;
+      const late = wk.days.filter((_,di) => getWSt(ai,di)==="متأخر").length;
+      const exc  = wk.days.filter((_,di) => getWSt(ai,di)==="مستأذن").length;
+      const wlk  = wk.days.filter((_,di) => getWSt(ai,di)==="انسحاب").length;
+      const color = abs>0?"#fef2f2":late+wlk>0?"#fdf4ff":"#fff";
+      const daysCells = wk.days.map((_,di)=>{
+        const st=getWSt(ai,di); const r=getWR(ai,di);
+        const ic = st==="حاضر"?"✅":st==="متأخر"?"🌅":st==="مستأذن"?"📋":st==="انسحاب"?"🚶":"❌";
+        const subTxt = st==="متأخر"&&r.lateMin?`<br><small>${r.lateMin}د</small>`
+          : st==="مستأذن"&&(r.excuseFrom||r.excuseTo)?`<br><small>${r.excuseFrom||""}${r.excuseTo?"→"+r.excuseTo:""}</small>`:"";
+        return `<td>${ic}${subTxt}</td>`;
+      }).join("");
+      return `<tr style="background:${color}"><td>${ai+1}</td><td style="text-align:right;padding:5px 8px">${a.name}${a.id?` <small>(${a.id})</small>`:""}</td>
+        ${daysCells}
+        <td style="color:#ea580c;font-weight:bold">${late||"—"}</td>
+        <td style="color:#2563eb;font-weight:bold">${exc||"—"}</td>
+        <td style="color:#9333ea;font-weight:bold">${wlk||"—"}</td>
+        <td style="color:#dc2626;font-weight:bold">${abs||"—"}</td></tr>`;
+    }).join("");
+    printWindow(`<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8"><title>${title}</title>
+    <style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Noto Sans Arabic',Arial,sans-serif;padding:20px;direction:rtl}
+    .hdr{text-align:center;margin-bottom:14px;padding-bottom:8px;border-bottom:3px solid #7c3aed}
+    .hdr h1{font-size:16px;color:#7c3aed;font-weight:900}.hdr p{font-size:11px;color:#555;margin-top:2px}
+    table{width:100%;border-collapse:collapse;font-size:10px}
+    th{background:#7c3aed;color:#fff;padding:6px;text-align:center}
+    td{border:1px solid #e5e7eb;padding:4px;text-align:center}
+    .footer{text-align:center;margin-top:12px;font-size:9px;color:#aaa}
+    @media print{@page{size:A4 landscape;margin:1cm}}</style></head><body>
+    <div class="hdr"><h1>مدرسة عبيدة بن الحارث المتوسطة</h1>
+    <p>${title} — ${wk.days[0]?.dateM} إلى ${wk.days[wk.days.length-1]?.dateM} م</p></div>
+    <table><thead><tr><th>م</th><th>اسم الإداري</th>
+    ${wk.days.map(d=>`<th>${d.name}</th>`).join("")}
+    <th>🌅متأخر</th><th>📋مستأذن</th><th>🚶انسحاب</th><th>❌غائب</th></tr></thead>
+    <tbody>${rows}</tbody></table>
+    <div class="footer">تم الإصدار ${new Date().toLocaleDateString("ar-SA")} — بوابة مدرسة عبيدة بن الحارث الإلكترونية</div>
+    <script>window.onload=()=>window.print()</script></body></html>`);
+  };
+
+  /* ─── طباعة من بداية العام ─── */
+  const printYearReport = () => {
+    const thisYear = archive.filter(e => {
+      const d = new Date(e.archivedAt); return d.getFullYear() === printYear;
+    });
+    if (thisYear.length === 0 && !confirm("لا يوجد أرشيف لهذا العام. هل تريد طباعة الأسبوع الحالي فقط؟")) return;
+    const allWeeks = [...thisYear.map(e => ({ wk: e.week, wkAtt: e.att })), { wk: week, wkAtt: att }];
+    // تجميع إجماليات لكل إداري
+    const summary = admins.map((a,ai) => {
+      let totalAbs=0, totalLate=0, totalExc=0, totalWlk=0, totalLateMins=0;
+      allWeeks.forEach(({ wk:wk_, wkAtt:wa }) => {
+        wk_.days.forEach((_,di) => {
+          const st = wa[ai]?.[di]?.status || "حاضر";
+          const r = wa[ai]?.[di] || {};
+          if (st==="غائب")   totalAbs++;
+          if (st==="متأخر")  { totalLate++; totalLateMins += parseInt(r.lateMin||0); }
+          if (st==="مستأذن") totalExc++;
+          if (st==="انسحاب") totalWlk++;
+        });
+      });
+      return { a, totalAbs, totalLate, totalExc, totalWlk, totalLateMins };
+    });
+    const rows = summary.map((s,i) => {
+      const color = s.totalAbs>2?"#fef2f2":s.totalLate>3?"#fdf4ff":"#fff";
+      return `<tr style="background:${color}"><td>${i+1}</td>
+        <td style="text-align:right;padding:5px 10px">${s.a.name}${s.a.id?` <small>(${s.a.id})</small>`:""}</td>
+        <td style="color:#ea580c;font-weight:bold">${s.totalLate||"—"}</td>
+        <td style="color:#ea580c">${s.totalLateMins>0?s.totalLateMins+"د":"—"}</td>
+        <td style="color:#2563eb;font-weight:bold">${s.totalExc||"—"}</td>
+        <td style="color:#9333ea;font-weight:bold">${s.totalWlk||"—"}</td>
+        <td style="color:#dc2626;font-weight:bold">${s.totalAbs||"—"}</td></tr>`;
+    }).join("");
+    printWindow(`<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8"><title>تقرير دوام الإداريين ${printYear}</title>
+    <style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Noto Sans Arabic',Arial,sans-serif;padding:24px;direction:rtl}
+    .hdr{text-align:center;margin-bottom:16px;padding-bottom:10px;border-bottom:3px solid #7c3aed}
+    .hdr h1{font-size:18px;color:#7c3aed;font-weight:900}.hdr p{font-size:12px;color:#555;margin-top:3px}
+    table{width:100%;border-collapse:collapse;font-size:12px}
+    th{background:#7c3aed;color:#fff;padding:7px;text-align:center}
+    td{border:1px solid #e5e7eb;padding:5px;text-align:center}
+    .footer{text-align:center;margin-top:16px;font-size:10px;color:#999}
+    @media print{@page{size:A4;margin:1.5cm}}</style></head><body>
+    <div class="hdr"><h1>مدرسة عبيدة بن الحارث المتوسطة</h1>
+    <p>تقرير دوام الإداريين التراكمي — عام ${printYear} م (${allWeeks.length} أسبوع)</p></div>
+    <table><thead><tr>
+      <th>م</th><th>اسم الإداري</th><th>🌅تأخر</th><th>دقائق تأخر</th><th>📋استئذان</th><th>🚶انسحاب</th><th>❌غياب</th>
+    </tr></thead><tbody>${rows}</tbody></table>
+    <div class="footer">تم الإصدار ${new Date().toLocaleDateString("ar-SA")} — بوابة مدرسة عبيدة بن الحارث الإلكترونية</div>
+    <script>window.onload=()=>window.print()</script></body></html>`);
+  };
+
+  const filtered = admins.map((a,i) => ({a,ai:i})).filter(({a}) => a.name.includes(searchQ));
+
+  /* ─── JSX ─── */
+  return (
+    <div dir="rtl">
+      {/* Header */}
+      <div className="rounded-b-2xl p-6 mb-5 text-white shadow-xl" style={{ background:"linear-gradient(135deg,#7c3aed 0%,#5b21b6 100%)" }}>
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="text-center sm:text-right">
+            <div className="text-4xl mb-1">🏢</div>
+            <h2 className="text-2xl font-black">سجل دوام الإداريين</h2>
+            <p className="opacity-80 text-sm mt-1">مدرسة عبيدة بن الحارث المتوسطة — {new Date().getFullYear()}م</p>
+          </div>
+          <div className="flex gap-2 flex-wrap justify-center">
+            <button onClick={printDay} className="bg-white text-purple-700 px-3 py-2 rounded-xl text-xs font-bold hover:bg-purple-50 shadow">🖨️ طباعة اليوم</button>
+            <button onClick={() => setShowSummary(!showSummary)} className="bg-white text-indigo-700 px-3 py-2 rounded-xl text-xs font-bold hover:bg-indigo-50 shadow">📊 ملخص الأسبوع</button>
+            <button onClick={() => setShowArchive(!showArchive)} className="bg-white text-amber-700 px-3 py-2 rounded-xl text-xs font-bold hover:bg-amber-50 shadow">📁 الأرشيف والتقارير</button>
+            <button onClick={() => setShowAddAdmin(true)} className="bg-white text-green-700 px-3 py-2 rounded-xl text-xs font-bold hover:bg-green-50 shadow">➕ إضافة إداري</button>
+            <button onClick={() => setShowImport(true)} className="bg-white text-blue-700 px-3 py-2 rounded-xl text-xs font-bold hover:bg-blue-50 shadow">📥 إكسل</button>
+          </div>
+        </div>
+      </div>
+
+      {/* إحصائيات اليوم */}
+      {!showSummary && !showArchive && (
+        <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 mb-4">
+          {STATUS_OPTS.map(opt => (
+            <div key={opt.val} className="rounded-2xl p-3 text-center border-2" style={{ background:opt.bg, borderColor:opt.brd }}>
+              <div className="text-2xl font-black" style={{ color:opt.clr }}>{cnt(selDay,opt.val)}</div>
+              <div className="text-xs font-bold mt-1" style={{ color:opt.clr }}>{opt.icon} {opt.label}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* تبويب الأيام */}
+      {!showSummary && !showArchive && (
+        <div className="flex gap-2 mb-3 overflow-x-auto pb-1">
+          {week.days.map((d,i) => (
+            <button key={i} onClick={() => setSelDay(i)}
+              className={`px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-all flex-shrink-0 ${selDay===i?"bg-purple-600 text-white shadow-lg scale-105":"bg-white border-2 border-gray-200 text-gray-600 hover:border-purple-300"}`}>
+              <div>{d.name}</div>
+              <div className="text-xs opacity-70">{d.dateM}</div>
+            </button>
+          ))}
+          <button onClick={() => setShowDatePick(!showDatePick)}
+            className="px-3 py-2 rounded-xl text-xs font-bold bg-white border-2 border-dashed border-purple-300 text-purple-600 hover:bg-purple-50 flex-shrink-0">
+            📅 تغيير الأسبوع
+          </button>
+        </div>
+      )}
+
+      {/* تغيير تاريخ الأسبوع */}
+      {showDatePick && (
+        <div className="bg-white rounded-2xl shadow-lg border border-purple-100 p-4 mb-4">
+          <h3 className="font-bold text-purple-800 mb-3 text-sm">📅 تحديد أسبوع جديد</h3>
+          <AdminWeekPicker week={week} setWeek={w => { setWeek(w); setShowDatePick(false); setSelDay(0); }} />
+          <button onClick={() => setShowDatePick(false)} className="mt-2 text-xs text-gray-500 hover:text-gray-700">إلغاء</button>
+        </div>
+      )}
+
+      {/* ملخص الأسبوع */}
+      {showSummary && !showArchive && (
+        <div className="bg-white rounded-2xl shadow-lg border border-purple-100 p-4 mb-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-black text-purple-800">📊 ملخص دوام الأسبوع</h3>
+            <div className="flex gap-2">
+              <button onClick={() => printWeekSummary(week, att)} className="text-xs px-3 py-1.5 rounded-lg bg-purple-600 text-white font-bold">🖨️ طباعة</button>
+              <button onClick={archiveWeek} className="text-xs px-3 py-1.5 rounded-lg bg-amber-500 text-white font-bold">📁 أرشفة</button>
+              <button onClick={() => setShowSummary(false)} className="text-xs px-3 py-1.5 rounded-lg bg-gray-100 text-gray-600 font-bold">✕</button>
+            </div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-purple-50">
+                  <th className="p-2 text-right">م</th>
+                  <th className="p-2 text-right">الإداري</th>
+                  {week.days.map((d,i) => <th key={i} className="p-2 text-center">{d.name}</th>)}
+                  <th className="p-2 text-center text-orange-700">متأخر</th>
+                  <th className="p-2 text-center text-blue-700">مستأذن</th>
+                  <th className="p-2 text-center text-purple-700">انسحاب</th>
+                  <th className="p-2 text-center text-red-700">غائب</th>
+                </tr>
+              </thead>
+              <tbody>
+                {admins.map((a,ai) => {
+                  const s = weekStats(ai);
+                  const bg = s.abs>0?"#fef2f2":s.wlk>0?"#fdf4ff":s.late>0?"#fef3c7":"#fff";
+                  return (
+                    <tr key={ai} style={{ background:bg }} className="border-t border-gray-100">
+                      <td className="p-2 text-center text-gray-400">{ai+1}</td>
+                      <td className="p-2 font-medium text-gray-800">{a.name}{a.id&&<span className="text-xs text-gray-400 mr-1">({a.id})</span>}</td>
+                      {week.days.map((_,di) => {
+                        const st = getStatus(ai,di); const r = getR(ai,di);
+                        const opt = STATUS_OPTS.find(o=>o.val===st)||STATUS_OPTS[0];
+                        return <td key={di} className="p-1 text-center">
+                          <div>{opt.icon}</div>
+                          {st==="متأخر"&&r.lateMin&&<div className="text-xs text-orange-500">{r.lateMin}د</div>}
+                          {st==="انسحاب"&&r.exitTime&&<div className="text-xs text-purple-500">{r.exitTime}</div>}
+                        </td>;
+                      })}
+                      <td className="p-2 text-center font-bold text-orange-600">{s.late||"—"}</td>
+                      <td className="p-2 text-center font-bold text-blue-600">{s.exc||"—"}</td>
+                      <td className="p-2 text-center font-bold text-purple-600">{s.wlk||"—"}</td>
+                      <td className="p-2 text-center font-bold text-red-600">{s.abs||"—"}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* الأرشيف والتقارير */}
+      {showArchive && (
+        <div className="bg-white rounded-2xl shadow-lg border border-amber-100 p-4 mb-4">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-black text-amber-800 text-lg">📁 الأرشيف والتقارير التراكمية</h3>
+            <button onClick={() => setShowArchive(false)} className="text-gray-400 hover:text-gray-600 text-xl font-bold">✕</button>
+          </div>
+          {/* تقرير من بداية العام */}
+          <div className="bg-amber-50 rounded-xl p-4 mb-4 border border-amber-200">
+            <h4 className="font-bold text-amber-800 mb-3 text-sm">📋 طباعة تقرير من بداية العام</h4>
+            <div className="flex gap-3 flex-wrap items-center">
+              <div>
+                <label className="text-xs font-bold text-gray-600 block mb-1">السنة الميلادية</label>
+                <select value={printYear} onChange={e => setPrintYear(parseInt(e.target.value))}
+                  className="px-3 py-2 rounded-lg border border-amber-300 text-sm focus:outline-none bg-white">
+                  {[2022,2023,2024,2025,2026,2027,2028].map(y => <option key={y} value={y}>{y}</option>)}
+                </select>
+              </div>
+              <button onClick={printYearReport} className="bg-amber-600 text-white px-5 py-2 rounded-xl text-sm font-bold hover:bg-amber-700 mt-4">
+                🖨️ طباعة التقرير التراكمي {printYear}
+              </button>
+            </div>
+          </div>
+          {/* قائمة الأرشيف */}
+          <h4 className="font-bold text-gray-700 mb-2 text-sm">📂 الأسابيع المحفوظة ({archive.length} أسبوع)</h4>
+          {archive.length === 0 ? (
+            <div className="text-center py-6 text-gray-400 text-sm">لا يوجد أرشيف بعد. استخدم زر "أرشفة" في ملخص الأسبوع.</div>
+          ) : (
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {archive.map((e,i) => {
+                const d = new Date(e.archivedAt);
+                return (
+                  <div key={i} className="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-2 border border-gray-100">
+                    <div>
+                      <div className="text-sm font-bold text-gray-800">{e.week.days[0]?.dateM} — {e.week.days[e.week.days.length-1]?.dateM}</div>
+                      <div className="text-xs text-gray-400">تمت الأرشفة: {d.toLocaleDateString("ar-SA")}</div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button onClick={() => printWeekSummary(e.week, e.att, `ملخص أسبوع ${e.week.days[0]?.dateM}`)}
+                        className="text-xs px-3 py-1.5 rounded-lg bg-purple-600 text-white font-bold hover:bg-purple-700">🖨️</button>
+                      <button onClick={() => { if(confirm("حذف هذا الأسبوع من الأرشيف؟")) setArchive(prev=>prev.filter((_,j)=>j!==i)); }}
+                        className="text-xs px-2 py-1.5 rounded-lg bg-red-100 text-red-600 font-bold hover:bg-red-200">🗑️</button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* جدول الحضور اليومي */}
+      {!showSummary && !showArchive && (
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="bg-purple-600 text-white px-4 py-3 text-center">
+            <span className="font-black">{week.days[selDay]?.name}</span>
+            <span className="mx-2 opacity-60">|</span>
+            <span className="text-sm opacity-90">{week.days[selDay]?.dateM} م</span>
+          </div>
+          {/* بحث */}
+          <div className="p-3 border-b border-gray-100">
+            <input value={searchQ} onChange={e => setSearchQ(e.target.value)}
+              placeholder="🔍 بحث عن إداري..." dir="rtl"
+              className="w-full px-4 py-2 rounded-xl border-2 border-gray-200 focus:border-purple-400 focus:outline-none text-sm" />
+          </div>
+          {admins.length === 0 ? (
+            <div className="text-center py-12 text-gray-400">
+              <div className="text-5xl mb-3">👥</div>
+              <div className="font-bold">لا يوجد إداريون مضافون بعد</div>
+              <div className="text-sm mt-1">اضغط "إضافة إداري" أو استورد من إكسل</div>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr style={{ background:"#faf5ff" }}>
+                    <th className="p-3 text-right text-xs font-bold text-gray-500 w-8">م</th>
+                    <th className="p-3 text-right text-xs font-bold text-gray-500">الإداري</th>
+                    <th className="p-3 text-center text-xs font-bold text-gray-500">الحالة</th>
+                    <th className="p-3 text-center text-xs font-bold text-orange-700">التفاصيل</th>
+                    <th className="p-3 text-center text-xs font-bold text-gray-500">وقت الخروج</th>
+                    <th className="p-3 text-center text-xs font-bold text-gray-400">ملاحظات</th>
+                    <th className="p-3 w-8"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map(({ a, ai }) => {
+                    const r = getR(ai, selDay);
+                    const st = r.status || "حاضر";
+                    const opt = STATUS_OPTS.find(o => o.val === st) || STATUS_OPTS[0];
+                    return (
+                      <tr key={ai} style={{ background: opt.bg + "55" }} className="border-t border-gray-100">
+                        <td className="p-2 text-center text-xs text-gray-400 font-bold">{ai+1}</td>
+                        <td className="p-2.5">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: opt.brd }}></div>
+                            <div>
+                              <div className="font-medium text-gray-800 text-sm">{a.name}</div>
+                              {a.id && <div className="text-xs text-gray-400">هوية: {a.id}</div>}
+                            </div>
+                          </div>
+                        </td>
+                        {/* الحالة */}
+                        <td className="p-1.5">
+                          <div className="flex flex-wrap gap-1 justify-center">
+                            {STATUS_OPTS.map(o => (
+                              <button key={o.val} onClick={() => upd(ai, selDay, "status", o.val)}
+                                className="px-1.5 py-1 rounded-lg text-xs font-bold transition-all border-2"
+                                style={{
+                                  background: st===o.val ? o.bg : "#f9fafb",
+                                  borderColor: st===o.val ? o.brd : "#e5e7eb",
+                                  color: st===o.val ? o.clr : "#9ca3af",
+                                }}>
+                                {o.icon} {o.val === "انسحاب" ? "انسحاب" : o.val}
+                              </button>
+                            ))}
+                          </div>
+                        </td>
+                        {/* التفاصيل */}
+                        <td className="p-1.5 text-center">
+                          {st === "متأخر" && (
+                            <div className="flex items-center gap-1 justify-center">
+                              <input type="number" min="1" max="180" placeholder="دقائق"
+                                value={r.lateMin || ""}
+                                onChange={e => upd(ai, selDay, "lateMin", e.target.value)}
+                                className="w-16 px-2 py-1.5 rounded-lg border-2 border-orange-200 text-center text-xs font-bold focus:outline-none focus:border-orange-400 bg-orange-50" />
+                              <span className="text-xs text-orange-600 font-bold">د</span>
+                            </div>
+                          )}
+                          {st === "مستأذن" && (
+                            <div className="space-y-1">
+                              {/* وقت الاستئذان */}
+                              <div className="flex items-center gap-1 justify-center">
+                                <span className="text-xs text-blue-600 font-bold flex-shrink-0">من</span>
+                                <input type="time"
+                                  value={r.excuseFrom || ""}
+                                  onChange={e => upd(ai, selDay, "excuseFrom", e.target.value)}
+                                  className="flex-1 px-1.5 py-1 rounded-lg border-2 border-blue-200 text-xs font-bold focus:outline-none focus:border-blue-400 bg-blue-50 text-blue-700" />
+                              </div>
+                              <div className="flex items-center gap-1 justify-center">
+                                <span className="text-xs text-blue-600 font-bold flex-shrink-0">إلى</span>
+                                <input type="time"
+                                  value={r.excuseTo || ""}
+                                  onChange={e => upd(ai, selDay, "excuseTo", e.target.value)}
+                                  className="flex-1 px-1.5 py-1 rounded-lg border-2 border-blue-200 text-xs font-bold focus:outline-none focus:border-blue-400 bg-blue-50 text-blue-700" />
+                              </div>
+                              {/* سبب الاستئذان */}
+                              <select value={r.excuseReason || ""}
+                                onChange={e => upd(ai, selDay, "excuseReason", e.target.value)}
+                                className="px-2 py-1 rounded-lg border-2 border-blue-200 text-xs font-bold focus:outline-none bg-blue-50 text-blue-700 w-full">
+                                <option value="">— السبب —</option>
+                                {EXCUSE_REASONS.map(r => <option key={r}>{r}</option>)}
+                              </select>
+                              {r.excuseReason === "أخرى" && (
+                                <input type="text" placeholder="اذكر السبب..."
+                                  value={r.excuseOther || ""}
+                                  onChange={e => upd(ai, selDay, "excuseOther", e.target.value)}
+                                  className="w-full px-2 py-1 rounded-lg border-2 border-blue-200 text-xs focus:outline-none focus:border-blue-400" />
+                              )}
+                            </div>
+                          )}
+                          {st === "غائب" && <span className="text-red-400 text-lg">❌</span>}
+                          {st === "حاضر" && <span className="text-green-400 text-lg">✅</span>}
+                          {st === "انسحاب" && <span className="text-xs text-purple-600 font-bold">خروج بدون إذن</span>}
+                        </td>
+                        {/* وقت الخروج */}
+                        <td className="p-1.5 text-center">
+                          {(st === "مستأذن" || st === "انسحاب") && (
+                            <input type="time"
+                              value={r.exitTime || ""}
+                              onChange={e => upd(ai, selDay, "exitTime", e.target.value)}
+                              className="px-2 py-1 rounded-lg border-2 border-gray-200 text-xs focus:outline-none focus:border-purple-400 text-center" />
+                          )}
+                          {(st === "حاضر" || st === "غائب" || st === "متأخر") && <span className="text-gray-200 text-lg">—</span>}
+                        </td>
+                        {/* ملاحظات */}
+                        <td className="p-1.5">
+                          <input type="text" placeholder="ملاحظة..."
+                            value={r.notes || ""}
+                            onChange={e => upd(ai, selDay, "notes", e.target.value)}
+                            className="w-full px-2 py-1 rounded-lg border-2 border-gray-200 text-xs focus:outline-none focus:border-purple-400 text-center"
+                            style={{ minWidth:"80px" }} />
+                        </td>
+                        <td className="p-1 text-center">
+                          <button onClick={() => delAdmin(ai)}
+                            style={{ background:"#fee2e2", border:"1px solid #fca5a5",
+                                     borderRadius:8, color:"#dc2626", cursor:"pointer",
+                                     fontSize:11, fontWeight:800, padding:"3px 8px",
+                                     fontFamily:"'Cairo',sans-serif" }}
+                            title="حذف الإداري">🗑️ حذف</button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* نافذة إضافة إداري */}
+      {showAddAdmin && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-black text-gray-800 text-lg">➕ إضافة إداري</h3>
+              <button onClick={() => setShowAddAdmin(false)} className="text-gray-400 hover:text-gray-600 text-xl font-bold">✕</button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-bold text-gray-600 block mb-1">الاسم <span className="text-red-500">*</span></label>
+                <input type="text" value={newName} onChange={e => setNewName(e.target.value)} onKeyDown={e => e.key==="Enter"&&addAdmin()}
+                  placeholder="اسم الإداري رباعياً"
+                  className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-purple-400 focus:outline-none text-sm" dir="rtl" autoFocus />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-gray-600 block mb-1">رقم الهوية <span className="text-gray-400">(اختياري)</span></label>
+                <input type="text" value={newId} onChange={e => setNewId(e.target.value)}
+                  placeholder="رقم الهوية الوطنية"
+                  className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-purple-400 focus:outline-none text-sm" dir="rtl" />
+              </div>
+            </div>
+            <div className="flex gap-2 mt-4">
+              <button onClick={addAdmin} className="flex-1 bg-purple-600 text-white py-2.5 rounded-xl font-bold hover:bg-purple-700">إضافة</button>
+              <button onClick={() => { setShowAddAdmin(false); setNewName(""); setNewId(""); }} className="px-4 py-2.5 rounded-xl bg-gray-100 text-gray-600 font-bold hover:bg-gray-200">إلغاء</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* نافذة استيراد إكسل */}
+      {showImport && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-black text-gray-800 text-lg">📥 استيراد من إكسل</h3>
+              <button onClick={() => setShowImport(false)} className="text-gray-400 hover:text-gray-600 text-xl font-bold">✕</button>
+            </div>
+            <div className="bg-blue-50 rounded-xl p-3 text-sm text-blue-700 mb-4 font-medium">
+              يجب أن يحتوي الملف على عمود بأسماء الإداريين. سيتم إضافة الأسماء الجديدة تلقائياً.
+            </div>
+            <label className="flex flex-col items-center justify-center border-2 border-dashed border-purple-300 rounded-xl p-8 cursor-pointer hover:border-purple-500 hover:bg-purple-50 transition-all">
+              <div className="text-4xl mb-2">📂</div>
+              <div className="font-bold text-gray-700">اضغط لاختيار ملف إكسل</div>
+              <div className="text-xs text-gray-400 mt-1">يدعم .xlsx و .xls</div>
+              <input type="file" accept=".xlsx,.xls" className="hidden"
+                onChange={e => { const f = e.target.files?.[0]; if (f) handleImportXLSX(f); }} />
+            </label>
+            <button onClick={() => setShowImport(false)} className="w-full mt-3 py-2.5 rounded-xl bg-gray-100 text-gray-600 font-bold hover:bg-gray-200">إلغاء</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─── مساعد تغيير تاريخ أسبوع الإداريين ─── */
 function AdminWeekPicker({ week, setWeek }) {
   const [startDate, setStartDate] = useState("");
   const generate = () => {
@@ -10833,6 +11496,540 @@ function ActivitiesPage({ activities, setActivities, saveActivities }) {
   );
 }
 
+// ==================== SMS PAGE ====================
+function SMSPage({ teachers, attendance, week, classList }) {
+  const [tab, setTab] = useState("contacts");
+  const [apiKey, setApiKey] = useState(() => localStorage.getItem("sms_apikey") || "");
+  const [sender, setSender] = useState(() => localStorage.getItem("sms_sender") || "School1");
+  const [showConfig, setShowConfig] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [result, setResult] = useState(null);
+
+  // ===== CONTACTS STATE =====
+  // Each contact: { id, name, phone, type: "student"|"teacher", class: "" }
+  const [contacts, setContacts] = useState([]);
+  const [contactsTab, setContactsTab] = useState("students"); // students | teachers
+  const [newName, setNewName] = useState("");
+  const [newPhone, setNewPhone] = useState("");
+  const [newClass, setNewClass] = useState("");
+  const [editId, setEditId] = useState(null);
+  const [editName, setEditName] = useState("");
+  const [editPhone, setEditPhone] = useState("");
+  const [editClass, setEditClass] = useState("");
+  const [searchContact, setSearchContact] = useState("");
+  const [selectedContacts, setSelectedContacts] = useState([]);
+  const [importMsg, setImportMsg] = useState("");
+
+  // Save contacts to localStorage
+  useEffect(() => {
+    try { localStorage.setItem("sms_contacts", JSON.stringify(contacts)); } catch {}
+  }, [contacts]);
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("sms_contacts");
+      if (saved) setContacts(JSON.parse(saved));
+    } catch {}
+  }, []);
+
+  const addContact = (type) => {
+    if (!newName.trim() || !newPhone.trim()) return;
+    const phone = newPhone.trim().replace(/\s/g, "");
+    setContacts(prev => [...prev, { id: Date.now(), name: newName.trim(), phone, type, class: newClass.trim() }]);
+    setNewName(""); setNewPhone(""); setNewClass("");
+  };
+
+  const deleteContact = (id) => setContacts(prev => prev.filter(c => c.id !== id));
+
+  const startEdit = (c) => { setEditId(c.id); setEditName(c.name); setEditPhone(c.phone); setEditClass(c.class || ""); };
+  const saveEdit = () => {
+    setContacts(prev => prev.map(c => c.id === editId ? { ...c, name: editName, phone: editPhone.replace(/\s/g,""), class: editClass } : c));
+    setEditId(null);
+  };
+
+  const importExcel = async (file, type) => {
+    try {
+      const XLSX = await loadXLSX();
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf);
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { header: 1 });
+      let added = 0;
+      const newContacts = [];
+      rows.forEach(row => {
+        // Try to find name and phone in the row
+        const cells = row.map(c => String(c || "").trim()).filter(Boolean);
+        if (cells.length < 1) return;
+        // Phone: cell containing 10+ digits starting with 05 or 9665
+        const phoneCell = cells.find(c => /^(05|9665|966)\d{7,}/.test(c.replace(/\s/g,"")));
+        // Name: longest non-numeric cell
+        const nameCell = cells.filter(c => !/^\d+$/.test(c) && c !== phoneCell).sort((a,b) => b.length - a.length)[0];
+        const classCell = cells.find(c => /فصل|صف|شعب|class/i.test(c) && c !== nameCell);
+        if (nameCell && phoneCell) {
+          newContacts.push({ id: Date.now() + Math.random(), name: nameCell, phone: phoneCell.replace(/\s/g,""), type, class: classCell || "" });
+          added++;
+        }
+      });
+      if (added > 0) {
+        setContacts(prev => {
+          const existingPhones = new Set(prev.map(c => c.phone));
+          const unique = newContacts.filter(c => !existingPhones.has(c.phone));
+          return [...prev, ...unique];
+        });
+        setImportMsg(`✅ تم استيراد ${added} جهة اتصال`);
+      } else {
+        setImportMsg("⚠️ لم يُعثر على أرقام بالصيغة المطلوبة. تأكد أن الملف يحتوي اسم ورقم في كل صف.");
+      }
+      setTimeout(() => setImportMsg(""), 4000);
+    } catch (e) { setImportMsg("❌ خطأ في قراءة الملف: " + e.message); }
+  };
+
+  const toggleSelect = (id) => setSelectedContacts(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  const selectAll = (type) => {
+    const ids = filteredContacts(type).map(c => c.id);
+    const allSelected = ids.every(id => selectedContacts.includes(id));
+    if (allSelected) setSelectedContacts(prev => prev.filter(id => !ids.includes(id)));
+    else setSelectedContacts(prev => [...new Set([...prev, ...ids])]);
+  };
+  const filteredContacts = (type) => contacts.filter(c => c.type === type && (
+    c.name.includes(searchContact) || c.phone.includes(searchContact) || (c.class||"").includes(searchContact)
+  ));
+  const selectedPhones = () => contacts.filter(c => selectedContacts.includes(c.id)).map(c => c.phone).join(",");
+
+  // Send tabs state
+  const [manualNums, setManualNums] = useState("");
+  const [manualMsg, setManualMsg] = useState("");
+  const [selectedDay, setSelectedDay] = useState(0);
+  const [supervisorNum, setSupervisorNum] = useState("");
+  const [absentMsg, setAbsentMsg] = useState("");
+  const [bulkNums, setBulkNums] = useState("");
+  const [bulkMsg, setBulkMsg] = useState("");
+
+  // Auto-build attendance message
+  useEffect(() => {
+    const di = selectedDay;
+    const dayLabel = week?.[di]?.day || `اليوم ${di + 1}`;
+    const dateLabel = week?.[di]?.dateH || "";
+    const absents = teachers.filter((_, ti) => (attendance?.[ti]?.[di]?.status || "حاضر") === "غائب").map((t, i) => `${i + 1}. ${t}`);
+    const lates = teachers.filter((_, ti) => (attendance?.[ti]?.[di]?.status || "حاضر") === "متأخر").map((t, i) => {
+      const r = attendance?.[teachers.indexOf(t)]?.[di] || {};
+      return `${i + 1}. ${t} (${r.lateType || "صباحي"} - ${r.lateMinutes || 0} دقيقة)`;
+    });
+    let msg = `📋 تقرير حضور ${dayLabel} ${dateLabel}\nمدرسة عبيدة بن الحارث المتوسطة\n\n`;
+    if (absents.length) msg += `❌ الغائبون (${absents.length}):\n${absents.join("\n")}\n\n`;
+    if (lates.length) msg += `🕐 المتأخرون (${lates.length}):\n${lates.join("\n")}\n`;
+    if (!absents.length && !lates.length) msg += `✅ جميع المعلمين حاضرون`;
+    setAbsentMsg(msg);
+  }, [selectedDay, teachers, attendance, week]);
+
+  const TABS = [
+    { id: "contacts",   label: "جهات الاتصال",   icon: "👥" },
+    { id: "manual",     label: "رسالة يدوية",    icon: "✍️" },
+    { id: "attendance", label: "إشعار الغياب",   icon: "📋" },
+    { id: "bulk",       label: "رسالة للأهالي",  icon: "👨‍👦" },
+    { id: "absence",    label: "غياب الطلاب",    icon: "🏫" },
+  ];
+
+  // ===== SEND FUNCTION — مباشر بدون خادم وسيط =====
+  const sendSMS = async (numbers, message) => {
+    if (!numbers?.trim()) { setResult({ ok:false, topMsg:"📞 أدخل رقماً واحداً على الأقل" }); return; }
+    if (!message.trim()) { setResult({ ok:false, topMsg:"✏️ اكتب نص الرسالة" }); return; }
+    setSending(true); setResult(null);
+
+    try {
+      const res = await fetch("/api/send-sms", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ numbers, message, sender: sender || "School1" }),
+      });
+      const text = await res.text();
+      let data;
+      try { data = JSON.parse(text); } catch(e) { data = { success: false, message: "رد غير متوقع من السيرفر: " + text.substring(0,100) }; }
+      if (data.success) {
+        setResult({ ok:true, msg:"✅ تم الإرسال بنجاح!\n📋 رد الخادم: " + (data.response || "") });
+      } else {
+        setResult({ ok:false, topMsg:"❌ فشل الإرسال — " + (data.message || ""), attempts: data.attempts || [], msg: "تحقق من صحة API Key والرصيد والـ Sender ID" });
+      }
+    } catch(e) {
+      setResult({ ok:false, topMsg:"❌ خطأ في الاتصال", msg: e.message });
+    }
+    setSending(false);
+  };
+
+  // Send to selected contacts
+  const [sendMsg, setSendMsg] = useState("");
+  const sendToSelected = () => {
+    const phones = selectedPhones();
+    sendSMS(phones, sendMsg);
+  };
+
+  return (
+    <div className="space-y-5">
+      {/* Header */}
+      <div className="bg-gradient-to-l from-green-600 to-teal-700 rounded-2xl p-5 text-white flex items-center justify-between flex-wrap gap-4">
+        <div>
+          <h2 className="text-xl font-black">📱 مركز الرسائل النصية SMS</h2>
+          <p className="text-sm opacity-75 mt-1">إرسال مباشر عبر المدار التقني — mobile.net.sa</p>
+        </div>
+        <button onClick={() => setShowConfig(!showConfig)}
+          className="bg-white bg-opacity-20 hover:bg-opacity-30 px-4 py-2 rounded-xl text-sm font-bold border border-white border-opacity-30">
+          ⚙️ إعدادات الحساب
+        </button>
+      </div>
+
+      {/* Config */}
+      {showConfig && (
+        <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm">
+          <h3 className="font-black text-gray-800 mb-1">⚙️ إعدادات CORBIT المدار</h3>
+          <p className="text-xs text-gray-400 mb-4">أدخل API Key من صفحة رموز API في حسابك</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-3">
+            <div>
+              <label className="text-xs font-black text-gray-600 mb-1 block">🔑 API Key</label>
+              <input value={apiKey} onChange={e => { setApiKey(e.target.value); localStorage.setItem("sms_apikey", e.target.value); }}
+                className="w-full border-2 border-gray-200 focus:border-teal-400 focus:outline-none rounded-xl px-3 py-2.5 text-sm font-mono"
+                placeholder="أدخل API Key من لوحة التحكم" dir="ltr" />
+              <p className="text-xs text-gray-400 mt-1">📍 من حسابك: الإعدادات ← رموز API</p>
+            </div>
+            <div>
+              <label className="text-xs font-black text-gray-600 mb-1 block">📛 اسم المرسل (Sender ID)</label>
+              <input value={sender} onChange={e => { setSender(e.target.value); localStorage.setItem("sms_sender", e.target.value); }}
+                className="w-full border-2 border-gray-200 focus:border-teal-400 focus:outline-none rounded-xl px-3 py-2.5 text-sm"
+                placeholder="School1" />
+            </div>
+          </div>
+          <div className="bg-teal-50 rounded-xl px-4 py-3 text-xs text-teal-700 space-y-1">
+            <p className="font-black">💡 كيف يعمل الإرسال؟</p>
+            <p>✅ الإرسال يتم عبر خادم Vercel مباشرةً بدون مشكلة CORS</p>
+            <p>✅ API Key يُحفظ تلقائياً في المتصفح</p>
+          </div>
+        </div>
+      )}
+
+      {/* Tabs */}
+      <div className="flex gap-1 bg-gray-100 p-1 rounded-2xl overflow-x-auto">
+        {TABS.map(t => (
+          <button key={t.id} onClick={() => { setTab(t.id); setResult(null); }}
+            className={`flex-1 whitespace-nowrap py-2.5 px-3 rounded-xl text-xs font-bold transition-all ${tab === t.id ? "bg-white shadow text-teal-700" : "text-gray-500 hover:text-gray-700"}`}>
+            {t.icon} {t.label}
+          </button>
+        ))}
+      </div>
+
+      {result && (
+        <div className={`rounded-2xl px-5 py-4 text-sm font-bold ${result.ok ? "bg-green-50 text-green-700 border border-green-200" : "bg-red-50 text-red-700 border border-red-200"}`}>
+          {result.ok ? (
+            <span>{result.msg}</span>
+          ) : (
+            <div className="space-y-2">
+              <div className="font-black text-base">{result.topMsg || "❌ لم يُرسَل"}</div>
+              {result.attempts && result.attempts.length > 0 ? (
+                <div className="bg-white rounded-xl p-3 space-y-1 max-h-60 overflow-y-auto text-xs font-mono border border-red-100">
+                  {result.attempts.map((a,i) => (
+                    <div key={i} className={a.error ? "text-gray-400" : a.http===200?"text-blue-700":"text-red-600"}>
+                      <strong>#{a.n}</strong> HTTP:{a.http||"—"} | {(a.raw||a.error||"").substring(0,120)}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-xs">{result.msg}</div>
+              )}
+              <div className="text-xs text-red-500 bg-red-50 rounded-lg p-2 mt-2">
+                📋 انسخ هذا التقرير وأرسله للمطور على واتساب: 0548454776
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ===== TAB: CONTACTS ===== */}
+      {tab === "contacts" && (
+        <div className="space-y-4">
+          {/* Sub-tabs: students / teachers */}
+          <div className="flex gap-2">
+            {[{ id:"students", label:"👨‍🎓 أولياء أمور الطلاب" }, { id:"teachers", label:"👨‍🏫 المعلمون" }].map(t => (
+              <button key={t.id} onClick={() => setContactsTab(t.id)}
+                className={`flex-1 py-2.5 rounded-xl text-sm font-bold border transition-all ${contactsTab === t.id ? "bg-teal-600 text-white border-teal-600" : "bg-white text-gray-500 border-gray-200 hover:border-teal-300"}`}>
+                {t.label} <span className="mr-1 text-xs opacity-70">({contacts.filter(c=>c.type===t.id).length})</span>
+              </button>
+            ))}
+          </div>
+
+          {/* Import + Add */}
+          <div className="bg-white rounded-2xl border border-gray-200 p-5 space-y-4">
+            <div className={cx.row}>
+              <h3 className="font-black text-gray-800">
+                {contactsTab === "students" ? "📥 استيراد / إضافة أولياء الأمور" : "📥 استيراد / إضافة المعلمين"}
+              </h3>
+              {/* Excel import */}
+              <label className="cursor-pointer bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 font-bold text-xs px-4 py-2 rounded-xl flex items-center gap-2">
+                📊 استيراد من Excel
+                <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={e => { if(e.target.files[0]) importExcel(e.target.files[0], contactsTab); e.target.value=""; }} />
+              </label>
+            </div>
+            {importMsg && <div className="text-sm font-bold text-center py-2 rounded-xl bg-gray-50 border">{importMsg}</div>}
+
+            {/* Excel format hint */}
+            <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-xs text-blue-700">
+              💡 <strong>صيغة ملف Excel:</strong> عمود للاسم وعمود للرقم (05XXXXXXXXX) — يمكن إضافة عمود للفصل/الصف اختيارياً. الملف يُضيف الجديد فقط دون حذف الموجود.
+            </div>
+
+            {/* Manual add form */}
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 pt-2 border-t border-gray-100">
+              <div className="sm:col-span-2">
+                <label className={cx.label}>الاسم</label>
+                <input value={newName} onChange={e => setNewName(e.target.value)}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm" placeholder="اسم الشخص" />
+              </div>
+              <div>
+                <label className={cx.label}>رقم الجوال</label>
+                <input value={newPhone} onChange={e => setNewPhone(e.target.value)}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm" placeholder="05XXXXXXXX" dir="ltr" />
+              </div>
+              <div>
+                <label className={cx.label}>{contactsTab === "students" ? "الفصل (اختياري)" : "التخصص (اختياري)"}</label>
+                <input value={newClass} onChange={e => setNewClass(e.target.value)}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm" placeholder={contactsTab === "students" ? "1أ، 2ب..." : "رياضيات..."} />
+              </div>
+              <div className="sm:col-span-4">
+                <button onClick={() => addContact(contactsTab)}
+                  disabled={!newName.trim() || !newPhone.trim()}
+                  className="bg-teal-600 hover:bg-teal-700 disabled:opacity-40 text-white font-bold px-5 py-2 rounded-xl text-sm">
+                  ➕ إضافة {contactsTab === "students" ? "ولي أمر" : "معلم"}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Contacts list */}
+          <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+            {/* Search + select all + send to selected */}
+            <div className="p-4 border-b border-gray-100 flex flex-wrap gap-3 items-center">
+              <input value={searchContact} onChange={e => setSearchContact(e.target.value)}
+                className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm" placeholder="🔍 بحث بالاسم أو الرقم أو الفصل..." />
+              <button onClick={() => selectAll(contactsTab)}
+                className="text-xs font-bold px-3 py-2 rounded-xl border border-gray-200 hover:bg-gray-50">
+                {filteredContacts(contactsTab).every(c => selectedContacts.includes(c.id)) ? "✗ إلغاء الكل" : "✓ تحديد الكل"}
+              </button>
+              {selectedContacts.length > 0 && (
+                <span className="text-xs font-bold text-teal-600 bg-teal-50 px-3 py-2 rounded-xl border border-teal-200">
+                  {selectedContacts.length} محدد
+                </span>
+              )}
+            </div>
+
+            {filteredContacts(contactsTab).length === 0 ? (
+              <div className="p-10 text-center text-gray-400">
+                <div className="text-4xl mb-3">{contactsTab === "students" ? "👨‍🎓" : "👨‍🏫"}</div>
+                <p className="font-bold">لا توجد جهات اتصال بعد</p>
+                <p className="text-xs mt-1">أضف يدوياً أو استورد من ملف Excel</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-gray-50 max-h-96 overflow-y-auto">
+                {filteredContacts(contactsTab).map(c => (
+                  <div key={c.id} className={`flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-all ${selectedContacts.includes(c.id) ? "bg-teal-50" : ""}`}>
+                    {/* Checkbox */}
+                    <input type="checkbox" checked={selectedContacts.includes(c.id)} onChange={() => toggleSelect(c.id)}
+                      className="w-4 h-4 accent-teal-600 cursor-pointer flex-shrink-0" />
+                    {editId === c.id ? (
+                      // Edit mode
+                      <div className="flex-1 grid grid-cols-3 gap-2">
+                        <input value={editName} onChange={e => setEditName(e.target.value)}
+                          className="border border-teal-300 rounded-lg px-2 py-1 text-xs" placeholder="الاسم" />
+                        <input value={editPhone} onChange={e => setEditPhone(e.target.value)}
+                          className="border border-teal-300 rounded-lg px-2 py-1 text-xs" placeholder="الرقم" dir="ltr" />
+                        <input value={editClass} onChange={e => setEditClass(e.target.value)}
+                          className="border border-teal-300 rounded-lg px-2 py-1 text-xs" placeholder="الفصل" />
+                      </div>
+                    ) : (
+                      <div className="flex-1 min-w-0">
+                        <div className="font-bold text-sm text-gray-800 truncate">{c.name}</div>
+                        <div className="text-xs text-gray-400 flex items-center gap-2">
+                          <span dir="ltr">{c.phone}</span>
+                          {c.class && <span className="bg-gray-100 px-2 py-0.5 rounded-full">{c.class}</span>}
+                        </div>
+                      </div>
+                    )}
+                    <div className="flex gap-1 flex-shrink-0">
+                      {editId === c.id ? (
+                        <>
+                          <button onClick={saveEdit} className="text-xs bg-teal-600 text-white px-3 py-1.5 rounded-lg font-bold">حفظ</button>
+                          <button onClick={() => setEditId(null)} className="text-xs border border-gray-200 px-3 py-1.5 rounded-lg font-bold">إلغاء</button>
+                        </>
+                      ) : (
+                        <>
+                          <button onClick={() => startEdit(c)} className="text-xs text-blue-600 hover:bg-blue-50 px-2 py-1.5 rounded-lg">✏️</button>
+                          <button onClick={() => deleteContact(c.id)} className="text-xs text-red-500 hover:bg-red-50 px-2 py-1.5 rounded-lg">🗑️</button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Send to selected footer */}
+            {selectedContacts.length > 0 && (
+              <div className="border-t border-gray-200 p-4 bg-teal-50 space-y-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-black text-teal-700">📤 إرسال لـ {selectedContacts.length} شخص محدد</span>
+                </div>
+                <textarea value={sendMsg} onChange={e => setSendMsg(e.target.value)}
+                  rows={3} className="w-full border border-teal-200 rounded-xl px-3 py-2 text-sm resize-none bg-white"
+                  placeholder="اكتب نص الرسالة..." />
+                <div className="flex gap-2">
+                  <button onClick={sendToSelected} disabled={sending || !sendMsg.trim()}
+                    className="bg-teal-600 hover:bg-teal-700 disabled:opacity-40 text-white font-bold px-5 py-2 rounded-xl text-sm">
+                    {sending ? "⏳ جاري الإرسال..." : `📤 إرسال الآن`}
+                  </button>
+                  <button onClick={() => setSelectedContacts([])}
+                    className="border border-gray-200 bg-white text-gray-500 font-bold px-4 py-2 rounded-xl text-sm">
+                    إلغاء التحديد
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ===== TAB: MANUAL ===== */}
+      {tab === "manual" && (
+        <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm space-y-4">
+          <h3 className="font-black text-gray-800">✍️ رسالة يدوية بأرقام مباشرة</h3>
+          <div>
+            <label className={cx.label}>أرقام الهاتف (مفصولة بفاصلة)</label>
+            <textarea value={manualNums} onChange={e => setManualNums(e.target.value)}
+              rows={2} className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm resize-none"
+              placeholder="0512345678,0598765432" dir="ltr" />
+            {selectedContacts.length > 0 && (
+              <button onClick={() => setManualNums(selectedPhones())}
+                className="mt-2 text-xs text-teal-600 font-bold hover:underline">
+                ← تعبئة من {selectedContacts.length} جهة محددة في قسم جهات الاتصال
+              </button>
+            )}
+          </div>
+          <div>
+            <label className={cx.label}>نص الرسالة <span className="text-gray-400 font-normal mr-1">({manualMsg.length} حرف)</span></label>
+            <textarea value={manualMsg} onChange={e => setManualMsg(e.target.value)}
+              rows={4} className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm resize-none" placeholder="اكتب نص رسالتك هنا..." />
+          </div>
+          <div className="flex gap-3">
+            <button onClick={() => sendSMS(manualNums, manualMsg)} disabled={sending}
+              className="bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white font-bold px-6 py-2.5 rounded-xl text-sm">
+              {sending ? "⏳ جاري الإرسال..." : "📤 إرسال الآن"}
+            </button>
+            <button onClick={() => { setManualNums(""); setManualMsg(""); }}
+              className="border border-gray-200 text-gray-500 font-bold px-4 py-2.5 rounded-xl text-sm">مسح</button>
+          </div>
+        </div>
+      )}
+
+      {/* ===== TAB: ATTENDANCE ===== */}
+      {tab === "attendance" && (
+        <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm space-y-4">
+          <h3 className="font-black text-gray-800">📋 إشعار غياب وتأخر المعلمين</h3>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className={cx.label}>اليوم</label>
+              <select value={selectedDay} onChange={e => setSelectedDay(Number(e.target.value))}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white">
+                {(week || []).map((d, i) => <option key={i} value={i}>{d.day} — {d.dateH}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className={cx.label}>رقم المشرف</label>
+              <input value={supervisorNum} onChange={e => setSupervisorNum(e.target.value)}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm" placeholder="05XXXXXXXX" dir="ltr" />
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            {[
+              { label:"حاضر", color:"green", count: teachers.filter((_,ti)=>(attendance?.[ti]?.[selectedDay]?.status||"حاضر")==="حاضر").length },
+              { label:"متأخر", color:"amber", count: teachers.filter((_,ti)=>(attendance?.[ti]?.[selectedDay]?.status||"حاضر")==="متأخر").length },
+              { label:"غائب", color:"red", count: teachers.filter((_,ti)=>(attendance?.[ti]?.[selectedDay]?.status||"حاضر")==="غائب").length },
+            ].map(s => (
+              <div key={s.label} className={`bg-${s.color}-50 border border-${s.color}-200 rounded-xl p-3 text-center`}>
+                <div className={`text-2xl font-black text-${s.color}-600`}>{s.count}</div>
+                <div className={`text-xs font-bold text-${s.color}-500`}>{s.label}</div>
+              </div>
+            ))}
+          </div>
+          <div>
+            <label className={cx.label}>نص الرسالة (مُولَّد تلقائياً — قابل للتعديل)</label>
+            <textarea value={absentMsg} onChange={e => setAbsentMsg(e.target.value)}
+              rows={8} className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm font-mono resize-none" />
+          </div>
+          <button onClick={() => sendSMS(supervisorNum, absentMsg)} disabled={sending}
+            className="bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white font-bold px-6 py-2.5 rounded-xl text-sm">
+            {sending ? "⏳ جاري الإرسال..." : "📤 أرسل للمشرف"}
+          </button>
+        </div>
+      )}
+
+      {/* ===== TAB: BULK ===== */}
+      {tab === "bulk" && (
+        <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm space-y-4">
+          <h3 className="font-black text-gray-800">👨‍👦 رسالة جماعية لأولياء الأمور</h3>
+          <div className="bg-teal-50 border border-teal-200 rounded-xl px-4 py-3 text-sm text-teal-700 flex items-center justify-between gap-3 flex-wrap">
+            <span>💡 يمكنك تحديد الأرقام من قسم <strong>جهات الاتصال</strong> ثم العودة هنا</span>
+            {selectedContacts.length > 0 && (
+              <button onClick={() => setBulkNums(selectedPhones())}
+                className="bg-teal-600 text-white font-bold text-xs px-3 py-1.5 rounded-lg">
+                ← تعبئة {selectedContacts.length} رقم محدد
+              </button>
+            )}
+          </div>
+          <div>
+            <label className={cx.label}>أرقام أولياء الأمور <span className="text-gray-400 font-normal mr-1">({bulkNums.split(",").filter(n=>n.trim().length>5).length} رقم)</span></label>
+            <textarea value={bulkNums} onChange={e => setBulkNums(e.target.value)}
+              rows={3} className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm resize-none"
+              placeholder="0512345678,0598765432,0566778899" dir="ltr" />
+          </div>
+          <div>
+            <label className="text-xs font-bold text-gray-500 mb-2 block">قوالب جاهزة</label>
+            <div className="flex gap-2 flex-wrap">
+              {[
+                { label:"دعوة اجتماع", msg:"أولياء الأمور الكرام\nيُعقد اجتماعاً بالمدرسة يوم ............\nالرجاء الحضور في الموعد المحدد\nمدرسة عبيدة بن الحارث المتوسطة" },
+                { label:"موعد الاختبارات", msg:"أولياء الأمور الكرام\nتبدأ الاختبارات يوم ............\nنتمنى لأبنائكم التوفيق\nمدرسة عبيدة بن الحارث المتوسطة" },
+                { label:"إجازة عارضة", msg:"أولياء الأمور الكرام\nتُعلم المدرسة بعدم الدراسة يوم ............\nمع التقدير\nمدرسة عبيدة بن الحارث المتوسطة" },
+                { label:"نشاط مدرسي", msg:"أولياء الأمور الكرام\nتقيم المدرسة نشاطاً بتاريخ ............\nنتشرف بحضوركم\nمدرسة عبيدة بن الحارث المتوسطة" },
+              ].map(t => (
+                <button key={t.label} onClick={() => setBulkMsg(t.msg)}
+                  className="bg-gray-100 hover:bg-teal-50 hover:text-teal-700 text-gray-600 text-xs font-bold px-3 py-1.5 rounded-lg border border-gray-200 transition-all">
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className={cx.label}>نص الرسالة <span className="text-gray-400 font-normal mr-1">({bulkMsg.length} حرف)</span></label>
+            <textarea value={bulkMsg} onChange={e => setBulkMsg(e.target.value)}
+              rows={5} className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm resize-none"
+              placeholder="اكتب رسالتك لأولياء الأمور..." />
+          </div>
+          <div className="flex gap-3">
+            <button onClick={() => sendSMS(bulkNums, bulkMsg)} disabled={sending}
+              className="bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white font-bold px-6 py-2.5 rounded-xl text-sm">
+              {sending ? "⏳ جاري الإرسال..." : `📤 إرسال لـ ${bulkNums.split(",").filter(n=>n.trim().length>5).length} رقم`}
+            </button>
+            <button onClick={() => { setBulkNums(""); setBulkMsg(""); }}
+              className="border border-gray-200 text-gray-500 font-bold px-4 py-2.5 rounded-xl text-sm">مسح</button>
+          </div>
+        </div>
+      )}
+
+      {/* Notes */}
+      <div className="bg-gray-50 rounded-2xl px-5 py-4 border border-gray-200">
+        <p className="text-xs text-gray-500 font-bold mb-1">📌 ملاحظات:</p>
+        <ul className="text-xs text-gray-400 space-y-1 list-disc list-inside">
+          <li>الأرقام السعودية: 05XXXXXXXX أو 9665XXXXXXXX</li>
+          <li>جهات الاتصال تُحفظ في المتصفح تلقائياً</li>
+          <li>الرسائل العربية: 70 حرف = رسالة واحدة</li>
+          <li>يمكن الإرسال لأكثر من 500 رقم في طلب واحد</li>
+        </ul>
+      </div>
+    </div>
+  );
+}
 
 // ==================== STUDENT ABSENCE PAGE ====================
 function StudentAbsencePage() {
@@ -11554,11 +12751,21 @@ function ProgramReportPage() {
   const FIELDS_LIST  = ["النشاط الطلابيّ","التوجيه والإرشاد","الرياضة المدرسية","الأمن والسلامة","التربية الإسلامية","المناهج الدراسية","التقنية والحاسب","البيئة والصحة","الفنون والثقافة","الخدمة المجتمعية","أخرى"];
   const TARGETS_LIST = ["الطلاب","الطلاب وأولياء الأمور","المعلمون","الهيئة التعليمية","الجميع","أخرى"];
 
+  const MOTIVATIONAL_QUOTES = [
+    "الإبداع لا يُورَث، بل يُصنَع بالعمل والإتقان 🌟",
+    "كل برنامج تُنفِّذه هو بذرة تنمو في عقل طالب 🌱",
+    "التعليم رسالة والمعلم صانع الأجيال 🏆",
+    "من أثَّر في طالب واحد فقد غيَّر العالم 💡",
+    "الجودة في التخطيط تعني الجودة في النتائج ✨",
+    "برامجنا التعليمية هي جسور نحو المستقبل 🚀",
+  ];
+  const QUOTE = MOTIVATIONAL_QUOTES[new Date().getDay() % MOTIVATIONAL_QUOTES.length];
+
   const EMPTY = {
     acadYear:"1447هـ", semester:"الأول", period:"الأولى",
     reportTitle:"تقرير تكريم الطلاب المتفوقين في الفترة الأولى للفصل الدراسي الأول لعام 1447هـ",
     field:"النشاط الطلابيّ",
-    executor:"طلال القرني _معيض القرني",
+    executor:"",
     targetGroup:"الطلاب",
     execDayNum:"24", execHijriMonth:"شوال", execHijriYear:"1447هـ",
     intro:"يُعدّ تكريم الطلاب المتفوقين من أهم الوسائل التي تعزز روح المنافسة والاجتهاد بين الطلبة، حيث يعكس تقدير المجتمع التربوي للجهود المبذولة والإنجازات المحققة.",
@@ -11566,8 +12773,10 @@ function ProgramReportPage() {
     activities:"تم تنفيذ مجموعة من الأنشطة التي تهدف إلى إبراز جهود الطلاب المتفوقين والاحتفاء بإنجازاتهم، حيث شمل البرنامج حفل تكريم رسمي بحضور الهيئة التعليمية.",
     results:"من المتوقع أن يسهم هذا البرنامج في رفع مستوى الدافعية لدى الطلاب وتحفيزهم على تحقيق المزيد من النجاحات.",
     recommendations:"يوصى بالاستمرار في تنفيذ برامج تكريم الطلاب المتفوقين بشكل دوري لما لها من أثر إيجابي كبير.",
-    activityLeader:"طلال القرني", activityLeaderTitle:"رائد النشاط",
-    coordinator:"معيض القرني",   coordinatorTitle:"منسق الرياضي",
+    programCoordinator:"",
+    supporter:"",
+    activityLeader:"", activityLeaderTitle:"رائد النشاط",
+    coordinator:"",   coordinatorTitle:"منسق البرنامج",
     principal:"فازع القرني",
     witnesses:[null,null,null,null,null,null],
   };
@@ -11584,9 +12793,40 @@ function ProgramReportPage() {
   });
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [archives, setArchives] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("prog_report_archives_v1")||"[]"); } catch { return []; }
+  });
+  const [showArchives, setShowArchives] = useState(false);
   const witnessRefs = [useRef(),useRef(),useRef(),useRef(),useRef(),useRef()];
 
   const upd = (k, v) => setReport(p => ({ ...p, [k]: v }));
+
+  const saveToArchive = () => {
+    const title = report.reportTitle || "تقرير بدون عنوان";
+    const date  = new Date().toLocaleDateString("ar-SA");
+    const entry = { id: Date.now(), title, date, report: { ...report, witnesses: report.witnesses.map(w => w ? {dataUrl:w.dataUrl||null,name:w.name||""} : null) } };
+    const updated = [entry, ...archives].slice(0, 20);
+    setArchives(updated);
+    localStorage.setItem("prog_report_archives_v1", JSON.stringify(updated));
+    DB.set("school-prog-report-archives", updated);
+    alert(`✅ تم حفظ "${title}" في الأرشيف`);
+  };
+
+  const loadFromArchive = (entry) => {
+    if (!confirm(`تحميل "${entry.title}"؟ ستُفقد البيانات الحالية.`)) return;
+    const r = { ...entry.report };
+    if (!r.witnesses || r.witnesses.length < 6)
+      r.witnesses = [...(r.witnesses||[]), null,null,null,null,null,null].slice(0,6);
+    setReport(r);
+    setShowArchives(false);
+  };
+
+  const deleteFromArchive = (id) => {
+    const updated = archives.filter(a => a.id !== id);
+    setArchives(updated);
+    localStorage.setItem("prog_report_archives_v1", JSON.stringify(updated));
+    DB.set("school-prog-report-archives", updated);
+  };
 
   useEffect(() => {
     setSaving(true);
@@ -11654,7 +12894,9 @@ body{font-family:'Cairo',sans-serif;background:#fff;color:#1a2035;direction:rtl;
 .sigs{display:grid;grid-template-columns:repeat(3,1fr);gap:0;border-top:2px solid #0d3b6e;margin:0 14px 14px}
 .sg{text-align:center;padding:14px 8px 6px;border-left:1px solid #c7d2e8}
 .sg:first-child{border-left:none}
-.sg-r{font-size:10px;color:#64748b;margin-bottom:6px}.sg-n{font-size:12px;font-weight:900;color:#1a2035;border-top:1.5px dashed #0d9488;padding-top:8px;margin-top:14px}
+.sg-r{font-size:10px;color:#64748b;margin-bottom:6px}.sg-n{font-size:12px;font-weight:900;color:#1a2035;border-top:1.5px dashed #0d9488;padding-top:8px;margin-top:8px}
+.sg-box{height:40px;border:1.5px dashed #c7d2e8;border-radius:6px;margin:4px 0;background:#fafbff}
+.quote-bar{background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;text-align:center;padding:7px 14px;font-size:12px;font-weight:900;border-bottom:2px solid #0d3b6e}
 .wp{page-break-before:always;padding:0}
 .wt{background:linear-gradient(135deg,#1a2f5e,#0d9488);color:#fff;text-align:center;padding:11px;font-size:15px;font-weight:900}
 .wg{display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:14px}
@@ -11672,6 +12914,7 @@ body{font-family:'Cairo',sans-serif;background:#fff;color:#1a2035;direction:rtl;
     <div class="hc c"><img src="${LOGO_URL}" class="logo"/></div>
     <div class="hc l"><div style="font-size:11px;opacity:.8">مدرسة عبيدة بن الحارث المتوسطة</div><div style="font-size:13px;font-weight:900">العام الدراسي ${report.acadYear}</div><div style="font-size:11px;opacity:.8">الفصل الدراسي ${report.semester}</div></div>
   </div>
+  <div class="quote-bar">✨ ${report.motivationalQuote || QUOTE}</div>
   <div class="yr"><div class="yc">العام الدراسي ${report.acadYear}</div><div class="yc">الفصل الدراسي ${report.semester}</div></div>
   <div class="tb">${report.reportTitle}</div>
   <div class="meta">
@@ -11688,9 +12931,17 @@ body{font-family:'Cairo',sans-serif;background:#fff;color:#1a2035;direction:rtl;
     <div class="sec"><div class="sh2">💡 التوصيات</div><div class="sb">${ft(report.recommendations)}</div></div>
   </div>
   <div class="sigs">
-    <div class="sg"><div class="sg-r">${report.activityLeaderTitle} / إسم المعلم</div><div class="sg-n">${report.activityLeader}</div></div>
-    <div class="sg"><div class="sg-r">${report.coordinatorTitle} / إسم المعلم</div><div class="sg-n">${report.coordinator}</div></div>
-    <div class="sg"><div class="sg-r">مدير المدرسة / اسم المدير</div><div class="sg-n">${report.principal}</div></div>
+    <div class="sg"><div class="sg-r">منسق البرنامج / اسم المعلم</div><div class="sg-box"></div><div class="sg-n">${report.programCoordinator||"................................"}</div></div>
+    <div class="sg"><div class="sg-r">المساند / اسم المعلم</div><div class="sg-box"></div><div class="sg-n">${report.supporter||"................................"}</div></div>
+    <div class="sg"><div class="sg-r">${report.activityLeaderTitle} / اسم المعلم</div><div class="sg-box"></div><div class="sg-n">${report.activityLeader||"................................"}</div></div>
+  </div>
+  <div class="sigs" style="border-top:none;margin-top:-2px">
+    <div class="sg"><div class="sg-r">${report.coordinatorTitle} / اسم المعلم</div><div class="sg-box"></div><div class="sg-n">${report.coordinator||"................................"}</div></div>
+    <div class="sg" style="grid-column:2/4">
+      <div class="sg-r">مدير المدرسة / التوقيع والختم</div>
+      <div style="border:2px dashed #0d9488;border-radius:10px;min-height:60px;margin:8px auto;width:80%;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:11px">التوقيع والختم</div>
+      <div class="sg-n">${report.principal||"................................"}</div>
+    </div>
   </div>
   <div class="ft">www.edu-forms.com — موقع نماذج تعليمية • صفحة 1 من 2</div>
 </div>
@@ -11770,6 +13021,22 @@ body{font-family:'Cairo',sans-serif;background:#fff;color:#1a2035;direction:rtl;
         select.rpt-sel:focus{border-color:#1d4ed8;}
         textarea:focus,input[type=text]:focus{border-color:#1d4ed8!important;box-shadow:0 0 0 3px rgba(29,78,216,.1);}
       `}</style>
+
+      {/* ── عبارة محفزة ── */}
+      <div className="rounded-2xl px-5 py-3 text-center shadow-lg flex items-center justify-center gap-3"
+        style={{background:"linear-gradient(135deg,#f59e0b,#d97706,#b45309)"}}>
+        <span className="text-xl shrink-0">✨</span>
+        <input
+          value={report.motivationalQuote !== undefined ? report.motivationalQuote : QUOTE}
+          onChange={e => upd("motivationalQuote", e.target.value)}
+          className="flex-1 bg-transparent text-white placeholder-white/60 text-center font-black text-sm focus:outline-none border-b border-white/40 pb-0.5"
+          placeholder="اكتب عبارة محفزة..."
+          style={{fontFamily:"'Cairo',sans-serif"}}
+        />
+        <button onClick={() => upd("motivationalQuote", MOTIVATIONAL_QUOTES[Math.floor(Math.random()*MOTIVATIONAL_QUOTES.length)])}
+          title="عبارة عشوائية"
+          className="text-white/80 hover:text-white text-lg shrink-0 transition-all">🔀</button>
+      </div>
 
       {/* ── ترويسة ── */}
       <div className="rounded-2xl overflow-hidden shadow-2xl text-white"
@@ -11882,26 +13149,55 @@ body{font-family:'Cairo',sans-serif;background:#fff;color:#1a2035;direction:rtl;
       {/* ── التوقيعات ── */}
       <div className="rpt-card">
         <div className="rpt-hdr">✍️ التوقيعات</div>
-        <div className="grid grid-cols-3 gap-4 p-4">
-          {[
-            {roleF:"activityLeaderTitle",nameF:"activityLeader",  defRole:"رائد النشاط"},
-            {roleF:"coordinatorTitle",   nameF:"coordinator",     defRole:"منسق الرياضي"},
-            {roleF:null,                 nameF:"principal",        defRole:"مدير المدرسة"},
-          ].map((sig,i)=>(
-            <div key={i} className="text-center p-3 rounded-xl border-2 space-y-2" style={{borderColor:"#c7d2e8"}}>
-              {sig.roleF ? (
-                <input value={report[sig.roleF]||""} onChange={e=>upd(sig.roleF,e.target.value)}
-                  className="w-full text-center text-xs font-black border rounded-lg px-2 py-1 focus:outline-none"
-                  style={{color:"#64748b",borderColor:"#e2e8f0"}} placeholder={sig.defRole} />
-              ) : (
-                <div className="text-xs font-black text-gray-500">مدير المدرسة</div>
-              )}
-              <div style={{height:1,background:"#e2e8f0",margin:"10px 0"}}/>
-              <input value={report[sig.nameF]||""} onChange={e=>upd(sig.nameF,e.target.value)}
+        <div className="p-4 space-y-4">
+          {/* الصف الأول: منسق البرنامج، المساند، رائد النشاط */}
+          <div className="grid grid-cols-3 gap-4">
+            {[
+              {label:"منسق البرنامج", nameF:"programCoordinator", roleF:null},
+              {label:"المساند",        nameF:"supporter",          roleF:null},
+              {label:"رائد النشاط",   nameF:"activityLeader",     roleF:"activityLeaderTitle"},
+            ].map((sig,i)=>(
+              <div key={i} className="text-center p-3 rounded-xl border-2 space-y-2" style={{borderColor:"#c7d2e8"}}>
+                {sig.roleF ? (
+                  <input value={report[sig.roleF]||""} onChange={e=>upd(sig.roleF,e.target.value)}
+                    className="w-full text-center text-xs font-black border rounded-lg px-2 py-1 focus:outline-none"
+                    style={{color:"#64748b",borderColor:"#e2e8f0"}} placeholder={sig.label} />
+                ) : (
+                  <div className="text-xs font-black py-1" style={{color:"#64748b"}}>{sig.label}</div>
+                )}
+                {/* صندوق التوقيع */}
+                <div className="border-2 border-dashed rounded-xl mx-1" style={{borderColor:"#c7d2e8",minHeight:44,background:"#fafbff"}}></div>
+                <input value={report[sig.nameF]||""} onChange={e=>upd(sig.nameF,e.target.value)}
+                  className="w-full text-center font-black text-sm border-b-2 focus:outline-none bg-transparent"
+                  style={{borderColor:"#0d9488",color:"#0d3b6e"}} placeholder="الاسم" />
+              </div>
+            ))}
+          </div>
+
+          {/* الصف الثاني: منسق (coordinatorTitle)، مدير المدرسة + ختم */}
+          <div className="grid grid-cols-3 gap-4">
+            <div className="text-center p-3 rounded-xl border-2 space-y-2" style={{borderColor:"#c7d2e8"}}>
+              <input value={report.coordinatorTitle||""} onChange={e=>upd("coordinatorTitle",e.target.value)}
+                className="w-full text-center text-xs font-black border rounded-lg px-2 py-1 focus:outline-none"
+                style={{color:"#64748b",borderColor:"#e2e8f0"}} placeholder="منسق البرنامج" />
+              <div className="border-2 border-dashed rounded-xl mx-1" style={{borderColor:"#c7d2e8",minHeight:44,background:"#fafbff"}}></div>
+              <input value={report.coordinator||""} onChange={e=>upd("coordinator",e.target.value)}
                 className="w-full text-center font-black text-sm border-b-2 focus:outline-none bg-transparent"
                 style={{borderColor:"#0d9488",color:"#0d3b6e"}} placeholder="الاسم" />
             </div>
-          ))}
+
+            {/* مدير المدرسة + التوقيع والختم — يأخذ خانتين */}
+            <div className="col-span-2 text-center p-3 rounded-xl border-2 space-y-2"
+              style={{borderColor:"#0d3b6e",background:"#f8fbff"}}>
+              <div className="text-xs font-black" style={{color:"#0d3b6e"}}>مدير المدرسة — التوقيع والختم</div>
+              <div className="border-2 border-dashed rounded-xl mx-auto" style={{borderColor:"#0d9488",minHeight:60,maxWidth:260,background:"#fff",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                <span className="text-xs text-gray-300 font-bold">التوقيع والختم</span>
+              </div>
+              <input value={report.principal||""} onChange={e=>upd("principal",e.target.value)}
+                className="w-full text-center font-black text-sm border-b-2 focus:outline-none bg-transparent"
+                style={{borderColor:"#0d3b6e",color:"#0d3b6e"}} placeholder="اسم مدير المدرسة" />
+            </div>
+          </div>
         </div>
       </div>
 
@@ -11913,6 +13209,46 @@ body{font-family:'Cairo',sans-serif;background:#fff;color:#1a2035;direction:rtl;
         </div>
       </div>
 
+      {/* ── أرشيف التقارير ── */}
+      {showArchives && (
+        <div className="rpt-card">
+          <div className="rpt-hdr" style={{background:"linear-gradient(135deg,#7c3aed,#4f46e5)"}}>
+            🗂️ أرشيف التقارير المحفوظة
+            <button onClick={()=>setShowArchives(false)} className="mr-auto text-white/70 hover:text-white text-base">✕</button>
+          </div>
+          <div className="p-4">
+            {archives.length === 0 ? (
+              <div className="text-center py-8 text-gray-400">
+                <div className="text-4xl mb-2">📭</div>
+                <div className="font-bold text-sm">لا يوجد تقارير محفوظة بعد</div>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {archives.map(entry => (
+                  <div key={entry.id} className="flex items-center gap-3 p-3 rounded-xl border-2 hover:border-purple-300 transition-all"
+                    style={{borderColor:"#e2e8f0",background:"#fafbff"}}>
+                    <div className="text-2xl">📄</div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-black text-sm truncate" style={{color:"#1a2035"}}>{entry.title}</div>
+                      <div className="text-xs text-gray-400 mt-0.5">📅 {entry.date}</div>
+                    </div>
+                    <button onClick={()=>loadFromArchive(entry)}
+                      className="px-3 py-1.5 rounded-lg text-xs font-black text-white"
+                      style={{background:"linear-gradient(135deg,#1d4ed8,#0d9488)"}}>
+                      📂 تحميل
+                    </button>
+                    <button onClick={()=>{ if(confirm("حذف هذا التقرير؟")) deleteFromArchive(entry.id); }}
+                      className="px-3 py-1.5 rounded-lg text-xs font-black text-white bg-red-500 hover:bg-red-600">
+                      🗑️
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* ── شريط التحكم ── */}
       <div className="flex gap-3 flex-wrap justify-between items-center rounded-2xl p-4 shadow-lg text-white"
         style={{background:"linear-gradient(135deg,#0d3b6e,#0d9488)"}}>
@@ -11921,7 +13257,17 @@ body{font-family:'Cairo',sans-serif;background:#fff;color:#1a2035;direction:rtl;
                   : saved  ? <><span className="text-green-300">✅</span><span>تم الحفظ</span></>
                            : <><span>☁️</span><span className="opacity-60">يحفظ تلقائياً</span></>}
         </div>
-        <div className="flex gap-3">
+        <div className="flex gap-3 flex-wrap">
+          <button onClick={()=>setShowArchives(v=>!v)}
+            className="px-4 py-2.5 rounded-xl font-black text-sm border border-white/30 hover:bg-white/10 flex items-center gap-1.5"
+            style={{background: showArchives ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.1)"}}>
+            🗂️ الأرشيف {archives.length > 0 && <span className="bg-amber-400 text-gray-900 text-xs font-black px-1.5 py-0.5 rounded-full">{archives.length}</span>}
+          </button>
+          <button onClick={saveToArchive}
+            className="px-5 py-2.5 rounded-xl font-black text-sm flex items-center gap-1.5 shadow-lg"
+            style={{background:"linear-gradient(135deg,#7c3aed,#4f46e5)",color:"#fff"}}>
+            📥 حفظ في الأرشيف
+          </button>
           <button onClick={()=>{ if(confirm("إعادة تعيين جميع البيانات؟")) setReport(EMPTY); }}
             className="px-5 py-2.5 rounded-xl font-black text-sm text-white/80 border border-white/30 hover:bg-white/10">
             🔄 إعادة تعيين
@@ -18251,6 +19597,382 @@ function OfficialFormsPage({ teachers, attendance, week }) {
 
 
 // -
+// صفحة ملف الطالب الشامل
+// -
+function StudentPortfolioPage({ classList, weekArchive, attendance, week, teachers }) {
+  const [selClass,   setSelClass]   = useState("");
+  const [selStudent, setSelStudent] = useState("");
+  const [tab,        setTab]        = useState("overview");
+
+  const cls  = classList.find(c=>c.id===selClass);
+  const stu  = cls?.students?.find(s=>s.id===selStudent);
+
+  // حضور الطالب
+  const absCount = stu ? (() => {
+    let abs = 0;
+    teachers.forEach((_,ti)=>{
+      week.days.forEach((_,di)=>{
+        if ((attendance[ti]?.[di]?.status||"حاضر")==="غائب") abs++;
+      });
+    });
+    return abs;
+  })() : 0;
+
+  // تقييمات المادة
+  const evals = stu?.evals || [];
+  const subjEvals = {};
+  evals.forEach(ev=>{
+    if (!ev.subject) return;
+    if (!subjEvals[ev.subject]) subjEvals[ev.subject]=[];
+    subjEvals[ev.subject].push(ev);
+  });
+
+  const lvLabel = l => ({excel:"ممتاز",vgood:"جيد جداً",good:"جيد",accept:"مقبول",weak:"ضعيف"}[l]||l);
+  const lvColor = l => ({excel:"#10b981",vgood:"#3b82f6",good:"#f59e0b",accept:"#f97316",weak:"#ef4444"}[l]||"#6b7280");
+
+  return (
+    <div dir="rtl" className="space-y-4">
+      <div className="rounded-b-2xl overflow-hidden shadow-xl" style={{background:"linear-gradient(135deg,#0f172a,#7c3aed)"}}>
+        <div className="p-6 text-white">
+          <h2 className="text-2xl font-black mb-1">📁 ملف الطالب الشامل</h2>
+          <p className="opacity-80 text-sm">سجل متكامل — الأداء الأكاديمي والحضور والتقييمات</p>
+        </div>
+      </div>
+
+      {/* اختيار الطالب */}
+      <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex gap-3 flex-wrap">
+        <div className="flex-1">
+          <label className="text-xs font-bold text-gray-500 block mb-1">الفصل</label>
+          <select value={selClass} onChange={e=>{setSelClass(e.target.value);setSelStudent("");}}
+            className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 text-sm font-bold focus:outline-none" style={{fontFamily:"inherit"}}>
+            <option value="">— اختر الفصل —</option>
+            {classList.map(c=><option key={c.id} value={c.id}>{c.name||`${c.level}/${c.section}`}</option>)}
+          </select>
+        </div>
+        {cls && (
+          <div className="flex-1">
+            <label className="text-xs font-bold text-gray-500 block mb-1">الطالب</label>
+            <select value={selStudent} onChange={e=>setSelStudent(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 text-sm font-bold focus:outline-none" style={{fontFamily:"inherit"}}>
+              <option value="">— اختر الطالب —</option>
+              {(cls.students||[]).filter(s=>s.name).map(s=><option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+          </div>
+        )}
+      </div>
+
+      {stu && (
+        <>
+          {/* بطاقة الطالب */}
+          <div className="rounded-2xl overflow-hidden shadow-sm border border-gray-100">
+            <div className="p-5 text-white flex items-center gap-4" style={{background:"linear-gradient(135deg,#0f172a,#7c3aed)"}}>
+              <div className="w-16 h-16 rounded-2xl bg-white bg-opacity-20 flex items-center justify-center text-3xl flex-shrink-0">👨‍🎓</div>
+              <div>
+                <h3 className="text-xl font-black">{stu.name}</h3>
+                <p className="opacity-70 text-sm">{cls?.level} / شعبة {cls?.section} — {cls?.teacher}</p>
+                {stu.nationalId && <p className="opacity-60 text-xs mt-0.5">الهوية: {stu.nationalId}</p>}
+              </div>
+            </div>
+            <div className="grid grid-cols-3 divide-x divide-x-reverse bg-white">
+              {[
+                {l:"مواد مقيّمة",v:Object.keys(subjEvals).length,c:"#6366f1"},
+                {l:"أيام الغياب",v:absCount,c:absCount>3?"#ef4444":"#10b981"},
+                {l:"المرحلة",v:cls?.level||"—",c:"#0ea5e9"},
+              ].map(k=>(
+                <div key={k.l} className="p-4 text-center">
+                  <div className="text-2xl font-black" style={{color:k.c}}>{k.v}</div>
+                  <div className="text-xs text-gray-400 font-bold mt-1">{k.l}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* تبويبات */}
+          <div className="flex gap-1 bg-white rounded-2xl p-1.5 shadow-sm overflow-x-auto">
+            {[{id:"overview",l:"📊 نظرة عامة"},{id:"subjects",l:"📚 المواد"},{id:"attendance",l:"📋 الحضور"},{id:"plan",l:"💡 خطة التطوير"}].map(t=>(
+              <button key={t.id} onClick={()=>setTab(t.id)}
+                className={"flex-shrink-0 px-4 py-2 rounded-xl text-xs font-black transition-all "+(tab===t.id?"bg-purple-600 text-white shadow":"text-gray-500 hover:bg-gray-50")}>
+                {t.l}
+              </button>
+            ))}
+          </div>
+
+          {/* نظرة عامة */}
+          {tab==="overview" && (
+            <div className="space-y-3">
+              {Object.keys(subjEvals).length===0 ? (
+                <div className="bg-white rounded-2xl p-8 text-center shadow-sm border">
+                  <div className="text-3xl mb-2">📚</div>
+                  <div className="font-black text-gray-400">لا توجد تقييمات بعد لهذا الطالب</div>
+                </div>
+              ) : (
+                <div className="grid gap-3">
+                  {Object.entries(subjEvals).map(([subj,evs])=>{
+                    const last = evs[evs.length-1];
+                    const color = lvColor(last?.level);
+                    return (
+                      <div key={subj} className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex items-center gap-4">
+                        <div className="flex-1">
+                          <div className="font-black text-gray-800 text-sm">{subj}</div>
+                          <div className="text-xs text-gray-400 mt-0.5">{evs.length} تقييم</div>
+                        </div>
+                        <span className="font-black px-3 py-1.5 rounded-xl text-sm" style={{background:color+"18",color}}>{lvLabel(last?.level)}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* تفاصيل المواد */}
+          {tab==="subjects" && (
+            <div className="space-y-3">
+              {Object.entries(subjEvals).map(([subj,evs])=>(
+                <div key={subj} className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+                  <h4 className="font-black text-gray-800 mb-3 text-sm">{subj}</h4>
+                  <div className="space-y-2">
+                    {evs.map((ev,i)=>{
+                      const c=lvColor(ev.level);
+                      return (
+                        <div key={i} className="flex items-center justify-between bg-gray-50 rounded-xl px-3 py-2">
+                          <span className="text-xs text-gray-500">{ev.dateH||ev.day||"—"}</span>
+                          <span className="text-xs font-black px-2 py-0.5 rounded-full" style={{background:c+"18",color:c}}>{lvLabel(ev.level)}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* الحضور */}
+          {tab==="attendance" && (
+            <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+              <h4 className="font-black text-gray-800 mb-4 text-sm">📋 سجل الحضور الأسبوعي</h4>
+              <div className="grid grid-cols-5 gap-2">
+                {(week.days||[]).map((day,di)=>{
+                  const ti = teachers.indexOf(cls?.teacher||"");
+                  const status = ti>=0?(attendance[ti]?.[di]?.status||"حاضر"):"—";
+                  const col = status==="حاضر"?"#10b981":status==="غائب"?"#ef4444":"#f59e0b";
+                  return (
+                    <div key={di} className="rounded-xl p-3 text-center border" style={{borderColor:col+"44",background:col+"11"}}>
+                      <div className="text-xs font-black" style={{color:col}}>{day.name}</div>
+                      <div className="text-xs mt-1" style={{color:col}}>{status}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* خطة التطوير */}
+          {tab==="plan" && (
+            <StudentImprovementPlan student={stu} subjEvals={subjEvals} lvLabel={lvLabel} lvColor={lvColor}/>
+          )}
+        </>
+      )}
+      {!stu && !cls && (
+        <div className="bg-white rounded-2xl p-12 text-center shadow-sm border">
+          <div className="text-4xl mb-3">📁</div>
+          <div className="font-black text-gray-600">اختر فصلاً وطالباً لعرض ملفه الشامل</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// مكوّن خطة التحسين الفردية
+function StudentImprovementPlan({ student, subjEvals, lvLabel, lvColor }) {
+  const [saved, setSaved]   = useState(false);
+  const [notes, setNotes]   = useState("");
+  const [goals, setGoals]   = useState([{text:"",done:false}]);
+
+  const weakSubjects = Object.entries(subjEvals).filter(([,evs])=>{
+    const last = evs[evs.length-1];
+    return ["weak","accept"].includes(last?.level);
+  });
+
+  const addGoal = () => setGoals(g=>[...g,{text:"",done:false}]);
+  const saveP   = () => { setSaved(true); setTimeout(()=>setSaved(false),2500); };
+  const printP  = () => {
+    printWindow(`<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8">
+    <title>خطة تطوير — ${student.name}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>body{font-family:'Cairo';direction:rtl;padding:24px;color:#1e293b}
+    h1{font-size:18px;font-weight:900;color:#6366f1;border-bottom:3px solid #6366f1;padding-bottom:8px;margin-bottom:16px}
+    h3{font-size:14px;font-weight:800;color:#1e3a5f;margin:16px 0 8px}
+    .badge{background:#fee2e2;color:#dc2626;padding:2px 10px;border-radius:20px;font-weight:700;font-size:12px}
+    .goal{padding:8px 12px;border:1px solid #e2e8f0;border-radius:8px;margin:4px 0;font-size:13px}
+    .notes{background:#f8fafc;border-radius:8px;padding:12px;font-size:13px;line-height:2}
+    @media print{@page{margin:1.5cm}}</style></head><body>
+    <h1>📋 خطة تطوير الطالب</h1>
+    <p><strong>الاسم:</strong> ${student.name}</p>
+    <p><strong>رقم الهوية:</strong> ${student.nationalId||"—"}</p>
+    <p><strong>التاريخ:</strong> ${new Date().toLocaleDateString("ar-SA")}</p>
+    ${weakSubjects.length>0?`<h3>المواد التي تحتاج دعماً:</h3>${weakSubjects.map(([s,evs])=>`<span class="badge">${s}: ${lvLabel(evs[evs.length-1].level)}</span> `).join("")}`:""}
+    <h3>الأهداف:</h3>${goals.filter(g=>g.text).map(g=>`<div class="goal">${g.text}</div>`).join("")}
+    ${notes?`<h3>ملاحظات المعلم:</h3><div class="notes">${notes}</div>`:""}
+    <script>window.onload=()=>window.print()</script></body></html>`);
+  };
+
+  return (
+    <div className="space-y-4">
+      {weakSubjects.length>0 && (
+        <div className="bg-red-50 border border-red-200 rounded-2xl p-4">
+          <h4 className="font-black text-red-700 mb-2 text-sm">⚠️ مواد تحتاج دعماً</h4>
+          <div className="flex flex-wrap gap-2">
+            {weakSubjects.map(([s,evs])=>{
+              const c=lvColor(evs[evs.length-1]?.level);
+              return <span key={s} className="px-3 py-1.5 rounded-xl font-black text-xs" style={{background:c+"18",color:c}}>{s}: {lvLabel(evs[evs.length-1].level)}</span>;
+            })}
+          </div>
+        </div>
+      )}
+      <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 space-y-3">
+        <h4 className="font-black text-gray-800 text-sm">🎯 أهداف خطة التطوير</h4>
+        {goals.map((g,i)=>(
+          <div key={i} className="flex items-center gap-2">
+            <input type="checkbox" checked={g.done} onChange={e=>setGoals(gs=>gs.map((x,j)=>j===i?{...x,done:e.target.checked}:x))} className="w-4 h-4 accent-green-500"/>
+            <input value={g.text} onChange={e=>setGoals(gs=>gs.map((x,j)=>j===i?{...x,text:e.target.value}:x))}
+              placeholder={`هدف ${i+1}...`} className="flex-1 px-3 py-2 rounded-xl border-2 border-gray-200 text-sm focus:outline-none focus:border-purple-400" style={{fontFamily:"inherit"}}/>
+            {goals.length>1&&<button onClick={()=>setGoals(gs=>gs.filter((_,j)=>j!==i))} className="text-red-400 px-2">✕</button>}
+          </div>
+        ))}
+        <button onClick={addGoal} className="text-xs text-purple-600 font-black hover:underline">+ إضافة هدف</button>
+      </div>
+      <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+        <h4 className="font-black text-gray-800 text-sm mb-2">📝 ملاحظات المعلم</h4>
+        <textarea value={notes} onChange={e=>setNotes(e.target.value)} rows={4}
+          placeholder="أكتب ملاحظاتك وتوصياتك للطالب وولي أمره..."
+          className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 text-sm focus:outline-none focus:border-purple-400 resize-none" style={{fontFamily:"inherit"}}/>
+      </div>
+      {saved && <div className="bg-green-50 border border-green-200 rounded-2xl p-3 text-center font-black text-green-700 text-sm">✅ تم حفظ الخطة</div>}
+      <div className="flex gap-3">
+        <button onClick={saveP} className="flex-1 py-3 rounded-2xl font-black text-white text-sm" style={{background:"linear-gradient(135deg,#6366f1,#7c3aed)"}}>💾 حفظ الخطة</button>
+        <button onClick={printP} className="flex-1 py-3 rounded-2xl font-black text-white text-sm" style={{background:"linear-gradient(135deg,#0f172a,#1e3a5f)"}}>🖨️ طباعة وإرسال لولي الأمر</button>
+      </div>
+    </div>
+  );
+}
+
+// -
+// صفحة تنبيه الطلاب المعرضين للرسوب
+// -
+function EarlyWarningPage({ classList }) {
+  const [threshold, setThreshold] = useState(60);
+  const [selectedClass, setSelectedClass] = useState("all");
+
+  const allStudents = classList.flatMap(cls=>
+    (cls.students||[]).filter(s=>s.name).map(s=>({...s,cls}))
+  );
+
+  const filtered = selectedClass==="all"?allStudents:allStudents.filter(s=>s.cls.id===selectedClass);
+
+  const atRisk = filtered.map(s=>{
+    const evals = s.evals||[];
+    const subjects = {};
+    evals.forEach(ev=>{
+      if(!ev.subject) return;
+      const scores = {excel:5,vgood:4,good:3,accept:2,weak:1};
+      if(!subjects[ev.subject]) subjects[ev.subject]=[];
+      subjects[ev.subject].push(scores[ev.level]||0);
+    });
+    const subjectAvgs = Object.entries(subjects).map(([sub,sc])=>({
+      sub, avg:sc.reduce((a,b)=>a+b,0)/sc.length*20
+    }));
+    const overall = subjectAvgs.length?subjectAvgs.reduce((a,b)=>a+b.avg,0)/subjectAvgs.length:0;
+    const weakSubjects = subjectAvgs.filter(x=>x.avg<threshold);
+    return {...s, overall:Math.round(overall), subjectAvgs, weakSubjects};
+  }).filter(s=>s.weakSubjects.length>0).sort((a,b)=>a.overall-b.overall);
+
+  const riskLevel = pct => pct<40?"critical":pct<threshold?"high":"medium";
+  const riskColor = l => ({critical:"#dc2626",high:"#ea580c",medium:"#f59e0b"}[l]);
+  const riskBg    = l => ({critical:"#fee2e2",high:"#ffedd5",medium:"#fef3c7"}[l]);
+  const riskLabel = l => ({critical:"خطر شديد",high:"معرض للرسوب",medium:"يحتاج متابعة"}[l]);
+
+  return (
+    <div dir="rtl" className="space-y-4">
+      <div className="rounded-b-2xl overflow-hidden shadow-xl" style={{background:"linear-gradient(135deg,#dc2626,#b91c1c)"}}>
+        <div className="p-6 text-white">
+          <h2 className="text-2xl font-black mb-1">🚨 نظام الإنذار المبكر</h2>
+          <p className="opacity-80 text-sm">رصد الطلاب المعرضين للتعثر قبل فوات الأوان</p>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex flex-wrap gap-3 items-end">
+        <div>
+          <label className="text-xs font-bold text-gray-500 block mb-1">الفصل</label>
+          <select value={selectedClass} onChange={e=>setSelectedClass(e.target.value)}
+            className="px-3 py-2 rounded-xl border-2 border-gray-200 text-sm font-bold focus:outline-none" style={{fontFamily:"inherit"}}>
+            <option value="all">كل الفصول</option>
+            {classList.map(c=><option key={c.id} value={c.id}>{c.name||`${c.level}/${c.section}`}</option>)}
+          </select>
+        </div>
+        <div className="flex-1">
+          <label className="text-xs font-bold text-gray-500 block mb-1">حد التنبيه: {threshold}%</label>
+          <input type="range" min="40" max="75" value={threshold} onChange={e=>setThreshold(Number(e.target.value))} className="w-full"/>
+        </div>
+        <div className="text-center bg-red-50 rounded-xl px-4 py-2">
+          <div className="text-2xl font-black text-red-600">{atRisk.length}</div>
+          <div className="text-xs text-red-400 font-bold">طالب معرض للخطر</div>
+        </div>
+      </div>
+
+      {atRisk.length===0 ? (
+        <div className="bg-green-50 border border-green-200 rounded-2xl p-12 text-center">
+          <div className="text-4xl mb-3">🌟</div>
+          <div className="font-black text-green-700 text-lg">ممتاز! لا يوجد طلاب معرضون للخطر</div>
+          <div className="text-sm text-green-600 mt-1">جميع الطلاب فوق حد {threshold}%</div>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {atRisk.map(s=>{
+            const level = riskLevel(s.overall);
+            const col   = riskColor(level);
+            const bg    = riskBg(level);
+            return (
+              <div key={s.id} className="bg-white rounded-2xl overflow-hidden shadow-sm border-2" style={{borderColor:col+"44"}}>
+                <div className="flex items-center justify-between px-5 py-3" style={{background:bg}}>
+                  <div>
+                    <div className="font-black text-sm" style={{color:col}}>{s.name}</div>
+                    <div className="text-xs mt-0.5" style={{color:col,opacity:.7}}>{s.cls.name||`${s.cls.level}/${s.cls.section}`}</div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="text-center">
+                      <div className="text-2xl font-black" style={{color:col}}>{s.overall}%</div>
+                      <div className="text-xs font-bold" style={{color:col,opacity:.7}}>المتوسط</div>
+                    </div>
+                    <span className="px-3 py-1.5 rounded-xl font-black text-xs text-white" style={{background:col}}>
+                      {riskLabel(level)}
+                    </span>
+                  </div>
+                </div>
+                <div className="px-5 py-3">
+                  <div className="text-xs font-bold text-gray-500 mb-2">مواد تحتاج تدخل:</div>
+                  <div className="flex flex-wrap gap-2">
+                    {s.weakSubjects.map(w=>(
+                      <span key={w.sub} className="px-2 py-1 rounded-lg text-xs font-black" style={{background:"#fee2e2",color:"#dc2626"}}>
+                        {w.sub}: {Math.round(w.avg)}%
+                      </span>
+                    ))}
+                  </div>
+                  {/* شريط تقدم */}
+                  <div className="mt-3 h-2.5 rounded-full overflow-hidden" style={{background:"#f3f4f6"}}>
+                    <div className="h-full rounded-full" style={{width:s.overall+"%",background:col}}/>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// -
 // صفحة الاجتماعات وحجز المواعيد
 // -
 function MeetingsPage({ teachers }) {
@@ -22523,6 +24245,134 @@ function BroadcastPage() {
   );
 }
 
+// ===== صفحة تقسيم الطلاب لمجموعات =====
+function GroupDividerPage() {
+  const [names, setNames] = useState("");
+  const [groupCount, setGroupCount] = useState(4);
+  const [groups, setGroups] = useState([]);
+  const [divided, setDivided] = useState(false);
+  const [groupNames, setGroupNames] = useState([]);
+
+  const divide = () => {
+    const list = names.split("\n").map(n => n.trim()).filter(Boolean);
+    if (list.length === 0) { alert("أدخل أسماء الطلاب أولاً"); return; }
+    const shuffled = [...list].sort(() => Math.random() - 0.5);
+    const result = Array.from({length: groupCount}, () => []);
+    shuffled.forEach((name, i) => result[i % groupCount].push(name));
+    setGroups(result);
+    setGroupNames(Array.from({length: groupCount}, (_, i) => "المجموعة " + (i + 1)));
+    setDivided(true);
+  };
+
+  const handleExcel = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    readFileAsync(file, "text").then(ev => {
+      const text = ev;
+      const lines = text.split("\n").map(l => l.split(",")[0].trim()).filter(Boolean);
+      setNames(lines.join("\n"));
+    });
+  };
+
+  const print = () => {
+    printWindow(`<!DOCTYPE html><html dir="rtl"><head>
+      <meta charset="utf-8"/><title>تقسيم المجموعات</title>
+      <style>
+        body{font-family:'Segoe UI',Tahoma,sans-serif;padding:20px;direction:rtl;}
+        h1{text-align:center;color:#0d9488;font-size:20px;margin-bottom:16px;}
+        .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;}
+        .group{border:2px solid #0d9488;border-radius:12px;padding:12px;}
+        .group-title{font-weight:bold;color:#0d9488;font-size:14px;margin-bottom:8px;text-align:center;border-bottom:1px dashed #ccc;padding-bottom:6px;}
+        .name{font-size:13px;padding:4px 0;border-bottom:1px solid #f0f0f0;}
+      </style>
+    </head><body>
+      <h1>🏫 مدرسة عبيدة بن الحارث المتوسطة — تقسيم المجموعات</h1>
+      <div class="grid">
+        ${groups.map((g, i) => `<div class="group"><div class="group-title">${groupNames[i]||"المجموعة "+(i+1)} (${g.length} طلاب)</div>${g.map(n => `<div class="name">• ${n}</div>`).join("")}</div>`).join("")}
+      </div>
+    </body></html>`);
+  };
+
+  const colors = ["bg-teal-50 border-teal-300","bg-blue-50 border-blue-300","bg-purple-50 border-purple-300","bg-amber-50 border-amber-300","bg-pink-50 border-pink-300","bg-green-50 border-green-300","bg-red-50 border-red-300","bg-indigo-50 border-indigo-300"];
+  const headerColors = ["bg-teal-500","bg-blue-500","bg-purple-500","bg-amber-500","bg-pink-500","bg-green-500","bg-red-500","bg-indigo-500"];
+
+  return (
+    <div>
+      <div className="page-header-bar mb-6" style={{background:"linear-gradient(135deg,#7c3aed,#4f46e5)"}}>
+        <h2 className="text-2xl font-black">👥 تقسيم الطلاب لمجموعات</h2>
+        <p className="opacity-80 text-sm mt-1">قسّم طلابك عشوائياً بضغطة واحدة</p>
+      </div>
+      {!divided ? (
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="text-sm font-black text-gray-700 mb-2 block">📋 أسماء الطلاب (سطر لكل اسم)</label>
+              <textarea value={names} onChange={e => setNames(e.target.value)} rows={12}
+                placeholder={"أحمد محمد\nسلطان علي\nعمر خالد\n..."}
+                className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-purple-400 focus:outline-none text-sm resize-none" />
+              <div className="mt-2">
+                <label className="flex items-center gap-2 cursor-pointer text-sm font-bold text-purple-600 hover:text-purple-700">
+                  <span>📥 استيراد من Excel/CSV</span>
+                  <input type="file" accept=".csv,.xlsx,.xls,.txt" className="hidden" onChange={handleExcel} />
+                </label>
+              </div>
+            </div>
+            <div>
+              <label className="text-sm font-black text-gray-700 mb-2 block">🔢 عدد المجموعات</label>
+              <div className="grid grid-cols-4 gap-2 mb-6">
+                {[2,3,4,5,6,7,8,10].map(n => (
+                  <button key={n} onClick={() => setGroupCount(n)}
+                    className={"py-3 rounded-xl font-black text-sm border-2 transition-all " + (groupCount===n?"bg-purple-600 text-white border-purple-600":"bg-white text-gray-600 border-gray-200 hover:border-purple-300")}>
+                    {n}
+                  </button>
+                ))}
+              </div>
+              <div className="bg-purple-50 rounded-2xl p-4 text-center">
+                <div className="text-4xl mb-2">👥</div>
+                <p className="text-sm font-bold text-purple-800">
+                  {names.split("\n").filter(Boolean).length} طالب ← {groupCount} مجموعات
+                </p>
+                <p className="text-xs text-purple-600 mt-1">
+                  تقريباً {Math.ceil(names.split("\n").filter(Boolean).length / groupCount)} طالب في كل مجموعة
+                </p>
+              </div>
+            </div>
+          </div>
+          <button onClick={divide} className="mt-6 w-full py-4 rounded-2xl font-black text-white text-lg"
+            style={{background:"linear-gradient(135deg,#7c3aed,#4f46e5)"}}>
+            🎲 قسّم المجموعات عشوائياً
+          </button>
+        </div>
+      ) : (
+        <div>
+          <div className="flex gap-2 mb-4 flex-wrap">
+            <button onClick={() => setDivided(false)} className="px-4 py-2 rounded-xl bg-gray-100 text-gray-600 font-bold text-sm hover:bg-gray-200">← تعديل</button>
+            <button onClick={divide} className="px-4 py-2 rounded-xl bg-purple-600 text-white font-bold text-sm hover:bg-purple-700">🔀 إعادة التقسيم</button>
+            <button onClick={print} className={cx.btn}>🖨️ طباعة</button>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {groups.map((group, i) => (
+              <div key={i} className={"rounded-2xl border-2 overflow-hidden " + (colors[i % colors.length])}>
+                <div className={"px-4 py-2.5 flex items-center justify-between " + (headerColors[i % headerColors.length])}>
+                  <input value={groupNames[i]||""} onChange={e => { const ng = [...groupNames]; ng[i]=e.target.value; setGroupNames(ng); }}
+                    className="bg-transparent text-white font-black text-sm focus:outline-none w-full" />
+                  <span className="text-white text-xs opacity-80 shrink-0">{group.length} طلاب</span>
+                </div>
+                <div className="p-3 space-y-1">
+                  {group.map((name, j) => (
+                    <div key={j} className="text-sm font-bold text-gray-700 py-1 px-2 bg-white bg-opacity-60 rounded-lg">
+                      {j+1}. {name}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ===== صفحة اختبارات الطلاب =====
 function QuizPage() {
@@ -22785,6 +24635,249 @@ function QuizPage() {
   );
 }
 
+// ===== مؤقت الحصة =====
+function ClassTimerPage() {
+  const STAGES = [
+    { id: 0, name: "التهيئة",            icon: "🎯", minutes: 5,  color: "#f59e0b", colorDark: "#b45309", bullets: ["ربط الدرس السابق بالجديد","سؤال سريع أو موقف حياتي","هدف الحصة بلغة بسيطة"] },
+    { id: 1, name: "عرض المفهوم",        icon: "📚", minutes: 10, color: "#3b82f6", colorDark: "#1d4ed8", bullets: ["شرح مختصر ومباشر","استخدام مثال واحد واضح","السبورة + مشاركة الطلاب"] },
+    { id: 2, name: "تعلم نشط موجّه",    icon: "👥", minutes: 10, color: "#8b5cf6", colorDark: "#6d28d9", bullets: ["تقسيم إلى مجموعات ٢–٣","نشاط: حل سؤال / مناقشة","المعلم يتجول ويعزز"] },
+    { id: 3, name: "تطبيق فردي",         icon: "✏️", minutes: 10, color: "#10b981", colorDark: "#047857", bullets: ["تمارين سريعة فردية","مراعاة الفروق (سهل–تحدي)","متابعة سريعة للضعاف"] },
+    { id: 4, name: "التقويم السريع",     icon: "📊", minutes: 5,  color: "#ef4444", colorDark: "#b91c1c", bullets: ["سؤال شفهي أو بطاقة خروج","رفع يد / اختيار من متعدد","قياس الفهم فوراً"] },
+    { id: 5, name: "الإغلاق",            icon: "🏁", minutes: 5,  color: "#0d9488", colorDark: "#065f46", bullets: ["تلخيص النقاط الأساسية","تصحيح أخطاء شائعة","واجب بسيط مرتبط بالدرس"] },
+  ];
+  const TOTAL_SECS = STAGES.reduce((s, st) => s + st.minutes * 60, 0);
+
+  const [stageIdx, setStageIdx]   = useState(0);
+  const [remaining, setRemaining] = useState(STAGES[0].minutes * 60);
+  const [running, setRunning]     = useState(false);
+  const [done, setDone]           = useState(false);
+  const [totalElapsed, setTotalElapsed] = useState(0);
+  const [completedStages, setCompletedStages] = useState([]);
+  const [showDoneAnim, setShowDoneAnim] = useState(false);
+  const intervalRef = useRef(null);
+
+  const stage = STAGES[stageIdx];
+
+  /* ضبط عام */
+  const resetAll = () => {
+    clearInterval(intervalRef.current);
+    setStageIdx(0); setRemaining(STAGES[0].minutes * 60);
+    setRunning(false); setDone(false); setTotalElapsed(0);
+    setCompletedStages([]); setShowDoneAnim(false);
+  };
+
+  /* الانتقال للمرحلة التالية يدوياً */
+  const goToStage = (idx) => {
+    if (done) return;
+    clearInterval(intervalRef.current); setRunning(false);
+    const elapsed = STAGES.slice(0, idx).reduce((s, st) => s + st.minutes * 60, 0);
+    setStageIdx(idx); setRemaining(STAGES[idx].minutes * 60);
+    setTotalElapsed(elapsed);
+    setCompletedStages(STAGES.slice(0, idx).map(s => s.id));
+  };
+
+  useEffect(() => {
+    if (running) {
+      intervalRef.current = setInterval(() => {
+        setRemaining(r => {
+          if (r <= 1) {
+            clearInterval(intervalRef.current);
+            setRunning(false);
+            const nextIdx = stageIdx + 1;
+            if (nextIdx >= STAGES.length) {
+              setDone(true); setShowDoneAnim(true);
+              setTimeout(() => setShowDoneAnim(false), 3000);
+            } else {
+              setCompletedStages(prev => [...prev, stageIdx]);
+              setStageIdx(nextIdx);
+              setRemaining(STAGES[nextIdx].minutes * 60);
+              setTotalElapsed(prev => prev + 1);
+            }
+            return 0;
+          }
+          setTotalElapsed(prev => prev + 1);
+          return r - 1;
+        });
+      }, 1000);
+    } else clearInterval(intervalRef.current);
+    return () => clearInterval(intervalRef.current);
+  }, [running, stageIdx]);
+
+  const stageMins  = Math.floor(remaining / 60);
+  const stageSecs  = remaining % 60;
+  const stagePct   = (STAGES[stageIdx].minutes * 60 - remaining) / (STAGES[stageIdx].minutes * 60);
+  const totalPct   = totalElapsed / TOTAL_SECS;
+  const totalMinsLeft = Math.floor((TOTAL_SECS - totalElapsed) / 60);
+  const totalSecsLeft = (TOTAL_SECS - totalElapsed) % 60;
+  const R = 72, CIRC = 2 * Math.PI * R;
+
+  const urgent = remaining <= 60 && !done;
+
+  const stageGradient = `linear-gradient(135deg, ${stage.color}dd, ${stage.colorDark})`;
+
+  return (
+    <div style={{fontFamily:"'Tajawal',sans-serif"}}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&display=swap');
+        @keyframes ct-pulse { 0%,100%{opacity:1} 50%{opacity:.45} }
+        @keyframes ct-bounce { 0%,100%{transform:scale(1)} 50%{transform:scale(1.08)} }
+        @keyframes ct-celebrate { 0%{transform:scale(0) rotate(-20deg);opacity:0} 60%{transform:scale(1.15) rotate(5deg);opacity:1} 100%{transform:scale(1) rotate(0);opacity:1} }
+        @keyframes ct-slide-in { from{transform:translateX(30px);opacity:0} to{transform:translateX(0);opacity:1} }
+        @keyframes ct-shimmer { 0%{transform:translateX(-100%)} 100%{transform:translateX(200%)} }
+        .ct-urgent { animation: ct-pulse 0.8s ease-in-out infinite; }
+        .ct-done-anim { animation: ct-celebrate 0.5s cubic-bezier(.34,1.56,.64,1) forwards; }
+        .ct-slide { animation: ct-slide-in 0.35s ease forwards; }
+        .ct-shimmer::after { content:''; position:absolute; inset:0; background:linear-gradient(90deg,transparent,rgba(255,255,255,.18),transparent); animation:ct-shimmer 2s linear infinite; }
+      `}</style>
+
+      <div className="page-header-bar mb-4" style={{background:"linear-gradient(135deg,#0369a1,#1e3a5f)"}}>
+        <h2 className="text-2xl font-black">⏱️ مؤقت الحصة النموذجية</h2>
+        <p className="opacity-80 text-sm mt-1">٤٥ دقيقة · ٦ مراحل متكاملة</p>
+      </div>
+
+      <div className="w-full px-2">
+
+        {/* بطاقة المرحلة الحالية */}
+        {!done ? (
+          <div className="ct-slide rounded-b-2xl p-5 mb-4 text-white shadow-2xl relative overflow-hidden ct-shimmer"
+            style={{background: stageGradient}}>
+            <div className="flex items-center gap-3 mb-3">
+              <span className="text-4xl">{stage.icon}</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-bold opacity-75">المرحلة {stageIdx + 1} من {STAGES.length}</p>
+                <h3 className="text-xl font-black leading-tight">{stage.name}</h3>
+              </div>
+              <div className="text-left">
+                <p className="text-xs opacity-70">الوقت الكلي</p>
+                <p className="text-sm font-black">{String(totalMinsLeft).padStart(2,"0")}:{String(totalSecsLeft).padStart(2,"0")}</p>
+              </div>
+            </div>
+
+            {/* الشاشة الكبيرة */}
+            <div className="flex items-center justify-center gap-6 mb-4">
+              {/* دائرة الوقت */}
+              <div className="relative shrink-0">
+                <svg width="160" height="160" viewBox="0 0 160 160">
+                  <circle cx="80" cy="80" r={R} fill="none" stroke="rgba(255,255,255,.2)" strokeWidth="10"/>
+                  <circle cx="80" cy="80" r={R} fill="none" stroke="white" strokeWidth="10"
+                    strokeDasharray={CIRC} strokeDashoffset={CIRC * (1 - stagePct)}
+                    strokeLinecap="round" transform="rotate(-90 80 80)"
+                    style={{transition:"stroke-dashoffset 1s linear"}}/>
+                </svg>
+                <div className={`absolute inset-0 flex flex-col items-center justify-center ${urgent?"ct-urgent":""}`}>
+                  <span className="text-4xl font-black leading-none tracking-tighter">
+                    {String(stageMins).padStart(2,"0")}:{String(stageSecs).padStart(2,"0")}
+                  </span>
+                  <span className="text-xs opacity-70 mt-1">{running ? "جارٍ" : "متوقف"}</span>
+                </div>
+              </div>
+
+              {/* نقاط المرحلة */}
+              <div className="flex-1 space-y-2">
+                {stage.bullets.map((b, i) => (
+                  <div key={i} className="flex items-start gap-2 text-sm">
+                    <span className="mt-0.5 w-5 h-5 rounded-full bg-white bg-opacity-25 flex items-center justify-center text-xs font-black shrink-0">{i+1}</span>
+                    <span className="opacity-90 leading-snug">{b}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* أزرار التحكم */}
+            <div className="flex gap-2 justify-center">
+              <button onClick={() => setRunning(r => !r)}
+                className="flex-1 max-w-xs py-3 rounded-2xl font-black text-sm transition-all active:scale-95"
+                style={{background: running ? "rgba(255,255,255,.25)" : "rgba(255,255,255,.95)", color: running ? "white" : stage.colorDark}}>
+                {running ? "⏸ إيقاف مؤقت" : "▶ تشغيل"}
+              </button>
+              {stageIdx < STAGES.length - 1 && (
+                <button onClick={() => { setCompletedStages(prev=>[...prev,stageIdx]); goToStage(stageIdx+1); }}
+                  className="px-4 py-3 rounded-2xl font-black text-sm bg-white bg-opacity-20 hover:bg-opacity-30 transition-all active:scale-95">
+                  التالي ←
+                </button>
+              )}
+              <button onClick={resetAll}
+                className="px-4 py-3 rounded-2xl font-black text-sm bg-white bg-opacity-20 hover:bg-opacity-30 transition-all active:scale-95">
+                ⟳
+              </button>
+            </div>
+
+            {/* شريط تقدم الحصة الكاملة */}
+            <div className="mt-4">
+              <div className="flex justify-between text-xs opacity-70 mb-1">
+                <span>تقدم الحصة الكاملة</span>
+                <span>{Math.round(totalPct * 100)}%</span>
+              </div>
+              <div className="h-2 rounded-full bg-white bg-opacity-20 overflow-hidden">
+                <div className="h-full rounded-full bg-white transition-all duration-1000"
+                  style={{width:(totalPct*100)+"%"}}/>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className={`rounded-3xl p-8 mb-4 text-center shadow-2xl ${showDoneAnim?"ct-done-anim":""}`}
+            style={{background:"linear-gradient(135deg,#0d9488,#065f46)"}}>
+            <div className="text-6xl mb-3">🎉</div>
+            <h3 className="text-2xl font-black text-white mb-1">انتهت الحصة!</h3>
+            <p className="text-teal-200 text-sm mb-4">٤٥ دقيقة من التعلم الفعّال</p>
+            <button onClick={resetAll}
+              className="px-8 py-3 rounded-2xl bg-white text-teal-700 font-black text-sm hover:shadow-lg transition-all active:scale-95">
+              🔄 حصة جديدة
+            </button>
+          </div>
+        )}
+
+        {/* قائمة المراحل */}
+        <div className="space-y-2">
+          {STAGES.map((st, i) => {
+            const isActive    = i === stageIdx && !done;
+            const isCompleted = completedStages.includes(st.id) || done;
+            const isUpcoming  = !isActive && !isCompleted;
+            return (
+              <button key={st.id} onClick={() => !done && goToStage(i)}
+                disabled={done}
+                className={`w-full flex items-center gap-3 p-3 rounded-2xl transition-all text-right border-2 ${
+                  isActive
+                    ? "border-transparent shadow-lg scale-[1.01]"
+                    : isCompleted
+                    ? "border-transparent opacity-60"
+                    : "border-gray-200 hover:border-gray-300 bg-white"
+                }`}
+                style={isActive ? {background: stageGradient, color:"white"} : isCompleted ? {background:"#f0fdf4", borderColor: st.color+"44"} : {}}>
+                <div className="shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-lg"
+                  style={{background: isActive ? "rgba(255,255,255,.25)" : isCompleted ? st.color+"22" : "#f3f4f6"}}>
+                  {isCompleted ? "✅" : st.icon}
+                </div>
+                <div className="flex-1 min-w-0 text-right">
+                  <p className={`font-black text-sm ${isActive?"text-white":isCompleted?"":"text-gray-800"}`}>{st.name}</p>
+                  <p className={`text-xs truncate ${isActive?"opacity-70 text-white":isCompleted?"text-green-600":"text-gray-400"}`}>
+                    {st.bullets[0]}
+                  </p>
+                </div>
+                <div className={`shrink-0 text-xs font-black px-2 py-1 rounded-full ${
+                  isActive ? "bg-white bg-opacity-25 text-white" : isCompleted ? "text-green-600" : "text-gray-400"
+                }`}>
+                  {st.minutes} د
+                </div>
+                {isActive && (
+                  <div className={`shrink-0 text-sm font-black text-white ${urgent?"ct-urgent":""}`}>
+                    {String(stageMins).padStart(2,"0")}:{String(stageSecs).padStart(2,"0")}
+                  </div>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* ملخص الوقت */}
+        <div className="mt-4 bg-white rounded-2xl p-4 border border-gray-100 shadow-sm flex items-center justify-between">
+          <span className="text-sm font-bold text-gray-500">⏳ إجمالي الحصة</span>
+          <span className="text-lg font-black text-teal-600">٤٥ دقيقة</span>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ===== عجلة الحظ =====
 function LuckyWheelPage() {
@@ -22918,7 +25011,189 @@ function LuckyWheelPage() {
   );
 }
 
+// ===== بطاقة الخروج =====
+function ExitTicketPage() {
+  const [question, setQuestion] = useState("");
+  const [responses, setResponses] = useState([]);
+  const [studentName, setStudentName] = useState("");
+  const [answer, setAnswer] = useState("");
+  const [submitted, setSubmitted] = useState(false);
+  const [mode, setMode] = useState("setup"); // setup | answer | results
 
+  useEffect(() => {
+    DB.get("school-exit-ticket", { question:"", responses:[] }).then(d => {
+      if (d && d.question) { setQuestion(d.question); setResponses(d.responses||[]); }
+    });
+  }, []);
+
+  const saveTicket = (q, r) => DB.set("school-exit-ticket", { question: q, responses: r });
+
+  const publish = () => {
+    if (!question.trim()) return;
+    setResponses([]); saveTicket(question, []); setMode("answer");
+  };
+
+  const submitAnswer = () => {
+    if (!studentName.trim() || !answer.trim()) { alert("أدخل اسمك وإجابتك"); return; }
+    const r = [...responses, { name: studentName, answer, time: new Date().toLocaleTimeString("ar-SA") }];
+    setResponses(r); saveTicket(question, r);
+    setSubmitted(true);
+  };
+
+  const print = () => {
+    printWindow(`<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8"/><title>بطاقات الخروج</title>
+    <style>body{font-family:sans-serif;padding:20px;direction:rtl;} h1{color:#0d9488;font-size:18px;} .card{border:1px solid #ccc;border-radius:8px;padding:12px;margin:8px 0;page-break-inside:avoid;} .q{font-weight:bold;color:#0d9488;margin-bottom:6px;} .name{font-size:12px;color:#666;} .ans{font-size:13px;margin-top:4px;}</style>
+    </head><body><h1>🚪 بطاقات الخروج — ${question}</h1>
+    ${responses.map(r=>`<div class="card"><div class="name">👤 ${r.name} — ${r.time}</div><div class="ans">💬 ${r.answer}</div></div>`).join("")}
+    </body></html>`);
+  };
+
+  return (
+    <div>
+      <div className="page-header-bar mb-6" style={{background:"linear-gradient(135deg,#059669,#065f46)"}}>
+        <h2 className="text-2xl font-black">🚪 بطاقة الخروج</h2>
+        <p className="opacity-80 text-sm mt-1">سؤال سريع قبل نهاية الحصة</p>
+      </div>
+      <div className="flex gap-2 mb-6">
+        {["setup","answer","results"].map(m => (
+          <button key={m} onClick={() => setMode(m)}
+            className={"px-4 py-2.5 rounded-xl font-bold text-sm " + (mode===m?"bg-teal-600 text-white":"bg-white text-gray-600 border border-gray-200")}>
+            {m==="setup"?"⚙️ إعداد السؤال":m==="answer"?"✏️ إجابة الطلاب":"📊 النتائج ("+responses.length+")"}
+          </button>
+        ))}
+      </div>
+
+      {mode === "setup" && (
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+          <label className="text-sm font-black text-gray-700 mb-2 block">💡 سؤال بطاقة الخروج</label>
+          <textarea value={question} onChange={e => setQuestion(e.target.value)} rows={3}
+            placeholder="مثال: ما أهم شيء تعلمته اليوم؟ أو ما سؤالك عن الدرس؟"
+            className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-teal-400 focus:outline-none text-sm resize-none mb-4" />
+          <button onClick={publish} className="w-full py-3 rounded-2xl bg-teal-600 text-white font-black hover:bg-teal-700">
+            📤 نشر السؤال للطلاب
+          </button>
+        </div>
+      )}
+
+      {mode === "answer" && (
+        <div className="w-full">
+          {!submitted ? (
+            <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+              <div className="bg-teal-50 rounded-xl p-4 mb-5 text-center">
+                <p className="font-black text-teal-800 text-lg">{question || "لم يُنشر سؤال بعد"}</p>
+              </div>
+              <input value={studentName} onChange={e => setStudentName(e.target.value)} placeholder="اسمك الكامل"
+                className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-teal-400 focus:outline-none text-sm mb-3" />
+              <textarea value={answer} onChange={e => setAnswer(e.target.value)} rows={4}
+                placeholder="اكتب إجابتك هنا..."
+                className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-teal-400 focus:outline-none text-sm resize-none mb-4" />
+              <button onClick={submitAnswer} className="w-full py-3 rounded-2xl bg-teal-600 text-white font-black hover:bg-teal-700">
+                ✅ إرسال الإجابة
+              </button>
+            </div>
+          ) : (
+            <div className="bg-white rounded-2xl p-8 text-center shadow-sm">
+              <div className="text-5xl mb-3">✅</div>
+              <h3 className="font-black text-gray-800 text-xl mb-2">تم الإرسال!</h3>
+              <p className="text-gray-500 text-sm">شكراً {studentName}</p>
+              <button onClick={() => { setStudentName(""); setAnswer(""); setSubmitted(false); }}
+                className="mt-4 px-6 py-2.5 rounded-xl bg-teal-600 text-white font-bold text-sm">إجابة طالب آخر</button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {mode === "results" && (
+        <div>
+          <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+            <h3 className="font-black text-gray-800">الإجابات ({responses.length})</h3>
+            <div className="flex gap-2">
+              {responses.length > 0 && <button onClick={print} className="px-4 py-2 rounded-xl bg-blue-600 text-white font-bold text-sm">🖨️ طباعة</button>}
+              <button onClick={() => { setResponses([]); saveTicket(question, []); }} className="px-4 py-2 rounded-xl bg-red-50 text-red-500 font-bold text-sm">🗑️ مسح</button>
+            </div>
+          </div>
+          {responses.length === 0 && <div className={cx.empty}><div className="text-4xl mb-2">📭</div><p className="font-bold">لا توجد إجابات بعد</p></div>}
+          <div className="space-y-3">
+            {responses.map((r,i) => (
+              <div key={i} className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="font-black text-gray-800 text-sm">👤 {r.name}</span>
+                  <span className="text-xs text-gray-400">{r.time}</span>
+                </div>
+                <p className="text-gray-700 text-sm leading-relaxed bg-gray-50 rounded-lg p-3">💬 {r.answer}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ===== جدول الحصص الأسبوعي =====
+function TimetablePage({ teachers }) {
+  const days = ["الأحد","الإثنين","الثلاثاء","الأربعاء","الخميس"];
+  const periods = [1,2,3,4,5,6,7,8];
+  const [timetable, setTimetable] = useState({});
+  const [selectedTeacher, setSelectedTeacher] = useState("الكل");
+
+  useEffect(() => {
+    DB.get("school-timetable", {}).then(d => setTimetable(d||{}));
+  }, []);
+
+  const save = (t) => { setTimetable(t); DB.set("school-timetable", t); };
+
+  const update = (day, period, value) => {
+    const t = { ...timetable, [`${day}-${period}`]: value };
+    save(t);
+  };
+
+  const print = () => {
+    printWindow(`<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8"/><title>جدول الحصص</title>
+    <style>body{font-family:sans-serif;direction:rtl;padding:20px;font-size:12px;} h1{color:#0d9488;text-align:center;} table{width:100%;border-collapse:collapse;margin-top:16px;} th,td{border:1px solid #ccc;padding:8px 6px;text-align:center;} th{background:#0d9488;color:white;font-size:11px;} td{font-size:11px;} .period{background:#f0fdfa;font-weight:bold;}</style>
+    </head><body><h1>🏫 جدول الحصص الأسبوعي — مدرسة عبيدة بن الحارث المتوسطة</h1>
+    <table><tr><th>الحصة</th>${days.map(d=>`<th>${d}</th>`).join("")}</tr>
+    ${periods.map(p=>`<tr><td class="period">الحصة ${p}</td>${days.map(d=>`<td>${timetable[d+"-"+p]||""}</td>`).join("")}</tr>`).join("")}
+    </table></body></html>`);
+  };
+
+  return (
+    <div>
+      <div className="page-header-bar mb-6" style={{background:"linear-gradient(135deg,#0369a1,#1e3a5f)"}}>
+        <h2 className="text-2xl font-black">🗓️ جدول الحصص الأسبوعي</h2>
+        <p className="opacity-80 text-sm mt-1">جدول أسبوعي قابل للتعديل والطباعة</p>
+      </div>
+      <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+        <p className="text-sm text-gray-500 font-bold">اضغط على أي خانة لتعديلها</p>
+        <button onClick={print} className={cx.btn}>🖨️ طباعة الجدول</button>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm border-collapse bg-white rounded-2xl overflow-hidden shadow-sm">
+          <thead>
+            <tr>
+              <th className="px-3 py-3 text-white text-xs font-black" style={{background:"#0d9488"}}>الحصة</th>
+              {days.map(d => <th key={d} className="px-3 py-3 text-white text-xs font-black" style={{background:"#0d9488"}}>{d}</th>)}
+            </tr>
+          </thead>
+          <tbody>
+            {periods.map(p => (
+              <tr key={p} className={p%2===0?"bg-gray-50":""}>
+                <td className="px-3 py-2 text-center font-black text-teal-700 text-xs border border-gray-100">{p}</td>
+                {days.map(d => (
+                  <td key={d} className="border border-gray-100 p-1">
+                    <input value={timetable[`${d}-${p}`]||""} onChange={e => update(d,p,e.target.value)}
+                      placeholder="المادة / المعلم"
+                      className="w-full px-2 py-1.5 rounded-lg text-xs focus:outline-none focus:bg-teal-50 bg-transparent hover:bg-gray-50 transition-all text-center" />
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
 
 // ===== سجل الزيارات الصفية =====
 function HonorBoardPage({ classList }) {
@@ -25266,7 +27541,7 @@ export default function SchoolWebsite() {
       if (hash.startsWith("ann-")) { setDirectAnnId(hash.replace("ann-","")); return; }
       setDirectAnnId(null);
       if (hash === "teacherportal") { setTeacherProfilePortal(true); return; }
-      if (["home","attendance","announcements","activities","settings","students","messages","surveys","qiyas","report","gradeanalysis","monthlyreport","teacherprofile","absencestats","attendancereport","student-absence","strategies","calendar","gallery","certificates","poll","raffle","broadcast","quiz","luckywheel","honorboard","tasks","dailyquiz","aiteacher","lessonprep","lessonrecommend","officialforms","meetings","heatmap","committeemeeting","teachereval","assessment","studentexcuses","perfresults","teacherreports","suggestions","dailyattend"].includes(hash)) { setTeacherProfilePortal(false); setPage(hash); }
+      if (["home","attendance","announcements","activities","settings","students","messages","surveys","qiyas","sms","report","gradeanalysis","monthlyreport","teacherprofile","absencestats","attendancereport","student-absence","strategies","calendar","gallery","certificates","poll","raffle","broadcast","groupdivider","quiz","classtimer","luckywheel","exitticket","timetable","honorboard","tasks","dailyquiz","aiteacher","lessonprep","lessonrecommend","officialforms","portfolio","earlywarning","meetings","heatmap","committeemeeting","teachereval","assessment","studentexcuses","perfresults","teacherreports","suggestions","dailyattend"].includes(hash)) { setTeacherProfilePortal(false); setPage(hash); }
     };
     window.addEventListener("hashchange", h); h();
     return () => window.removeEventListener("hashchange", h);
@@ -25522,11 +27797,13 @@ export default function SchoolWebsite() {
   const pages = [
     { id: "home",            label: "الرئيسية",        icon: "🏡" },
     { id: "attendance",      label: "الحضور اليومي",  icon: "📅" },
+    { id: "admin-attendance",label: "دوام الإداريين", icon: "🏛️" },
     { id: "student-absence", label: "غياب الطلاب",   icon: "🎒" },
     { id: "students",        label: "تقييم الطلاب",  icon: "🎓" },
     { id: "announcements", label: "الإعلانات",       icon: "📣" },
     { id: "activities",    label: "الأنشطة",         icon: "🎯" },
     { id: "messages",      label: "رسائل الأهالي",  icon: "💌" },
+    { id: "sms",           label: "رسائل SMS",       icon: "📲" },
     { id: "perfresults",   label: "تقويم الأداء",   icon: "📈" },
     { id: "settings",      label: "الإعدادات",       icon: "🛠️" },
   ];
@@ -25535,8 +27812,12 @@ export default function SchoolWebsite() {
   const classToolPages = [
     { id: "strategies",     label: "الاستراتيجيات",      icon: "🧠" },
     { id: "broadcast",      label: "الإذاعة المدرسية",   icon: "🎙️" },
+    { id: "groupdivider",   label: "تقسيم المجموعات",    icon: "👥" },
     { id: "quiz",           label: "اختبارات الطلاب",    icon: "📝" },
+    { id: "classtimer",     label: "مؤقت الحصة",          icon: "⏱️" },
     { id: "luckywheel",     label: "عجلة الحظ",            icon: "🎡" },
+    { id: "exitticket",     label: "بطاقة الخروج",         icon: "🎫" },
+    { id: "timetable",      label: "جدول الحصص",           icon: "📅" },
     { id: "dailyquiz",      label: "الاختبار اليومي",      icon: "🎯" },
     { id: "raffle",         label: "سحب الطلاب",           icon: "🎰" },
     { id: "aiteacher",      label: "مساعد المعلم الذكي",   icon: "🤖" },
@@ -25563,6 +27844,8 @@ export default function SchoolWebsite() {
     { id: "absencestats",   label: "إحصائيات الغياب",      icon: "📉" },
     { id: "attendancereport",label: "تحليل الحضور",        icon: "🗂️" },
     { id: "officialforms",  label: "النماذج الرسمية",      icon: "📃" },
+    { id: "portfolio",      label: "ملف الطالب الشامل",    icon: "📁" },
+    { id: "earlywarning",   label: "الإنذار المبكر",       icon: "🚨" },
     { id: "meetings",       label: "الاجتماعات",           icon: "🤝" },
     { id: "heatmap",        label: "خريطة النشاط",         icon: "🗺️" },
     { id: "committeemeeting",label: "اجتماعات اللجان",     icon: "👔" },
@@ -25839,6 +28122,7 @@ export default function SchoolWebsite() {
               <div style={{ direction:"rtl" }}>
                 {page === "home"           && <HomePage teachers={teachers} announcements={announcements} activities={activities} navigate={navigate} attendance={attendance} week={week} messages={messages} classList={classList} weekArchive={weekArchive} />}
                 {page === "student-absence" && <StudentAbsencePage />}
+                {page === "admin-attendance"&& <AdminAttendancePage />}
                 {page === "attendance"     && <AttendancePage teachers={teachers} setTeachers={setTeachers} saveTeachers={saveTeachers} week={week} setWeek={setWeek} saveWeek={saveWeek} attendance={attendance} setAttendance={setAttendance} saveAttendance={saveAttendance} navigate={navigate} weekArchive={weekArchive} setWeekArchive={setWeekArchive} saveWeekArchive={saveWeekArchive} />}
                 {page === "students"       && <StudentsPage classList={classList} setClassList={setClassList} saveClass={saveClass} deleteClass={deleteClass} onSendNote={handleSendNote} messages={messages} />}
                 {page === "announcements"  && <AnnouncementsPage announcements={announcements} setAnnouncements={setAnnouncements} saveAnnouncements={saveAnnouncements} viewMode="mobile" />}
@@ -25846,6 +28130,7 @@ export default function SchoolWebsite() {
                 {page === "messages"       && <MessagesPage messages={messages} setMessages={setMessages} saveMessages={saveMessages} isParent={false} />}
                 {page === "surveys"        && <SurveysPage surveys={surveys} setSurveys={setSurveys} saveSurveys={saveSurveys} />}
                 {page === "qiyas"          && <QiyasAlatharPage />}
+                {page === "sms"            && <SMSPage teachers={teachers} attendance={attendance} week={week} classList={classList} />}
                 {page === "report"         && <ProgramReportPage />}
                 {page === "strategies"     && <StrategiesPage />}
                 {page === "calendar"       && <CalendarPage />}
@@ -25854,8 +28139,12 @@ export default function SchoolWebsite() {
                 {page === "poll"           && <PollPage teachers={teachers} />}
                 {page === "raffle"         && <RafflePage />}
                 {page === "broadcast"      && <BroadcastPage />}
+                {page === "groupdivider"   && <GroupDividerPage />}
                 {page === "quiz"           && <QuizPage />}
+                {page === "classtimer"     && <ClassTimerPage />}
                 {page === "luckywheel"     && <LuckyWheelPage />}
+                {page === "exitticket"     && <ExitTicketPage />}
+                {page === "timetable"      && <TimetablePage teachers={teachers} />}
                 {page === "honorboard"     && <HonorBoardPage classList={classList} />}
                 {page === "tasks"          && <TasksPage teachers={teachers} />}
                 {page === "absencestats"   && <AbsenceStatsPage teachers={teachers} attendance={attendance} week={week} weekArchive={weekArchive} />}
@@ -25865,6 +28154,8 @@ export default function SchoolWebsite() {
                 {page === "attendancereport"&& <AttendanceAnalysisPage />}
                 {page === "dailyquiz"      && <DailyQuizPage classList={classList} />}
                 {page === "officialforms"  && <OfficialFormsPage teachers={teachers} attendance={attendance} week={week} />}
+                {page === "portfolio"      && <StudentPortfolioPage classList={classList} weekArchive={weekArchive} attendance={attendance} week={week} teachers={teachers} />}
+                {page === "earlywarning"   && <EarlyWarningPage classList={classList} />}
                 {page === "meetings"       && <MeetingsPage teachers={teachers} />}
                 {page === "heatmap"        && <HeatmapPage teachers={teachers} attendance={attendance} week={week} weekArchive={weekArchive} announcements={announcements} activities={activities} />}
                 {page === "committeemeeting"&& <CommitteeMeetingPage teachers={teachers} />}
@@ -26074,6 +28365,7 @@ export default function SchoolWebsite() {
       <main className="w-full py-3">
         {page === "home"          && <HomePage teachers={teachers} announcements={announcements} activities={activities} navigate={navigate} attendance={attendance} week={week} messages={messages} classList={classList} weekArchive={weekArchive} />}
         {page === "student-absence" && <StudentAbsencePage />}
+        {page === "admin-attendance" && <AdminAttendancePage />}
         {page === "attendance"    && <AttendancePage teachers={teachers} setTeachers={setTeachers} saveTeachers={saveTeachers} week={week} setWeek={setWeek} saveWeek={saveWeek} attendance={attendance} setAttendance={setAttendance} saveAttendance={saveAttendance} navigate={navigate} weekArchive={weekArchive} setWeekArchive={setWeekArchive} saveWeekArchive={saveWeekArchive} />}
         {page === "students"      && <StudentsPage classList={classList} setClassList={setClassList} saveClass={saveClass} deleteClass={deleteClass} onSendNote={handleSendNote} messages={messages} />}
         {page === "announcements" && <AnnouncementsPage announcements={announcements} setAnnouncements={setAnnouncements} saveAnnouncements={saveAnnouncements} />}
@@ -26081,6 +28373,7 @@ export default function SchoolWebsite() {
         {page === "messages"      && <MessagesPage messages={messages} setMessages={setMessages} saveMessages={saveMessages} isParent={false} />}
         {page === "surveys"       && <SurveysPage surveys={surveys} setSurveys={setSurveys} saveSurveys={saveSurveys} />}
         {page === "qiyas"         && <QiyasAlatharPage />}
+        {page === "sms"           && <SMSPage teachers={teachers} attendance={attendance} week={week} classList={classList} />}
         {page === "report"        && <ProgramReportPage />}
         {page === "strategies"    && <StrategiesPage />}
         {page === "calendar"      && <CalendarPage />}
@@ -26089,8 +28382,12 @@ export default function SchoolWebsite() {
         {page === "poll"          && <PollPage teachers={teachers} />}
         {page === "raffle"        && <RafflePage />}
         {page === "broadcast"     && <BroadcastPage />}
+        {page === "groupdivider"  && <GroupDividerPage />}
         {page === "quiz"          && <QuizPage />}
+        {page === "classtimer"    && <ClassTimerPage />}
         {page === "luckywheel"    && <LuckyWheelPage />}
+        {page === "exitticket"    && <ExitTicketPage />}
+        {page === "timetable"     && <TimetablePage teachers={teachers} />}
         {page === "honorboard"    && <HonorBoardPage classList={classList} />}
         {page === "tasks"         && <TasksPage teachers={teachers} />}
         {page === "absencestats"  && <AbsenceStatsPage teachers={teachers} attendance={attendance} week={week} weekArchive={weekArchive} />}
@@ -26100,6 +28397,8 @@ export default function SchoolWebsite() {
         {page === "attendancereport" && <AttendanceAnalysisPage />}
         {page === "dailyquiz"      && <DailyQuizPage classList={classList} />}
         {page === "officialforms"  && <OfficialFormsPage teachers={teachers} attendance={attendance} week={week} />}
+        {page === "portfolio"      && <StudentPortfolioPage classList={classList} weekArchive={weekArchive} attendance={attendance} week={week} teachers={teachers} />}
+        {page === "earlywarning"   && <EarlyWarningPage classList={classList} />}
         {page === "meetings"       && <MeetingsPage teachers={teachers} />}
         {page === "heatmap"        && <HeatmapPage teachers={teachers} attendance={attendance} week={week} weekArchive={weekArchive} announcements={announcements} activities={activities} />}
         {page === "committeemeeting" && <CommitteeMeetingPage teachers={teachers} />}
