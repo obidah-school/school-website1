@@ -21372,7 +21372,7 @@ function TeacherProfilePortal({ siteFont, onBack, attendance, teachers, week }) 
     { id:"reports",   label:"تقاريري",   icon:"📁" },
     { id:"selfeval",  label:"تقييمي",    icon:"⭐" },
     { id:"analytics", label:"التحليل",   icon:"📈" },
-    { id:"license",   label:"الرخصة المهنية", icon:"🏅" },
+    { id:"license",   label:"سجل النمو المهني", icon:"📗" },
   ];
 
   // ════════ شاشة الدخول ════════
@@ -22364,19 +22364,24 @@ function SuggestionsPortal({ siteFont, onBack, classList }) {
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;800;900&display=swap');`}</style>
 
       {/* Header */}
-      <div className="text-center text-white pt-10 pb-6 px-4 relative">
+      <div className="text-center text-white pt-8 pb-6 px-4 relative">
         <button onClick={onBack} className="absolute right-4 top-4 bg-white/15 hover:bg-white/25 text-white px-3 py-1.5 rounded-xl text-xs font-bold">← رجوع</button>
-        <div className="w-20 h-20 rounded-3xl mx-auto mb-4 flex items-center justify-center text-4xl shadow-xl"
-          style={{background:"rgba(255,255,255,0.15)",backdropFilter:"blur(10px)",border:"1px solid rgba(255,255,255,0.25)"}}>
-          💬
+
+        {/* اسم المدرسة والقسم */}
+        <div className="mb-4">
+          <p className="text-sm font-bold opacity-80 mb-1">مدرسة عبيدة بن الحارث المتوسطة</p>
+          <div className="w-16 h-16 rounded-2xl mx-auto mb-3 flex items-center justify-center text-3xl shadow-xl"
+            style={{background:"rgba(255,255,255,0.15)",backdropFilter:"blur(10px)",border:"1px solid rgba(255,255,255,0.25)"}}>
+            💬
+          </div>
+          <h1 className="text-xl font-black mb-0.5">قسم الشكاوى والاقتراحات</h1>
+          <p className="opacity-75 text-xs">رأيك يبني مستقبل أبنائنا — شاركنا لنرتقي معاً</p>
         </div>
-        <h1 className="text-2xl font-black mb-1">آراء ومقترحات</h1>
-        <p className="opacity-70 text-sm">مدرسة عبيدة بن الحارث المتوسطة</p>
 
         {/* مربع مشاركة الرابط */}
         {step === "choice" && (
-          <div className="mt-4 bg-white/10 backdrop-blur rounded-2xl p-3 max-w-sm mx-auto border border-white/20">
-            <p className="text-xs opacity-75 mb-2">🔗 شارك رابط البوابة مع أولياء الأمور والمعلمين</p>
+          <div className="mt-3 bg-white/10 backdrop-blur rounded-2xl p-3 max-w-sm mx-auto border border-white/20">
+            <p className="text-xs opacity-75 mb-2">🔗 شارك رابط البوابة مع أولياء الأمور</p>
             <div className="flex gap-2 justify-center">
               <button onClick={copyLink}
                 className="flex-1 py-2 rounded-xl text-xs font-black border border-white/30 hover:bg-white/20 transition-all"
@@ -22388,7 +22393,6 @@ function SuggestionsPortal({ siteFont, onBack, classList }) {
                 💚 واتساب
               </button>
             </div>
-            <p className="text-xs opacity-50 mt-2 truncate">{portalLink}</p>
           </div>
         )}
       </div>
@@ -22604,11 +22608,148 @@ function SuggestionsAdminPage() {
   );
   const counts = { total:items.length, new:items.filter(i=>i.status==="جديد").length };
 
+  // طباعة كل الشكاوى على A4
+  const printAll = () => {
+    const printItems = filtered.length > 0 ? filtered : items;
+    const win = window.open("","_blank","width=900,height=700");
+    win.document.write(`
+      <!DOCTYPE html>
+      <html dir="rtl" lang="ar">
+      <head>
+        <meta charset="UTF-8">
+        <title>سجل الشكاوى والاقتراحات</title>
+        <style>
+          @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap');
+          * { margin:0; padding:0; box-sizing:border-box; }
+          body { font-family:'Cairo',sans-serif; direction:rtl; background:#fff; color:#1f2937; font-size:11pt; }
+          .page { width:210mm; min-height:297mm; margin:0 auto; padding:15mm 18mm; }
+          @media print {
+            body { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+            .page { padding:10mm 15mm; }
+            .card { page-break-inside:avoid; }
+          }
+          .school-header { text-align:center; border-bottom:3px solid #064e3b; padding-bottom:10px; margin-bottom:16px; }
+          .school-header .ministry { font-size:9pt; color:#6b7280; margin-bottom:2px; }
+          .school-header .school-name { font-size:16pt; font-weight:900; color:#064e3b; margin-bottom:2px; }
+          .school-header .section-title { font-size:12pt; font-weight:700; color:#0d9488; }
+          .school-header .tagline { font-size:9pt; color:#6b7280; margin-top:4px; }
+          .stats-row { display:flex; gap:10px; margin-bottom:14px; justify-content:center; }
+          .stat-box { flex:1; border:1px solid #d1fae5; background:#f0fdf4; border-radius:8px; padding:8px; text-align:center; }
+          .stat-num { font-size:18pt; font-weight:900; color:#064e3b; }
+          .stat-label { font-size:8pt; color:#6b7280; }
+          .filter-label { font-size:9pt; color:#6b7280; margin-bottom:8px; }
+          .card { border:1px solid #e5e7eb; border-radius:10px; padding:10px 12px; margin-bottom:10px; background:#fff; }
+          .card-header { display:flex; align-items:center; gap:8px; margin-bottom:6px; border-bottom:1px dashed #e5e7eb; padding-bottom:6px; }
+          .type-badge { font-size:8pt; font-weight:700; padding:2px 8px; border-radius:20px; }
+          .status-badge { font-size:8pt; font-weight:700; padding:2px 8px; border-radius:20px; margin-right:auto; }
+          .card-meta { display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-bottom:6px; }
+          .meta-item { font-size:9pt; }
+          .meta-label { color:#9ca3af; font-size:8pt; }
+          .meta-value { font-weight:700; color:#1f2937; }
+          .message-text { font-size:10pt; color:#374151; line-height:1.6; background:#f9fafb; padding:8px; border-radius:6px; }
+          .page-num { text-align:center; font-size:8pt; color:#9ca3af; margin-top:10px; border-top:1px solid #e5e7eb; padding-top:6px; }
+          .print-date { font-size:8pt; color:#9ca3af; text-align:left; }
+          .img-row { display:flex; gap:6px; flex-wrap:wrap; margin-top:4px; }
+          .img-row img { width:70px; height:70px; object-fit:cover; border-radius:6px; border:1px solid #e5e7eb; }
+        </style>
+      </head>
+      <body>
+        <div class="page">
+          <div class="school-header">
+            <div class="ministry">المملكة العربية السعودية — وزارة التعليم</div>
+            <div class="school-name">مدرسة عبيدة بن الحارث المتوسطة</div>
+            <div class="section-title">قسم الشكاوى والاقتراحات</div>
+            <div class="tagline">رأيك يبني مستقبل أبنائنا — شاركنا لنرتقي معاً</div>
+          </div>
+          <div class="stats-row">
+            <div class="stat-box"><div class="stat-num">${items.length}</div><div class="stat-label">إجمالي الرسائل</div></div>
+            <div class="stat-box"><div class="stat-num">${items.filter(i=>i.status==="جديد").length}</div><div class="stat-label">جديدة</div></div>
+            <div class="stat-box"><div class="stat-num">${items.filter(i=>i.status==="تمت المعالجة").length}</div><div class="stat-label">تمت المعالجة</div></div>
+            <div class="stat-box"><div class="stat-num">${printItems.length}</div><div class="stat-label">المطبوعة</div></div>
+          </div>
+          <div class="print-date">تاريخ الطباعة: ${new Date().toLocaleDateString("ar-SA")}</div>
+          <br/>
+          ${printItems.map((item,idx) => `
+            <div class="card">
+              <div class="card-header">
+                <span style="font-size:16pt">${TYPE_ICONS[item.type]||"💬"}</span>
+                <span class="type-badge" style="background:${item.type==="اقتراح"?"#dbeafe":item.type==="شكوى"?"#fee2e2":item.type==="ملاحظة"?"#fef9c3":"#f3f4f6"};color:${item.type==="اقتراح"?"#1d4ed8":item.type==="شكوى"?"#dc2626":item.type==="ملاحظة"?"#b45309":"#6b7280"}">${item.type}</span>
+                <span class="status-badge" style="background:${(STATUS_COLORS[item.status]||"#6b7280")+"20"};color:${STATUS_COLORS[item.status]||"#6b7280"}">${item.status||"جديد"}</span>
+                <span style="font-size:8pt;color:#9ca3af">${item.date} — ${item.time||""}</span>
+              </div>
+              <div class="card-meta">
+                <div class="meta-item"><span class="meta-label">مقدم الطلب: </span><span class="meta-value">${item.parentName||"—"}</span></div>
+                <div class="meta-item"><span class="meta-label">رقم التواصل: </span><span class="meta-value">${item.phone||"—"}</span></div>
+                ${item.studentName&&item.studentName!=="—"?`<div class="meta-item"><span class="meta-label">الطالب: </span><span class="meta-value">${item.studentName}</span></div><div class="meta-item"><span class="meta-label">الصف: </span><span class="meta-value">${item.studentClass||"—"}</span></div>`:""}
+              </div>
+              <div class="message-text">${(item.message||"").replace(/<[^>]*>/g,"")}</div>
+              ${item.images&&item.images.length>0?`<div class="img-row">${item.images.map(img=>`<img src="${img.data}" />`).join("")}</div>`:""}
+            </div>
+          `).join("")}
+          <div class="page-num">إجمالي ${printItems.length} رسالة — مدرسة عبيدة بن الحارث المتوسطة</div>
+        </div>
+        <script>window.onload=()=>{ window.print(); }</script>
+      </body>
+      </html>
+    `);
+    win.document.close();
+  };
+
   if (loading) return <div className="flex items-center justify-center py-20"><div className="text-4xl animate-bounce">💬</div></div>;
 
   if (selected) return (
     <div dir="rtl" className="max-w-2xl mx-auto px-3 py-4 space-y-4">
-      <button onClick={() => setSelected(null)} className="text-sm font-bold text-blue-600 hover:underline flex items-center gap-1">← قائمة الرسائل</button>
+      <div className="flex items-center justify-between">
+        <button onClick={() => setSelected(null)} className="text-sm font-bold text-blue-600 hover:underline flex items-center gap-1">← قائمة الرسائل</button>
+        <button onClick={() => {
+          const win = window.open("","_blank","width=800,height=600");
+          win.document.write(`
+            <!DOCTYPE html><html dir="rtl" lang="ar"><head>
+            <meta charset="UTF-8"><title>طباعة رسالة</title>
+            <style>
+              @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap');
+              *{margin:0;padding:0;box-sizing:border-box}
+              body{font-family:'Cairo',sans-serif;direction:rtl;padding:20mm;color:#1f2937;font-size:11pt}
+              @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+              .header{text-align:center;border-bottom:2px solid #064e3b;padding-bottom:10px;margin-bottom:16px}
+              .school{font-size:15pt;font-weight:900;color:#064e3b}
+              .section{font-size:11pt;font-weight:700;color:#0d9488}
+              .type-row{display:flex;align-items:center;gap:12px;margin-bottom:12px;padding:8px 12px;background:#f9fafb;border-radius:8px}
+              .type-badge{padding:4px 14px;border-radius:20px;font-weight:700;font-size:10pt}
+              table{width:100%;border-collapse:collapse;margin-bottom:12px}
+              td{padding:6px 10px;border:1px solid #e5e7eb;font-size:10pt}
+              td:first-child{font-weight:700;color:#6b7280;background:#f9fafb;width:35%}
+              .msg{background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:12px;line-height:1.7;font-size:10pt;margin-bottom:12px}
+              .imgs{display:flex;gap:8px;flex-wrap:wrap}
+              .imgs img{width:80px;height:80px;object-fit:cover;border-radius:6px;border:1px solid #e5e7eb}
+              .footer{margin-top:16px;text-align:center;font-size:8pt;color:#9ca3af;border-top:1px solid #e5e7eb;padding-top:8px}
+            </style></head><body>
+            <div class="header">
+              <div class="school">مدرسة عبيدة بن الحارث المتوسطة</div>
+              <div class="section">قسم الشكاوى والاقتراحات</div>
+            </div>
+            <div class="type-row">
+              <span style="font-size:22pt">${TYPE_ICONS[selected.type]||"💬"}</span>
+              <span class="type-badge" style="background:${selected.type==="اقتراح"?"#dbeafe":selected.type==="شكوى"?"#fee2e2":"#fef9c3"};color:${selected.type==="اقتراح"?"#1d4ed8":selected.type==="شكوى"?"#dc2626":"#b45309"}">${selected.type}</span>
+              <span style="font-size:9pt;color:#9ca3af;margin-right:auto">${selected.date} — ${selected.time||""}</span>
+            </div>
+            <table>
+              <tr><td>مقدم الطلب</td><td>${selected.parentName||"—"}</td></tr>
+              <tr><td>رقم التواصل</td><td>${selected.phone||"—"}</td></tr>
+              ${selected.studentName&&selected.studentName!=="—"?`<tr><td>اسم الطالب</td><td>${selected.studentName}</td></tr><tr><td>الصف</td><td>${selected.studentClass||"—"}</td></tr>`:""}
+              <tr><td>الحالة</td><td>${selected.status||"جديد"}</td></tr>
+            </table>
+            <div class="msg">${(selected.message||"").replace(/<[^>]*>/g,"")}</div>
+            ${selected.images&&selected.images.length>0?`<div class="imgs">${selected.images.map(img=>`<img src="${img.data}"/>`).join("")}</div>`:""}
+            <div class="footer">مدرسة عبيدة بن الحارث المتوسطة — قسم الشكاوى والاقتراحات — ${new Date().toLocaleDateString("ar-SA")}</div>
+            <script>window.onload=()=>window.print()</script>
+            </body></html>
+          `);
+          win.document.close();
+        }} className="px-3 py-2 rounded-xl text-xs font-black bg-teal-600 text-white hover:bg-teal-700 flex items-center gap-1.5">
+          🖨️ طباعة
+        </button>
+      </div>
       <div className="bg-white rounded-2xl p-5 shadow-sm">
         <div className="flex items-start justify-between gap-3 mb-4">
           <div className="flex items-center gap-3">
@@ -22669,6 +22810,7 @@ function SuggestionsAdminPage() {
             </div>
           </div>
           <button onClick={refresh} className="px-3 py-2 rounded-xl text-xs font-black bg-white/20 hover:bg-white/30 border border-white/30">🔄 تحديث</button>
+          <button onClick={printAll} className="px-3 py-2 rounded-xl text-xs font-black bg-white/20 hover:bg-white/30 border border-white/30">🖨️ طباعة A4</button>
           <button onClick={() => {
             const link = window.location.origin + window.location.pathname + "#suggestions-portal";
             navigator.clipboard.writeText(link).then(() => alert("✅ تم نسخ رابط البوابة!\n" + link));
@@ -22730,15 +22872,66 @@ function SuggestionsAdminPage() {
 
 
 // ================================================================
-// ===== صفحة الرخصة المهنية للمعلمين =====
+// ===== سجل النمو المهني للمعلمين (إدارة) =====
 // ================================================================
-function ProfessionalLicensePage() {
 
-  const SPECIALIZATIONS = [
-    "رياضيات","علوم","لغة عربية","اجتماعيات","تربية إسلامية",
-    "إنجليزي","حاسب وتقنية","تربية بدنية","فنون","كيمياء",
-    "فيزياء","أحياء","جغرافيا","تاريخ","تربية وطنية","أخرى"
-  ];
+// ثوابت مشتركة لسجل النمو المهني
+const PGR_SPECIALIZATIONS = [
+  "رياضيات","علوم","لغة عربية","اجتماعيات","تربية إسلامية",
+  "إنجليزي","حاسب وتقنية","تربية بدنية","فنون","كيمياء",
+  "فيزياء","أحياء","جغرافيا","تاريخ","تربية وطنية","أخرى"
+];
+const PGR_QUALIFICATIONS = ["دبلوم","بكالوريوس","ماجستير","دكتوراه","أخرى"];
+const PGR_STAGES = ["ابتدائي","متوسط","ثانوي"];
+const PGR_TRAINING_NEEDS = [
+  { id:"strategies",    label:"استراتيجيات التدريس الحديثة",          icon:"🎯" },
+  { id:"active",        label:"التعلّم النشط والتعاوني",               icon:"🤝" },
+  { id:"assessment",    label:"التقويم والقياس وبناء الاختبارات",      icon:"📊" },
+  { id:"technology",    label:"توظيف التقنية في التدريس",              icon:"💻" },
+  { id:"elearning",     label:"التعلّم الإلكتروني ومنصة مدرستي",      icon:"🖥️" },
+  { id:"classmanage",   label:"إدارة الصف والانضباط الصفي",           icon:"🏫" },
+  { id:"planning",      label:"التخطيط اليومي والفصلي",               icon:"📋" },
+  { id:"thinking",      label:"مهارات التفكير العليا",                 icon:"🧠" },
+  { id:"feedback",      label:"التغذية الراجعة وأساليبها",             icon:"💬" },
+  { id:"diff",          label:"التعامل مع الفروق الفردية",             icon:"🌈" },
+  { id:"gifted",        label:"رعاية الموهوبين وذوي الاحتياجات",      icon:"⭐" },
+  { id:"research",      label:"البحث الإجرائي وتطوير الذات",          icon:"🔬" },
+  { id:"communication", label:"مهارات التواصل مع الطلاب وأولياء الأمور",icon:"📞" },
+  { id:"mental",        label:"الصحة النفسية والإرشاد التربوي",        icon:"🧘" },
+  { id:"quality",       label:"معايير الجودة في التعليم",              icon:"🏆" },
+];
+const PGR_IMPACT_AREAS = [
+  "استراتيجيات التدريس","التقويم والقياس","توظيف التقنية",
+  "إدارة الصف","التعلّم النشط","مهارات التفكير","التغذية الراجعة","التعامل مع الفروق الفردية"
+];
+
+const mkPGREmpty = (name="") => ({
+  name,
+  // بيانات أساسية
+  qualification:"", specialization:"", stage:"", yearsService:"", phone:"", email:"",
+  prevCourses:"", startDate:"",
+  // احتياجات تدريبية
+  needs: Object.fromEntries(PGR_TRAINING_NEEDS.map(n=>[n.id,{needed:null,priority:""}])),
+  // خطة النمو
+  growthPlan: Array(8).fill(null).map(()=>({goal:"",method:"",duration:"",indicator:""})),
+  // سجل الدورات
+  courses: Array(14).fill(null).map(()=>({name:"",org:"",date:"",hours:""})),
+  // متابعة التنفيذ
+  followup: Array(10).fill(null).map(()=>({action:"",done:null,execDate:"",notes:""})),
+  // أثر التدريب
+  impact: Object.fromEntries(PGR_IMPACT_AREAS.map(a=>[a,{level:"",notes:""}])),
+  // التقارير
+  monthlyReport:{ month:"", date:"", activities:"", pct:"", challenges:"" },
+  semesterReport:{ semester:"", achievements:"", pct:"", recommendations:"" },
+  // الرخصة المهنية
+  hasLicense: null, licenseReason:"", licenseImages:[null,null],
+  // توقيعات
+  teacherSign:"", principalSign:"", viceSign:"",
+  approvalDate:"",
+});
+
+function ProfessionalLicensePage() {
+  const SPECIALIZATIONS = PGR_SPECIALIZATIONS;
 
   const PROGRAMS = [
     { id:"planning",      label:"التخطيط للتدريس",           icon:"📋" },
@@ -22759,12 +22952,7 @@ function ProfessionalLicensePage() {
     { val:"low",    label:"حاجة منخفضة",   color:"#059669", bg:"#d1fae5" },
   ];
 
-  const mkEmpty = (name="") => ({
-    name, specialization:"", yearsService:"", trainingHours:"",
-    programs: Object.fromEntries(PROGRAMS.map(p=>[p.id,{need:"",notes:""}])),
-    hasLicense: null, licenseReason:"",
-    licenseImages:[null,null],
-  });
+  const mkEmpty = (name="") => mkPGREmpty(name);
 
   const [records, setRecords]   = useState([]);
   const [teachers, setTeachers] = useState([]);
@@ -22929,15 +23117,35 @@ function ProfessionalLicensePage() {
           </div>
         </div>
 
-        {/* ── بيانات أساسية ── */}
+        {/* ── غلاف السجل ── */}
+        <div className="rounded-3xl p-6 text-white text-center shadow-xl"
+          style={{background:"linear-gradient(135deg,#1a3a2a,#064e3b,#0d9488)"}}>
+          <div className="text-4xl mb-2">📗</div>
+          <div className="font-black text-2xl mb-1">سجل النمو المهني</div>
+          <div className="opacity-80 text-sm mb-3">نحو تطوير تربوي ومهني مستدام</div>
+          <div className="bg-white/15 rounded-2xl p-3 text-sm">
+            <div className="font-black text-lg">{rec.name || "—"}</div>
+            <div className="opacity-75 text-xs mt-1">{rec.specialization||""} {rec.stage?`• ${rec.stage}`:""}</div>
+          </div>
+        </div>
+
+        {/* ── البيانات الأساسية ── */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="px-5 py-3 font-black text-sm text-white flex items-center gap-2"
             style={{background:"linear-gradient(135deg,#1e3a5f,#1d4ed8)"}}>
-            <span>👤</span> البيانات الأساسية
+            <span>👤</span> بيانات المعلم الأساسية
           </div>
-          <div className="p-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div className="p-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
-              <label className="text-xs font-black text-gray-600 mb-1.5 block">📚 التخصص</label>
+              <label className="text-xs font-black text-gray-600 mb-1.5 block">المؤهل العلمي</label>
+              <select value={rec.qualification||""} onChange={e=>updRecord(idx,"qualification",e.target.value)}
+                className="w-full px-3 py-2.5 rounded-xl border-2 border-gray-200 focus:border-blue-400 focus:outline-none text-sm font-bold bg-white">
+                <option value="">— اختر —</option>
+                {PGR_QUALIFICATIONS.map(s=><option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-black text-gray-600 mb-1.5 block">التخصص الدقيق</label>
               <select value={rec.specialization||""} onChange={e=>updRecord(idx,"specialization",e.target.value)}
                 className="w-full px-3 py-2.5 rounded-xl border-2 border-gray-200 focus:border-blue-400 focus:outline-none text-sm font-bold bg-white">
                 <option value="">— اختر التخصص —</option>
@@ -22945,70 +23153,281 @@ function ProfessionalLicensePage() {
               </select>
             </div>
             <div>
-              <label className="text-xs font-black text-gray-600 mb-1.5 block">📅 سنوات الخدمة</label>
-              <select value={rec.yearsService||""} onChange={e=>updRecord(idx,"yearsService",e.target.value)}
-                className="w-full px-3 py-2.5 rounded-xl border-2 border-gray-200 focus:border-blue-400 focus:outline-none text-sm font-bold bg-white">
-                <option value="">— اختر —</option>
-                {["أقل من سنة","1-3 سنوات","4-6 سنوات","7-10 سنوات","11-15 سنة","أكثر من 15 سنة"].map(s=>(
-                  <option key={s} value={s}>{s}</option>
+              <label className="text-xs font-black text-gray-600 mb-1.5 block">المرحلة الدراسية</label>
+              <div className="flex gap-2">
+                {PGR_STAGES.map(s=>(
+                  <button key={s} onClick={()=>updRecord(idx,"stage",s)}
+                    className={"flex-1 py-2 rounded-xl text-xs font-black border-2 transition-all "+(rec.stage===s?"border-blue-500 bg-blue-50 text-blue-700":"border-gray-200 text-gray-500")}>
+                    {s}
+                  </button>
                 ))}
-              </select>
+              </div>
             </div>
             <div>
-              <label className="text-xs font-black text-gray-600 mb-1.5 block">🎓 ساعات التدريب (تقريباً)</label>
-              <select value={rec.trainingHours||""} onChange={e=>updRecord(idx,"trainingHours",e.target.value)}
-                className="w-full px-3 py-2.5 rounded-xl border-2 border-gray-200 focus:border-blue-400 focus:outline-none text-sm font-bold bg-white">
-                <option value="">— اختر —</option>
-                {["أقل من 20 ساعة","20-40 ساعة","41-60 ساعة","61-80 ساعة","81-100 ساعة","أكثر من 100 ساعة"].map(s=>(
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </select>
+              <label className="text-xs font-black text-gray-600 mb-1.5 block">سنوات الخبرة</label>
+              <input type="number" min="0" max="40" value={rec.yearsService||""} onChange={e=>updRecord(idx,"yearsService",e.target.value)}
+                placeholder="مثال: 7" className="w-full px-3 py-2.5 rounded-xl border-2 border-gray-200 focus:border-blue-400 focus:outline-none text-sm font-bold" />
+            </div>
+            <div>
+              <label className="text-xs font-black text-gray-600 mb-1.5 block">رقم الجوال</label>
+              <input type="tel" value={rec.phone||""} onChange={e=>updRecord(idx,"phone",e.target.value)}
+                placeholder="05XXXXXXXX" className="w-full px-3 py-2.5 rounded-xl border-2 border-gray-200 focus:border-blue-400 focus:outline-none text-sm" />
+            </div>
+            <div>
+              <label className="text-xs font-black text-gray-600 mb-1.5 block">البريد الإلكتروني</label>
+              <input type="email" value={rec.email||""} onChange={e=>updRecord(idx,"email",e.target.value)}
+                placeholder="example@edu.sa" className="w-full px-3 py-2.5 rounded-xl border-2 border-gray-200 focus:border-blue-400 focus:outline-none text-sm" />
+            </div>
+            <div>
+              <label className="text-xs font-black text-gray-600 mb-1.5 block">عدد الدورات السابقة</label>
+              <input type="number" min="0" value={rec.prevCourses||""} onChange={e=>updRecord(idx,"prevCourses",e.target.value)}
+                placeholder="مثال: 5" className="w-full px-3 py-2.5 rounded-xl border-2 border-gray-200 focus:border-blue-400 focus:outline-none text-sm" />
+            </div>
+            <div>
+              <label className="text-xs font-black text-gray-600 mb-1.5 block">تاريخ المباشرة في المدرسة</label>
+              <input type="text" value={rec.startDate||""} onChange={e=>updRecord(idx,"startDate",e.target.value)}
+                placeholder="مثال: 1443/09/01 هـ" className="w-full px-3 py-2.5 rounded-xl border-2 border-gray-200 focus:border-blue-400 focus:outline-none text-sm" />
             </div>
           </div>
         </div>
 
-        {/* ── البرامج ── */}
+        {/* ── حصر الاحتياجات التدريبية ── */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="px-5 py-3 font-black text-sm text-white flex items-center gap-2"
             style={{background:"linear-gradient(135deg,#065f46,#0d9488)"}}>
-            <span>📋</span> البرامج التدريبية المحتاجة
+            <span>📋</span> حصر الاحتياجات التدريبية
           </div>
-          <div className="divide-y divide-gray-100">
-            {PROGRAMS.map(prog => {
-              const pd = rec.programs?.[prog.id] || {need:"", notes:""};
-              const nl = getNeedLevel(pd.need);
-              return (
-                <div key={prog.id} className="px-5 py-3">
-                  <div className="flex items-start gap-3 flex-wrap sm:flex-nowrap">
-                    <div className="flex items-center gap-2 min-w-0 flex-1">
-                      <span className="text-xl flex-shrink-0">{prog.icon}</span>
-                      <span className="font-black text-sm text-gray-800">{prog.label}</span>
-                      {nl && (
-                        <span className="text-xs font-black px-2 py-0.5 rounded-full flex-shrink-0"
-                          style={{background:nl.bg, color:nl.color}}>
-                          {nl.label}
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex gap-2 items-center flex-shrink-0">
-                      <select value={pd.need||""} onChange={e=>updProgram(idx,prog.id,"need",e.target.value)}
-                        className="px-2 py-1.5 rounded-xl border-2 border-gray-200 focus:border-teal-400 focus:outline-none text-xs font-bold bg-white"
-                        style={{minWidth:130}}>
-                        <option value="">— درجة الحاجة —</option>
-                        {NEED_LEVELS.map(n=>(
-                          <option key={n.val} value={n.val}>{n.label}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                  <div className="mt-2">
-                    <input value={pd.notes||""} onChange={e=>updProgram(idx,prog.id,"notes",e.target.value)}
-                      placeholder="أهمية البرنامج أو ملاحظات..."
-                      className="w-full px-3 py-2 rounded-xl border border-gray-200 focus:border-teal-400 focus:outline-none text-xs text-gray-700" />
-                  </div>
+          <div className="p-4 overflow-x-auto">
+            <p className="text-xs text-gray-500 mb-3">ضع علامة أمام المجالات التي تحتاج للتطوير فيها:</p>
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-gray-50">
+                  <th className="text-right p-2 font-black text-gray-700 w-6">م</th>
+                  <th className="text-right p-2 font-black text-gray-700">المجال</th>
+                  <th className="p-2 font-black text-teal-600 text-center">حاجة</th>
+                  <th className="p-2 font-black text-red-600 text-center">عالية</th>
+                  <th className="p-2 font-black text-yellow-600 text-center">متوسطة</th>
+                  <th className="p-2 font-black text-green-600 text-center">منخفضة</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {PGR_TRAINING_NEEDS.map((need,i)=>{
+                  const nd = rec.needs?.[need.id]||{needed:null,priority:""};
+                  return (
+                    <tr key={need.id} className="hover:bg-gray-50">
+                      <td className="p-2 text-gray-400 font-bold">{i+1}</td>
+                      <td className="p-2"><span className="font-bold text-gray-700">{need.icon} {need.label}</span></td>
+                      <td className="p-2 text-center">
+                        <button onClick={()=>{const next=[...records];next[idx]={...next[idx],needs:{...next[idx].needs,[need.id]:{...nd,needed:nd.needed===true?null:true}}};save(next);}}
+                          className={"w-6 h-6 rounded-full border-2 mx-auto flex items-center justify-center "+(nd.needed===true?"bg-teal-500 border-teal-500 text-white":"border-gray-300")}>
+                          {nd.needed===true?"✓":""}
+                        </button>
+                      </td>
+                      {["high","medium","low"].map(p=>(
+                        <td key={p} className="p-2 text-center">
+                          <button onClick={()=>{const next=[...records];next[idx]={...next[idx],needs:{...next[idx].needs,[need.id]:{...nd,priority:nd.priority===p?"":p}}};save(next);}}
+                            className={"w-6 h-6 rounded-full border-2 mx-auto flex items-center justify-center "+(nd.priority===p?(p==="high"?"bg-red-500 border-red-500 text-white":p==="medium"?"bg-yellow-400 border-yellow-400 text-white":"bg-green-500 border-green-500 text-white"):"border-gray-300")}>
+                            {nd.priority===p?"✓":""}
+                          </button>
+                        </td>
+                      ))}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* ── خطة النمو المهني ── */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="px-5 py-3 font-black text-sm text-white flex items-center gap-2"
+            style={{background:"linear-gradient(135deg,#1e3a5f,#7c3aed)"}}>
+            <span>🌱</span> خطة النمو المهني
+          </div>
+          <div className="p-4 overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-gray-50">
+                  <th className="p-2 font-black text-gray-600 w-6">م</th>
+                  <th className="text-right p-2 font-black text-gray-600">الهدف التطويري</th>
+                  <th className="text-right p-2 font-black text-gray-600">وسيلة التطوير</th>
+                  <th className="text-right p-2 font-black text-gray-600">المدة</th>
+                  <th className="text-right p-2 font-black text-gray-600">مؤشر الإنجاز</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {(rec.growthPlan||Array(8).fill({})).map((row,i)=>(
+                  <tr key={i}><td className="p-2 text-gray-400 font-bold text-center">{i+1}</td>
+                    {["goal","method","duration","indicator"].map(f=>(
+                      <td key={f} className="p-1"><input value={row?.[f]||""} onChange={e=>{const next=[...records];const plan=[...(next[idx].growthPlan||Array(8).fill({}))];plan[i]={...plan[i],[f]:e.target.value};next[idx]={...next[idx],growthPlan:plan};save(next);}} className="w-full px-2 py-1.5 rounded-lg border border-gray-200 focus:outline-none text-xs" /></td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* ── سجل الدورات التدريبية ── */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="px-5 py-3 font-black text-sm text-white flex items-center gap-2"
+            style={{background:"linear-gradient(135deg,#7c3aed,#db2777)"}}>
+            <span>🎓</span> سجل الدورات التدريبية
+          </div>
+          <div className="p-4 overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-gray-50">
+                  <th className="p-2 font-black text-gray-600 w-6">م</th>
+                  <th className="text-right p-2 font-black text-gray-600">اسم الدورة</th>
+                  <th className="text-right p-2 font-black text-gray-600">الجهة المنظمة</th>
+                  <th className="text-right p-2 font-black text-gray-600">التاريخ</th>
+                  <th className="text-right p-2 font-black text-gray-600 w-16">الساعات</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {(rec.courses||Array(14).fill({})).map((row,i)=>(
+                  <tr key={i}><td className="p-2 text-gray-400 font-bold text-center">{i+1}</td>
+                    {["name","org","date","hours"].map(f=>(
+                      <td key={f} className="p-1"><input value={row?.[f]||""} onChange={e=>{const next=[...records];const courses=[...(next[idx].courses||Array(14).fill({}))];courses[i]={...courses[i],[f]:e.target.value};next[idx]={...next[idx],courses};save(next);}} className="w-full px-2 py-1.5 rounded-lg border border-gray-200 focus:outline-none text-xs" /></td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot><tr className="bg-purple-50">
+                <td colSpan={3} className="p-2 font-black text-purple-800 text-right">إجمالي الساعات</td>
+                <td className="p-2 font-black text-purple-800 text-center">{(rec.courses||[]).reduce((s,c)=>s+(parseInt(c?.hours)||0),0)}</td>
+              </tr></tfoot>
+            </table>
+          </div>
+        </div>
+
+        {/* ── متابعة تنفيذ الخطة ── */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="px-5 py-3 font-black text-sm text-white flex items-center gap-2"
+            style={{background:"linear-gradient(135deg,#0369a1,#0ea5e9)"}}>
+            <span>📌</span> متابعة تنفيذ الخطة
+          </div>
+          <div className="p-4 overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-gray-50">
+                  <th className="p-2 w-6">م</th>
+                  <th className="text-right p-2 font-black text-gray-600">الإجراء التطويري</th>
+                  <th className="p-2 font-black text-green-600 text-center w-10">نعم</th>
+                  <th className="p-2 font-black text-red-500 text-center w-10">لا</th>
+                  <th className="text-right p-2 font-black text-gray-600">تاريخ التنفيذ</th>
+                  <th className="text-right p-2 font-black text-gray-600">الملاحظات</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {(rec.followup||Array(10).fill({})).map((row,i)=>(
+                  <tr key={i}>
+                    <td className="p-2 text-gray-400 text-center">{i+1}</td>
+                    <td className="p-1"><input value={row?.action||""} onChange={e=>{const next=[...records];const f=[...(next[idx].followup||Array(10).fill({}))];f[i]={...f[i],action:e.target.value};next[idx]={...next[idx],followup:f};save(next);}} className="w-full px-2 py-1.5 rounded-lg border border-gray-200 focus:outline-none text-xs" /></td>
+                    {[true,false].map(v=>(
+                      <td key={String(v)} className="p-2 text-center">
+                        <button onClick={()=>{const next=[...records];const f=[...(next[idx].followup||Array(10).fill({}))];f[i]={...f[i],done:row?.done===v?null:v};next[idx]={...next[idx],followup:f};save(next);}}
+                          className={"w-6 h-6 rounded-full border-2 mx-auto flex items-center justify-center "+(row?.done===v?(v?"bg-green-500 border-green-500 text-white":"bg-red-500 border-red-500 text-white"):"border-gray-300")}>
+                          {row?.done===v?"✓":""}
+                        </button>
+                      </td>
+                    ))}
+                    {["execDate","notes"].map(f=>(
+                      <td key={f} className="p-1"><input value={row?.[f]||""} onChange={e=>{const next=[...records];const fu=[...(next[idx].followup||Array(10).fill({}))];fu[i]={...fu[i],[f]:e.target.value};next[idx]={...next[idx],followup:fu};save(next);}} className="w-full px-2 py-1.5 rounded-lg border border-gray-200 focus:outline-none text-xs" /></td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* ── أثر التدريب ── */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="px-5 py-3 font-black text-sm text-white flex items-center gap-2"
+            style={{background:"linear-gradient(135deg,#065f46,#15803d)"}}>
+            <span>📈</span> أثر التدريب على الأداء الصفي
+          </div>
+          <div className="p-4 overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-gray-50">
+                  <th className="p-2 w-6">م</th>
+                  <th className="text-right p-2 font-black text-gray-600">مجال التدريب</th>
+                  <th className="p-2 font-black text-green-600 text-center">تحسّن ملحوظ</th>
+                  <th className="p-2 font-black text-yellow-600 text-center">متوسط</th>
+                  <th className="p-2 font-black text-red-500 text-center">يحتاج دعم</th>
+                  <th className="text-right p-2 font-black text-gray-600">ملاحظات</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {PGR_IMPACT_AREAS.map((area,i)=>{
+                  const imp=rec.impact?.[area]||{level:"",notes:""};
+                  return (
+                    <tr key={area} className="hover:bg-gray-50">
+                      <td className="p-2 text-gray-400 text-center">{i+1}</td>
+                      <td className="p-2 font-bold text-gray-700">{area}</td>
+                      {["تحسّن ملحوظ","متوسط","يحتاج دعم"].map(level=>(
+                        <td key={level} className="p-2 text-center">
+                          <button onClick={()=>{const next=[...records];next[idx]={...next[idx],impact:{...next[idx].impact,[area]:{...imp,level:imp.level===level?"":level}}};save(next);}}
+                            className={"w-6 h-6 rounded-full border-2 mx-auto flex items-center justify-center "+(imp.level===level?(level==="تحسّن ملحوظ"?"bg-green-500 border-green-500 text-white":level==="متوسط"?"bg-yellow-400 border-yellow-400 text-white":"bg-red-500 border-red-500 text-white"):"border-gray-300")}>
+                            {imp.level===level?"✓":""}
+                          </button>
+                        </td>
+                      ))}
+                      <td className="p-1"><input value={imp.notes||""} onChange={e=>{const next=[...records];next[idx]={...next[idx],impact:{...next[idx].impact,[area]:{...imp,notes:e.target.value}}};save(next);}} className="w-full px-2 py-1.5 rounded-lg border border-gray-200 focus:outline-none text-xs" /></td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* ── التقارير الدورية ── */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="px-5 py-3 font-black text-sm text-white flex items-center gap-2"
+            style={{background:"linear-gradient(135deg,#b45309,#d97706)"}}>
+            <span>📅</span> التقارير الدورية
+          </div>
+          <div className="p-5 space-y-4">
+            <div className="bg-amber-50 rounded-2xl p-4 border border-amber-200">
+              <div className="font-black text-amber-800 mb-3">◆ التقرير الشهري</div>
+              <div className="grid grid-cols-2 gap-3 mb-3">
+                <div><label className="text-xs font-black text-gray-600 mb-1 block">الشهر</label>
+                  <input value={rec.monthlyReport?.month||""} onChange={e=>{const next=[...records];next[idx]={...next[idx],monthlyReport:{...next[idx].monthlyReport,month:e.target.value}};save(next);}} className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 focus:outline-none text-sm" placeholder="مثال: محرم" />
                 </div>
-              );
-            })}
+                <div><label className="text-xs font-black text-gray-600 mb-1 block">نسبة الإنجاز %</label>
+                  <input type="number" min="0" max="100" value={rec.monthlyReport?.pct||""} onChange={e=>{const next=[...records];next[idx]={...next[idx],monthlyReport:{...next[idx].monthlyReport,pct:e.target.value}};save(next);}} className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 focus:outline-none text-sm font-bold" />
+                </div>
+              </div>
+              <div><label className="text-xs font-black text-gray-600 mb-1 block">أبرز الأنشطة التطويرية</label>
+                <textarea value={rec.monthlyReport?.activities||""} rows={2} onChange={e=>{const next=[...records];next[idx]={...next[idx],monthlyReport:{...next[idx].monthlyReport,activities:e.target.value}};save(next);}} className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 focus:outline-none text-sm resize-none mb-2" />
+              </div>
+              <div><label className="text-xs font-black text-gray-600 mb-1 block">التحديات والمعوّقات</label>
+                <textarea value={rec.monthlyReport?.challenges||""} rows={2} onChange={e=>{const next=[...records];next[idx]={...next[idx],monthlyReport:{...next[idx].monthlyReport,challenges:e.target.value}};save(next);}} className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 focus:outline-none text-sm resize-none" />
+              </div>
+            </div>
+            <div className="bg-blue-50 rounded-2xl p-4 border border-blue-200">
+              <div className="font-black text-blue-800 mb-3">◆ التقرير الفصلي</div>
+              <div className="flex gap-3 mb-3">
+                {["الأول","الثاني"].map(s=>(
+                  <button key={s} onClick={()=>{const next=[...records];next[idx]={...next[idx],semesterReport:{...next[idx].semesterReport,semester:s}};save(next);}}
+                    className={"flex-1 py-2 rounded-xl text-sm font-black border-2 transition-all "+(rec.semesterReport?.semester===s?"border-blue-500 bg-blue-100 text-blue-700":"border-gray-200 text-gray-500")}>
+                    الفصل {s}
+                  </button>
+                ))}
+                <input type="number" min="0" max="100" value={rec.semesterReport?.pct||""} onChange={e=>{const next=[...records];next[idx]={...next[idx],semesterReport:{...next[idx].semesterReport,pct:e.target.value}};save(next);}} placeholder="نسبة الإنجاز %" className="flex-1 px-3 py-2 rounded-xl border-2 border-gray-200 focus:outline-none text-sm font-bold" />
+              </div>
+              <div><label className="text-xs font-black text-gray-600 mb-1 block">أبرز الإنجازات</label>
+                <textarea value={rec.semesterReport?.achievements||""} rows={2} onChange={e=>{const next=[...records];next[idx]={...next[idx],semesterReport:{...next[idx].semesterReport,achievements:e.target.value}};save(next);}} className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 focus:outline-none text-sm resize-none mb-2" />
+              </div>
+              <div><label className="text-xs font-black text-gray-600 mb-1 block">التوصيات للفصل القادم</label>
+                <textarea value={rec.semesterReport?.recommendations||""} rows={2} onChange={e=>{const next=[...records];next[idx]={...next[idx],semesterReport:{...next[idx].semesterReport,recommendations:e.target.value}};save(next);}} className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 focus:outline-none text-sm resize-none" />
+              </div>
+            </div>
           </div>
         </div>
 
@@ -23025,56 +23444,40 @@ function ProfessionalLicensePage() {
                 {[{val:true,label:"✅ نعم، حصلت عليها"},{val:false,label:"❌ لا، لم أحصل عليها"}].map(opt=>(
                   <button key={String(opt.val)} onClick={()=>updRecord(idx,"hasLicense",opt.val)}
                     className="flex-1 py-3 rounded-2xl font-black text-sm border-2 transition-all"
-                    style={{
-                      background: rec.hasLicense===opt.val ? (opt.val?"#d1fae5":"#fee2e2") : "#f9fafb",
-                      borderColor: rec.hasLicense===opt.val ? (opt.val?"#059669":"#dc2626") : "#e5e7eb",
-                      color: rec.hasLicense===opt.val ? (opt.val?"#065f46":"#991b1b") : "#6b7280",
-                    }}>
+                    style={{background:rec.hasLicense===opt.val?(opt.val?"#d1fae5":"#fee2e2"):"#f9fafb",borderColor:rec.hasLicense===opt.val?(opt.val?"#059669":"#dc2626"):"#e5e7eb",color:rec.hasLicense===opt.val?(opt.val?"#065f46":"#991b1b"):"#6b7280"}}>
                     {opt.label}
                   </button>
                 ))}
               </div>
             </div>
-
             {rec.hasLicense === false && (
-              <div>
-                <label className="text-xs font-black text-gray-600 mb-1.5 block">سبب عدم الحصول على الرخصة</label>
+              <div><label className="text-xs font-black text-gray-600 mb-1.5 block">سبب عدم الحصول على الرخصة</label>
                 <textarea value={rec.licenseReason||""} onChange={e=>updRecord(idx,"licenseReason",e.target.value)}
                   placeholder="اكتب السبب هنا..." rows={3}
                   className="w-full px-4 py-3 rounded-2xl border-2 border-gray-200 focus:border-purple-400 focus:outline-none text-sm resize-none" />
               </div>
             )}
-
             {rec.hasLicense === true && (
               <div>
-                <label className="text-xs font-black text-gray-600 mb-3 block">صور الرخصة المهنية</label>
+                <label className="text-xs font-black text-gray-600 mb-3 block">📸 صور الرخصة المهنية</label>
                 <div className="grid grid-cols-2 gap-4">
                   {[0,1].map(imgIdx => {
                     const img = rec.licenseImages?.[imgIdx];
                     return (
                       <div key={imgIdx} className="rounded-2xl overflow-hidden border-2 border-dashed"
-                        style={{borderColor: img?"#7c3aed":"#d1d5db", minHeight:160}}>
+                        style={{borderColor:img?"#7c3aed":"#d1d5db",minHeight:150}}>
                         {img ? (
                           <div className="relative">
-                            <img src={img.dataUrl} alt={`رخصة ${imgIdx+1}`}
-                              className="w-full object-cover" style={{height:160}} />
-                            <button onClick={()=>removeLicenseImg(imgIdx,idx)}
-                              className="absolute top-2 left-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-lg">
-                              🗑️
-                            </button>
-                            <div className="text-center py-1.5 text-xs font-black text-white"
-                              style={{background:"#7c3aed"}}>صورة الرخصة {imgIdx+1}</div>
+                            <img src={img.dataUrl} alt={`رخصة ${imgIdx+1}`} className="w-full object-cover" style={{height:145}} />
+                            <button onClick={()=>removeLicenseImg(imgIdx,idx)} className="absolute top-2 left-2 bg-red-500/90 text-white text-xs font-bold px-2 py-1 rounded-lg shadow">🗑️</button>
+                            <div className="text-center py-1.5 text-xs font-black text-white" style={{background:"#7c3aed"}}>صورة الرخصة {imgIdx+1}</div>
                           </div>
                         ) : (
-                          <label className="flex flex-col items-center justify-center h-full cursor-pointer hover:bg-purple-50 transition-all"
-                            style={{minHeight:160}}>
+                          <label className="flex flex-col items-center justify-center h-full cursor-pointer hover:bg-purple-50" style={{minHeight:150}}>
                             <div className="text-3xl mb-2">📷</div>
-                            <div className="text-xs font-black" style={{color:"#7c3aed"}}>
-                              صورة الرخصة {imgIdx+1}
-                            </div>
+                            <div className="text-xs font-black" style={{color:"#7c3aed"}}>صورة الرخصة {imgIdx+1}</div>
                             <div className="text-xs text-gray-400 mt-1">اضغط لرفع الصورة</div>
-                            <input type="file" accept="image/*" className="hidden"
-                              ref={imgRefs[imgIdx]}
+                            <input type="file" accept="image/*" className="hidden" ref={imgRefs[imgIdx]}
                               onChange={e=>{const f=e.target.files?.[0];if(f)handleLicenseImg(imgIdx,idx,f);e.target.value="";}} />
                           </label>
                         )}
@@ -23084,6 +23487,24 @@ function ProfessionalLicensePage() {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+
+        {/* ── التوقيعات ── */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="px-5 py-3 font-black text-sm text-white flex items-center gap-2"
+            style={{background:"linear-gradient(135deg,#374151,#1f2937)"}}>
+            <span>✍️</span> الاعتماد والتوقيعات
+          </div>
+          <div className="p-5 grid grid-cols-2 gap-4">
+            {[["المعلم","teacherSign"],["قائد المدرسة","principalSign"],["وكيل الشؤون التعليمية","viceSign"],["تاريخ الاعتماد","approvalDate"]].map(([label,field])=>(
+              <div key={field} className="bg-gray-50 rounded-xl p-3">
+                <div className="font-black text-gray-700 text-xs mb-2">{label}</div>
+                <input value={rec[field]||""} onChange={e=>updRecord(idx,field,e.target.value)}
+                  placeholder={field==="approvalDate"?"مثال: 1446/05/01 هـ":"الاسم والتوقيع"}
+                  className="w-full px-3 py-2 rounded-xl border border-gray-200 focus:outline-none text-sm" />
+              </div>
+            ))}
           </div>
         </div>
 
@@ -23104,6 +23525,150 @@ function ProfessionalLicensePage() {
   }
 
   // ── القائمة الرئيسية ──
+  const [academicYear, setAcademicYear] = useState(() => {
+    try { return localStorage.getItem("pgr-academic-year") || ""; } catch { return ""; }
+  });
+  const saveAcademicYear = (v) => {
+    setAcademicYear(v);
+    try { localStorage.setItem("pgr-academic-year", v); } catch {}
+  };
+
+  // طباعة سجل معلم واحد على A4
+  const printRecord = (rec) => {
+    const win = window.open("","_blank","width=900,height=700");
+    const totalHours = (rec.courses||[]).reduce((s,c)=>s+(parseInt(c?.hours)||0),0);
+    win.document.write(`<!DOCTYPE html><html dir="rtl" lang="ar"><head>
+<meta charset="UTF-8"><title>سجل النمو المهني</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Cairo',sans-serif;direction:rtl;background:#fff;color:#1f2937;font-size:10pt}
+@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}.no-print{display:none}}
+.page{width:210mm;margin:0 auto;padding:12mm 15mm}
+.header{display:flex;align-items:center;gap:14px;border-bottom:3px solid #064e3b;padding-bottom:10px;margin-bottom:14px}
+.header-text{flex:1}
+.ministry{font-size:8pt;color:#6b7280}
+.school-name{font-size:14pt;font-weight:900;color:#064e3b}
+.record-title{font-size:11pt;font-weight:700;color:#0d9488}
+.year{font-size:9pt;color:#6b7280}
+.logo{width:60px;height:60px;background:linear-gradient(135deg,#064e3b,#0d9488);border-radius:12px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:26pt;flex-shrink:0}
+.cover-card{background:linear-gradient(135deg,#1a3a2a,#064e3b);color:#fff;border-radius:10px;padding:12px 16px;margin-bottom:14px;display:flex;align-items:center;gap:12px}
+.cover-card .name{font-size:15pt;font-weight:900}
+.cover-card .sub{font-size:9pt;opacity:0.75;margin-top:2px}
+.section-title{background:linear-gradient(90deg,#064e3b,#0d9488);color:#fff;padding:5px 12px;font-weight:700;font-size:9pt;border-radius:6px;margin-bottom:8px;margin-top:12px}
+table{width:100%;border-collapse:collapse;margin-bottom:4px;font-size:9pt}
+th{background:#f0fdf4;color:#065f46;font-weight:700;padding:5px 8px;border:1px solid #d1fae5;text-align:right}
+td{padding:4px 8px;border:1px solid #e5e7eb;vertical-align:top}
+td.label{background:#f9fafb;color:#6b7280;font-weight:700;width:28%;white-space:nowrap}
+.circle{width:16px;height:16px;border-radius:50%;border:2px solid #d1d5db;display:inline-flex;align-items:center;justify-content:center;font-size:7pt;font-weight:900}
+.circle.yes{background:#059669;border-color:#059669;color:#fff}
+.circle.no{background:#dc2626;border-color:#dc2626;color:#fff}
+.circle.med{background:#d97706;border-color:#d97706;color:#fff}
+.circle.high{background:#dc2626;border-color:#dc2626;color:#fff}
+.circle.low{background:#059669;border-color:#059669;color:#fff}
+.sign-box{border:1px solid #e5e7eb;border-radius:6px;padding:8px 10px;text-align:center;min-height:50px}
+.sign-label{font-size:8pt;color:#6b7280;margin-bottom:4px}
+.sign-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px}
+.footer{text-align:center;font-size:8pt;color:#9ca3af;border-top:1px dashed #e5e7eb;padding-top:6px;margin-top:10px}
+.quote{background:#f0fdf4;border-right:4px solid #0d9488;padding:6px 10px;font-size:9pt;color:#065f46;font-weight:700;margin-bottom:10px;border-radius:0 6px 6px 0}
+.pct-bar{height:8px;background:#e5e7eb;border-radius:4px;margin-top:4px;overflow:hidden}
+.pct-fill{height:100%;background:linear-gradient(90deg,#059669,#0d9488);border-radius:4px}
+</style></head><body>
+<div class="page">
+<div class="header">
+  <div class="logo">📗</div>
+  <div class="header-text">
+    <div class="ministry">المملكة العربية السعودية — وزارة التعليم — إدارة التعليم بمحافظة جدة</div>
+    <div class="school-name">مدرسة عبيدة بن الحارث المتوسطة</div>
+    <div class="record-title">سجل النمو المهني للمعلمين</div>
+    <div class="year">العام الدراسي: ${academicYear || ".............. / .............. هـ"}</div>
+  </div>
+</div>
+<div class="quote">❝ المعلم المتعلّم دوماً هو المعلم القادر على صناعة التغيير. ❞</div>
+<div class="cover-card">
+  <div style="font-size:28pt">👨‍🏫</div>
+  <div><div class="name">${rec.name||"—"}</div><div class="sub">${rec.specialization||""} ${rec.stage?`• ${rec.stage}`:""} ${rec.yearsService?`• خبرة ${rec.yearsService} سنوات`:""}</div></div>
+</div>
+
+<div class="section-title">👤 البيانات الأساسية</div>
+<table>
+  <tr><td class="label">المؤهل العلمي</td><td>${rec.qualification||"—"}</td><td class="label">التخصص</td><td>${rec.specialization||"—"}</td></tr>
+  <tr><td class="label">المرحلة الدراسية</td><td>${rec.stage||"—"}</td><td class="label">سنوات الخبرة</td><td>${rec.yearsService||"—"}</td></tr>
+  <tr><td class="label">رقم الجوال</td><td>${rec.phone||"—"}</td><td class="label">البريد الإلكتروني</td><td>${rec.email||"—"}</td></tr>
+  <tr><td class="label">عدد الدورات السابقة</td><td>${rec.prevCourses||"—"}</td><td class="label">تاريخ المباشرة</td><td>${rec.startDate||"—"}</td></tr>
+</table>
+
+<div class="section-title">📋 حصر الاحتياجات التدريبية</div>
+<table>
+  <thead><tr><th>م</th><th>المجال التدريبي</th><th>حاجة</th><th>عالية</th><th>متوسطة</th><th>منخفضة</th></tr></thead>
+  <tbody>
+    ${PGR_TRAINING_NEEDS.map((n,i)=>{const nd=rec.needs?.[n.id]||{};return `<tr><td style="text-align:center">${i+1}</td><td>${n.icon} ${n.label}</td><td style="text-align:center"><span class="circle ${nd.needed===true?"yes":""}">${nd.needed===true?"✓":""}</span></td><td style="text-align:center"><span class="circle ${nd.priority==="high"?"high":""}">${nd.priority==="high"?"✓":""}</span></td><td style="text-align:center"><span class="circle ${nd.priority==="medium"?"med":""}">${nd.priority==="medium"?"✓":""}</span></td><td style="text-align:center"><span class="circle ${nd.priority==="low"?"low":""}">${nd.priority==="low"?"✓":""}</span></td></tr>`;}).join("")}
+  </tbody>
+</table>
+
+<div class="section-title">🌱 خطة النمو المهني</div>
+<table>
+  <thead><tr><th>م</th><th>الهدف التطويري</th><th>وسيلة التطوير</th><th>المدة الزمنية</th><th>مؤشر الإنجاز</th></tr></thead>
+  <tbody>
+    ${(rec.growthPlan||[]).map((r,i)=>`<tr><td style="text-align:center">${i+1}</td><td>${r?.goal||""}</td><td>${r?.method||""}</td><td>${r?.duration||""}</td><td>${r?.indicator||""}</td></tr>`).join("")}
+  </tbody>
+</table>
+
+<div class="section-title">🎓 سجل الدورات التدريبية</div>
+<table>
+  <thead><tr><th>م</th><th>اسم الدورة / البرنامج</th><th>الجهة المنظمة</th><th>التاريخ</th><th>عدد الساعات</th></tr></thead>
+  <tbody>
+    ${(rec.courses||[]).map((r,i)=>`<tr><td style="text-align:center">${i+1}</td><td>${r?.name||""}</td><td>${r?.org||""}</td><td>${r?.date||""}</td><td style="text-align:center">${r?.hours||""}</td></tr>`).join("")}
+    <tr style="background:#f0fdf4"><td colspan="4" style="font-weight:700;text-align:right;color:#065f46">إجمالي الساعات التدريبية</td><td style="font-weight:900;text-align:center;color:#065f46">${totalHours}</td></tr>
+  </tbody>
+</table>
+
+<div class="section-title">📌 متابعة تنفيذ الخطة</div>
+<table>
+  <thead><tr><th>م</th><th>البند / الإجراء التطويري</th><th>نعم</th><th>لا</th><th>تاريخ التنفيذ</th><th>الملاحظات</th></tr></thead>
+  <tbody>
+    ${(rec.followup||[]).map((r,i)=>`<tr><td style="text-align:center">${i+1}</td><td>${r?.action||""}</td><td style="text-align:center"><span class="circle ${r?.done===true?"yes":""}">${r?.done===true?"✓":""}</span></td><td style="text-align:center"><span class="circle ${r?.done===false?"no":""}">${r?.done===false?"✓":""}</span></td><td>${r?.execDate||""}</td><td>${r?.notes||""}</td></tr>`).join("")}
+  </tbody>
+</table>
+
+<div class="section-title">📈 أثر التدريب على الأداء</div>
+<table>
+  <thead><tr><th>م</th><th>مجال التدريب</th><th>تحسّن ملحوظ</th><th>متوسط</th><th>يحتاج دعم</th><th>الملاحظات</th></tr></thead>
+  <tbody>
+    ${PGR_IMPACT_AREAS.map((area,i)=>{const imp=rec.impact?.[area]||{};return `<tr><td style="text-align:center">${i+1}</td><td>${area}</td><td style="text-align:center"><span class="circle ${imp.level==="تحسّن ملحوظ"?"yes":""}">${imp.level==="تحسّن ملحوظ"?"✓":""}</span></td><td style="text-align:center"><span class="circle ${imp.level==="متوسط"?"med":""}">${imp.level==="متوسط"?"✓":""}</span></td><td style="text-align:center"><span class="circle ${imp.level==="يحتاج دعم"?"no":""}">${imp.level==="يحتاج دعم"?"✓":""}</span></td><td>${imp.notes||""}</td></tr>`;}).join("")}
+  </tbody>
+</table>
+
+<div class="section-title">📅 التقارير الدورية</div>
+<table>
+  <tr><td class="label">الشهر</td><td>${rec.monthlyReport?.month||"—"}</td><td class="label">نسبة إنجاز الشهر</td><td>${rec.monthlyReport?.pct||"—"} %</td></tr>
+  <tr><td class="label">أبرز الأنشطة التطويرية</td><td colspan="3">${rec.monthlyReport?.activities||"—"}</td></tr>
+  <tr><td class="label">التحديات والمعوّقات</td><td colspan="3">${rec.monthlyReport?.challenges||"—"}</td></tr>
+  <tr><td class="label">الفصل الدراسي</td><td>${rec.semesterReport?.semester?`الفصل ${rec.semesterReport.semester}`:"—"}</td><td class="label">نسبة إنجاز الفصل</td><td>${rec.semesterReport?.pct||"—"} %</td></tr>
+  <tr><td class="label">أبرز إنجازات الفصل</td><td colspan="3">${rec.semesterReport?.achievements||"—"}</td></tr>
+  <tr><td class="label">توصيات الفصل القادم</td><td colspan="3">${rec.semesterReport?.recommendations||"—"}</td></tr>
+</table>
+
+<div class="section-title">🏅 الرخصة المهنية</div>
+<table>
+  <tr><td class="label">حالة الرخصة</td><td colspan="3">${rec.hasLicense===true?"✅ حاصل على الرخصة المهنية":rec.hasLicense===false?"❌ لم يحصل على الرخصة — "+( rec.licenseReason||"لم يُحدد السبب"):"⏳ لم يُحدد بعد"}</td></tr>
+</table>
+
+<div class="section-title">✍️ الاعتماد والتوقيعات</div>
+<div class="sign-grid">
+  <div class="sign-box"><div class="sign-label">المعلم</div><div style="font-size:9pt;font-weight:700">${rec.teacherSign||"..."}</div></div>
+  <div class="sign-box"><div class="sign-label">قائد المدرسة</div><div style="font-size:9pt;font-weight:700">${rec.principalSign||"..."}</div></div>
+  <div class="sign-box"><div class="sign-label">وكيل الشؤون التعليمية</div><div style="font-size:9pt;font-weight:700">${rec.viceSign||"..."}</div></div>
+</div>
+<table style="margin-top:8px"><tr><td class="label">تاريخ الاعتماد</td><td>${rec.approvalDate||"....../....../14.... هـ"}</td></tr></table>
+
+<div class="footer">مدرسة عبيدة بن الحارث المتوسطة — سجل النمو المهني — العام الدراسي ${academicYear||"............"} — تاريخ الطباعة: ${new Date().toLocaleDateString("ar-SA")}</div>
+</div>
+<script>window.onload=()=>window.print()</script>
+</body></html>`);
+    win.document.close();
+  };
+
   const stats = {
     total: records.length,
     hasLicense: records.filter(r=>r.hasLicense===true).length,
@@ -23113,41 +23678,68 @@ function ProfessionalLicensePage() {
 
   return (
     <div dir="rtl" className="max-w-3xl mx-auto px-3 py-4 space-y-4" style={{fontFamily:"'Cairo',sans-serif"}}>
-      {/* ── Header ── */}
-      <div className="rounded-2xl p-5 text-white shadow-xl"
-        style={{background:"linear-gradient(135deg,#1e3a5f,#1d4ed8,#7c3aed)"}}>
-        <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
-          <div className="flex items-center gap-3">
-            <div className="text-4xl">🏅</div>
-            <div>
-              <h2 className="font-black text-xl">الرخصة المهنية للمعلمين</h2>
-              <p className="opacity-70 text-xs">تتبع البرامج التدريبية وحالة الرخصة</p>
-            </div>
+
+      {/* ── Header المدرسة ── */}
+      <div className="rounded-3xl overflow-hidden shadow-xl">
+        {/* صورة تعبيرية */}
+        <div className="relative h-36 flex items-center justify-center"
+          style={{background:"linear-gradient(135deg,#1a3a2a,#064e3b,#065f46,#0d9488)"}}>
+          {/* زخارف هندسية */}
+          <div className="absolute inset-0 overflow-hidden opacity-10">
+            {[...Array(6)].map((_,i)=>(
+              <div key={i} className="absolute rounded-full border-2 border-white"
+                style={{width:(i+2)*60,height:(i+2)*60,top:"50%",left:"50%",transform:"translate(-50%,-50%)"}} />
+            ))}
           </div>
-          <div className="flex gap-2 flex-wrap">
-            <label className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-black cursor-pointer border border-white/30 bg-white/15 hover:bg-white/25">
-              {importing ? "⏳ جاري..." : "📥 استيراد Excel"}
-              <input type="file" accept=".xlsx,.xls" className="hidden"
-                onChange={e=>{const f=e.target.files?.[0];if(f)handleImportExcel(f);e.target.value="";}} />
-            </label>
-            <button onClick={addManual}
-              className="px-3 py-2 rounded-xl text-xs font-black border border-white/30 bg-white/15 hover:bg-white/25">
-              ➕ إضافة يدوي
-            </button>
+          <div className="relative text-center text-white px-6">
+            <div className="text-5xl mb-2">📗</div>
+            <div className="font-black text-lg">مدرسة عبيدة بن الحارث المتوسطة</div>
+            <div className="opacity-80 text-sm">سجل النمو المهني للمعلمين</div>
+            <div className="text-xs opacity-60 italic mt-1">نحو تطوير تربوي ومهني مستدام</div>
           </div>
         </div>
-        <div className="grid grid-cols-4 gap-3">
-          {[
-            {v:stats.total,     l:"إجمالي",      c:"#93c5fd"},
-            {v:stats.hasLicense,l:"حاصل",        c:"#86efac"},
-            {v:stats.noLicense, l:"لم يحصل",     c:"#fca5a5"},
-            {v:stats.pending,   l:"غير محدد",    c:"#fbbf24"},
-          ].map(s=>(
-            <div key={s.l} className="bg-white/15 rounded-xl py-2 text-center">
-              <div className="text-xl font-black" style={{color:s.c}}>{s.v}</div>
-              <div className="text-xs opacity-75">{s.l}</div>
+
+        {/* حقل العام الدراسي */}
+        <div className="bg-white px-5 py-3 flex items-center gap-3 border-b border-gray-100">
+          <span className="text-sm font-black text-gray-600">📅 العام الدراسي:</span>
+          <input value={academicYear} onChange={e=>saveAcademicYear(e.target.value)}
+            placeholder="مثال: 1446 / 1447 هـ"
+            className="flex-1 px-3 py-1.5 rounded-xl border-2 border-gray-200 focus:border-teal-400 focus:outline-none text-sm font-bold" />
+        </div>
+
+        {/* إحصائيات + أزرار */}
+        <div className="p-4 text-white"
+          style={{background:"linear-gradient(135deg,#1e3a5f,#1d4ed8,#7c3aed)"}}>
+          <div className="flex items-center justify-between flex-wrap gap-3 mb-3">
+            <div className="flex items-center gap-2">
+              <span className="text-2xl">👨‍🏫</span>
+              <span className="font-black text-base">سجلات المعلمين</span>
             </div>
-          ))}
+            <div className="flex gap-2 flex-wrap">
+              <label className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-black cursor-pointer border border-white/30 bg-white/15 hover:bg-white/25">
+                {importing ? "⏳ جاري..." : "📥 استيراد Excel"}
+                <input type="file" accept=".xlsx,.xls" className="hidden"
+                  onChange={e=>{const f=e.target.files?.[0];if(f)handleImportExcel(f);e.target.value="";}} />
+              </label>
+              <button onClick={addManual}
+                className="px-3 py-2 rounded-xl text-xs font-black border border-white/30 bg-white/15 hover:bg-white/25">
+                ➕ إضافة يدوي
+              </button>
+            </div>
+          </div>
+          <div className="grid grid-cols-4 gap-3">
+            {[
+              {v:stats.total,     l:"إجمالي",      c:"#93c5fd"},
+              {v:stats.hasLicense,l:"حاصل على الرخصة", c:"#86efac"},
+              {v:stats.noLicense, l:"لم يحصل",     c:"#fca5a5"},
+              {v:stats.pending,   l:"غير محدد",    c:"#fbbf24"},
+            ].map(s=>(
+              <div key={s.l} className="bg-white/15 rounded-xl py-2 text-center">
+                <div className="text-xl font-black" style={{color:s.c}}>{s.v}</div>
+                <div className="text-xs opacity-75">{s.l}</div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -23168,38 +23760,44 @@ function ProfessionalLicensePage() {
           {filtered.map((rec, i) => {
             const realIdx = records.indexOf(rec);
             const pct = getCompletePct(rec);
-            const highNeeds = PROGRAMS.filter(p => rec.programs?.[p.id]?.need === "high");
+            const highNeeds = Object.values(rec.needs||{}).filter(n=>n.priority==="high").length;
+            const totalHours = (rec.courses||[]).reduce((s,c)=>s+(parseInt(c?.hours)||0),0);
             return (
-              <button key={i} onClick={()=>setSelected(realIdx)}
-                className="w-full bg-white rounded-2xl p-4 shadow-sm border border-gray-100 hover:shadow-md hover:border-blue-200 transition-all text-right">
-                <div className="flex items-center gap-3">
-                  <div className="w-11 h-11 rounded-2xl flex items-center justify-center text-xl flex-shrink-0"
-                    style={{background: rec.hasLicense===true?"#d1fae5":rec.hasLicense===false?"#fee2e2":"#f3f4f6"}}>
-                    {rec.hasLicense===true?"🏅":rec.hasLicense===false?"❌":"⏳"}
+              <div key={i} className="bg-white rounded-2xl shadow-sm border border-gray-100 hover:shadow-md hover:border-blue-200 transition-all">
+                <button onClick={()=>setSelected(realIdx)} className="w-full p-4 text-right">
+                  <div className="flex items-center gap-3">
+                    <div className="w-11 h-11 rounded-2xl flex items-center justify-center text-xl flex-shrink-0"
+                      style={{background: rec.hasLicense===true?"#d1fae5":rec.hasLicense===false?"#fee2e2":"#f0fdf4"}}>
+                      {rec.hasLicense===true?"🏅":rec.hasLicense===false?"❌":"📗"}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-black text-sm text-gray-800 truncate">{rec.name}</span>
+                        {rec.specialization && (
+                          <span className="text-xs px-2 py-0.5 rounded-full font-bold flex-shrink-0"
+                            style={{background:"#dbeafe",color:"#1d4ed8"}}>{rec.specialization}</span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3 text-xs text-gray-500">
+                        {rec.yearsService && <span>📅 {rec.yearsService} سنوات</span>}
+                        {totalHours > 0 && <span>🎓 {totalHours} ساعة</span>}
+                        {highNeeds > 0 && <span className="text-red-500 font-bold">⚠️ {highNeeds} احتياج عالي</span>}
+                      </div>
+                      <div className="mt-1.5 bg-gray-100 rounded-full h-1.5 overflow-hidden">
+                        <div className="h-full rounded-full transition-all"
+                          style={{width:pct+"%", background: pct===100?"#059669":"#1d4ed8"}} />
+                      </div>
+                    </div>
+                    <span className="text-gray-300 flex-shrink-0">◄</span>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="font-black text-sm text-gray-800 truncate">{rec.name}</span>
-                      {rec.specialization && (
-                        <span className="text-xs px-2 py-0.5 rounded-full font-bold flex-shrink-0"
-                          style={{background:"#dbeafe",color:"#1d4ed8"}}>{rec.specialization}</span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-3 text-xs text-gray-500">
-                      {rec.yearsService && <span>📅 {rec.yearsService}</span>}
-                      {rec.trainingHours && <span>🎓 {rec.trainingHours}</span>}
-                      {highNeeds.length > 0 && (
-                        <span className="text-red-500 font-bold">⚠️ {highNeeds.length} احتياج عالي</span>
-                      )}
-                    </div>
-                    <div className="mt-1.5 bg-gray-100 rounded-full h-1.5 overflow-hidden">
-                      <div className="h-full rounded-full transition-all"
-                        style={{width:pct+"%", background: pct===100?"#059669":"#1d4ed8"}} />
-                    </div>
-                  </div>
-                  <span className="text-gray-300 flex-shrink-0">◄</span>
+                </button>
+                <div className="px-4 pb-3 flex justify-end">
+                  <button onClick={e=>{e.stopPropagation();printRecord(rec);}}
+                    className="px-3 py-1.5 rounded-xl text-xs font-black bg-teal-50 text-teal-700 border border-teal-200 hover:bg-teal-100 flex items-center gap-1">
+                    🖨️ طباعة A4
+                  </button>
                 </div>
-              </button>
+              </div>
             );
           })}
         </div>
@@ -23211,368 +23809,520 @@ function ProfessionalLicensePage() {
 
 
 // ================================================================
-// ===== تبويب الرخصة المهنية داخل بوابة المعلم =====
+// ===== سجل النمو المهني داخل بوابة المعلم =====
 // ================================================================
 function TeacherLicenseTab({ teacherName, teacherId }) {
 
-  const SPECIALIZATIONS = [
-    "رياضيات","علوم","لغة عربية","اجتماعيات","تربية إسلامية",
-    "إنجليزي","حاسب وتقنية","تربية بدنية","فنون","كيمياء",
-    "فيزياء","أحياء","جغرافيا","تاريخ","تربية وطنية","أخرى"
-  ];
+  const DB_KEY = `school-pgr-${teacherId}`;
 
-  const PROGRAMS = [
-    { id:"planning",      label:"التخطيط للتدريس",           icon:"📋" },
-    { id:"strategies",    label:"استراتيجيات التدريس",        icon:"🎯" },
-    { id:"classmanage",   label:"إدارة الصف",                icon:"🏫" },
-    { id:"assessment",    label:"التقويم والقياس",            icon:"📊" },
-    { id:"technology",    label:"توظيف التقنية",              icon:"💻" },
-    { id:"thinking",      label:"تنمية مهارات التفكير",       icon:"🧠" },
-    { id:"relations",     label:"بناء العلاقة مع الطلاب",    icon:"🤝" },
-    { id:"development",   label:"التطوير المهني",             icon:"🌱" },
-    { id:"timemanage",    label:"إدارة الوقت",                icon:"⏱️" },
-    { id:"communication", label:"مهارات التواصل",             icon:"💬" },
-  ];
+  const mkEmpty = () => mkPGREmpty(teacherName || "");
 
-  const NEED_LEVELS = [
-    { val:"high",   label:"حاجة عالية",    color:"#dc2626", bg:"#fee2e2" },
-    { val:"medium", label:"حاجة متوسطة",   color:"#d97706", bg:"#fef3c7" },
-    { val:"low",    label:"حاجة منخفضة",   color:"#059669", bg:"#d1fae5" },
-  ];
-
-  const DB_KEY = `school-license-${teacherId}`;
-
-  const mkEmpty = () => ({
-    specialization:"", yearsService:"", trainingHours:"",
-    programs: Object.fromEntries(PROGRAMS.map(p=>[p.id,{need:"",notes:""}])),
-    hasLicense:null, licenseReason:"",
-    licenseImages:[null,null],
-    name: teacherName || "",
-  });
-
-  const [rec, setRec]     = useState(null);
+  const [rec, setRec]         = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving]   = useState(false);
   const [lastSaved, setLastSaved] = useState(null);
+  const [activeTab, setActiveTab] = useState("info");
   const imgRefs = [useRef(), useRef()];
   const saveTimer = useRef(null);
 
-  // تحميل البيانات
   useEffect(() => {
     if (!teacherId) { setLoading(false); return; }
-    // أولاً: جرّب المفتاح الخاص بهذا المعلم
     DB.get(DB_KEY, null).then(data => {
-      if (data) {
-        // تأكد من وجود كل الحقول
-        const full = { ...mkEmpty(), ...data };
-        if (!full.programs) full.programs = mkEmpty().programs;
-        if (!full.licenseImages || full.licenseImages.length < 2)
-          full.licenseImages = [null, null];
-        setRec(full);
-      } else {
-        // جرّب من السجل المركزي
+      if (data) { setRec({ ...mkEmpty(), ...data }); }
+      else {
         DB.get("school-license-records", []).then(recs => {
-          const found = Array.isArray(recs) ? recs.find(r => r.name === teacherName) : null;
-          if (found) {
-            const full = { ...mkEmpty(), ...found };
-            setRec(full);
-          } else {
-            setRec(mkEmpty());
-          }
+          const found = Array.isArray(recs) ? recs.find(r => r.name === teacherName || r.teacherId === teacherId) : null;
+          setRec(found ? { ...mkEmpty(), ...found } : mkEmpty());
         });
       }
       setLoading(false);
     });
   }, [teacherId]);
 
-  // حفظ تلقائي مع debounce
   const autoSave = (newRec) => {
     if (!teacherId) return;
     setSaving(true);
     clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(async () => {
-      const toSave = {
-        ...newRec,
-        licenseImages: (newRec.licenseImages||[]).map(img => img ? { dataUrl: img.dataUrl, name: img.name } : null),
-        savedAt: new Date().toISOString(),
-        teacherId,
-        name: teacherName,
-      };
-      // احفظ في مفتاح خاص بالمعلم
+      const toSave = { ...newRec, savedAt: new Date().toISOString(), teacherId, name: teacherName };
       await DB.set(DB_KEY, toSave);
-      // احفظ أيضاً في السجل المركزي
       const recs = await DB.get("school-license-records", []);
       const arr = Array.isArray(recs) ? recs : [];
       const idx = arr.findIndex(r => r.name === teacherName || r.teacherId === teacherId);
-      if (idx >= 0) arr[idx] = toSave;
-      else arr.push(toSave);
+      if (idx >= 0) arr[idx] = toSave; else arr.push(toSave);
       await DB.set("school-license-records", arr);
       setSaving(false);
       setLastSaved(new Date().toLocaleTimeString("ar-SA-u-nu-latn",{hour:"2-digit",minute:"2-digit"}));
     }, 800);
   };
 
-  const upd = (field, val) => {
-    const next = { ...rec, [field]: val };
-    setRec(next);
-    autoSave(next);
-  };
-
-  const updProgram = (progId, field, val) => {
-    const next = {
-      ...rec,
-      programs: { ...rec.programs, [progId]: { ...rec.programs[progId], [field]: val } }
-    };
-    setRec(next);
-    autoSave(next);
-  };
+  const upd = (field, val) => { const next={...rec,[field]:val}; setRec(next); autoSave(next); };
 
   const handleLicenseImg = (imgIdx, file) => {
     if (!file) return;
     readFileAsync(file, "dataurl").then(dataUrl => {
-      const imgs = [...(rec.licenseImages||[null,null])];
-      imgs[imgIdx] = { dataUrl, name: file.name };
-      const next = { ...rec, licenseImages: imgs };
-      setRec(next);
-      autoSave(next);
+      const imgs=[...(rec.licenseImages||[null,null])];
+      imgs[imgIdx]={dataUrl,name:file.name};
+      const next={...rec,licenseImages:imgs}; setRec(next); autoSave(next);
     });
   };
-
   const removeLicenseImg = (imgIdx) => {
-    const imgs = [...(rec.licenseImages||[null,null])];
-    imgs[imgIdx] = null;
-    const next = { ...rec, licenseImages: imgs };
-    setRec(next);
-    autoSave(next);
+    const imgs=[...(rec.licenseImages||[null,null])]; imgs[imgIdx]=null;
+    const next={...rec,licenseImages:imgs}; setRec(next); autoSave(next);
   };
-
-  const getNeedLevel = (val) => NEED_LEVELS.find(n => n.val === val);
 
   const getCompletePct = () => {
     if (!rec) return 0;
-    let done = 0, total = 5;
+    let done=0, total=6;
     if (rec.specialization) done++;
+    if (rec.qualification) done++;
     if (rec.yearsService) done++;
-    if (rec.trainingHours) done++;
-    if (PROGRAMS.some(p => rec.programs?.[p.id]?.need)) done++;
+    if (rec.phone) done++;
+    if (Object.values(rec.needs||{}).some(n=>n.needed===true)) done++;
     if (rec.hasLicense !== null) done++;
-    return Math.round(done / total * 100);
+    return Math.round(done/total*100);
   };
 
   if (loading) return (
     <div className="flex items-center justify-center py-16 text-gray-400">
-      <div className="text-center"><div className="text-4xl mb-2 animate-bounce">🏅</div><p className="text-sm font-bold">جاري تحميل بياناتك…</p></div>
+      <div className="text-center"><div className="text-4xl mb-2 animate-bounce">📗</div><p className="text-sm font-bold">جاري تحميل سجلك…</p></div>
     </div>
   );
-
   if (!rec) return null;
 
   const pct = getCompletePct();
+  const TABS = [
+    {id:"info",    label:"البيانات",    icon:"👤"},
+    {id:"needs",   label:"الاحتياجات", icon:"📋"},
+    {id:"plan",    label:"الخطة",       icon:"🌱"},
+    {id:"courses", label:"الدورات",     icon:"🎓"},
+    {id:"followup",label:"المتابعة",    icon:"📌"},
+    {id:"impact",  label:"الأثر",       icon:"📈"},
+    {id:"reports", label:"التقارير",    icon:"📅"},
+    {id:"license", label:"الرخصة",      icon:"🏅"},
+  ];
 
   return (
     <div className="space-y-4 pb-6">
 
-      {/* ── شريط الحالة ── */}
+      {/* شريط الحالة */}
       <div className="rounded-2xl p-4 text-white shadow-lg"
-        style={{background:"linear-gradient(135deg,#4c1d95,#7c3aed)"}}>
+        style={{background:"linear-gradient(135deg,#1a3a2a,#064e3b,#0d9488)"}}>
         <div className="flex items-center justify-between mb-3">
           <div>
-            <div className="font-black text-base">🏅 الرخصة المهنية</div>
+            <div className="font-black text-base">📗 سجل النمو المهني</div>
             <div className="text-xs opacity-70 mt-0.5">ملف {teacherName}</div>
           </div>
           <div className="text-right">
             {saving ? (
-              <div className="flex items-center gap-1.5 text-xs font-bold">
-                <span className="animate-pulse text-yellow-300">💾</span>
-                <span className="opacity-80">جاري الحفظ…</span>
-              </div>
+              <div className="flex items-center gap-1.5 text-xs font-bold"><span className="animate-pulse text-yellow-300">💾</span><span className="opacity-80">جاري الحفظ…</span></div>
             ) : lastSaved ? (
-              <div className="flex items-center gap-1.5 text-xs font-bold">
-                <span className="text-green-300">✅</span>
-                <span className="opacity-80">محفوظ {lastSaved}</span>
-              </div>
+              <div className="flex items-center gap-1.5 text-xs font-bold"><span className="text-green-300">✅</span><span className="opacity-80">محفوظ {lastSaved}</span></div>
             ) : null}
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 mb-1">
           <div className="flex-1 bg-white/20 rounded-full h-2.5 overflow-hidden">
-            <div className="h-full rounded-full transition-all duration-500"
-              style={{width:pct+"%", background: pct===100?"#86efac":"#fbbf24"}} />
+            <div className="h-full rounded-full bg-white transition-all" style={{width:pct+"%"}} />
           </div>
           <span className="text-sm font-black">{pct}%</span>
         </div>
-        <div className="text-xs opacity-60 mt-1">اكتمال ملفك المهني</div>
+        <div className="text-xs opacity-60">اكتمال سجلك المهني</div>
+      </div>
+
+      {/* تبويبات التنقل */}
+      <div className="flex gap-1.5 flex-wrap">
+        {TABS.map(t=>(
+          <button key={t.id} onClick={()=>setActiveTab(t.id)}
+            className={"px-3 py-1.5 rounded-xl text-xs font-black border-2 transition-all "+(activeTab===t.id?"text-white border-transparent":"bg-white text-gray-600 border-gray-200 hover:border-teal-300")}
+            style={activeTab===t.id?{background:"linear-gradient(135deg,#064e3b,#0d9488)"}:{}}>
+            {t.icon} {t.label}
+          </button>
+        ))}
       </div>
 
       {/* ── البيانات الأساسية ── */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="px-4 py-3 font-black text-sm text-white flex items-center gap-2"
-          style={{background:"linear-gradient(135deg,#1e3a5f,#1d4ed8)"}}>
-          <span>👤</span> بياناتك الأساسية
-        </div>
-        <div className="p-4 space-y-3">
-          <div>
-            <label className="text-xs font-black text-gray-600 mb-1.5 block">📚 تخصصك</label>
-            <select value={rec.specialization||""} onChange={e=>upd("specialization",e.target.value)}
-              className="w-full px-3 py-3 rounded-xl border-2 border-gray-200 focus:border-blue-400 focus:outline-none text-sm font-bold bg-white">
-              <option value="">— اختر تخصصك —</option>
-              {SPECIALIZATIONS.map(s=><option key={s} value={s}>{s}</option>)}
-            </select>
+      {activeTab==="info" && (
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="px-4 py-3 font-black text-sm text-white flex items-center gap-2"
+            style={{background:"linear-gradient(135deg,#1e3a5f,#1d4ed8)"}}>
+            <span>👤</span> بياناتك الأساسية
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="p-4 space-y-3">
             <div>
-              <label className="text-xs font-black text-gray-600 mb-1.5 block">📅 سنوات الخدمة</label>
-              <select value={rec.yearsService||""} onChange={e=>upd("yearsService",e.target.value)}
+              <label className="text-xs font-black text-gray-600 mb-1.5 block">المؤهل العلمي</label>
+              <select value={rec.qualification||""} onChange={e=>upd("qualification",e.target.value)}
                 className="w-full px-3 py-3 rounded-xl border-2 border-gray-200 focus:border-blue-400 focus:outline-none text-sm font-bold bg-white">
                 <option value="">— اختر —</option>
-                {Array.from({length:35},(_,i)=>i+1).map(y=>(
-                  <option key={y} value={y}>{y} {y===1?"سنة":"سنوات"}</option>
-                ))}
+                {PGR_QUALIFICATIONS.map(s=><option key={s} value={s}>{s}</option>)}
               </select>
             </div>
             <div>
-              <label className="text-xs font-black text-gray-600 mb-1.5 block">🎓 ساعات التدريب (تقريباً)</label>
-              <select value={rec.trainingHours||""} onChange={e=>upd("trainingHours",e.target.value)}
+              <label className="text-xs font-black text-gray-600 mb-1.5 block">التخصص الدقيق</label>
+              <select value={rec.specialization||""} onChange={e=>upd("specialization",e.target.value)}
                 className="w-full px-3 py-3 rounded-xl border-2 border-gray-200 focus:border-blue-400 focus:outline-none text-sm font-bold bg-white">
-                <option value="">— اختر —</option>
-                {["أقل من 20 ساعة","20–40 ساعة","41–60 ساعة","61–80 ساعة","81–100 ساعة","أكثر من 100 ساعة"].map(s=>(
-                  <option key={s} value={s}>{s}</option>
-                ))}
+                <option value="">— اختر تخصصك —</option>
+                {PGR_SPECIALIZATIONS.map(s=><option key={s} value={s}>{s}</option>)}
               </select>
             </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ── البرامج التدريبية ── */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="px-4 py-3 font-black text-sm text-white flex items-center gap-2"
-          style={{background:"linear-gradient(135deg,#065f46,#0d9488)"}}>
-          <span>📋</span> البرامج التدريبية التي تحتاجها
-        </div>
-        <div className="divide-y divide-gray-100">
-          {PROGRAMS.map(prog => {
-            const pd = rec.programs?.[prog.id] || {need:"",notes:""};
-            const nl = getNeedLevel(pd.need);
-            return (
-              <div key={prog.id} className="p-4 space-y-2">
-                <div className="flex items-center justify-between gap-3 flex-wrap">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xl">{prog.icon}</span>
-                    <span className="font-black text-sm text-gray-800">{prog.label}</span>
-                    {nl && (
-                      <span className="text-xs font-black px-2 py-0.5 rounded-full"
-                        style={{background:nl.bg, color:nl.color}}>{nl.label}</span>
-                    )}
-                  </div>
-                  <select value={pd.need||""} onChange={e=>updProgram(prog.id,"need",e.target.value)}
-                    className="px-2 py-2 rounded-xl border-2 border-gray-200 focus:border-teal-400 focus:outline-none text-xs font-bold bg-white"
-                    style={{minWidth:140}}>
-                    <option value="">— درجة الحاجة —</option>
-                    {NEED_LEVELS.map(n=>(
-                      <option key={n.val} value={n.val}>{n.label}</option>
-                    ))}
-                  </select>
-                </div>
-                <input value={pd.notes||""} onChange={e=>updProgram(prog.id,"notes",e.target.value)}
-                  placeholder="أهمية هذا البرنامج أو ملاحظاتك..."
-                  className="w-full px-3 py-2 rounded-xl border border-gray-200 focus:border-teal-400 focus:outline-none text-xs text-gray-700" />
+            <div>
+              <label className="text-xs font-black text-gray-600 mb-1.5 block">المرحلة الدراسية</label>
+              <div className="flex gap-2">
+                {PGR_STAGES.map(s=>(
+                  <button key={s} onClick={()=>upd("stage",s)}
+                    className={"flex-1 py-2 rounded-xl text-xs font-black border-2 transition-all "+(rec.stage===s?"border-blue-500 bg-blue-50 text-blue-700":"border-gray-200 text-gray-500")}>
+                    {s}
+                  </button>
+                ))}
               </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* ── الرخصة المهنية ── */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="px-4 py-3 font-black text-sm text-white flex items-center gap-2"
-          style={{background:"linear-gradient(135deg,#7c3aed,#6d28d9)"}}>
-          <span>🏅</span> حالة الرخصة المهنية
-        </div>
-        <div className="p-4 space-y-4">
-          <div>
-            <label className="text-xs font-black text-gray-600 mb-2 block">هل حصلت على الرخصة المهنية؟</label>
+            </div>
             <div className="grid grid-cols-2 gap-3">
-              {[{val:true,label:"✅ نعم، حصلت عليها"},{val:false,label:"❌ لا، لم أحصل عليها"}].map(opt=>(
-                <button key={String(opt.val)} onClick={()=>upd("hasLicense",opt.val)}
-                  className="py-3 rounded-2xl font-black text-sm border-2 transition-all"
-                  style={{
-                    background: rec.hasLicense===opt.val ? (opt.val?"#d1fae5":"#fee2e2") : "#f9fafb",
-                    borderColor: rec.hasLicense===opt.val ? (opt.val?"#059669":"#dc2626") : "#e5e7eb",
-                    color: rec.hasLicense===opt.val ? (opt.val?"#065f46":"#991b1b") : "#9ca3af",
-                  }}>
-                  {opt.label}
-                </button>
-              ))}
+              <div>
+                <label className="text-xs font-black text-gray-600 mb-1.5 block">سنوات الخبرة</label>
+                <input type="number" min="0" max="40" value={rec.yearsService||""} onChange={e=>upd("yearsService",e.target.value)}
+                  placeholder="مثال: 7" className="w-full px-3 py-3 rounded-xl border-2 border-gray-200 focus:border-blue-400 focus:outline-none text-sm font-bold" />
+              </div>
+              <div>
+                <label className="text-xs font-black text-gray-600 mb-1.5 block">عدد الدورات السابقة</label>
+                <input type="number" min="0" value={rec.prevCourses||""} onChange={e=>upd("prevCourses",e.target.value)}
+                  placeholder="مثال: 5" className="w-full px-3 py-3 rounded-xl border-2 border-gray-200 focus:border-blue-400 focus:outline-none text-sm" />
+              </div>
+            </div>
+            <div>
+              <label className="text-xs font-black text-gray-600 mb-1.5 block">رقم الجوال</label>
+              <input type="tel" value={rec.phone||""} onChange={e=>upd("phone",e.target.value)}
+                placeholder="05XXXXXXXX" className="w-full px-3 py-3 rounded-xl border-2 border-gray-200 focus:border-blue-400 focus:outline-none text-sm" />
+            </div>
+            <div>
+              <label className="text-xs font-black text-gray-600 mb-1.5 block">البريد الإلكتروني</label>
+              <input type="email" value={rec.email||""} onChange={e=>upd("email",e.target.value)}
+                placeholder="example@edu.sa" className="w-full px-3 py-3 rounded-xl border-2 border-gray-200 focus:border-blue-400 focus:outline-none text-sm" />
+            </div>
+            <div>
+              <label className="text-xs font-black text-gray-600 mb-1.5 block">تاريخ المباشرة في المدرسة</label>
+              <input type="text" value={rec.startDate||""} onChange={e=>upd("startDate",e.target.value)}
+                placeholder="مثال: 1443/09/01 هـ" className="w-full px-3 py-3 rounded-xl border-2 border-gray-200 focus:border-blue-400 focus:outline-none text-sm" />
             </div>
           </div>
+        </div>
+      )}
 
-          {rec.hasLicense === false && (
-            <div>
-              <label className="text-xs font-black text-gray-600 mb-1.5 block">سبب عدم الحصول على الرخصة</label>
-              <textarea value={rec.licenseReason||""} onChange={e=>upd("licenseReason",e.target.value)}
-                placeholder="اكتب السبب هنا..." rows={3}
-                className="w-full px-4 py-3 rounded-2xl border-2 border-gray-200 focus:border-purple-400 focus:outline-none text-sm resize-none" />
-            </div>
-          )}
-
-          {rec.hasLicense === true && (
-            <div>
-              <label className="text-xs font-black text-gray-600 mb-3 block">📸 صور الرخصة المهنية</label>
-              <div className="grid grid-cols-2 gap-3">
-                {[0,1].map(imgIdx => {
-                  const img = rec.licenseImages?.[imgIdx];
+      {/* ── الاحتياجات التدريبية ── */}
+      {activeTab==="needs" && (
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="px-4 py-3 font-black text-sm text-white flex items-center gap-2"
+            style={{background:"linear-gradient(135deg,#065f46,#0d9488)"}}>
+            <span>📋</span> حصر الاحتياجات التدريبية
+          </div>
+          <div className="p-4 overflow-x-auto">
+            <p className="text-xs text-gray-500 mb-3">ضع علامة أمام المجالات التي تحتاج للتطوير وحدّد درجة الأولوية:</p>
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-gray-50">
+                  <th className="text-right p-2 font-black text-gray-700">المجال</th>
+                  <th className="p-2 font-black text-teal-600 text-center w-12">حاجة</th>
+                  <th className="p-2 font-black text-red-600 text-center w-12">عالية</th>
+                  <th className="p-2 font-black text-yellow-600 text-center w-12">متوسطة</th>
+                  <th className="p-2 font-black text-green-600 text-center w-12">منخفضة</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {PGR_TRAINING_NEEDS.map(need=>{
+                  const nd=rec.needs?.[need.id]||{needed:null,priority:""};
                   return (
-                    <div key={imgIdx} className="rounded-2xl overflow-hidden border-2 border-dashed"
-                      style={{borderColor:img?"#7c3aed":"#d1d5db", minHeight:150}}>
-                      {img ? (
-                        <div className="relative">
-                          <img src={img.dataUrl} alt={`رخصة ${imgIdx+1}`}
-                            className="w-full object-cover" style={{height:145}} />
-                          <button onClick={()=>removeLicenseImg(imgIdx)}
-                            className="absolute top-2 left-2 bg-red-500/90 text-white text-xs font-bold px-2 py-1 rounded-lg shadow">
-                            🗑️
+                    <tr key={need.id} className="hover:bg-gray-50">
+                      <td className="p-2 font-bold text-gray-700 text-xs">{need.icon} {need.label}</td>
+                      <td className="p-2 text-center">
+                        <button onClick={()=>{const n={...rec,needs:{...rec.needs,[need.id]:{...nd,needed:nd.needed===true?null:true}}};setRec(n);autoSave(n);}}
+                          className={"w-6 h-6 rounded-full border-2 mx-auto flex items-center justify-center "+(nd.needed===true?"bg-teal-500 border-teal-500 text-white":"border-gray-300")}>
+                          {nd.needed===true?"✓":""}
+                        </button>
+                      </td>
+                      {["high","medium","low"].map(p=>(
+                        <td key={p} className="p-2 text-center">
+                          <button onClick={()=>{const n={...rec,needs:{...rec.needs,[need.id]:{...nd,priority:nd.priority===p?"":p}}};setRec(n);autoSave(n);}}
+                            className={"w-6 h-6 rounded-full border-2 mx-auto flex items-center justify-center "+(nd.priority===p?(p==="high"?"bg-red-500 border-red-500 text-white":p==="medium"?"bg-yellow-400 border-yellow-400 text-white":"bg-green-500 border-green-500 text-white"):"border-gray-300")}>
+                            {nd.priority===p?"✓":""}
                           </button>
-                          <div className="py-1.5 text-center text-xs font-black text-white"
-                            style={{background:"#7c3aed"}}>صورة رقم {imgIdx+1}</div>
-                        </div>
-                      ) : (
-                        <label className="flex flex-col items-center justify-center cursor-pointer hover:bg-purple-50 transition-all"
-                          style={{minHeight:150}}>
-                          <div className="text-3xl mb-2">📷</div>
-                          <div className="text-xs font-black" style={{color:"#7c3aed"}}>صورة الرخصة {imgIdx+1}</div>
-                          <div className="text-xs text-gray-400 mt-1">اضغط لرفع</div>
-                          <input type="file" accept="image/*" className="hidden"
-                            ref={imgRefs[imgIdx]}
-                            onChange={e=>{const f=e.target.files?.[0];if(f)handleLicenseImg(imgIdx,f);e.target.value="";}} />
-                        </label>
-                      )}
-                    </div>
+                        </td>
+                      ))}
+                    </tr>
                   );
                 })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ── خطة النمو ── */}
+      {activeTab==="plan" && (
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="px-4 py-3 font-black text-sm text-white flex items-center gap-2"
+            style={{background:"linear-gradient(135deg,#1e3a5f,#7c3aed)"}}>
+            <span>🌱</span> خطة النمو المهني
+          </div>
+          <div className="p-4 overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-gray-50">
+                  <th className="p-2 w-6">م</th>
+                  <th className="text-right p-2 font-black text-gray-600">الهدف التطويري</th>
+                  <th className="text-right p-2 font-black text-gray-600">وسيلة التطوير</th>
+                  <th className="text-right p-2 font-black text-gray-600">المدة</th>
+                  <th className="text-right p-2 font-black text-gray-600">مؤشر الإنجاز</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {(rec.growthPlan||Array(8).fill({})).map((row,i)=>(
+                  <tr key={i}><td className="p-2 text-gray-400 text-center">{i+1}</td>
+                    {["goal","method","duration","indicator"].map(f=>(
+                      <td key={f} className="p-1"><input value={row?.[f]||""} onChange={e=>{const p=[...(rec.growthPlan||Array(8).fill({}))];p[i]={...p[i],[f]:e.target.value};const n={...rec,growthPlan:p};setRec(n);autoSave(n);}} className="w-full px-2 py-1.5 rounded-lg border border-gray-200 focus:outline-none text-xs" /></td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ── سجل الدورات ── */}
+      {activeTab==="courses" && (
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="px-4 py-3 font-black text-sm text-white flex items-center gap-2"
+            style={{background:"linear-gradient(135deg,#7c3aed,#db2777)"}}>
+            <span>🎓</span> سجل الدورات التدريبية
+          </div>
+          <div className="p-4 overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-gray-50">
+                  <th className="p-2 w-6">م</th>
+                  <th className="text-right p-2 font-black text-gray-600">اسم الدورة</th>
+                  <th className="text-right p-2 font-black text-gray-600">الجهة المنظمة</th>
+                  <th className="text-right p-2 font-black text-gray-600">التاريخ</th>
+                  <th className="p-2 font-black text-gray-600 w-16">الساعات</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {(rec.courses||Array(14).fill({})).map((row,i)=>(
+                  <tr key={i}><td className="p-2 text-gray-400 text-center">{i+1}</td>
+                    {["name","org","date","hours"].map(f=>(
+                      <td key={f} className="p-1"><input value={row?.[f]||""} onChange={e=>{const c=[...(rec.courses||Array(14).fill({}))];c[i]={...c[i],[f]:e.target.value};const n={...rec,courses:c};setRec(n);autoSave(n);}} className="w-full px-2 py-1.5 rounded-lg border border-gray-200 focus:outline-none text-xs" /></td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot><tr className="bg-purple-50">
+                <td colSpan={3} className="p-2 font-black text-purple-800 text-right">إجمالي الساعات</td>
+                <td className="p-2 font-black text-purple-800 text-center">{(rec.courses||[]).reduce((s,c)=>s+(parseInt(c?.hours)||0),0)}</td>
+              </tr></tfoot>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ── متابعة التنفيذ ── */}
+      {activeTab==="followup" && (
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="px-4 py-3 font-black text-sm text-white flex items-center gap-2"
+            style={{background:"linear-gradient(135deg,#0369a1,#0ea5e9)"}}>
+            <span>📌</span> متابعة تنفيذ الخطة
+          </div>
+          <div className="p-4 overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-gray-50">
+                  <th className="p-2 w-6">م</th>
+                  <th className="text-right p-2 font-black text-gray-600">الإجراء</th>
+                  <th className="p-2 font-black text-green-600 text-center w-10">نعم</th>
+                  <th className="p-2 font-black text-red-500 text-center w-10">لا</th>
+                  <th className="text-right p-2 font-black text-gray-600">تاريخ التنفيذ</th>
+                  <th className="text-right p-2 font-black text-gray-600">الملاحظات</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {(rec.followup||Array(10).fill({})).map((row,i)=>(
+                  <tr key={i}>
+                    <td className="p-2 text-gray-400 text-center">{i+1}</td>
+                    <td className="p-1"><input value={row?.action||""} onChange={e=>{const f=[...(rec.followup||Array(10).fill({}))];f[i]={...f[i],action:e.target.value};const n={...rec,followup:f};setRec(n);autoSave(n);}} className="w-full px-2 py-1.5 rounded-lg border border-gray-200 focus:outline-none text-xs" /></td>
+                    {[true,false].map(v=>(
+                      <td key={String(v)} className="p-2 text-center">
+                        <button onClick={()=>{const f=[...(rec.followup||Array(10).fill({}))];f[i]={...f[i],done:row?.done===v?null:v};const n={...rec,followup:f};setRec(n);autoSave(n);}}
+                          className={"w-6 h-6 rounded-full border-2 mx-auto flex items-center justify-center "+(row?.done===v?(v?"bg-green-500 border-green-500 text-white":"bg-red-500 border-red-500 text-white"):"border-gray-300")}>
+                          {row?.done===v?"✓":""}
+                        </button>
+                      </td>
+                    ))}
+                    {["execDate","notes"].map(f2=>(
+                      <td key={f2} className="p-1"><input value={row?.[f2]||""} onChange={e=>{const f=[...(rec.followup||Array(10).fill({}))];f[i]={...f[i],[f2]:e.target.value};const n={...rec,followup:f};setRec(n);autoSave(n);}} className="w-full px-2 py-1.5 rounded-lg border border-gray-200 focus:outline-none text-xs" /></td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ── أثر التدريب ── */}
+      {activeTab==="impact" && (
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="px-4 py-3 font-black text-sm text-white flex items-center gap-2"
+            style={{background:"linear-gradient(135deg,#065f46,#15803d)"}}>
+            <span>📈</span> أثر التدريب على الأداء الصفي
+          </div>
+          <div className="p-4 overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-gray-50">
+                  <th className="text-right p-2 font-black text-gray-600">المجال</th>
+                  <th className="p-2 font-black text-green-600 text-center">تحسّن ملحوظ</th>
+                  <th className="p-2 font-black text-yellow-600 text-center">متوسط</th>
+                  <th className="p-2 font-black text-red-500 text-center">يحتاج دعم</th>
+                  <th className="text-right p-2 font-black text-gray-600">ملاحظات</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {PGR_IMPACT_AREAS.map(area=>{
+                  const imp=rec.impact?.[area]||{level:"",notes:""};
+                  return (
+                    <tr key={area} className="hover:bg-gray-50">
+                      <td className="p-2 font-bold text-gray-700">{area}</td>
+                      {["تحسّن ملحوظ","متوسط","يحتاج دعم"].map(level=>(
+                        <td key={level} className="p-2 text-center">
+                          <button onClick={()=>{const n={...rec,impact:{...rec.impact,[area]:{...imp,level:imp.level===level?"":level}}};setRec(n);autoSave(n);}}
+                            className={"w-6 h-6 rounded-full border-2 mx-auto flex items-center justify-center "+(imp.level===level?(level==="تحسّن ملحوظ"?"bg-green-500 border-green-500 text-white":level==="متوسط"?"bg-yellow-400 border-yellow-400 text-white":"bg-red-500 border-red-500 text-white"):"border-gray-300")}>
+                            {imp.level===level?"✓":""}
+                          </button>
+                        </td>
+                      ))}
+                      <td className="p-1"><input value={imp.notes||""} onChange={e=>{const n={...rec,impact:{...rec.impact,[area]:{...imp,notes:e.target.value}}};setRec(n);autoSave(n);}} className="w-full px-2 py-1.5 rounded-lg border border-gray-200 focus:outline-none text-xs" /></td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ── التقارير ── */}
+      {activeTab==="reports" && (
+        <div className="space-y-4">
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
+            <div className="font-black text-amber-800 mb-3">◆ التقرير الشهري</div>
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              <div><label className="text-xs font-black text-gray-600 mb-1 block">الشهر</label>
+                <input value={rec.monthlyReport?.month||""} onChange={e=>{const n={...rec,monthlyReport:{...rec.monthlyReport,month:e.target.value}};setRec(n);autoSave(n);}} className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 focus:outline-none text-sm" placeholder="مثال: محرم" />
+              </div>
+              <div><label className="text-xs font-black text-gray-600 mb-1 block">نسبة الإنجاز %</label>
+                <input type="number" min="0" max="100" value={rec.monthlyReport?.pct||""} onChange={e=>{const n={...rec,monthlyReport:{...rec.monthlyReport,pct:e.target.value}};setRec(n);autoSave(n);}} className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 focus:outline-none text-sm font-bold" />
               </div>
             </div>
-          )}
+            <div><label className="text-xs font-black text-gray-600 mb-1 block">أبرز الأنشطة التطويرية</label>
+              <textarea value={rec.monthlyReport?.activities||""} rows={2} onChange={e=>{const n={...rec,monthlyReport:{...rec.monthlyReport,activities:e.target.value}};setRec(n);autoSave(n);}} className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 focus:outline-none text-sm resize-none mb-2" />
+            </div>
+            <div><label className="text-xs font-black text-gray-600 mb-1 block">التحديات والمعوّقات</label>
+              <textarea value={rec.monthlyReport?.challenges||""} rows={2} onChange={e=>{const n={...rec,monthlyReport:{...rec.monthlyReport,challenges:e.target.value}};setRec(n);autoSave(n);}} className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 focus:outline-none text-sm resize-none" />
+            </div>
+          </div>
+          <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
+            <div className="font-black text-blue-800 mb-3">◆ التقرير الفصلي</div>
+            <div className="flex gap-3 mb-3">
+              {["الأول","الثاني"].map(s=>(
+                <button key={s} onClick={()=>{const n={...rec,semesterReport:{...rec.semesterReport,semester:s}};setRec(n);autoSave(n);}}
+                  className={"flex-1 py-2 rounded-xl text-sm font-black border-2 transition-all "+(rec.semesterReport?.semester===s?"border-blue-500 bg-blue-100 text-blue-700":"border-gray-200 text-gray-500")}>
+                  الفصل {s}
+                </button>
+              ))}
+              <input type="number" min="0" max="100" value={rec.semesterReport?.pct||""} onChange={e=>{const n={...rec,semesterReport:{...rec.semesterReport,pct:e.target.value}};setRec(n);autoSave(n);}} placeholder="نسبة الإنجاز %" className="flex-1 px-3 py-2 rounded-xl border-2 border-gray-200 focus:outline-none text-sm font-bold" />
+            </div>
+            <div><label className="text-xs font-black text-gray-600 mb-1 block">أبرز الإنجازات</label>
+              <textarea value={rec.semesterReport?.achievements||""} rows={2} onChange={e=>{const n={...rec,semesterReport:{...rec.semesterReport,achievements:e.target.value}};setRec(n);autoSave(n);}} className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 focus:outline-none text-sm resize-none mb-2" />
+            </div>
+            <div><label className="text-xs font-black text-gray-600 mb-1 block">التوصيات للفصل القادم</label>
+              <textarea value={rec.semesterReport?.recommendations||""} rows={2} onChange={e=>{const n={...rec,semesterReport:{...rec.semesterReport,recommendations:e.target.value}};setRec(n);autoSave(n);}} className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 focus:outline-none text-sm resize-none" />
+            </div>
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* ── حفظ يدوي ── */}
-      <div className="flex items-center justify-between px-1">
-        <div className="text-xs text-gray-400">
-          {lastSaved ? `✅ آخر حفظ: ${lastSaved}` : "لم يُحفظ بعد"}
+      {/* ── الرخصة المهنية ── */}
+      {activeTab==="license" && (
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="px-4 py-3 font-black text-sm text-white flex items-center gap-2"
+            style={{background:"linear-gradient(135deg,#7c3aed,#6d28d9)"}}>
+            <span>🏅</span> حالة الرخصة المهنية
+          </div>
+          <div className="p-4 space-y-4">
+            <div>
+              <label className="text-xs font-black text-gray-600 mb-2 block">هل حصلت على الرخصة المهنية؟</label>
+              <div className="grid grid-cols-2 gap-3">
+                {[{val:true,label:"✅ نعم، حصلت عليها"},{val:false,label:"❌ لا، لم أحصل عليها"}].map(opt=>(
+                  <button key={String(opt.val)} onClick={()=>upd("hasLicense",opt.val)}
+                    className="py-3 rounded-2xl font-black text-sm border-2 transition-all"
+                    style={{background:rec.hasLicense===opt.val?(opt.val?"#d1fae5":"#fee2e2"):"#f9fafb",borderColor:rec.hasLicense===opt.val?(opt.val?"#059669":"#dc2626"):"#e5e7eb",color:rec.hasLicense===opt.val?(opt.val?"#065f46":"#991b1b"):"#9ca3af"}}>
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {rec.hasLicense === false && (
+              <div><label className="text-xs font-black text-gray-600 mb-1.5 block">سبب عدم الحصول على الرخصة</label>
+                <textarea value={rec.licenseReason||""} onChange={e=>upd("licenseReason",e.target.value)}
+                  placeholder="اكتب السبب هنا..." rows={3}
+                  className="w-full px-4 py-3 rounded-2xl border-2 border-gray-200 focus:border-purple-400 focus:outline-none text-sm resize-none" />
+              </div>
+            )}
+            {rec.hasLicense === true && (
+              <div>
+                <label className="text-xs font-black text-gray-600 mb-3 block">📸 صور الرخصة المهنية</label>
+                <div className="grid grid-cols-2 gap-3">
+                  {[0,1].map(imgIdx=>{
+                    const img=rec.licenseImages?.[imgIdx];
+                    return (
+                      <div key={imgIdx} className="rounded-2xl overflow-hidden border-2 border-dashed"
+                        style={{borderColor:img?"#7c3aed":"#d1d5db",minHeight:150}}>
+                        {img?(
+                          <div className="relative">
+                            <img src={img.dataUrl} alt="" className="w-full object-cover" style={{height:145}} />
+                            <button onClick={()=>removeLicenseImg(imgIdx)} className="absolute top-2 left-2 bg-red-500/90 text-white text-xs font-bold px-2 py-1 rounded-lg shadow">🗑️</button>
+                            <div className="py-1.5 text-center text-xs font-black text-white" style={{background:"#7c3aed"}}>صورة رقم {imgIdx+1}</div>
+                          </div>
+                        ):(
+                          <label className="flex flex-col items-center justify-center cursor-pointer hover:bg-purple-50 transition-all" style={{minHeight:150}}>
+                            <div className="text-3xl mb-2">📷</div>
+                            <div className="text-xs font-black" style={{color:"#7c3aed"}}>صورة الرخصة {imgIdx+1}</div>
+                            <div className="text-xs text-gray-400 mt-1">اضغط لرفع</div>
+                            <input type="file" accept="image/*" className="hidden" ref={imgRefs[imgIdx]}
+                              onChange={e=>{const f=e.target.files?.[0];if(f)handleLicenseImg(imgIdx,f);e.target.value="";}} />
+                          </label>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
-        <button onClick={()=>autoSave(rec)}
-          disabled={saving}
+      )}
+
+      {/* زر الحفظ */}
+      <div className="flex items-center justify-between px-1">
+        <div className="text-xs text-gray-400">{lastSaved?`✅ آخر حفظ: ${lastSaved}`:"لم يُحفظ بعد"}</div>
+        <button onClick={()=>autoSave(rec)} disabled={saving}
           className="px-5 py-2.5 rounded-xl font-black text-sm text-white shadow-md"
-          style={{background: saving ? "#9ca3af" : "linear-gradient(135deg,#4c1d95,#7c3aed)"}}>
-          {saving ? "⏳ جاري الحفظ..." : "💾 حفظ البيانات"}
+          style={{background:saving?"#9ca3af":"linear-gradient(135deg,#064e3b,#0d9488)"}}>
+          {saving?"⏳ جاري الحفظ...":"💾 حفظ البيانات"}
         </button>
       </div>
 
     </div>
   );
 }
-
 
 
 // ================================================================
@@ -27409,7 +28159,7 @@ export default function SchoolWebsite() {
     { id: "committeemeeting",label: "اجتماعات اللجان",     icon: "👔" },
     { id: "teachereval",    label: "قياس أداء المعلم",     icon: "🎖️" },
     { id: "suggestions",    label: "آراء ومقترحات",        icon: "💬" },
-    { id: "prolicense",     label: "الرخصة المهنية",         icon: "🏅" },
+    { id: "prolicense",     label: "سجل النمو المهني",         icon: "📗" },
     { id: "teacherreports", label: "ملفات المعلمين",       icon: "🗄️" },
   ];
   const extraPages = [...classToolPages, ...reportPages];
