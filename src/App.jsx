@@ -21741,6 +21741,30 @@ function ProfessionalLicensePage() {
     { val:"low",    label:"حاجة منخفضة",   color:"#059669", bg:"#d1fae5" },
   ];
 
+  const TRAINING_NEEDS_LIST = [
+    {id:"strategies",  label:"استراتيجيات التدريس الحديثة"},
+    {id:"active",      label:"التعلّم النشط والتعاوني"},
+    {id:"assessment",  label:"التقويم والقياس وبناء الاختبارات"},
+    {id:"technology",  label:"توظيف التقنية في التدريس"},
+    {id:"elearning",   label:"التعلّم الإلكتروني ومنصة مدرستي"},
+    {id:"classmanage", label:"إدارة الصف والانضباط الصفي"},
+    {id:"planning",    label:"التخطيط اليومي والفصلي"},
+    {id:"thinking",    label:"مهارات التفكير العليا"},
+    {id:"feedback",    label:"التغذية الراجعة وأساليبها"},
+    {id:"diff",        label:"التعامل مع الفروق الفردية"},
+    {id:"gifted",      label:"رعاية الموهوبين وذوي الاحتياجات"},
+    {id:"research",    label:"البحث الإجرائي وتطوير الذات"},
+    {id:"communication",label:"مهارات التواصل مع الطلاب وأولياء الأمور"},
+    {id:"mental",      label:"الصحة النفسية والإرشاد التربوي"},
+    {id:"quality",     label:"معايير الجودة في التعليم"},
+  ];
+
+  const IMPACT_AREAS_LIST = [
+    "استراتيجيات التدريس","التقويم والقياس","توظيف التقنية",
+    "إدارة الصف","التعلّم النشط","مهارات التفكير",
+    "التغذية الراجعة","التعامل مع الفروق الفردية",
+  ];
+
   const mkEmpty = (name="") => ({
     name, specialization:"", yearsService:"", trainingHours:"",
     programs: Object.fromEntries(PROGRAMS.map(p=>[p.id,{need:"",notes:""}])),
@@ -22069,6 +22093,316 @@ function ProfessionalLicensePage() {
           </div>
         </div>
 
+        {/* ══ حصر الاحتياجات التدريبية ══ */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="px-5 py-3 font-black text-sm text-white flex items-center gap-2"
+            style={{background:"linear-gradient(135deg,#065f46,#0d9488)"}}>
+            <span>📋</span> حصر الاحتياجات التدريبية
+          </div>
+          <div className="p-4">
+            <p className="text-xs text-gray-500 mb-3">ضع علامة (✓) أمام المجالات التي ترى حاجتك للتطوير فيها، وحدّد مستوى الأولوية:</p>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs border-collapse">
+                <thead>
+                  <tr style={{background:"#0d9488"}}>
+                    <th className="p-2 text-white font-black text-right w-8">م</th>
+                    <th className="p-2 text-white font-black text-right">المجال / الموضوع التدريبي</th>
+                    <th className="p-2 text-white font-black text-center" colSpan={2}>الحاجة للتدريب</th>
+                    <th className="p-2 text-white font-black text-center" colSpan={3}>أولوية التدريب</th>
+                  </tr>
+                  <tr style={{background:"#f0fdf4"}}>
+                    <th className="p-1 border border-gray-200"></th>
+                    <th className="p-1 border border-gray-200"></th>
+                    <th className="p-2 text-center text-xs font-black border border-gray-200" style={{color:"#059669"}}>نعم</th>
+                    <th className="p-2 text-center text-xs font-black border border-gray-200" style={{color:"#dc2626"}}>لا</th>
+                    <th className="p-2 text-center text-xs font-black border border-gray-200" style={{color:"#dc2626"}}>عالية</th>
+                    <th className="p-2 text-center text-xs font-black border border-gray-200" style={{color:"#d97706"}}>متوسطة</th>
+                    <th className="p-2 text-center text-xs font-black border border-gray-200" style={{color:"#059669"}}>منخفضة</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {TRAINING_NEEDS_LIST.map((need, i) => {
+                    const nd = (rec.needs||{})[need.id] || {needed:null, priority:""};
+                    return (
+                      <tr key={need.id} style={{background:i%2===0?"#fff":"#f9fdf9"}}>
+                        <td className="p-2 text-center font-bold text-gray-500 border border-gray-100">{i+1}</td>
+                        <td className="p-2 font-bold text-gray-700 border border-gray-100">{need.label}</td>
+                        {[true, false].map((v, vi) => (
+                          <td key={vi} className="p-2 text-center border border-gray-100">
+                            <button onClick={()=>{
+                              const next=[...records];
+                              const cur=(next[idx].needs||{});
+                              next[idx]={...next[idx],needs:{...cur,[need.id]:{...nd,needed:nd.needed===v?null:v}}};
+                              save(next);
+                            }} className={"w-5 h-5 rounded-full border-2 mx-auto flex items-center justify-center text-xs font-black "+(nd.needed===v?(v?"bg-green-500 border-green-500 text-white":"bg-red-500 border-red-500 text-white"):"border-gray-300 bg-white")}>
+                              {nd.needed===v?"✓":""}
+                            </button>
+                          </td>
+                        ))}
+                        {["high","medium","low"].map(p => (
+                          <td key={p} className="p-2 text-center border border-gray-100">
+                            <button onClick={()=>{
+                              const next=[...records];
+                              const cur=(next[idx].needs||{});
+                              next[idx]={...next[idx],needs:{...cur,[need.id]:{...nd,priority:nd.priority===p?"":p}}};
+                              save(next);
+                            }} className={"w-5 h-5 rounded-full border-2 mx-auto flex items-center justify-center text-xs font-black "+(nd.priority===p?(p==="high"?"bg-red-500 border-red-500 text-white":p==="medium"?"bg-yellow-400 border-yellow-400 text-white":"bg-green-500 border-green-500 text-white"):"border-gray-300 bg-white")}>
+                              {nd.priority===p?"✓":""}
+                            </button>
+                          </td>
+                        ))}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        {/* ══ سجل الدورات التدريبية ══ */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="px-5 py-3 font-black text-sm text-white flex items-center gap-2"
+            style={{background:"linear-gradient(135deg,#065f46,#0d9488)"}}>
+            <span>🎓</span> سجل الدورات التدريبية
+          </div>
+          <div className="p-1 overflow-x-auto">
+            <table className="w-full text-xs border-collapse">
+              <thead>
+                <tr style={{background:"#0d9488"}}>
+                  <th className="p-2 text-white font-black text-center w-8">م</th>
+                  <th className="p-2 text-white font-black text-right">اسم الدورة / البرنامج</th>
+                  <th className="p-2 text-white font-black text-right">الجهة المنظمة</th>
+                  <th className="p-2 text-white font-black text-right">التاريخ</th>
+                  <th className="p-2 text-white font-black text-center w-20">عدد الساعات</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(rec.courses||Array(9).fill({})).map((row, i) => (
+                  <tr key={i} style={{background:i%2===0?"#fff":"#f9fdf9"}}>
+                    <td className="p-1 text-center font-bold text-gray-400 border border-gray-100">{i+1}</td>
+                    {["name","org","date","hours"].map(f => (
+                      <td key={f} className="p-1 border border-gray-100">
+                        <input value={row?.[f]||""} onChange={e=>{
+                          const next=[...records];
+                          const courses=[...(next[idx].courses||Array(9).fill({}))];
+                          courses[i]={...courses[i],[f]:e.target.value};
+                          next[idx]={...next[idx],courses};
+                          save(next);
+                        }} className="w-full px-2 py-1 rounded-lg border border-gray-100 focus:border-teal-400 focus:outline-none text-xs bg-transparent"/>
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr style={{background:"#f0fdf4"}}>
+                  <td colSpan={4} className="p-2 font-black text-right" style={{color:"#065f46"}}>إجمالي الساعات التدريبية</td>
+                  <td className="p-2 font-black text-center" style={{color:"#065f46"}}>
+                    {(rec.courses||[]).reduce((s,c)=>s+(parseInt(c?.hours)||0),0)}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+
+        {/* ══ أثر التدريب على الأداء ══ */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="px-5 py-3 font-black text-sm text-white flex items-center gap-2"
+            style={{background:"linear-gradient(135deg,#065f46,#0d9488)"}}>
+            <span>📈</span> أثر التدريب على الأداء الصفي
+          </div>
+          <div className="p-4">
+            <p className="text-xs text-gray-500 mb-3">ضع علامة (✓) في العمود الذي يعكس أثر كل مجال تدريبي على أدائك الفعلي:</p>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs border-collapse">
+                <thead>
+                  <tr style={{background:"#0d9488"}}>
+                    <th className="p-2 text-white font-black text-right w-8">م</th>
+                    <th className="p-2 text-white font-black text-right">مجال التدريب</th>
+                    <th className="p-2 text-white font-black text-center" colSpan={3}>مستوى الأثر على الأداء</th>
+                    <th className="p-2 text-white font-black text-right">الملاحظات</th>
+                  </tr>
+                  <tr>
+                    <th className="p-1 border border-gray-200"></th>
+                    <th className="p-1 border border-gray-200"></th>
+                    <th className="p-2 text-center text-xs font-black border border-gray-200" style={{color:"#059669",background:"#dcfce7"}}>تحسّن ملحوظ</th>
+                    <th className="p-2 text-center text-xs font-black border border-gray-200" style={{color:"#d97706",background:"#fef9c3"}}>متوسط</th>
+                    <th className="p-2 text-center text-xs font-black border border-gray-200" style={{color:"#dc2626",background:"#fee2e2"}}>يحتاج دعم</th>
+                    <th className="p-1 border border-gray-200"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {IMPACT_AREAS_LIST.map((area, i) => {
+                    const imp = (rec.impact||{})[area] || {level:"", notes:""};
+                    return (
+                      <tr key={area} style={{background:i%2===0?"#fff":"#f9fdf9"}}>
+                        <td className="p-2 text-center font-bold text-gray-500 border border-gray-100">{i+1}</td>
+                        <td className="p-2 font-bold text-gray-700 border border-gray-100">{area}</td>
+                        {["تحسّن ملحوظ","متوسط","يحتاج دعم"].map(level => (
+                          <td key={level} className="p-2 text-center border border-gray-100">
+                            <button onClick={()=>{
+                              const next=[...records];
+                              const cur=(next[idx].impact||{});
+                              next[idx]={...next[idx],impact:{...cur,[area]:{...imp,level:imp.level===level?"":level}}};
+                              save(next);
+                            }} className={"w-5 h-5 rounded-full border-2 mx-auto flex items-center justify-center text-xs font-black "+(imp.level===level?(level==="تحسّن ملحوظ"?"bg-green-500 border-green-500 text-white":level==="متوسط"?"bg-yellow-400 border-yellow-400 text-white":"bg-red-500 border-red-500 text-white"):"border-gray-300 bg-white")}>
+                              {imp.level===level?"✓":""}
+                            </button>
+                          </td>
+                        ))}
+                        <td className="p-1 border border-gray-100">
+                          <input value={imp.notes||""} onChange={e=>{
+                            const next=[...records];
+                            const cur=(next[idx].impact||{});
+                            next[idx]={...next[idx],impact:{...cur,[area]:{...imp,notes:e.target.value}}};
+                            save(next);
+                          }} className="w-full px-2 py-1 rounded-lg border border-gray-100 focus:border-teal-400 focus:outline-none text-xs bg-transparent"/>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        {/* ══ التقارير الدورية ══ */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="px-5 py-3 font-black text-sm text-white flex items-center gap-2"
+            style={{background:"linear-gradient(135deg,#065f46,#0d9488)"}}>
+            <span>📅</span> التقارير الدورية
+          </div>
+          <div className="p-4 space-y-4">
+            {/* التقرير الشهري */}
+            <div className="rounded-xl overflow-hidden border border-gray-200">
+              <div className="px-4 py-2.5 font-black text-sm text-white" style={{background:"#0d9488"}}>◆ التقرير الشهري</div>
+              <div className="p-4 space-y-3" style={{background:"#f9fdf9"}}>
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="text-xs font-black text-gray-600 mb-1 block">الشهر</label>
+                    <input value={(rec.monthlyReport||{}).month||""} onChange={e=>{
+                      const next=[...records];next[idx]={...next[idx],monthlyReport:{...(next[idx].monthlyReport||{}),month:e.target.value}};save(next);
+                    }} placeholder="مثال: محرم" className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 focus:border-teal-400 focus:outline-none text-sm"/>
+                  </div>
+                  <div>
+                    <label className="text-xs font-black text-gray-600 mb-1 block">التاريخ</label>
+                    <input value={(rec.monthlyReport||{}).date||""} onChange={e=>{
+                      const next=[...records];next[idx]={...next[idx],monthlyReport:{...(next[idx].monthlyReport||{}),date:e.target.value}};save(next);
+                    }} placeholder="1446/02/01 هـ" className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 focus:border-teal-400 focus:outline-none text-sm"/>
+                  </div>
+                  <div>
+                    <label className="text-xs font-black text-gray-600 mb-1 block">نسبة الإنجاز %</label>
+                    <input type="number" min="0" max="100" value={(rec.monthlyReport||{}).pct||""} onChange={e=>{
+                      const next=[...records];next[idx]={...next[idx],monthlyReport:{...(next[idx].monthlyReport||{}),pct:e.target.value}};save(next);
+                    }} className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 focus:border-teal-400 focus:outline-none text-sm font-bold"/>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs font-black text-gray-600 mb-1 block">أبرز الأنشطة التطويرية خلال الشهر</label>
+                  <textarea value={(rec.monthlyReport||{}).activities||""} rows={2} onChange={e=>{
+                    const next=[...records];next[idx]={...next[idx],monthlyReport:{...(next[idx].monthlyReport||{}),activities:e.target.value}};save(next);
+                  }} className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 focus:border-teal-400 focus:outline-none text-sm resize-none"/>
+                </div>
+                <div>
+                  <label className="text-xs font-black text-gray-600 mb-1 block">التحديات والمعوّقات</label>
+                  <textarea value={(rec.monthlyReport||{}).challenges||""} rows={2} onChange={e=>{
+                    const next=[...records];next[idx]={...next[idx],monthlyReport:{...(next[idx].monthlyReport||{}),challenges:e.target.value}};save(next);
+                  }} className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 focus:border-teal-400 focus:outline-none text-sm resize-none"/>
+                </div>
+              </div>
+            </div>
+            {/* التقرير الفصلي */}
+            <div className="rounded-xl overflow-hidden border border-gray-200">
+              <div className="px-4 py-2.5 font-black text-sm text-white" style={{background:"#0d9488"}}>◆ التقرير الفصلي</div>
+              <div className="p-4 space-y-3" style={{background:"#f9fdf9"}}>
+                <div className="flex gap-3 items-end flex-wrap">
+                  <div>
+                    <label className="text-xs font-black text-gray-600 mb-1 block">الفصل الدراسي</label>
+                    <div className="flex gap-2">
+                      {["الأول","الثاني"].map(s=>(
+                        <button key={s} onClick={()=>{
+                          const next=[...records];next[idx]={...next[idx],semesterReport:{...(next[idx].semesterReport||{}),semester:s}};save(next);
+                        }} className={"px-4 py-2 rounded-xl text-sm font-black border-2 transition-all "+((rec.semesterReport||{}).semester===s?"border-teal-500 bg-teal-50 text-teal-700":"border-gray-200 text-gray-500")}>
+                          {s}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs font-black text-gray-600 mb-1 block">نسبة الإنجاز %</label>
+                    <input type="number" min="0" max="100" value={(rec.semesterReport||{}).pct||""} onChange={e=>{
+                      const next=[...records];next[idx]={...next[idx],semesterReport:{...(next[idx].semesterReport||{}),pct:e.target.value}};save(next);
+                    }} className="px-3 py-2 rounded-xl border-2 border-gray-200 focus:border-teal-400 focus:outline-none text-sm font-bold" style={{width:100}}/>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs font-black text-gray-600 mb-1 block">ملخّص أبرز الإنجازات التطويرية للفصل</label>
+                  <textarea value={(rec.semesterReport||{}).achievements||""} rows={2} onChange={e=>{
+                    const next=[...records];next[idx]={...next[idx],semesterReport:{...(next[idx].semesterReport||{}),achievements:e.target.value}};save(next);
+                  }} className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 focus:border-teal-400 focus:outline-none text-sm resize-none"/>
+                </div>
+                <div>
+                  <label className="text-xs font-black text-gray-600 mb-1 block">التوصيات للفصل القادم</label>
+                  <textarea value={(rec.semesterReport||{}).recommendations||""} rows={2} onChange={e=>{
+                    const next=[...records];next[idx]={...next[idx],semesterReport:{...(next[idx].semesterReport||{}),recommendations:e.target.value}};save(next);
+                  }} className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 focus:border-teal-400 focus:outline-none text-sm resize-none"/>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ══ تصنيف المعلم ══ */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="px-5 py-3 font-black text-sm text-white flex items-center gap-2"
+            style={{background:"linear-gradient(135deg,#7c3aed,#6d28d9)"}}>
+            <span>⭐</span> تصنيف المعلم
+          </div>
+          <div className="p-5 space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-black text-gray-600 mb-1.5 block">📅 العام الدراسي</label>
+                <input value={rec.academicYear||""} onChange={e=>updRecord(idx,"academicYear",e.target.value)}
+                  placeholder="مثال: 1446 / 1447 هـ"
+                  className="w-full px-3 py-2.5 rounded-xl border-2 border-gray-200 focus:border-purple-400 focus:outline-none text-sm"/>
+              </div>
+              <div>
+                <label className="text-xs font-black text-gray-600 mb-1.5 block">👨‍💼 مدير المدرسة</label>
+                <input value={rec.principalName||""} onChange={e=>updRecord(idx,"principalName",e.target.value)}
+                  placeholder="اسم مدير المدرسة"
+                  className="w-full px-3 py-2.5 rounded-xl border-2 border-gray-200 focus:border-purple-400 focus:outline-none text-sm font-bold"/>
+              </div>
+            </div>
+            <div>
+              <label className="text-xs font-black text-gray-600 mb-2 block">🏆 التصنيف النهائي للمعلم</label>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {[
+                  {val:"ممتاز",    color:"#059669", bg:"#d1fae5", border:"#059669", icon:"🌟"},
+                  {val:"جيد جداً", color:"#0284c7", bg:"#dbeafe", border:"#0284c7", icon:"⭐"},
+                  {val:"جيد",      color:"#d97706", bg:"#fef3c7", border:"#d97706", icon:"✨"},
+                  {val:"متدني",    color:"#dc2626", bg:"#fee2e2", border:"#dc2626", icon:"⚠️"},
+                ].map(opt=>(
+                  <button key={opt.val} onClick={()=>updRecord(idx,"teacherRating",opt.val)}
+                    className="py-4 rounded-2xl font-black text-sm border-2 transition-all flex flex-col items-center gap-1.5"
+                    style={{
+                      background: rec.teacherRating===opt.val ? opt.bg : "#f9fafb",
+                      borderColor: rec.teacherRating===opt.val ? opt.border : "#e5e7eb",
+                      color: rec.teacherRating===opt.val ? opt.color : "#9ca3af",
+                      transform: rec.teacherRating===opt.val ? "scale(1.04)" : "scale(1)",
+                      boxShadow: rec.teacherRating===opt.val ? "0 4px 12px "+opt.color+"40" : "none",
+                    }}>
+                    <span className="text-2xl">{opt.icon}</span>
+                    {opt.val}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* ── أزرار ── */}
         <div className="flex justify-between items-center">
           <button onClick={()=>deleteRecord(idx)}
@@ -22086,6 +22420,12 @@ function ProfessionalLicensePage() {
   }
 
   // ── القائمة الرئيسية ──
+  const RATINGS_LIST = [
+    {val:"ممتاز",    color:"#059669", bg:"#d1fae5", icon:"🌟"},
+    {val:"جيد جداً", color:"#0284c7", bg:"#dbeafe", icon:"⭐"},
+    {val:"جيد",      color:"#d97706", bg:"#fef3c7", icon:"✨"},
+    {val:"متدني",    color:"#dc2626", bg:"#fee2e2", icon:"⚠️"},
+  ];
   const stats = {
     total: records.length,
     hasLicense: records.filter(r=>r.hasLicense===true).length,
@@ -22095,41 +22435,61 @@ function ProfessionalLicensePage() {
 
   return (
     <div dir="rtl" className="max-w-3xl mx-auto px-3 py-4 space-y-4" style={{fontFamily:"'Cairo',sans-serif"}}>
-      {/* ── Header ── */}
-      <div className="rounded-2xl p-5 text-white shadow-xl"
-        style={{background:"linear-gradient(135deg,#1e3a5f,#1d4ed8,#7c3aed)"}}>
-        <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
-          <div className="flex items-center gap-3">
-            <div className="text-4xl">🏅</div>
-            <div>
-              <h2 className="font-black text-xl">الرخصة المهنية للمعلمين</h2>
-              <p className="opacity-70 text-xs">تتبع البرامج التدريبية وحالة الرخصة</p>
-            </div>
+      {/* ── Header المدرسة ── */}
+      <div className="rounded-3xl overflow-hidden shadow-xl">
+        <div className="relative py-8 px-6 text-white text-center" style={{background:"linear-gradient(135deg,#1a3a2a,#064e3b,#0d9488)"}}>
+          <div className="absolute inset-0 overflow-hidden opacity-10">
+            {[...Array(4)].map((_,i)=>(
+              <div key={i} className="absolute rounded-full border-2 border-white"
+                style={{width:(i+2)*70,height:(i+2)*70,top:"50%",left:"50%",transform:"translate(-50%,-50%)"}}/>
+            ))}
           </div>
-          <div className="flex gap-2 flex-wrap">
-            <label className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-black cursor-pointer border border-white/30 bg-white/15 hover:bg-white/25">
-              {importing ? "⏳ جاري..." : "📥 استيراد Excel"}
-              <input type="file" accept=".xlsx,.xls" className="hidden"
-                onChange={e=>{const f=e.target.files?.[0];if(f)handleImportExcel(f);e.target.value="";}} />
-            </label>
-            <button onClick={addManual}
-              className="px-3 py-2 rounded-xl text-xs font-black border border-white/30 bg-white/15 hover:bg-white/25">
-              ➕ إضافة يدوي
-            </button>
+          <div className="relative">
+            <div className="text-5xl mb-2">🏅</div>
+            <div className="font-black text-xl mb-0.5">مدرسة عبيدة بن الحارث المتوسطة</div>
+            <div className="opacity-80 text-sm font-bold">سجل النمو المهني للمعلمين</div>
+            <div className="text-xs opacity-60 italic mt-1">نحو تطوير تربوي ومهني مستدام</div>
           </div>
         </div>
-        <div className="grid grid-cols-4 gap-3">
-          {[
-            {v:stats.total,     l:"إجمالي",      c:"#93c5fd"},
-            {v:stats.hasLicense,l:"حاصل",        c:"#86efac"},
-            {v:stats.noLicense, l:"لم يحصل",     c:"#fca5a5"},
-            {v:stats.pending,   l:"غير محدد",    c:"#fbbf24"},
-          ].map(s=>(
-            <div key={s.l} className="bg-white/15 rounded-xl py-2 text-center">
-              <div className="text-xl font-black" style={{color:s.c}}>{s.v}</div>
-              <div className="text-xs opacity-75">{s.l}</div>
+        <div className="p-4 text-white" style={{background:"linear-gradient(135deg,#1e3a5f,#1d4ed8,#7c3aed)"}}>
+          <div className="flex items-center justify-between flex-wrap gap-3 mb-3">
+            <div className="font-black text-base">👨‍🏫 المعلمون</div>
+            <div className="flex gap-2 flex-wrap">
+              <label className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-black cursor-pointer border border-white/30 bg-white/15 hover:bg-white/25">
+                {importing ? "⏳ جاري..." : "📥 استيراد Excel"}
+                <input type="file" accept=".xlsx,.xls" className="hidden"
+                  onChange={e=>{const f=e.target.files?.[0];if(f)handleImportExcel(f);e.target.value="";}} />
+              </label>
+              <button onClick={addManual}
+                className="px-3 py-2 rounded-xl text-xs font-black border border-white/30 bg-white/15 hover:bg-white/25">
+                ➕ إضافة يدوي
+              </button>
             </div>
-          ))}
+          </div>
+          <div className="grid grid-cols-4 gap-2 mb-3">
+            {[
+              {v:stats.total,     l:"إجمالي",  c:"#93c5fd"},
+              {v:stats.hasLicense,l:"حاصل",    c:"#86efac"},
+              {v:stats.noLicense, l:"لم يحصل", c:"#fca5a5"},
+              {v:stats.pending,   l:"غير محدد",c:"#fbbf24"},
+            ].map(s=>(
+              <div key={s.l} className="bg-white/15 rounded-xl py-2 text-center">
+                <div className="text-xl font-black" style={{color:s.c}}>{s.v}</div>
+                <div className="text-xs opacity-75">{s.l}</div>
+              </div>
+            ))}
+          </div>
+          <div className="bg-white/10 rounded-2xl p-3">
+            <div className="text-xs font-black opacity-70 mb-2">⭐ تصنيف المعلمين</div>
+            <div className="grid grid-cols-4 gap-2">
+              {RATINGS_LIST.map(r=>(
+                <div key={r.val} className="text-center">
+                  <div className="font-black">{r.icon} {records.filter(rec=>rec.teacherRating===r.val).length}</div>
+                  <div className="text-xs opacity-70">{r.val}</div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -22151,6 +22511,7 @@ function ProfessionalLicensePage() {
             const realIdx = records.indexOf(rec);
             const pct = getCompletePct(rec);
             const highNeeds = PROGRAMS.filter(p => rec.programs?.[p.id]?.need === "high");
+            const rating = RATINGS_LIST.find(r=>r.val===rec.teacherRating);
             return (
               <button key={i} onClick={()=>setSelected(realIdx)}
                 className="w-full bg-white rounded-2xl p-4 shadow-sm border border-gray-100 hover:shadow-md hover:border-blue-200 transition-all text-right">
@@ -22160,11 +22521,15 @@ function ProfessionalLicensePage() {
                     {rec.hasLicense===true?"🏅":rec.hasLicense===false?"❌":"⏳"}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
                       <span className="font-black text-sm text-gray-800 truncate">{rec.name}</span>
                       {rec.specialization && (
                         <span className="text-xs px-2 py-0.5 rounded-full font-bold flex-shrink-0"
                           style={{background:"#dbeafe",color:"#1d4ed8"}}>{rec.specialization}</span>
+                      )}
+                      {rating && (
+                        <span className="text-xs px-2 py-0.5 rounded-full font-black flex-shrink-0"
+                          style={{background:rating.bg,color:rating.color}}>{rating.icon} {rating.val}</span>
                       )}
                     </div>
                     <div className="flex items-center gap-3 text-xs text-gray-500">
