@@ -16988,6 +16988,398 @@ function AssessmentPage({ teachers: appTeachers = [] }) {
 // ═══════════════════════════════════════════════════════════
 //  🎯 صفحة قياس أداء المعلمين — التطوير المهني
 // ═══════════════════════════════════════════════════════════
+
+// ══════════════════════════════════════════════════════════════════
+// صفحة تقييم الأداء الوظيفي للمعلمين - مدرسة عبيدة بن الحارث المتوسطة
+// ══════════════════════════════════════════════════════════════════
+
+const EVAL_CRITERIA = [
+  { id: 1, name: "أداء الواجبات الوظيفية", details: "حضوري - المناوبة - الإشراف - الانتظار - النشاط - الإذاعة", weight: 0.1 },
+  { id: 2, name: "التفاعل مع المجتمع المهني", details: "الزيارات الصفية - ملف النمو المهني - مجتمعات التعلم المهني", weight: 0.1 },
+  { id: 3, name: "التفاعل مع أولياء الأمور", details: "الخطة الأسبوعية - إشعار أولياء الأمور - التواصل (المنصة/الجوال)", weight: 0.1 },
+  { id: 4, name: "التنويع في استراتيجيات التدريس", details: "خطة التحضير - أوراق عمل - 5 استراتيجيات كحد أدنى", weight: 0.1 },
+  { id: 5, name: "تحسين نتائج المتعلمين", details: "أنشطة إثرائية للمتميزين - خطط علاجية للمتعثرين", weight: 0.1 },
+  { id: 6, name: "إعداد وتنفيذ خطة التعلم", details: "توزيع المنهج - الخطة الأسبوعية - تحضير الدروس - الواجبات", weight: 0.1 },
+  { id: 7, name: "توظيف تقنيات ووسائل التعلم المناسبة", details: "أوراق تفاعلية - وسائل مساعدة - أجهزة ذكية - منصة مدرستي", weight: 0.1 },
+  { id: 8, name: "تهيئة بيئة تعليمية", details: "انضباط الصف - المعمل - مصادر التعلم - وسائل حسية", weight: 0.05 },
+  { id: 9, name: "الإدارة الصفية", details: "كشف المتابعة - تنويع الأسئلة - توزيع زمن الحصة", weight: 0.05 },
+  { id: 10, name: "تحليل نتائج المتعلمين وتشخيص مستوياتهم", details: "اختبار تشخيصي - أنماط التعلم - تصنيف الطلاب", weight: 0.1 },
+  { id: 11, name: "تنوع أساليب التقويم", details: "اختبارات تحسين - شهرية - مشاركة - أسئلة تمهيد ونهاية", weight: 0.1 },
+];
+
+const EVAL_RATING_LABELS = {
+  1: { label: "غير مرضٍ",       color: "#ef4444", bg: "#fef2f2" },
+  2: { label: "يحتاج تطوير",    color: "#f97316", bg: "#fff7ed" },
+  3: { label: "وافق التوقعات",  color: "#eab308", bg: "#fefce8" },
+  4: { label: "تخطى التوقعات",  color: "#22c55e", bg: "#f0fdf4" },
+  5: { label: "مثالي",          color: "#8b5cf6", bg: "#f5f3ff" },
+};
+
+function getEvalScoreInfo(score) {
+  if (score >= 90) return { label: "مثالي ⭐",            color: "#8b5cf6" };
+  if (score >= 80) return { label: "تخطى التوقعات 🌟",   color: "#22c55e" };
+  if (score >= 70) return { label: "وافق التوقعات ✅",   color: "#eab308" };
+  if (score >= 60) return { label: "يحتاج إلى تطوير ⚠️", color: "#f97316" };
+  return              { label: "غير مرضٍ ❌",             color: "#ef4444" };
+}
+
+function TeacherPerformanceEvalPage() {
+  const FIREBASE_PE_URL = "https://school-faza-default-rtdb.firebaseio.com";
+
+  const [selectedTeacher, setSelectedTeacher] = useState("");
+  const [teacherInfo, setTeacherInfo] = useState({ name:"", jobId:"", major:"", subject:"", stage:"", classes:"", evaluator:"", date:"" });
+  const [ratings, setRatings] = useState({});
+  const [loading, setLoading] = useState(false);
+  const [saving,  setSaving]  = useState(false);
+  const [saved,   setSaved]   = useState(false);
+  const [toast,   setToast]   = useState(null);
+  const [allResults, setAllResults] = useState([]);
+  const [viewMode, setViewMode] = useState("form"); // form | results
+
+  // ─── تحميل كل النتائج ───
+  const loadAllResults = () => {
+    fetch(`${FIREBASE_PE_URL}/school/teacher_eval.json`)
+      .then(r => r.json())
+      .then(data => {
+        if (data) {
+          const arr = Object.values(data).filter(Boolean).sort((a,b) => {
+            const na = parseInt(a.teacherNum?.replace("teacher_","")) || 0;
+            const nb = parseInt(b.teacherNum?.replace("teacher_","")) || 0;
+            return na - nb;
+          });
+          setAllResults(arr);
+        }
+      }).catch(() => {});
+  };
+
+  useEffect(() => { loadAllResults(); }, []);
+
+  // ─── تحميل بيانات المعلم ───
+  useEffect(() => {
+    if (!selectedTeacher) return;
+    setLoading(true);
+    setRatings({});
+    setTeacherInfo({ name:"", jobId:"", major:"", subject:"", stage:"", classes:"", evaluator:"", date:"" });
+    setSaved(false);
+    const key = `teacher_eval/${selectedTeacher}`;
+    fetch(`${FIREBASE_PE_URL}/school/${key}.json`)
+      .then(r => r.json())
+      .then(data => {
+        if (data) { setTeacherInfo(data.info || {}); setRatings(data.ratings || {}); setSaved(true); }
+        else {
+          try { const c = JSON.parse(localStorage.getItem("pe_cache_" + key)); if (c) { setTeacherInfo(c.info||{}); setRatings(c.ratings||{}); setSaved(true); } } catch {}
+        }
+      })
+      .catch(() => {
+        try { const c = JSON.parse(localStorage.getItem("pe_cache_" + key)); if (c) { setTeacherInfo(c.info||{}); setRatings(c.ratings||{}); setSaved(true); } } catch {}
+      })
+      .finally(() => setLoading(false));
+  }, [selectedTeacher]);
+
+  // ─── حساب الدرجات ───
+  const scores = useMemo(() => {
+    let total = 0;
+    const details = {};
+    EVAL_CRITERIA.forEach(c => {
+      const r = ratings[c.id] || 0;
+      const score = r > 0 ? (r / 5) * c.weight * 100 : 0;
+      details[c.id] = { rating: r, score: parseFloat(score.toFixed(2)) };
+      total += score;
+    });
+    return { total: parseFloat(total.toFixed(2)), details };
+  }, [ratings]);
+
+  // ─── حفظ ───
+  const handleSave = async () => {
+    if (!selectedTeacher) { showPEToast("اختر معلماً أولاً", "error"); return; }
+    const missing = EVAL_CRITERIA.filter(c => !ratings[c.id]);
+    if (missing.length) { showPEToast(`يرجى تقييم جميع المعايير (${missing.length} غير مكتمل)`, "warn"); return; }
+    setSaving(true);
+    const key = `teacher_eval/${selectedTeacher}`;
+    const value = { teacherNum: selectedTeacher, info: teacherInfo, ratings, totalScore: scores.total, updatedAt: new Date().toISOString() };
+    try { localStorage.setItem("pe_cache_" + key, JSON.stringify(value)); } catch {}
+    try {
+      const r = await fetch(`${FIREBASE_PE_URL}/school/${key}.json`, { method:"PUT", headers:{"Content-Type":"application/json"}, body: JSON.stringify(value) });
+      if (r.ok) { showPEToast("✅ تم الحفظ بنجاح", "success"); setSaved(true); loadAllResults(); }
+      else throw new Error();
+    } catch { showPEToast("💾 حُفظ محلياً — سيُرسل عند الاتصال", "warn"); setSaved(true); }
+    setSaving(false);
+  };
+
+  function showPEToast(msg, type) { setToast({msg,type}); setTimeout(()=>setToast(null), 4000); }
+
+  const completedCount = EVAL_CRITERIA.filter(c => ratings[c.id]).length;
+  const progressPct   = Math.round((completedCount / EVAL_CRITERIA.length) * 100);
+  const scoreInfo     = getEvalScoreInfo(scores.total);
+
+  const S = {
+    wrap:   { direction:"rtl", fontFamily:"'Cairo','Tajawal',Arial,sans-serif", minHeight:"100vh", background:"linear-gradient(135deg,#0f172a 0%,#1e293b 50%,#0f4c81 100%)", padding:"16px 12px 40px" },
+    card:   { background:"rgba(255,255,255,.07)", backdropFilter:"blur(20px)", border:"1px solid rgba(255,255,255,.13)", borderRadius:16, padding:"18px 20px", marginBottom:14 },
+    h2:     { color:"#93c5fd", fontSize:15, fontWeight:800, margin:"0 0 14px", display:"flex", alignItems:"center", gap:8 },
+    input:  { background:"rgba(255,255,255,.09)", border:"1.5px solid rgba(255,255,255,.15)", borderRadius:10, color:"#fff", padding:"9px 13px", fontSize:13, fontFamily:"inherit", width:"100%", boxSizing:"border-box", outline:"none" },
+    label:  { color:"rgba(255,255,255,.65)", fontSize:11, display:"block", marginBottom:4 },
+  };
+
+  return (
+    <div style={S.wrap}>
+      <style>{`
+        @keyframes peToast{from{opacity:0;transform:translateY(-12px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes peSpin{to{transform:rotate(360deg)}}
+        .pe-input:focus{border-color:rgba(99,179,237,.7)!important;background:rgba(255,255,255,.13)!important}
+        .pe-input::placeholder{color:rgba(255,255,255,.38)}
+        .pe-input option{background:#1e293b;color:#fff}
+        .pe-rbtn{transition:all .18s;cursor:pointer;border:2px solid transparent;border-radius:10px}
+        .pe-rbtn:hover{transform:scale(1.09)}
+        .pe-rbtn.active{transform:scale(1.12);border-color:currentColor}
+        .pe-savebtn{background:linear-gradient(135deg,#3b82f6,#6366f1);color:#fff;border:none;padding:13px 38px;border-radius:12px;font-size:15px;font-weight:800;font-family:inherit;cursor:pointer;transition:all .2s;box-shadow:0 4px 20px rgba(99,102,241,.4)}
+        .pe-savebtn:hover{transform:translateY(-2px);box-shadow:0 8px 28px rgba(99,102,241,.5)}
+        .pe-savebtn:disabled{opacity:.55;cursor:not-allowed;transform:none}
+        .pe-tab{padding:8px 20px;border-radius:999px;font-size:13px;font-weight:800;font-family:inherit;cursor:pointer;border:none;transition:all .2s}
+      `}</style>
+
+      {/* Toast */}
+      {toast && <div style={{ position:"fixed", top:18, right:18, zIndex:9999, background: toast.type==="success"?"#22c55e":toast.type==="warn"?"#f97316":"#ef4444", color:"#fff", padding:"13px 22px", borderRadius:12, boxShadow:"0 8px 28px rgba(0,0,0,.45)", fontSize:14, fontWeight:700, animation:"peToast .3s ease" }}>{toast.msg}</div>}
+
+      {/* هيدر */}
+      <div style={{ textAlign:"center", marginBottom:22 }}>
+        <div style={{ display:"inline-block", background:"rgba(59,130,246,.25)", border:"1px solid rgba(99,130,246,.3)", borderRadius:20, padding:"5px 18px", marginBottom:10 }}>
+          <span style={{ color:"#93c5fd", fontSize:12, fontWeight:700 }}>وزارة التعليم | مدرسة عبيدة بن الحارث المتوسطة</span>
+        </div>
+        <h1 style={{ color:"#fff", fontSize:"clamp(18px,3.5vw,26px)", fontWeight:900, margin:"0 0 5px", textShadow:"0 2px 10px rgba(0,0,0,.5)" }}>📋 تقييم الأداء الوظيفي للمعلم</h1>
+        <p style={{ color:"rgba(255,255,255,.55)", fontSize:13, margin:0 }}>استمارة التقييم الرسمية وفق معايير وزارة التعليم</p>
+      </div>
+
+      {/* تبويبات */}
+      <div style={{ textAlign:"center", marginBottom:18, display:"flex", gap:8, justifyContent:"center", flexWrap:"wrap" }}>
+        {[{id:"form",label:"📝 تقييم معلم"},{id:"results",label:"📊 جميع النتائج"}].map(t=>(
+          <button key={t.id} className="pe-tab"
+            style={{ background: viewMode===t.id?"linear-gradient(135deg,#3b82f6,#6366f1)":"rgba(255,255,255,.1)", color: viewMode===t.id?"#fff":"rgba(255,255,255,.7)" }}
+            onClick={()=>{ setViewMode(t.id); if(t.id==="results") loadAllResults(); }}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* ══ عرض النتائج ══ */}
+      {viewMode === "results" && (
+        <div style={{ maxWidth:900, margin:"0 auto" }}>
+          {allResults.length === 0 ? (
+            <div style={S.card}><p style={{ color:"rgba(255,255,255,.5)", textAlign:"center", padding:30 }}>لا توجد تقييمات محفوظة بعد</p></div>
+          ) : (
+            <>
+              <div style={{ ...S.card, marginBottom:16 }}>
+                <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))", gap:10 }}>
+                  {[{l:"إجمالي المقيَّمين",v:allResults.length,c:"#93c5fd"},
+                    {l:"المتوسط العام",v:(allResults.reduce((s,r)=>s+(r.totalScore||0),0)/allResults.length).toFixed(1)+"%",c:"#4ade80"},
+                    {l:"مثالي (≥90)",v:allResults.filter(r=>(r.totalScore||0)>=90).length,c:"#a78bfa"},
+                    {l:"يحتاج تطوير (<70)",v:allResults.filter(r=>(r.totalScore||0)<70).length,c:"#f97316"},
+                  ].map((s,i)=>(
+                    <div key={i} style={{ background:"rgba(255,255,255,.06)", borderRadius:12, padding:"12px 14px", textAlign:"center" }}>
+                      <div style={{ color:s.c, fontSize:22, fontWeight:900 }}>{s.v}</div>
+                      <div style={{ color:"rgba(255,255,255,.55)", fontSize:11, marginTop:2 }}>{s.l}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div style={S.card}>
+                <table style={{ width:"100%", borderCollapse:"collapse", fontSize:13 }}>
+                  <thead>
+                    <tr style={{ borderBottom:"1px solid rgba(255,255,255,.1)" }}>
+                      {["المعلم","الاسم","المادة","المُقيِّم","الدرجة","التقدير"].map(h=>(
+                        <th key={h} style={{ padding:"10px 8px", color:"rgba(255,255,255,.6)", fontWeight:700, textAlign:"right" }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {allResults.map((r,i)=>{
+                      const num = parseInt(r.teacherNum?.replace("teacher_","")) || i+1;
+                      const score = r.totalScore || 0;
+                      const si = getEvalScoreInfo(score);
+                      return (
+                        <tr key={i} style={{ borderBottom:"1px solid rgba(255,255,255,.06)", cursor:"pointer" }}
+                          onClick={()=>{ setSelectedTeacher(r.teacherNum); setViewMode("form"); }}>
+                          <td style={{ padding:"10px 8px", color:"#93c5fd", fontWeight:800 }}>معلم {num}</td>
+                          <td style={{ padding:"10px 8px", color:"#e2e8f0" }}>{r.info?.name||"—"}</td>
+                          <td style={{ padding:"10px 8px", color:"rgba(255,255,255,.6)" }}>{r.info?.subject||"—"}</td>
+                          <td style={{ padding:"10px 8px", color:"rgba(255,255,255,.6)" }}>{r.info?.evaluator||"—"}</td>
+                          <td style={{ padding:"10px 8px" }}>
+                            <span style={{ color:si.color, fontWeight:900, fontSize:15 }}>{score.toFixed(1)}</span>
+                            <span style={{ color:"rgba(255,255,255,.4)", fontSize:11 }}>/100</span>
+                          </td>
+                          <td style={{ padding:"10px 8px" }}>
+                            <span style={{ background:`${si.color}22`, color:si.color, padding:"3px 10px", borderRadius:20, fontSize:11, fontWeight:700 }}>{si.label}</span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ══ نموذج التقييم ══ */}
+      {viewMode === "form" && (
+        <>
+          {/* اختيار المعلم */}
+          <div style={{ ...S.card, maxWidth:900, margin:"0 auto 14px" }}>
+            <h2 style={S.h2}><span>👤</span> اختيار المعلم</h2>
+            <select className="pe-input" style={{ ...S.input, fontSize:14, fontWeight:700 }}
+              value={selectedTeacher} onChange={e=>{ setSelectedTeacher(e.target.value); setSaved(false); }}>
+              <option value="">-- اختر المعلم من القائمة --</option>
+              {Array.from({length:33},(_,i)=>(
+                <option key={i+1} value={`teacher_${String(i+1).padStart(2,"0")}`}>المعلم {i+1} / 33</option>
+              ))}
+            </select>
+          </div>
+
+          {selectedTeacher && (
+            <>
+              {loading ? (
+                <div style={{ textAlign:"center", padding:50 }}>
+                  <div style={{ width:44,height:44,border:"4px solid rgba(99,130,246,.3)",borderTop:"4px solid #6366f1",borderRadius:"50%",animation:"peSpin 1s linear infinite",margin:"0 auto 14px" }}/>
+                  <p style={{ color:"rgba(255,255,255,.6)" }}>جاري التحميل...</p>
+                </div>
+              ) : (
+                <>
+                  {/* بيانات المعلم */}
+                  <div style={{ ...S.card, maxWidth:900, margin:"0 auto 14px" }}>
+                    <h2 style={S.h2}><span>📝</span> بيانات المعلم</h2>
+                    <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(195px,1fr))", gap:11 }}>
+                      {[
+                        {k:"name",      l:"اسم المعلم",             p:"الاسم الثلاثي"},
+                        {k:"jobId",     l:"الرقم الوظيفي",          p:"مثال: 1234567890"},
+                        {k:"major",     l:"التخصص",                 p:"مثال: رياضيات"},
+                        {k:"subject",   l:"المادة",                 p:"مثال: رياضيات"},
+                        {k:"stage",     l:"المرحلة الدراسية",       p:"متوسطة"},
+                        {k:"classes",   l:"الصفوف التي يدرّسها",    p:"مثال: أول أ، ب"},
+                        {k:"evaluator", l:"اسم المُقيِّم",          p:"الاسم"},
+                        {k:"date",      l:"تاريخ التقييم",          p:"", t:"date"},
+                      ].map(f=>(
+                        <div key={f.k}>
+                          <label style={S.label}>{f.l}</label>
+                          <input className="pe-input" type={f.t||"text"} placeholder={f.p}
+                            style={S.input} value={teacherInfo[f.k]||""}
+                            onChange={e=>setTeacherInfo(p=>({...p,[f.k]:e.target.value}))} />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* شريط التقدم */}
+                  <div style={{ ...S.card, maxWidth:900, margin:"0 auto 14px" }}>
+                    <div style={{ display:"flex", justifyContent:"space-between", marginBottom:8 }}>
+                      <span style={{ color:"rgba(255,255,255,.7)", fontSize:13 }}>
+                        تم تقييم <strong style={{color:"#93c5fd"}}>{completedCount}</strong> / {EVAL_CRITERIA.length} معياراً
+                      </span>
+                      <span style={{ color:"rgba(255,255,255,.7)", fontSize:13, fontWeight:800 }}>{progressPct}%</span>
+                    </div>
+                    <div style={{ background:"rgba(255,255,255,.1)", borderRadius:8, height:9, overflow:"hidden" }}>
+                      <div style={{ width:`${progressPct}%`, height:"100%", background:"linear-gradient(90deg,#3b82f6,#8b5cf6)", transition:"width .4s ease" }}/>
+                    </div>
+                  </div>
+
+                  {/* معايير التقييم */}
+                  <div style={{ maxWidth:900, margin:"0 auto" }}>
+                    {EVAL_CRITERIA.map((c,idx)=>{
+                      const r   = ratings[c.id] || 0;
+                      const s   = scores.details[c.id]?.score || 0;
+                      const ri  = r ? EVAL_RATING_LABELS[r] : null;
+                      const brd = r ? `rgba(${r===5?"139,92,246":r>=4?"34,197,94":r>=3?"234,179,8":r>=2?"249,115,22":"239,68,68"},.35)` : "rgba(255,255,255,.13)";
+                      return (
+                        <div key={c.id} style={{ ...S.card, borderColor:brd }}>
+                          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:12, flexWrap:"wrap" }}>
+                            <div style={{ flex:1, minWidth:180 }}>
+                              <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:4 }}>
+                                <span style={{ background:"rgba(99,130,246,.3)", color:"#93c5fd", width:25, height:25, borderRadius:7, display:"flex", alignItems:"center", justifyContent:"center", fontSize:11, fontWeight:800, flexShrink:0 }}>{idx+1}</span>
+                                <h3 style={{ color:"#e2e8f0", fontSize:13, fontWeight:800, margin:0 }}>{c.name}</h3>
+                              </div>
+                              <p style={{ color:"rgba(255,255,255,.4)", fontSize:11, margin:"3px 0 0 33px", lineHeight:1.5 }}>{c.details}</p>
+                              <span style={{ display:"inline-block", marginTop:5, marginRight:33, background:"rgba(59,130,246,.18)", color:"#93c5fd", padding:"2px 8px", borderRadius:6, fontSize:10, fontWeight:700 }}>الوزن: {c.weight*100}%</span>
+                            </div>
+                            <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:5 }}>
+                              <div style={{ display:"flex", gap:5 }}>
+                                {[1,2,3,4,5].map(v=>{
+                                  const info = EVAL_RATING_LABELS[v];
+                                  const isA  = r === v;
+                                  return (
+                                    <button key={v} className={`pe-rbtn${isA?" active":""}`}
+                                      onClick={()=>setRatings(p=>({...p,[c.id]:v}))}
+                                      style={{ width:42, height:42, fontSize:16, fontWeight:800, background:isA?info.bg:"rgba(255,255,255,.08)", color:isA?info.color:"rgba(255,255,255,.45)", borderColor:isA?info.color:"transparent" }}>
+                                      {v}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                              {ri && (
+                                <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                                  <span style={{ fontSize:11, color:"rgba(255,255,255,.45)" }}>الناتج: <strong style={{color:"#93c5fd"}}>{s.toFixed(2)}</strong></span>
+                                  <span style={{ background:ri.bg, color:ri.color, padding:"2px 8px", borderRadius:6, fontSize:11, fontWeight:700 }}>{ri.label}</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* النتيجة الإجمالية */}
+                  {completedCount > 0 && (
+                    <div style={{ ...S.card, maxWidth:900, margin:"14px auto", textAlign:"center", background: scores.total>=70?"rgba(34,197,94,.07)":"rgba(239,68,68,.07)" }}>
+                      <p style={{ color:"rgba(255,255,255,.6)", fontSize:12, margin:"0 0 6px" }}>المجموع الإجمالي</p>
+                      <div style={{ fontSize:"clamp(44px,7vw,68px)", fontWeight:900, color:"#fff", textShadow:`0 0 25px ${scoreInfo.color}50` }}>
+                        {scores.total.toFixed(1)}<span style={{ fontSize:20, color:"rgba(255,255,255,.4)", fontWeight:500 }}>/100</span>
+                      </div>
+                      <div style={{ display:"inline-block", background:`${scoreInfo.color}20`, border:`1.5px solid ${scoreInfo.color}50`, color:scoreInfo.color, padding:"7px 24px", borderRadius:40, marginTop:10, fontSize:16, fontWeight:800 }}>{scoreInfo.label}</div>
+                      {/* تفصيل */}
+                      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(175px,1fr))", gap:7, marginTop:16, textAlign:"right" }}>
+                        {EVAL_CRITERIA.map(c=>{
+                          const d = scores.details[c.id];
+                          if (!d?.rating) return null;
+                          return (
+                            <div key={c.id} style={{ background:"rgba(255,255,255,.05)", borderRadius:8, padding:"7px 11px", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                              <span style={{ color:"rgba(255,255,255,.55)", fontSize:11 }}>{c.name}</span>
+                              <span style={{ color:"#93c5fd", fontWeight:800, fontSize:13 }}>{d.score.toFixed(2)}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* زر الحفظ */}
+                  <div style={{ maxWidth:900, margin:"14px auto", textAlign:"center" }}>
+                    <button className="pe-savebtn" onClick={handleSave} disabled={saving}>
+                      {saving ? "⏳ جاري الحفظ..." : saved ? "✅ حفظ التغييرات" : "💾 حفظ التقييم"}
+                    </button>
+                  </div>
+                </>
+              )}
+            </>
+          )}
+
+          {/* سلم التقدير */}
+          <div style={{ ...S.card, maxWidth:900, margin:"14px auto 0" }}>
+            <h3 style={{ color:"rgba(255,255,255,.6)", fontSize:12, fontWeight:800, margin:"0 0 10px" }}>📊 سلم التقدير</h3>
+            <div style={{ display:"flex", gap:7, flexWrap:"wrap" }}>
+              {Object.entries(EVAL_RATING_LABELS).reverse().map(([v,info])=>(
+                <div key={v} style={{ background:info.bg, border:`1.5px solid ${info.color}40`, borderRadius:8, padding:"5px 13px", display:"flex", gap:6, alignItems:"center" }}>
+                  <span style={{ color:info.color, fontWeight:900, fontSize:15 }}>{v}</span>
+                  <span style={{ color:"#374151", fontSize:11, fontWeight:700 }}>{info.label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+
 function TeacherEvalPage({ teachers = [] }) {
   const LS_KEY  = "teacher_eval_records_v2";
   const loadLS  = () => { try { const v = localStorage.getItem(LS_KEY); return v ? JSON.parse(v) : []; } catch { return []; } };
@@ -25896,7 +26288,7 @@ export default function SchoolWebsite() {
       if (hash.startsWith("ann-")) { setDirectAnnId(hash.replace("ann-","")); return; }
       setDirectAnnId(null);
       if (hash === "teacherportal") { setTeacherProfilePortal(true); return; }
-      if (["home","attendance","announcements","activities","settings","students","messages","surveys","qiyas","sms","report","gradeanalysis","monthlyreport","absencestats","attendancereport","student-absence","strategies","gallery","certificates","poll","raffle","broadcast","quiz","luckywheel","timetable","honorboard","dailyquiz","aiteacher","lessonprep","lessonrecommend","officialforms","meetings","committeemeeting","teachereval","assessment","studentexcuses","perfresults","teacherreports","suggestions","dailyattend"].includes(hash)) { setTeacherProfilePortal(false); setPage(hash); }
+      if (["home","attendance","announcements","activities","settings","students","messages","surveys","qiyas","sms","report","gradeanalysis","monthlyreport","absencestats","attendancereport","student-absence","strategies","gallery","certificates","poll","raffle","broadcast","quiz","luckywheel","timetable","honorboard","dailyquiz","aiteacher","lessonprep","lessonrecommend","officialforms","meetings","committeemeeting","teachereval","perfeval","assessment","studentexcuses","perfresults","teacherreports","suggestions","dailyattend"].includes(hash)) { setTeacherProfilePortal(false); setPage(hash); }
     };
     window.addEventListener("hashchange", h); h();
     return () => window.removeEventListener("hashchange", h);
@@ -26196,6 +26588,7 @@ export default function SchoolWebsite() {
     { id: "meetings",       label: "الاجتماعات",           icon: "🤝" },
     { id: "committeemeeting",label: "اجتماعات اللجان",     icon: "👔" },
     { id: "teachereval",    label: "قياس أداء المعلم",     icon: "🎖️" },
+    { id: "perfeval",       label: "تقييم الأداء الوظيفي", icon: "📋" },
     { id: "suggestions",    label: "آراء ومقترحات",        icon: "💬" },
     { id: "prolicense",     label: "الرخصة المهنية",         icon: "🏅" },
     { id: "teacherreports", label: "ملفات المعلمين",       icon: "🗄️" },
@@ -26500,6 +26893,7 @@ export default function SchoolWebsite() {
                 {page === "lessonprep"     && <LessonPrepPage />}
                 {page === "lessonrecommend"&& <LessonRecommendPage classList={classList} />}
                 {page === "teachereval"    && <TeacherEvalPage teachers={teachers} />}
+                {page === "perfeval"       && <TeacherPerformanceEvalPage />}
         {page === "perfresults"    && <PerfResultsAdminPage />}
         {page === "suggestions"    && <SuggestionsAdminPage />}
         {page === "prolicense"     && <ProfessionalLicensePage />}
@@ -26734,6 +27128,7 @@ export default function SchoolWebsite() {
         {page === "lessonprep"     && <LessonPrepPage />}
         {page === "lessonrecommend"&& <LessonRecommendPage classList={classList} />}
         {page === "teachereval"    && <TeacherEvalPage teachers={teachers} />}
+                {page === "perfeval"       && <TeacherPerformanceEvalPage />}
         {page === "perfresults"    && <PerfResultsAdminPage />}
         {page === "suggestions"    && <SuggestionsAdminPage />}
         {page === "prolicense"     && <ProfessionalLicensePage />}
