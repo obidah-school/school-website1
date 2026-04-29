@@ -11482,7 +11482,7 @@ function AnnouncementsPage({ announcements, setAnnouncements, saveAnnouncements,
             </div>
 
             {/* المحتوى — textarea بسيط في الجوال */}
-            <textarea placeholder="محتوى الإعلان..." value={newAnn.content.replace(/<[^>]*>/g,'')}
+            <textarea placeholder="محتوى الإعلان..." value={newAnn.content.replace(/<[^>]*>/g,"")}
               onChange={e => setNewAnn(p=>({...p,content:e.target.value}))}
               rows={4}
               style={{ width:"100%", padding:"10px 12px", borderRadius:10, border:"2px solid #e2e8f0",
@@ -11564,7 +11564,7 @@ function AnnouncementsPage({ announcements, setAnnouncements, saveAnnouncements,
                     <div style={{ fontSize:12, fontWeight:800, color:"#0d9488", marginBottom:8 }}>✏️ تعديل الإعلان</div>
                     <input value={editAnn.title} onChange={e=>setEditAnn(p=>({...p,title:e.target.value}))}
                       style={{ width:"100%", padding:"8px 10px", borderRadius:10, border:"2px solid #0d9488", fontSize:14, fontWeight:800, color:editAnn.titleColor||"#1f2937", fontFamily:"'Cairo',sans-serif", boxSizing:"border-box", outline:"none", marginBottom:8 }} />
-                    <textarea value={editAnn.content.replace(/<[^>]*>/g,'')}
+                    <textarea value={editAnn.content.replace(/<[^>]*>/g,"")}
                       onChange={e=>setEditAnn(p=>({...p,content:e.target.value}))} rows={3}
                       style={{ width:"100%", padding:"8px 10px", borderRadius:10, border:"1.5px solid #e2e8f0", fontSize:12, resize:"vertical", fontFamily:"'Cairo',sans-serif", boxSizing:"border-box", outline:"none", marginBottom:8, lineHeight:1.8 }} />
                     <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:6, marginBottom:8 }}>
